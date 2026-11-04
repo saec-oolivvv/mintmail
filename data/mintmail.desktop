@@ -1,0 +1,12 @@
+[Desktop Entry]
+Type=Application
+Name=MintMail
+GenericName=Client de messagerie
+Comment=Client mail moderne : boîte intelligente, reports, envoi annulable
+Exec=@EXEC@ %U
+Icon=mintmail
+Terminal=false
+Categories=Network;Email;
+MimeType=x-scheme-handler/mailto;
+StartupNotify=true
+StartupWMClass=mintmail

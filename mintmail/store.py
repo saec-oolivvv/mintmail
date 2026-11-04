@@ -1,0 +1,274 @@
+import copy
+import json
+import os
+import sqlite3
+import threading
+import time
+from pathlib import Path
+
+from .models import Message, Outgoing
+
+APP = "mintmail"
+CONFIG_DIR = Path(os.environ.get("XDG_CONFIG_HOME", str(Path.home() / ".config"))) / APP
+DATA_DIR = Path(os.environ.get("XDG_DATA_HOME", str(Path.home() / ".local" / "share"))) / APP
+
+DEFAULTS = {
+    "accounts": [], "passwords": {}, "theme": "system", "accent": "#3b82f6",
+    "density": "comfortable", "load_images": False, "notifications": True,
+    "refresh_minutes": 5, "undo_seconds": 6, "width": 1280, "height": 800,
+    "last_view": "inbox",
+}
+
+
+class Config:
+    def __init__(self, path=None):
+        self.path = Path(path) if path else CONFIG_DIR / "config.json"
+        self.data = copy.deepcopy(DEFAULTS)
+        self.load()
+
+    def load(self):
+        try:
+            with open(self.path, encoding="utf-8") as f:
+                self.data.update(json.load(f))
+        except (OSError, ValueError):
+            pass
+
+    def save(self):
+        self.path.parent.mkdir(parents=True, exist_ok=True)
+        tmp = str(self.path) + ".tmp"
+        with open(tmp, "w", encoding="utf-8") as f:
+            json.dump(self.data, f, indent=2, ensure_ascii=False)
+        os.chmod(tmp, 0o600)
+        os.replace(tmp, self.path)
+
+    def __getitem__(self, k):
+        return self.data[k]
+
+    def __setitem__(self, k, v):
+        self.data[k] = v
+
+    def get(self, k, d=None):
+        return self.data.get(k, d)
+
+    # -- mots de passe : trousseau système si disponible, sinon fichier 0600
+    def password(self, account_id):
+        try:
+            import keyring
+            pw = keyring.get_password(APP, account_id)
+            if pw:
+                return pw
+        except Exception:
+            pass
+        return self.data.get("passwords", {}).get(account_id, "")
+
+    def set_password(self, account_id, pw):
+        try:
+            import keyring
+            keyring.set_password(APP, account_id, pw)
+            self.data.get("passwords", {}).pop(account_id, None)
+            return
+        except Exception:
+            pass
+        self.data.setdefault("passwords", {})[account_id] = pw
+
+
+def parse_search(q):
+    terms, flt = [], {}
+    for tok in (q or "").split():
+        low = tok.lower()
+        if low.startswith("from:") and len(tok) > 5:
+            flt["from"] = low[5:]
+        elif low == "is:unread":
+            flt["unread"] = True
+        elif low == "is:starred":
+            flt["starred"] = True
+        elif low == "has:attachment":
+            flt["att"] = True
+        else:
+            terms.append(low)
+    return terms, flt
+
+
+class Cache:
+    def __init__(self, path=None):
+        DATA_DIR.mkdir(parents=True, exist_ok=True)
+        if not Path(str(path or DATA_DIR / "cache.db")).exists():
+            try:
+                (DATA_DIR / "demo_seeded").unlink()
+            except OSError:
+                pass
+        self.lock = threading.RLock()
+        self.db = sqlite3.connect(str(path or DATA_DIR / "cache.db"), check_same_thread=False)
+        with self.lock:
+            self.db.execute("""CREATE TABLE IF NOT EXISTS messages (
+                id TEXT PRIMARY KEY, account TEXT, folder TEXT, uid INTEGER, date REAL,
+                unread INTEGER, starred INTEGER, pinned INTEGER, snoozed REAL,
+                has_att INTEGER, category TEXT, sender TEXT, search TEXT, data TEXT)""")
+            self.db.execute("CREATE INDEX IF NOT EXISTS i_msg ON messages(account, folder, date)")
+            self.db.execute("""CREATE TABLE IF NOT EXISTS outbox (
+                id TEXT PRIMARY KEY, send_at REAL, data TEXT)""")
+            self.db.commit()
+
+    # -- messages
+    def upsert(self, m, commit=True):
+        sender = ("%s %s" % (m.sender_name, m.sender_email)).lower()
+        search = ("%s %s %s %s" % (m.subject, sender, m.to, m.text[:4000])).lower()
+        with self.lock:
+            self.db.execute(
+                "INSERT OR REPLACE INTO messages VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                (m.id, m.account, m.folder, m.uid, m.date, int(m.unread), int(m.starred),
+                 int(m.pinned), m.snoozed_until, int(bool(m.attachments)), m.category,
+                 sender, search, json.dumps(m.to_dict(), ensure_ascii=False)))
+            if commit:
+                self.db.commit()
+
+    def upsert_many(self, msgs):
+        for m in msgs:
+            self.upsert(m, commit=False)
+        with self.lock:
+            self.db.commit()
+
+    def get(self, mid):
+        with self.lock:
+            r = self.db.execute("SELECT data FROM messages WHERE id=?", (mid,)).fetchone()
+        return Message.from_dict(json.loads(r[0])) if r else None
+
+    def update(self, mid, **fields):
+        m = self.get(mid)
+        if not m:
+            return None
+        for k, v in fields.items():
+            setattr(m, k, v)
+        self.upsert(m)
+        return m
+
+    def delete(self, mid):
+        with self.lock:
+            self.db.execute("DELETE FROM messages WHERE id=?", (mid,))
+            self.db.commit()
+
+    def delete_account(self, account):
+        with self.lock:
+            self.db.execute("DELETE FROM messages WHERE account=?", (account,))
+            self.db.commit()
+
+    def uids(self, account, folder):
+        with self.lock:
+            rows = self.db.execute(
+                "SELECT uid, id FROM messages WHERE account=? AND folder=? AND uid>0",
+                (account, folder)).fetchall()
+        return {u: i for u, i in rows}
+
+    def query(self, view="inbox", account="all", category=None, unread_only=False,
+              attachments_only=False, search="", limit=400):
+        now = time.time()
+        where, args = [], []
+        if account != "all":
+            where.append("account=?")
+            args.append(account)
+        terms, flt = parse_search(search)
+        if terms or flt:
+            where.append("folder NOT IN ('trash','spam')")
+            for t in terms:
+                where.append("search LIKE ?")
+                args.append("%" + t + "%")
+            if "from" in flt:
+                where.append("sender LIKE ?")
+                args.append("%" + flt["from"] + "%")
+            if flt.get("unread"):
+                where.append("unread=1")
+            if flt.get("starred"):
+                where.append("starred=1")
+            if flt.get("att"):
+                where.append("has_att=1")
+        elif view == "inbox":
+            where.append("folder='inbox' AND snoozed<=?")
+            args.append(now)
+        elif view == "unread":
+            where.append("unread=1 AND folder='inbox' AND snoozed<=?")
+            args.append(now)
+        elif view == "starred":
+            where.append("starred=1 AND folder NOT IN ('trash','spam')")
+        elif view == "pinned":
+            where.append("pinned=1 AND folder NOT IN ('trash','spam')")
+        elif view == "snoozed":
+            where.append("snoozed>? AND folder NOT IN ('trash','spam')")
+            args.append(now)
+        else:
+            where.append("folder=?")
+            args.append(view)
+        if category:
+            where.append("category=?")
+            args.append(category)
+        if unread_only:
+            where.append("unread=1")
+        if attachments_only:
+            where.append("has_att=1")
+        sql = "SELECT data FROM messages WHERE " + " AND ".join(where) + \
+              " ORDER BY date DESC LIMIT ?"
+        with self.lock:
+            rows = self.db.execute(sql, args + [limit]).fetchall()
+        return [Message.from_dict(json.loads(r[0])) for r in rows]
+
+    def counts(self, account="all"):
+        acc = "" if account == "all" else " AND account=?"
+        a = [] if account == "all" else [account]
+        now = time.time()
+        with self.lock:
+            q = lambda s, x: self.db.execute(s, x).fetchone()[0]
+            return {
+                "inbox": q("SELECT COUNT(*) FROM messages WHERE folder='inbox' AND unread=1 AND snoozed<=?" + acc, [now] + a),
+                "drafts": q("SELECT COUNT(*) FROM messages WHERE folder='drafts'" + acc, a),
+                "snoozed": q("SELECT COUNT(*) FROM messages WHERE snoozed>?" + acc, [now] + a),
+            }
+
+    def wake_snoozed(self):
+        now = time.time()
+        with self.lock:
+            rows = self.db.execute(
+                "SELECT data FROM messages WHERE snoozed>0 AND snoozed<=?", (now,)).fetchall()
+        woken = []
+        for (d,) in rows:
+            m = Message.from_dict(json.loads(d))
+            m.snoozed_until, m.unread = 0.0, True
+            self.upsert(m)
+            woken.append(m)
+        return woken
+
+    def contacts(self, limit=300):
+        with self.lock:
+            rows = self.db.execute(
+                "SELECT data FROM messages WHERE folder IN ('inbox','sent','archive') "
+                "ORDER BY date DESC LIMIT 1500").fetchall()
+        seen, out = set(), []
+        for (d,) in rows:
+            m = json.loads(d)
+            for e in (m.get("sender_email"),):
+                if e and e not in seen:
+                    seen.add(e)
+                    out.append((m.get("sender_name") or "", e))
+            if len(out) >= limit:
+                break
+        return out
+
+    # -- boîte d'envoi (envoi différé / annulable)
+    def outbox_add(self, oid, send_at, out):
+        with self.lock:
+            self.db.execute("INSERT OR REPLACE INTO outbox VALUES (?,?,?)",
+                            (oid, send_at, json.dumps(out.to_dict(), ensure_ascii=False)))
+            self.db.commit()
+
+    def outbox_due(self):
+        with self.lock:
+            rows = self.db.execute("SELECT id, data FROM outbox WHERE send_at<=?",
+                                   (time.time(),)).fetchall()
+        return [(i, Outgoing.from_dict(json.loads(d))) for i, d in rows]
+
+    def outbox_remove(self, oid):
+        with self.lock:
+            self.db.execute("DELETE FROM outbox WHERE id=?", (oid,))
+            self.db.commit()
+
+    def outbox_count(self):
+        with self.lock:
+            return self.db.execute("SELECT COUNT(*) FROM outbox").fetchone()[0]
