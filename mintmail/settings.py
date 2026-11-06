@@ -9,6 +9,7 @@ from gi.repository import Gtk, Gdk, GLib
 from .backend import PRESETS, make_backend, new_account_id
 from .reader import WebKit2, HAS_WEBKIT
 from .settings_extra import gestures_page, filters_page, templates_page
+from .widgets import icon
 
 SHORTCUTS = [
     ("C", "Nouveau message"), ("R", "Répondre"), ("A", "Répondre à tous"), ("F", "Transférer"),
@@ -16,7 +17,7 @@ SHORTCUTS = [
     ("U", "Marquer lu / non lu"), ("H", "Reporter à demain 8 h"), ("J / K", "Message suivant / précédent"),
     ("/  ou  Ctrl+F", "Rechercher"), ("Ctrl+K", "Palette de commandes"), ("Ctrl+A", "Tout sélectionner"),
     ("!", "Signaler comme spam"), ("\\", "Basculer colonnes / liste seule"), ("X", "Mode sélection"),
-    ("Ctrl+R", "Actualiser"), ("Échap", "Annuler la sélection / la recherche"),
+    ("Ctrl+,", "Ouvrir les paramètres"), ("Ctrl+R", "Actualiser"), ("Échap", "Annuler la sélection / la recherche"),
 ]
 SIG_TEMPLATE = ('<p><b>Prénom Nom</b><br>Fonction — Société<br>'
                 '📞 +32 000 00 00 00 · ✉ vous@exemple.be<br>'
@@ -31,13 +32,31 @@ def _row(grid, i, label, widget):
     grid.attach(widget, 1, i, 1, 1)
 
 
-class SettingsWindow(Gtk.Window):
+class SettingsPage(Gtk.Box):
+    """Page des paramètres, affichée dans la fenêtre principale (retour : bouton, Échap)."""
+
     def __init__(self, win, page=None):
-        super().__init__(title="Paramètres de MintMail")
+        super().__init__(orientation=Gtk.Orientation.VERTICAL)
         self.win, self.cfg = win, win.config
-        self.set_transient_for(win)
-        self.set_default_size(900, 600)
+        self.get_style_context().add_class("settings-page")
         self.current = None
+        top = Gtk.Box(spacing=12)
+        top.set_border_width(12)
+        back = Gtk.Button()
+        bb = Gtk.Box(spacing=6)
+        bb.pack_start(icon("go-previous-symbolic"), False, False, 0)
+        bb.pack_start(Gtk.Label(label="Retour"), False, False, 0)
+        back.add(bb)
+        back.get_style_context().add_class("pill")
+        back.connect("clicked", lambda *_: self.win.close_settings())
+        ttl = Gtk.Label(label="Paramètres", xalign=0)
+        ttl.get_style_context().add_class("list-title")
+        top.pack_start(back, False, False, 0)
+        top.pack_start(ttl, True, True, 0)
+        hint = Gtk.Label(label="Échap pour revenir · Ctrl+, pour rouvrir")
+        hint.get_style_context().add_class("dim")
+        top.pack_end(hint, False, False, 0)
+        self.pack_start(top, False, False, 0)
         self.stack = stack = Gtk.Stack()
         stack.add_titled(self._scr(self._accounts_page()), "accounts", "Comptes")
         stack.add_titled(self._scr(self._signature_page()), "sig", "Signatures")
@@ -51,7 +70,7 @@ class SettingsWindow(Gtk.Window):
         box = Gtk.Box()
         box.pack_start(side, False, False, 0)
         box.pack_start(stack, True, True, 0)
-        self.add(box)
+        self.pack_start(box, True, True, 0)
         self._reload_accounts()
         self.show_all()
         if page:
@@ -228,6 +247,7 @@ class SettingsWindow(Gtk.Window):
         if any(x["email"].lower() == a["email"].lower() and x["id"] != a["id"] for x in self.cfg["accounts"]):
             self._say("Ce compte existe déjà.", True)
             return
+        first = not self.cfg["accounts"]
         self.cfg.set_password(a["id"], self.f_pass.get_text())
         accs = [x for x in self.cfg["accounts"] if x["id"] != a["id"]]
         old = next((x for x in self.cfg["accounts"] if x["id"] == a["id"]), {})
@@ -238,11 +258,14 @@ class SettingsWindow(Gtk.Window):
         self.win.accounts_changed()
         self._reload_accounts(select=a["id"])
         self._say("Compte enregistré. Synchronisation en cours…")
+        self.win.toast.popup("Compte ajouté. Réglages : icône ⚙ en haut à droite ou Ctrl+,", timeout=7)
+        if first:
+            GLib.timeout_add(900, lambda: (self.win.close_settings(), False)[1])
 
     def _remove_account(self, *_):
         aid = self.current.get("id")
         if aid and any(x["id"] == aid for x in self.cfg["accounts"]):
-            d = Gtk.MessageDialog(transient_for=self, modal=True, message_type=Gtk.MessageType.QUESTION,
+            d = Gtk.MessageDialog(transient_for=self.win, modal=True, message_type=Gtk.MessageType.QUESTION,
                                   text="Supprimer ce compte de MintMail ?",
                                   secondary_text="Les messages en cache seront effacés. Vos mails restent sur le serveur.")
             d.add_buttons("Annuler", Gtk.ResponseType.CANCEL, "Supprimer", Gtk.ResponseType.OK)
@@ -376,7 +399,7 @@ class SettingsWindow(Gtk.Window):
         self.win.toast.popup("Cache vidé, resynchronisation…", timeout=3)
 
     def _reset_look(self, *_):
-        d = Gtk.MessageDialog(transient_for=self, modal=True, message_type=Gtk.MessageType.QUESTION,
+        d = Gtk.MessageDialog(transient_for=self.win, modal=True, message_type=Gtk.MessageType.QUESTION,
                               text="Rétablir l'apparence, la disposition et les gestes par défaut ?")
         d.add_buttons("Annuler", Gtk.ResponseType.CANCEL, "Rétablir", Gtk.ResponseType.OK)
         ok = d.run() == Gtk.ResponseType.OK
@@ -389,7 +412,7 @@ class SettingsWindow(Gtk.Window):
         self.cfg.save()
         self.win.apply_settings()
         self.win.apply_layout()
-        self.destroy()
+        self.win.close_settings()
         self.win.show_settings("look")
 
     @staticmethod
@@ -412,3 +435,6 @@ class SettingsWindow(Gtk.Window):
         sw = Gtk.ScrolledWindow()
         sw.add(grid)
         return sw
+
+
+SettingsWindow = SettingsPage   # compatibilité

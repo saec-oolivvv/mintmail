@@ -156,7 +156,9 @@ row.set_offset(30); row._finish()
 assert fired == ["archive", "trash"], fired
 
 # --- réglages
-sw = S.SettingsWindow.__new__(S.SettingsWindow)
+win.root_stack = D(); win.root_stack.get_child_by_name = lambda n: None
+win.show_settings('accounts'); win.close_settings()
+sw = S.SettingsPage.__new__(S.SettingsPage)
 sw.__init__(win)
 sw._add_account()
 for w, v in ((sw.f_email, "moi@exemple.be"), (sw.f_name, "Moi"), (sw.f_ihost, "imap.exemple.be"),

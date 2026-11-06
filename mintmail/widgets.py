@@ -14,13 +14,14 @@ def icon_button(name, tip, relief=True):
     b = Gtk.Button()
     b.set_image(icon(name, Gtk.IconSize.LARGE_TOOLBAR))
     b.set_tooltip_text(tip)
-    b.set_relief(Gtk.ReliefStyle.NORMAL if relief else Gtk.ReliefStyle.NONE)
+    b.set_relief(Gtk.ReliefStyle.NONE)
+    b.get_style_context().add_class("flat-btn")
     b.set_focus_on_click(False)
     return b
 
 
 class Avatar(Gtk.Label):
-    def __init__(self, name, email, size=40):
+    def __init__(self, name, email, size=44):
         super().__init__(label=initials(name or email))
         ctx = self.get_style_context()
         ctx.add_class("avatar")
@@ -308,7 +309,7 @@ def group_key(msg):
 def row_header(row, before):
     key = group_key(row.msg)
     if before is None or group_key(before.msg) != key:
-        lbl = Gtk.Label(label=key.upper(), xalign=0)
+        lbl = Gtk.Label(label=key, xalign=0)
         lbl.get_style_context().add_class("group-header")
         lbl.show()
         row.set_header(lbl)

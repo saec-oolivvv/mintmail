@@ -1,10 +1,10 @@
-# MintMail 1.1.0
+# MintMail 1.2.0
 
 Client mail moderne pour Linux Mint (Python / GTK3), inspiré de Spark Mail.
 
 ## Installation / mise à jour
 ```bash
-unzip mintmail-1.1.0.zip && cd mintmail-1.1.0
+unzip mintmail-1.2.0.zip && cd mintmail-1.2.0
 ./install.sh            # pour l'utilisateur courant (~/.local)
 ./install.sh --system   # pour tous les utilisateurs (/opt, sudo)
 ```
@@ -24,6 +24,11 @@ Dépendances (installées automatiquement via apt) : `python3-gi`, `gir1.2-gtk-3
 - Palette de commandes `Ctrl+K`, raccourcis clavier (voir Paramètres → Raccourcis), thème clair/sombre, couleur d'accent
 - Interface adaptative (panneau latéral escamotable, mode une colonne en fenêtre étroite), notifications de bureau, gestionnaire `mailto:`
 - Sans compte configuré : mode démonstration avec messages d'exemple
+
+## Nouveautés 1.2.0
+- **Paramètres accessibles partout** : icône ⚙ dans la barre d'en-tête, bouton en bas de la barre latérale, `Ctrl+,`, menu ☰ et palette `Ctrl+K`. Ils s'ouvrent comme une page dans la fenêtre (bouton « Retour » ou Échap) — plus de fenêtre qui se perd.
+- Après l'ajout d'un premier compte, retour automatique à la boîte de réception
+- **Nouveau design inspiré de Spark** : grand bouton « Nouveau message », messages en cartes arrondies, avatars colorés, onglets en pastilles (Personnes / Notifications / Newsletters), en-tête épuré avec recherche en pilule, boutons ronds, lecteur aéré, thème clair et sombre revus
 
 ## Nouveautés 1.1.0
 - **Volets redimensionnables** : poignée large entre la liste et la lecture (et entre la barre latérale et la liste), tailles mémorisées

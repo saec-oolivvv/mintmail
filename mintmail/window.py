@@ -16,7 +16,7 @@ from .compose import ComposeWindow
 from .models import Message, Outgoing
 from .store import DATA_DIR
 from .reader import Reader
-from .settings import SettingsWindow
+from .settings import SettingsPage
 from .style import build_css
 from .util import (format_full, normalize_subject, sanitize_html, split_addresses, text_to_html)
 from .widgets import (MessageRow, Toast, icon, icon_button, row_header, row_sort, SWIPE_ACTIONS)
@@ -90,15 +90,16 @@ class MainWindow(Gtk.ApplicationWindow):
         self.side_toggle.set_active(True)
         self.side_toggle.connect("toggled", self._side_toggled)
         hb.pack_start(self.side_toggle)
-        comp = Gtk.Button(label="Écrire")
-        comp.set_image(icon("mail-message-new-symbolic"))
-        comp.set_always_show_image(True)
-        comp.get_style_context().add_class("suggested-action")
+        comp = Gtk.Button()
+        comp.set_image(icon("mail-message-new-symbolic", Gtk.IconSize.LARGE_TOOLBAR))
+        comp.set_tooltip_text("Nouveau message (C)")
+        comp.get_style_context().add_class("round-accent")
         comp.connect("clicked", lambda *_: self.compose())
         hb.pack_start(comp)
         self.search_entry = Gtk.SearchEntry()
         self.search_entry.set_placeholder_text("Rechercher…  (from:, is:unread, has:attachment)")
         self.search_entry.set_width_chars(22)
+        self.search_entry.get_style_context().add_class("mm-search")
         self.search_entry.connect("search-changed", self._search_changed)
         hb.set_custom_title(self.search_entry)
         menu_btn = Gtk.MenuButton()
@@ -113,6 +114,9 @@ class MainWindow(Gtk.ApplicationWindow):
         menu.show_all()
         menu_btn.set_popup(menu)
         hb.pack_end(menu_btn)
+        gear = icon_button("preferences-system-symbolic", "Paramètres (Ctrl+,)")
+        gear.connect("clicked", lambda *_: self.show_settings())
+        hb.pack_end(gear)
         self.refresh_btn = icon_button("view-refresh-symbolic", "Actualiser (Ctrl+R)")
         self.refresh_btn.connect("clicked", lambda *_: self.sync(True))
         hb.pack_end(self.refresh_btn)
@@ -140,6 +144,16 @@ class MainWindow(Gtk.ApplicationWindow):
         self.sidebar = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
         self.sidebar.get_style_context().add_class("mm-sidebar")
         self.sidebar.set_size_request(190, -1)
+        self.compose_btn = Gtk.Button()
+        cbox = Gtk.Box(spacing=8)
+        cbox.set_halign(Gtk.Align.CENTER)
+        cbox.pack_start(icon("mail-message-new-symbolic", Gtk.IconSize.LARGE_TOOLBAR), False, False, 0)
+        self.compose_lbl = Gtk.Label(label="Nouveau message")
+        cbox.pack_start(self.compose_lbl, False, False, 0)
+        self.compose_btn.add(cbox)
+        self.compose_btn.get_style_context().add_class("compose-btn")
+        self.compose_btn.connect("clicked", lambda *_: self.compose())
+        self.sidebar.pack_start(self.compose_btn, False, False, 0)
         self.acc_combo = Gtk.ComboBoxText()
         self.acc_combo.set_margin_start(10)
         self.acc_combo.set_margin_end(10)
@@ -184,13 +198,14 @@ class MainWindow(Gtk.ApplicationWindow):
         bar.get_style_context().add_class("mm-listbar")
         self.title_lbl = Gtk.Label(xalign=0)
         self.title_lbl.set_markup("<b>Boîte intelligente</b>")
+        self.title_lbl.get_style_context().add_class("list-title")
         bar.pack_start(self.title_lbl, False, False, 0)
-        self.cat_box = Gtk.Box(spacing=0)
-        self.cat_box.get_style_context().add_class("linked")
+        self.cat_box = Gtk.Box(spacing=6)
         first = None
         for key, label in CATEGORIES:
             rb = Gtk.RadioButton.new_with_label_from_widget(first, label)
             rb.set_mode(False)
+            rb.get_style_context().add_class("cat-tab")
             first = first or rb
             rb.connect("toggled", self._category_toggled, key)
             self.cat_box.pack_start(rb, True, True, 0)
@@ -199,10 +214,11 @@ class MainWindow(Gtk.ApplicationWindow):
         self.cat_sw.add(self.cat_box)
         bar.pack_start(self.cat_sw, False, False, 0)
         flt = Gtk.Box(spacing=6)
-        self.f_unread = Gtk.CheckButton(label="Non lus")
-        self.f_att = Gtk.CheckButton(label="Avec pièce jointe")
+        self.f_unread = Gtk.ToggleButton(label="Non lus")
+        self.f_att = Gtk.ToggleButton(label="Pièces jointes")
         for w, a in ((self.f_unread, "unread_only"), (self.f_att, "att_only")):
             w.connect("toggled", lambda b, attr=a: (setattr(self, attr, b.get_active()), self.reload_list()))
+            w.get_style_context().add_class("pill-toggle")
             flt.pack_start(w, False, False, 0)
         bar.pack_start(flt, False, False, 0)
         self.list_box.pack_start(bar, False, False, 0)
@@ -269,8 +285,12 @@ class MainWindow(Gtk.ApplicationWindow):
         body = Gtk.Box()
         body.pack_start(self.paned_out, True, True, 0)
         body.get_style_context().add_class("mm-root")
+        self.root_stack = Gtk.Stack()
+        self.root_stack.set_transition_type(Gtk.StackTransitionType.CROSSFADE)
+        self.root_stack.set_transition_duration(150)
+        self.root_stack.add_named(body, "mail")
         overlay = Gtk.Overlay()
-        overlay.add(body)
+        overlay.add(self.root_stack)
         self.toast = Toast()
         overlay.add_overlay(self.toast)
         self.add(overlay)
@@ -343,10 +363,13 @@ class MainWindow(Gtk.ApplicationWindow):
         theme = self.config["theme"]
         self.is_dark = theme == "dark" or (theme == "system" and self._system_dark)
         Gtk.Settings.get_default().set_property("gtk-application-prefer-dark-theme", self.is_dark)
-        try:
-            self.css.load_from_data(build_css(self.is_dark, self.config["accent"], self.config["density"]))
-        except GLib.Error as e:
-            print("CSS :", e)
+        base, fancy = build_css(self.is_dark, self.config["accent"], self.config["density"])
+        for data in (base + fancy, base):   # repli sans effets si un thème GTK refuse la version raffinée
+            try:
+                self.css.load_from_data(data)
+                break
+            except GLib.Error as e:
+                print("CSS :", e)
         self.reader.dark = self.is_dark
         if self.reader.msg:
             self.reader.show_message(self.reader.msg, self.config["load_images"])
@@ -359,14 +382,22 @@ class MainWindow(Gtk.ApplicationWindow):
         self.apply_settings()
 
     def show_settings(self, page=None):
-        cur = getattr(self, "_settings", None)
+        """Ouvre la page des paramètres (dans la fenêtre) ; Échap ou « Retour » pour revenir."""
+        cur = self.root_stack.get_child_by_name("settings")
+        if cur is None:
+            cur = SettingsPage(self, page)
+            self.root_stack.add_named(cur, "settings")
+            cur.show_all()
+        elif page:
+            cur.show_page(page)
+        self.root_stack.set_visible_child_name("settings")
+
+    def close_settings(self):
+        cur = self.root_stack.get_child_by_name("settings")
+        self.root_stack.set_visible_child_name("mail")
         if cur is not None:
-            cur.present()
-            if page:
-                cur.show_page(page)
-            return
-        self._settings = SettingsWindow(self, page)
-        self._settings.connect("destroy", lambda *_: setattr(self, "_settings", None))
+            self.root_stack.remove(cur)
+            cur.destroy()
 
     def show_about(self):
         d = Gtk.AboutDialog(transient_for=self, modal=True)
@@ -586,6 +617,7 @@ class MainWindow(Gtk.ApplicationWindow):
         for wdg in (self.acc_combo, self.status):
             wdg.set_visible(not rail)
         self.settings_btn.set_label("" if rail else "Paramètres")
+        self.compose_lbl.set_visible(not rail)
         self.sidebar.set_size_request(60 if rail else 190, -1)
         if visible:
             self.paned_out.set_position(60 if rail else max(190, self.config["side_width"]))
@@ -1021,6 +1053,14 @@ class MainWindow(Gtk.ApplicationWindow):
         key = Gdk.keyval_name(ev.keyval) or ""
         ctrl = bool(ev.state & Gdk.ModifierType.CONTROL_MASK)
         typing = isinstance(focus, (Gtk.Entry, Gtk.TextView, Gtk.SpinButton))
+        if ctrl and key == "comma":
+            self.show_settings()
+            return True
+        if self.root_stack.get_visible_child_name() == "settings":
+            if key == "Escape":
+                self.close_settings()
+                return True
+            return False
         if key == "Escape":
             if self.search_entry.get_text():
                 self.search_entry.set_text("")

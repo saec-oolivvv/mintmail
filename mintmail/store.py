@@ -13,7 +13,7 @@ CONFIG_DIR = Path(os.environ.get("XDG_CONFIG_HOME", str(Path.home() / ".config")
 DATA_DIR = Path(os.environ.get("XDG_DATA_HOME", str(Path.home() / ".local" / "share"))) / APP
 
 DEFAULTS = {
-    "accounts": [], "passwords": {}, "theme": "system", "accent": "#3b82f6",
+    "accounts": [], "passwords": {}, "theme": "system", "accent": "#1a73ff",
     "density": "comfortable", "load_images": False, "notifications": True,
     "refresh_minutes": 5, "undo_seconds": 6, "width": 1280, "height": 800,
     "last_view": "inbox", "layout": "columns", "pos_cols": 420, "pos_bottom": 300,
@@ -41,6 +41,8 @@ class Config:
                 self.data.update(json.load(f))
         except (OSError, ValueError):
             pass
+        if self.data.get("accent") == "#3b82f6":   # ancien bleu par défaut
+            self.data["accent"] = DEFAULTS["accent"]
 
     def save(self):
         self.path.parent.mkdir(parents=True, exist_ok=True)
