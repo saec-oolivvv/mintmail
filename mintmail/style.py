@@ -45,6 +45,16 @@ window, .mm-root { background: %(bg)s; color: %(text)s; }
 .quick-reply entry { border-radius: 999px; padding: 6px 14px; }
 .empty-state { color: %(dim)s; }
 entry, textview text { background: %(field)s; color: %(text)s; }
+paned > separator { background-image: none; background-color: %(line)s; min-width: 6px; }
+paned.vertical > separator { min-width: 0; min-height: 6px; }
+paned > separator:hover { background-color: @accent; }
+.msg-card { background: transparent; }
+.msg-card.swiping { background: %(card)s; }
+.swipe-bg { color: #fff; font-weight: 700; }
+.swipe-green { background: #16a34a; } .swipe-red { background: #dc2626; }
+.swipe-orange { background: #ea580c; } .swipe-blue { background: #2563eb; }
+.swipe-yellow { background: #ca8a04; } .swipe-purple { background: #7c3aed; }
+.swipe-grey { background: #6b7280; }
 """ % dict(c, accent=accent, pad=pad)
     for i, col in enumerate(AVATARS):
         css += ".avatar-%d { background: %s; }\n" % (i, col)

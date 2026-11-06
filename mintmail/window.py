@@ -14,11 +14,12 @@ from . import __version__, APP_NAME
 from .backend import make_backend
 from .compose import ComposeWindow
 from .models import Message, Outgoing
+from .store import DATA_DIR
 from .reader import Reader
 from .settings import SettingsWindow
 from .style import build_css
 from .util import (format_full, normalize_subject, sanitize_html, split_addresses, text_to_html)
-from .widgets import (MessageRow, Toast, icon, icon_button, row_header, row_sort)
+from .widgets import (MessageRow, Toast, icon, icon_button, row_header, row_sort, SWIPE_ACTIONS)
 
 NAV = [
     ("inbox", "Boîte intelligente", "mail-inbox-symbolic"),
@@ -36,7 +37,7 @@ TITLES = {k: v for k, v, _ in NAV}
 CATEGORIES = [(None, "Tout"), ("people", "Personnes"), ("notif", "Notifications"), ("news", "Newsletters")]
 DEMO_ACCOUNT = {"id": "demo", "name": "Démo", "email": "demo@mintmail.local", "demo": True,
                 "signature_html": "<i>Envoyé avec MintMail</i>"}
-NARROW, COMPACT = 900, 1180
+NARROW, RAIL_BELOW, HIDE_BELOW = 700, 1250, 900
 
 
 class MainWindow(Gtk.ApplicationWindow):
@@ -46,7 +47,9 @@ class MainWindow(Gtk.ApplicationWindow):
         self.view = config["last_view"] if config["last_view"] in TITLES else "inbox"
         self.account, self.category = "all", None
         self.unread_only = self.att_only = self.select_mode = False
-        self.narrow = self._compact = self.reader_open = False
+        self.narrow = self.reader_open = False
+        self._zone, self.sidebar_mode, self._reflow_src = None, "full", 0
+        self._saved_rows, self.nav_labels = [], []
         self.search, self._search_src = "", 0
         self._loading, self._pending, self._sync_busy = False, 0, False
         self._backends, self._sending, self.rows = {}, set(), {}
@@ -59,17 +62,18 @@ class MainWindow(Gtk.ApplicationWindow):
         Gtk.StyleContext.add_provider_for_screen(Gdk.Screen.get_default(), self.css,
                                                  Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
         self.set_default_size(config["width"], config["height"])
-        self.set_size_request(360, 480)
+        self.set_size_request(360, 420)
         self._build()
         self.apply_settings()
         self.connect("size-allocate", self._on_size)
         self.connect("key-press-event", self._on_key)
         self.connect("delete-event", self._on_close)
         self.show_all()
-        self._layout()
-        self.reader.set_narrow(False)
+        self.apply_layout()
+        self.reader.zoom = self.config["zoom"]
+        self.reader.apply_zoom()
         self.demo_banner.set_visible(not self.config["accounts"])
-        self.cat_box.set_visible(self.view == "inbox")
+        self.cat_sw.set_visible(self.view == "inbox")
         self.reload_list()
         self.update_counts()
         GLib.idle_add(lambda: (self.sync(), False)[1])
@@ -84,7 +88,7 @@ class MainWindow(Gtk.ApplicationWindow):
         self.side_toggle.set_image(icon("view-sidebar-start-symbolic", Gtk.IconSize.LARGE_TOOLBAR))
         self.side_toggle.set_tooltip_text("Afficher / masquer le panneau latéral")
         self.side_toggle.set_active(True)
-        self.side_toggle.connect("toggled", lambda b: self.sidebar.set_visible(b.get_active()))
+        self.side_toggle.connect("toggled", self._side_toggled)
         hb.pack_start(self.side_toggle)
         comp = Gtk.Button(label="Écrire")
         comp.set_image(icon("mail-message-new-symbolic"))
@@ -94,7 +98,7 @@ class MainWindow(Gtk.ApplicationWindow):
         hb.pack_start(comp)
         self.search_entry = Gtk.SearchEntry()
         self.search_entry.set_placeholder_text("Rechercher…  (from:, is:unread, has:attachment)")
-        self.search_entry.set_size_request(340, -1)
+        self.search_entry.set_width_chars(22)
         self.search_entry.connect("search-changed", self._search_changed)
         hb.set_custom_title(self.search_entry)
         menu_btn = Gtk.MenuButton()
@@ -117,11 +121,25 @@ class MainWindow(Gtk.ApplicationWindow):
         self.sel_btn.set_tooltip_text("Mode sélection multiple")
         self.sel_btn.connect("toggled", self._toggle_select_mode)
         hb.pack_end(self.sel_btn)
+        lay = Gtk.MenuButton()
+        lay.set_image(icon("view-dual-symbolic", Gtk.IconSize.LARGE_TOOLBAR))
+        lay.set_tooltip_text("Disposition")
+        lm = Gtk.Menu()
+        for label, fn in (("Colonnes : liste | lecture", lambda: self.set_layout("columns")),
+                          ("Lecture en bas", lambda: self.set_layout("bottom")),
+                          ("Liste seule (lecture plein écran)", lambda: self.set_layout("list")),
+                          ("Barre latérale réduite / étendue", self.toggle_rail)):
+            it = Gtk.MenuItem(label=label)
+            it.connect("activate", lambda _i, f=fn: f())
+            lm.append(it)
+        lm.show_all()
+        lay.set_popup(lm)
+        hb.pack_end(lay)
 
         # barre latérale
         self.sidebar = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
         self.sidebar.get_style_context().add_class("mm-sidebar")
-        self.sidebar.set_size_request(230, -1)
+        self.sidebar.set_size_request(190, -1)
         self.acc_combo = Gtk.ComboBoxText()
         self.acc_combo.set_margin_start(10)
         self.acc_combo.set_margin_end(10)
@@ -132,13 +150,16 @@ class MainWindow(Gtk.ApplicationWindow):
         self.nav.set_selection_mode(Gtk.SelectionMode.SINGLE)
         self.nav.set_activate_on_single_click(True)
         self.badges = {}
+        self.nav_labels = []
         for vid, label, ic in NAV:
             r = Gtk.ListBoxRow()
             r.view = vid
             r.get_style_context().add_class("nav-row")
             b = Gtk.Box(spacing=10)
             b.pack_start(icon(ic), False, False, 0)
-            b.pack_start(Gtk.Label(label=label, xalign=0), True, True, 0)
+            lab = Gtk.Label(label=label, xalign=0)
+            self.nav_labels.append(lab)
+            b.pack_start(lab, True, True, 0)
             badge = Gtk.Label()
             badge.get_style_context().add_class("badge")
             badge.set_no_show_all(True)
@@ -149,13 +170,16 @@ class MainWindow(Gtk.ApplicationWindow):
             if vid == self.view:
                 self._nav_initial = r
         self.nav.connect("row-selected", self._nav_selected)
-        self.sidebar.pack_start(self.nav, False, False, 0)
+        nsw = Gtk.ScrolledWindow()
+        nsw.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC)
+        nsw.add(self.nav)
+        self.sidebar.pack_start(nsw, True, True, 0)
         self.sidebar.pack_end(self._sidebar_footer(), False, False, 0)
 
         # liste
         self.list_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
         self.list_box.get_style_context().add_class("mm-list")
-        self.list_box.set_size_request(300, -1)
+        self.list_box.set_size_request(260, -1)
         bar = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
         bar.get_style_context().add_class("mm-listbar")
         self.title_lbl = Gtk.Label(xalign=0)
@@ -170,7 +194,10 @@ class MainWindow(Gtk.ApplicationWindow):
             first = first or rb
             rb.connect("toggled", self._category_toggled, key)
             self.cat_box.pack_start(rb, True, True, 0)
-        bar.pack_start(self.cat_box, False, False, 0)
+        self.cat_sw = Gtk.ScrolledWindow()
+        self.cat_sw.set_policy(Gtk.PolicyType.EXTERNAL, Gtk.PolicyType.NEVER)
+        self.cat_sw.add(self.cat_box)
+        bar.pack_start(self.cat_sw, False, False, 0)
         flt = Gtk.Box(spacing=6)
         self.f_unread = Gtk.CheckButton(label="Non lus")
         self.f_att = Gtk.CheckButton(label="Avec pièce jointe")
@@ -202,7 +229,10 @@ class MainWindow(Gtk.ApplicationWindow):
             b = Gtk.Button(label=label)
             b.connect("clicked", lambda _b, f=fn: f())
             bulk.pack_start(b, False, False, 0)
-        self.bulk_rev.add(bulk)
+        bsw = Gtk.ScrolledWindow()
+        bsw.set_policy(Gtk.PolicyType.EXTERNAL, Gtk.PolicyType.NEVER)
+        bsw.add(bulk)
+        self.bulk_rev.add(bsw)
         self.list_box.pack_start(self.bulk_rev, False, False, 0)
 
         self.listbox = Gtk.ListBox()
@@ -227,12 +257,17 @@ class MainWindow(Gtk.ApplicationWindow):
         self.reader.connect("quick-reply", lambda _r, t: self.quick_reply(t))
 
         self.paned_in = Gtk.Paned(orientation=Gtk.Orientation.HORIZONTAL)
+        self.paned_in.set_wide_handle(True)
         self.paned_in.pack1(self.list_box, False, False)
         self.paned_in.pack2(self.reader, True, False)
-        self.paned_in.set_position(400)
+        self.paned_in.set_position(self.config["pos_cols"])
+        self.paned_out = Gtk.Paned(orientation=Gtk.Orientation.HORIZONTAL)
+        self.paned_out.set_wide_handle(True)
+        self.paned_out.pack1(self.sidebar, False, False)
+        self.paned_out.pack2(self.paned_in, True, False)
+        self.paned_out.set_position(self.config["side_width"])
         body = Gtk.Box()
-        body.pack_start(self.sidebar, False, False, 0)
-        body.pack_start(self.paned_in, True, True, 0)
+        body.pack_start(self.paned_out, True, True, 0)
         body.get_style_context().add_class("mm-root")
         overlay = Gtk.Overlay()
         overlay.add(body)
@@ -240,6 +275,7 @@ class MainWindow(Gtk.ApplicationWindow):
         overlay.add_overlay(self.toast)
         self.add(overlay)
         self._fill_accounts()
+        self._rebuild_saved()
         self.nav.select_row(self._nav_initial)
 
     def _sidebar_footer(self):
@@ -249,12 +285,15 @@ class MainWindow(Gtk.ApplicationWindow):
         self.status.get_style_context().add_class("dim")
         self.status.set_line_wrap(True)
         box.pack_start(self.status, False, False, 0)
-        b = Gtk.Button(label="Paramètres")
+        b = self.settings_btn = Gtk.Button(label="Paramètres")
         b.set_image(icon("preferences-system-symbolic"))
         b.set_always_show_image(True)
         b.set_relief(Gtk.ReliefStyle.NONE)
         b.connect("clicked", lambda *_: self.show_settings())
         box.pack_start(b, False, False, 0)
+        rail = icon_button("pan-start-symbolic", "Réduire / étendre la barre latérale", relief=False)
+        rail.connect("clicked", lambda *_: self.toggle_rail())
+        box.pack_start(rail, False, False, 0)
         return box
 
     # --------------------------------------------------------------- comptes
@@ -283,6 +322,11 @@ class MainWindow(Gtk.ApplicationWindow):
         self._backends.clear()
         if self.config["accounts"]:
             self.cache.delete_account("demo")
+        else:
+            try:
+                (DATA_DIR / "demo_seeded").unlink()   # le mode démo pourra se re-semer
+            except OSError:
+                pass
         self._fill_accounts()
         self.demo_banner.set_visible(not self.config["accounts"])
         self.reload_list()
@@ -314,8 +358,15 @@ class MainWindow(Gtk.ApplicationWindow):
         self.config.save()
         self.apply_settings()
 
-    def show_settings(self):
-        SettingsWindow(self)
+    def show_settings(self, page=None):
+        cur = getattr(self, "_settings", None)
+        if cur is not None:
+            cur.present()
+            if page:
+                cur.show_page(page)
+            return
+        self._settings = SettingsWindow(self, page)
+        self._settings.connect("destroy", lambda *_: setattr(self, "_settings", None))
 
     def show_about(self):
         d = Gtk.AboutDialog(transient_for=self, modal=True)
@@ -332,17 +383,18 @@ class MainWindow(Gtk.ApplicationWindow):
         if not row:
             return
         self.view = row.view
-        self.config["last_view"] = self.view
+        if not self.view.startswith("saved:"):
+            self.config["last_view"] = self.view
         self.search_entry.set_text("")
         self.search = ""
-        self.cat_box.set_visible(self.view == "inbox")
-        self.title_lbl.set_markup("<b>%s</b>" % TITLES[self.view])
+        self.cat_sw.set_visible(self.view == "inbox")
+        self.title_lbl.set_markup("<b>%s</b>" % GLib.markup_escape_text(self._view_title()))
         self.listbox.unselect_all()
         self.reader.show_empty()
         self.reader_open = False
         self._layout()
         self.reload_list()
-        if self._compact:
+        if self._zone == 0:
             self.side_toggle.set_active(False)
         if self.view in ("sent", "archive", "trash", "spam"):
             self.sync(folders=(self.view,), quiet=True)
@@ -359,8 +411,8 @@ class MainWindow(Gtk.ApplicationWindow):
         def go():
             self._search_src = 0
             self.search = entry.get_text().strip()
-            self.title_lbl.set_markup("<b>Résultats</b>" if self.search else "<b>%s</b>" % TITLES[self.view])
-            self.cat_box.set_visible(self.view == "inbox" and not self.search)
+            self.title_lbl.set_markup("<b>Résultats</b>" if self.search else "<b>%s</b>" % GLib.markup_escape_text(self._view_title()))
+            self.cat_sw.set_visible(self.view == "inbox" and not self.search)
             self.reload_list()
             return False
         self._search_src = GLib.timeout_add(250, go)
@@ -369,13 +421,14 @@ class MainWindow(Gtk.ApplicationWindow):
     def reload_list(self, select_index=None):
         keep = {r.msg.id for r in self.listbox.get_selected_rows()}
         msgs = self.cache.query(self.view, self.account, self.category if self.view == "inbox" else None,
-                                self.unread_only, self.att_only, self.search)
+                                self.unread_only, self.att_only, self._effective_search())
         self._loading = True
         for ch in self.listbox.get_children():
             self.listbox.remove(ch)
         self.rows = {}
         for m in msgs:
-            row = MessageRow(m, self._row_checked)
+            row = MessageRow(m, self._row_checked, self._on_swipe,
+                             dict(self.config["swipe"], invert=self.config["swipe_invert"]), self._row_height())
             row.set_select_mode(self.select_mode)
             self.rows[m.id] = row
             self.listbox.add(row)
@@ -383,13 +436,13 @@ class MainWindow(Gtk.ApplicationWindow):
         for mid in keep:
             if mid in self.rows:
                 self.listbox.select_row(self.rows[mid])
-        if select_index is not None and msgs and not self.narrow:
+        if select_index is not None and msgs and not self.single:
             r = self.listbox.get_row_at_index(min(select_index, len(msgs) - 1))
             if r:
                 self.listbox.select_row(r)
         self._loading = False
         self.list_stack.set_visible_child_name("list" if msgs else "empty")
-        self.empty_lbl.set_text("Aucun résultat" if self.search else "Aucun message ici — profitez-en 🎉")
+        self.empty_lbl.set_text("Aucun résultat" if self._effective_search() else "Aucun message ici — profitez-en 🎉")
         self._on_selection(self.listbox)
 
     def selected_msgs(self):
@@ -422,7 +475,7 @@ class MainWindow(Gtk.ApplicationWindow):
 
     def open_message(self, msg):
         self.reader.show_message(msg, self.config["load_images"])
-        if self.narrow:
+        if self.single:
             self.reader_open = True
             self._layout()
         if msg.unread and msg.folder != "drafts":
@@ -433,7 +486,7 @@ class MainWindow(Gtk.ApplicationWindow):
             return
         if self.view == "drafts" or row.msg.folder == "drafts":
             self.open_draft(row.msg)
-        elif self.narrow:
+        elif self.single:
             self.open_message(row.msg)
 
     def _row_checked(self, row, active):
@@ -470,7 +523,11 @@ class MainWindow(Gtk.ApplicationWindow):
                  ("Retirer des favoris" if m.starred else "Ajouter aux favoris",
                   lambda: self.set_flag(self.selected_msgs(), "starred", not m.starred)),
                  ("Désépingler" if m.pinned else "Épingler",
-                  lambda: self.set_flag(self.selected_msgs(), "pinned", not m.pinned))]
+                  lambda: self.set_flag(self.selected_msgs(), "pinned", not m.pinned)), None,
+                 ("Signaler comme spam", lambda: self.move_messages(self.selected_msgs(), "spam")),
+                 ("Mettre l'expéditeur en spam", lambda: self.spam_sender(m)),
+                 ("Bloquer l'expéditeur", lambda: self.block_sender(m)),
+                 ("Voir tous ses messages", lambda: self.show_from(m))]
         for it in items:
             if it is None:
                 menu.append(Gtk.SeparatorMenuItem())
@@ -492,26 +549,86 @@ class MainWindow(Gtk.ApplicationWindow):
         self._on_selection(self.listbox)
 
     # ----------------------------------------------------------- disposition
+    @property
+    def single(self):
+        """Un seul volet à la fois (fenêtre étroite ou disposition « liste seule »)."""
+        return self.narrow or self.config["layout"] == "list"
+
     def _on_size(self, w, alloc):
-        narrow, compact = alloc.width < NARROW, alloc.width < COMPACT
-        if compact != self._compact:
-            self._compact = compact
-            self.side_toggle.set_active(not compact)
+        zone = 0 if alloc.width < HIDE_BELOW else (1 if alloc.width < RAIL_BELOW else 2)
+        narrow = alloc.width < NARROW
+        if (zone != self._zone or narrow != self.narrow) and not self._reflow_src:
+            self._reflow_src = GLib.idle_add(self._reflow, zone, narrow)
+
+    def _reflow(self, zone, narrow):
+        self._reflow_src = 0
+        if zone != self._zone:
+            self._zone = zone
+            self.sidebar_mode = "full" if zone == 2 else "rail"
+            self.side_toggle.handler_block_by_func(self._side_toggled)
+            self.side_toggle.set_active(zone > 0)
+            self.side_toggle.handler_unblock_by_func(self._side_toggled)
+            self._apply_sidebar()
         if narrow != self.narrow:
-            self.narrow = narrow
-            self.reader_open = False
-            self.reader.set_narrow(narrow)
-            self._layout()
+            self.narrow, self.reader_open = narrow, False
+            self.apply_layout()
+        return False
+
+    def _side_toggled(self, btn):
+        self._apply_sidebar()
+
+    def _apply_sidebar(self):
+        visible = self.side_toggle.get_active()
+        rail = self.sidebar_mode == "rail"
+        self.sidebar.set_visible(visible)
+        for lab in self.nav_labels:
+            lab.set_visible(not rail)
+        for wdg in (self.acc_combo, self.status):
+            wdg.set_visible(not rail)
+        self.settings_btn.set_label("" if rail else "Paramètres")
+        self.sidebar.set_size_request(60 if rail else 190, -1)
+        if visible:
+            self.paned_out.set_position(60 if rail else max(190, self.config["side_width"]))
+
+    def toggle_rail(self):
+        self.sidebar_mode = "full" if self.sidebar_mode == "rail" else "rail"
+        self.side_toggle.set_active(True)
+        self._apply_sidebar()
+
+    def _save_positions(self):
+        vertical = self.config["layout"] == "bottom"
+        if self.list_box.get_visible() and self.reader.get_visible():
+            self.config["pos_bottom" if vertical else "pos_cols"] = self.paned_in.get_position()
+        if self.sidebar.get_visible() and self.sidebar_mode == "full":
+            self.config["side_width"] = self.paned_out.get_position()
+
+    def set_layout(self, mode):
+        self._save_positions()
+        self.config["layout"] = mode
+        self.config.save()
+        self.reader_open = False
+        self.apply_layout()
+
+    def apply_layout(self):
+        vertical = self.config["layout"] == "bottom"
+        self.paned_in.set_orientation(Gtk.Orientation.VERTICAL if vertical else Gtk.Orientation.HORIZONTAL)
+        if self.single:
+            self.list_box.set_size_request(-1, -1)
+        elif vertical:
+            self.list_box.set_size_request(-1, 150)
+        else:
+            self.list_box.set_size_request(260, -1)
+        self.reader.set_narrow(self.single)
+        self._layout()
+        self.paned_in.set_position(self.config["pos_bottom" if vertical else "pos_cols"])
 
     def _layout(self):
-        if self.narrow:
+        if self.single:
             self.reader.set_visible(self.reader_open)
             self.list_box.set_visible(not self.reader_open)
-            self.list_box.set_size_request(-1, -1)
         else:
             self.reader.set_visible(True)
             self.list_box.set_visible(True)
-            self.list_box.set_size_request(300, -1)
 
     # ------------------------------------------------------------- tâches bg
     def run_bg(self, fn, done=None):
@@ -571,8 +688,10 @@ class MainWindow(Gtk.ApplicationWindow):
                 for uid, mid in kn.items():
                     if uid >= minuid and uid not in present:
                         self.cache.delete(mid)
-            if f == "inbox" and kn:
-                fresh += [m for m in msgs if m.unread]
+            if f == "inbox":
+                keep = self._auto_route([m for m in msgs if m.folder == "inbox"])
+                if kn:
+                    fresh += [m for m in keep if m.unread]
         self._last_sync = time.time()
         if errors:
             self.status.set_text("⚠ " + errors[0][:120])
@@ -610,6 +729,7 @@ class MainWindow(Gtk.ApplicationWindow):
                 self._notify(woken)
                 self.reload_list()
                 self.update_counts()
+            self.check_followups()
             if time.time() - self._last_sync > self.config["refresh_minutes"] * 60:
                 self.sync()
         return True
@@ -687,27 +807,7 @@ class MainWindow(Gtk.ApplicationWindow):
             state["done"] = True
             self._pending -= 1
 
-            def work():
-                errs = []
-                for m in msgs:
-                    try:
-                        self.backend(m.account).move(m, dest)
-                    except Exception as e:
-                        errs.append(str(e))
-                return errs
-
-            def done(errs, err):
-                if err or errs:
-                    self.toast.popup("Échec du déplacement : %s" % ((errs or [str(err)])[0][:80]), timeout=6)
-                real = False
-                for m in msgs:
-                    if not self.backend(m.account).demo:
-                        self.cache.delete(m.id)
-                        real = True
-                if real:
-                    self.sync(folders=("inbox", dest), quiet=True)
-                self.reload_list()
-            self.run_bg(work, done)
+            self._bg_move(msgs, dest)
         n = len(msgs)
         self.toast.popup("%d message%s %s%s" % (n, "s" if n > 1 else "", verb, "s" if n > 1 else ""),
                          "Annuler", undo, timeout=self.config["undo_seconds"], on_expire=commit)
@@ -755,7 +855,9 @@ class MainWindow(Gtk.ApplicationWindow):
             cb(datetime.datetime(y, mo + 1, d, h).timestamp())
 
     def snooze_selected(self, ts):
-        msgs = self.selected_msgs()
+        self.snooze_msgs(self.selected_msgs(), ts)
+
+    def snooze_msgs(self, msgs, ts):
         if not msgs or ts <= time.time():
             return
         prev = [(m.id, m.snoozed_until) for m in msgs]
@@ -773,7 +875,7 @@ class MainWindow(Gtk.ApplicationWindow):
         self.toast.popup("Reporté au %s" % format_full(ts), "Annuler", undo, timeout=5)
 
     def mark_all_read(self):
-        msgs = [m for m in self.cache.query(self.view, self.account, None, True, False, self.search)]
+        msgs = [m for m in self.cache.query(self.view, self.account, None, True, False, self._effective_search())]
         if msgs:
             self.set_unread(msgs, False)
             self.reload_list()
@@ -890,7 +992,7 @@ class MainWindow(Gtk.ApplicationWindow):
             self.forward(m)
         elif act in ("archive", "trash", "spam"):
             self.move_messages(msgs, act)
-            if self.narrow:
+            if self.single:
                 self.reader_open = False
                 self._layout()
         elif act == "star" and m:
@@ -902,6 +1004,16 @@ class MainWindow(Gtk.ApplicationWindow):
             self.set_unread(msgs, True)
         elif act == "images" and m:
             reader.show_message(m, True)
+        elif act == "spam_sender" and m:
+            self.spam_sender(m)
+        elif act in ("block", "block_domain") and m:
+            self.block_sender(m, act == "block_domain")
+        elif act == "from_sender" and m:
+            self.show_from(m)
+        elif act == "copy_addr" and m:
+            self.copy_text(m.sender_email)
+        elif act in ("followup_3", "followup_7") and m:
+            self.add_followup(m, int(act[-1]))
 
     # ------------------------------------------------------------- clavier
     def _on_key(self, w, ev):
@@ -948,6 +1060,9 @@ class MainWindow(Gtk.ApplicationWindow):
                 (datetime.datetime.now() + datetime.timedelta(days=1)).replace(hour=8, minute=0, second=0).timestamp()),
             "j": lambda: self._step(1), "k": lambda: self._step(-1),
             "slash": lambda: self.search_entry.grab_focus(),
+            "exclam": lambda: self.move_messages(msgs, "spam"),
+            "backslash": lambda: self.set_layout("columns" if self.config["layout"] == "list" else "list"),
+            "x": lambda: self.sel_btn.set_active(not self.sel_btn.get_active()),
         }
         fn = acts.get(key)
         if fn:
@@ -967,14 +1082,324 @@ class MainWindow(Gtk.ApplicationWindow):
             self.listbox.select_row(r)
             r.grab_focus()
 
+    # ----------------------------------------------------- gestes & actions
+    def _row_height(self):
+        return {"compact": 64, "comfortable": 72, "spacious": 80}.get(self.config["density"], 72)
+
+    def _on_swipe(self, row, action):
+        sel = [r.msg for r in self.listbox.get_selected_rows()] if row.is_selected() else []
+        msgs = sel if row.msg.id in {m.id for m in sel} else [row.msg]
+        self.run_action(action, msgs)
+
+    def run_action(self, action, msgs):
+        if not msgs:
+            return
+        m = msgs[0]
+        if action in ("archive", "trash", "spam"):
+            self.move_messages(msgs, action)
+        elif action == "read":
+            self.set_unread(msgs, not m.unread)
+        elif action in ("star", "pin"):
+            fld = "starred" if action == "star" else "pinned"
+            self.set_flag(msgs, fld, not getattr(m, fld))
+        elif action == "snooze":
+            ts = (datetime.datetime.now() + datetime.timedelta(days=1)).replace(
+                hour=8, minute=0, second=0, microsecond=0).timestamp()
+            self.snooze_msgs(msgs, ts)
+        elif action == "block":
+            self.block_sender(m)
+
+    # ------------------------------------------------- spam / blocage / règles
+    @staticmethod
+    def _key(msg, domain=False):
+        em = msg.sender_email.lower()
+        return "@" + em.split("@")[-1] if domain else em
+
+    def _gather(self, msg, key):
+        msgs = self.cache.by_sender(key, ("inbox", "archive"))
+        if msg.id not in {x.id for x in msgs} and msg.folder in ("inbox", "archive"):
+            msgs.append(msg)
+        return msgs
+
+    def spam_sender(self, msg, domain=False):
+        """L'expéditeur (ou son domaine) part en Spam, maintenant et pour les prochains messages."""
+        key = self._key(msg, domain)
+        if key not in self.config["spam_senders"]:
+            self.config["spam_senders"].append(key)
+            self.config.save()
+        msgs = self._gather(msg, key)
+        if msgs:
+            self.move_messages(msgs, "spam")
+        self.status.set_text("En spam : " + key)
+
+    def block_sender(self, msg, domain=False):
+        """Bloque l'expéditeur : ses messages vont à la corbeille (lus), les futurs aussi."""
+        key = self._key(msg, domain)
+        if key not in self.config["blocked"]:
+            self.config["blocked"].append(key)
+            self.config.save()
+        msgs = self._gather(msg, key)
+        if msgs:
+            self.move_messages(msgs, "trash")
+        else:
+            self.toast.popup("Expéditeur bloqué : " + key, timeout=4)
+        self.status.set_text("Bloqué : " + key)
+
+    def unblock(self, msg):
+        em, dom = self._key(msg), self._key(msg, True)
+        for k in ("blocked", "spam_senders"):
+            self.config[k] = [x for x in self.config[k] if x.lower() not in (em, dom)]
+        self.config.save()
+        self.toast.popup("%s débloqué" % msg.sender_email, timeout=3)
+
+    def is_blocked(self, msg):
+        keys = {self._key(msg), self._key(msg, True)}
+        return any(x.lower() in keys for x in self.config["blocked"] + self.config["spam_senders"])
+
+    def show_from(self, msg):
+        self.search_entry.set_text("from:" + msg.sender_email)
+        self.search_entry.grab_focus()
+
+    def copy_text(self, text):
+        Gtk.Clipboard.get(Gdk.SELECTION_CLIPBOARD).set_text(text, -1)
+        self.toast.popup("Copié : " + text, timeout=2)
+
+    @staticmethod
+    def _rule_match(r, m):
+        txt = (r.get("text") or "").lower()
+        hay = {"from": "%s %s" % (m.sender_name, m.sender_email), "subject": m.subject,
+               "to": "%s %s" % (m.to, m.cc)}.get(r.get("field"), "")
+        return bool(txt) and txt in hay.lower()
+
+    def _auto_route(self, msgs):
+        """Applique blocages, spam d'expéditeur et règles aux nouveaux messages. Retourne ceux qui restent."""
+        cfg = self.config
+        blocked = {x.lower() for x in cfg["blocked"]}
+        spam_s = {x.lower() for x in cfg["spam_senders"]}
+        rules = cfg["rules"]
+        if not msgs or not (blocked or spam_s or rules):
+            return list(msgs)
+        moves, keep = {"trash": [], "spam": [], "archive": []}, []
+        for m in msgs:
+            em = m.sender_email.lower()
+            dom = "@" + em.split("@")[-1]
+            dest = "trash" if (em in blocked or dom in blocked) else \
+                   "spam" if (em in spam_s or dom in spam_s) else None
+            if dest is None:
+                for r in rules:
+                    if not self._rule_match(r, m):
+                        continue
+                    act = r.get("action")
+                    if act in moves and dest is None:
+                        dest = act
+                    elif act == "read":
+                        self.set_unread([m], False, reload=False)
+                    elif act == "star":
+                        m.starred = True
+                        self.cache.update(m.id, starred=True)
+                        self._flag_remote(m, flagged=True)
+                    elif act == "pin":
+                        m.pinned = True
+                        self.cache.update(m.id, pinned=True)
+            (moves[dest] if dest else keep).append(m)
+        for dest, lst in moves.items():
+            if lst:
+                self._auto_move(lst, dest)
+        return keep
+
+    def apply_rules_now(self):
+        left = self._auto_route(self.cache.query("inbox", "all"))
+        self.reload_list()
+        self.update_counts()
+        self.toast.popup("Règles appliquées (%d message(s) restent dans la boîte)" % len(left), timeout=4)
+
+    def _auto_move(self, msgs, dest):
+        for m in msgs:
+            self.cache.update(m.id, folder=dest, unread=False if dest in ("trash", "spam") else m.unread)
+        self._bg_move(msgs, dest)
+
+    def _bg_move(self, msgs, dest):
+        self._pending += 1
+
+        def work():
+            errs, by = [], {}
+            for m in msgs:
+                by.setdefault(m.account, []).append(m)
+            for aid, lst in by.items():
+                try:
+                    self.backend(aid).move_many(lst, dest)
+                except Exception as e:
+                    errs.append(str(e))
+            return errs
+
+        def done(errs, err):
+            self._pending -= 1
+            if err or errs:
+                self.toast.popup("Échec du déplacement : %s" % ((errs or [str(err)])[0][:80]), timeout=6)
+            real = False
+            for m in msgs:
+                try:
+                    if not self.backend(m.account).demo:
+                        self.cache.delete(m.id)
+                        real = True
+                except Exception:
+                    pass
+            if real:
+                self.sync(folders=("inbox", dest), quiet=True)
+            self.reload_list()
+            self.update_counts()
+        self.run_bg(work, done)
+
+    # ------------------------------------------------------------- rappels
+    def add_followup(self, msg, days):
+        self.config["followups"].append({
+            "id": msg.id, "at": time.time() + days * 86400, "subject": msg.subject, "date": msg.date,
+            "to": msg.to if msg.folder == "sent" else msg.sender_email})
+        self.config.save()
+        self.toast.popup("Rappel dans %d jours si aucune réponse" % days, timeout=4)
+
+    def check_followups(self):
+        now, keep, due = time.time(), [], []
+        for f in self.config["followups"]:
+            if f["at"] > now:
+                keep.append(f)
+                continue
+            addrs = [a.lower() for a in split_addresses(f["to"])]
+            subj = normalize_subject(f["subject"]).lower()
+            replied = bool(addrs) and any(
+                m.date > f["date"] and normalize_subject(m.subject).lower() == subj
+                for m in self.cache.query("inbox", "all", search="from:" + addrs[0]))
+            if not replied:
+                due.append(f)
+        if len(keep) != len(self.config["followups"]):
+            self.config["followups"] = keep
+            self.config.save()
+        for f in due:
+            n = Gio.Notification.new("Pas de réponse")
+            n.set_body("« %s » — %s" % (f["subject"], f["to"]))
+            self.get_application().send_notification("followup-" + f["id"], n)
+            self.toast.popup("Pas de réponse à « %s »" % f["subject"][:50], timeout=8)
+
+    # ---------------------------------------------------- recherches enregistrées
+    def _rebuild_saved(self):
+        for r in self._saved_rows:
+            self.nav_labels = [l for l in self.nav_labels if l is not r.lab]
+            self.nav.remove(r)
+        self._saved_rows = []
+        for i, sv in enumerate(self.config["saved_searches"]):
+            r = Gtk.ListBoxRow()
+            r.view = "saved:%d" % i
+            r.get_style_context().add_class("nav-row")
+            b = Gtk.Box(spacing=10)
+            b.pack_start(icon("system-search-symbolic"), False, False, 0)
+            r.lab = Gtk.Label(label=sv["name"], xalign=0)
+            self.nav_labels.append(r.lab)
+            b.pack_start(r.lab, True, True, 0)
+            r.add(b)
+            r.show_all()
+            self.nav.add(r)
+            self._saved_rows.append(r)
+        if hasattr(self, "settings_btn"):
+            self._apply_sidebar()
+
+    def _saved_query(self):
+        if self.view.startswith("saved:"):
+            try:
+                return self.config["saved_searches"][int(self.view[6:])]["query"]
+            except (ValueError, IndexError):
+                return ""
+        return ""
+
+    def _effective_search(self):
+        return self.search or self._saved_query()
+
+    def _view_title(self):
+        if self.view.startswith("saved:"):
+            try:
+                return self.config["saved_searches"][int(self.view[6:])]["name"]
+            except (ValueError, IndexError):
+                return "Recherche"
+        return TITLES.get(self.view, "")
+
+    def save_current_search(self):
+        q = (self.search_entry.get_text() or self.search).strip()
+        if not q:
+            self.toast.popup("Tapez d'abord une recherche, puis enregistrez-la", timeout=3)
+            return
+        d = Gtk.Dialog(title="Enregistrer la recherche", transient_for=self, modal=True)
+        d.add_buttons("Annuler", Gtk.ResponseType.CANCEL, "Enregistrer", Gtk.ResponseType.OK)
+        e = Gtk.Entry(text=q)
+        e.set_activates_default(True)
+        d.set_default_response(Gtk.ResponseType.OK)
+        d.get_content_area().pack_start(e, True, True, 12)
+        d.show_all()
+        ok = d.run() == Gtk.ResponseType.OK
+        name = e.get_text().strip()
+        d.destroy()
+        if ok and name:
+            self.config["saved_searches"].append({"name": name, "query": q})
+            self.config.save()
+            self._rebuild_saved()
+
+    def delete_saved(self, idx):
+        try:
+            del self.config["saved_searches"][idx]
+        except IndexError:
+            return
+        self.config.save()
+        if self.view.startswith("saved:"):
+            self._goto("inbox")
+        self._rebuild_saved()
+
     # -------------------------------------------------------------- palette
-    def show_palette(self):
-        cmds = [("Nouveau message", self.compose), ("Actualiser", lambda: self.sync(True)),
-                ("Paramètres", self.show_settings), ("Basculer thème clair / sombre", self.toggle_theme),
-                ("Tout marquer comme lu", self.mark_all_read), ("Tout sélectionner", lambda: self.listbox.select_all()),
-                ("Rechercher", lambda: self.search_entry.grab_focus())]
+    def _palette_commands(self):
+        sel = self.selected_msgs()
+        m = self.reader.msg or (sel[0] if sel else None)
+        cmds = []
+        if m:
+            who, dom = m.sender_email, "@" + m.sender_email.split("@")[-1]
+            tomorrow = lambda: self.run_action("snooze", self.selected_msgs() or [m])
+            cmds += [
+                ("Répondre", lambda: self.reply(m)), ("Répondre à tous", lambda: self.reply(m, True)),
+                ("Transférer", lambda: self.forward(m)),
+                ("Archiver", lambda: self.move_messages(self.selected_msgs() or [m], "archive")),
+                ("Supprimer", lambda: self.move_messages(self.selected_msgs() or [m], "trash")),
+                ("Signaler comme spam (ce message)", lambda: self.move_messages(self.selected_msgs() or [m], "spam")),
+                ("Mettre l'expéditeur en spam — " + who, lambda: self.spam_sender(m)),
+                ("Mettre le domaine en spam — " + dom, lambda: self.spam_sender(m, True)),
+                ("Bloquer l'expéditeur — " + who, lambda: self.block_sender(m)),
+                ("Bloquer le domaine — " + dom, lambda: self.block_sender(m, True)),
+                ("Voir tous les messages de " + who, lambda: self.show_from(m)),
+                ("Copier l'adresse " + who, lambda: self.copy_text(who)),
+                ("Reporter à demain 8 h", tomorrow),
+                ("Me rappeler si pas de réponse (3 jours)", lambda: self.add_followup(m, 3)),
+                ("Me rappeler si pas de réponse (7 jours)", lambda: self.add_followup(m, 7)),
+                ("Créer une règle pour " + who, lambda: self.show_settings("filters")),
+            ]
+            if self.is_blocked(m):
+                cmds.insert(6, ("Débloquer " + who, lambda: self.unblock(m)))
+        cmds += [
+            ("Nouveau message", self.compose), ("Actualiser", lambda: self.sync(True)),
+            ("Gérer les expéditeurs bloqués et les règles", lambda: self.show_settings("filters")),
+            ("Appliquer les règles à la boîte de réception", self.apply_rules_now),
+            ("Enregistrer la recherche actuelle", self.save_current_search),
+            ("Disposition : colonnes", lambda: self.set_layout("columns")),
+            ("Disposition : lecture en bas", lambda: self.set_layout("bottom")),
+            ("Disposition : liste seule", lambda: self.set_layout("list")),
+            ("Barre latérale : réduire / étendre", self.toggle_rail),
+            ("Paramètres", self.show_settings), ("Gestes de swipe (réglages)", lambda: self.show_settings("gestures")),
+            ("Basculer thème clair / sombre", self.toggle_theme),
+            ("Tout marquer comme lu", self.mark_all_read), ("Tout sélectionner", lambda: self.listbox.select_all()),
+            ("Rechercher", lambda: self.search_entry.grab_focus()),
+        ]
+        for i, sv in enumerate(self.config["saved_searches"]):
+            cmds.append(("Supprimer la recherche enregistrée : " + sv["name"], lambda i=i: self.delete_saved(i)))
         for vid, label, _ in NAV:
             cmds.append(("Aller à : " + label, lambda v=vid: self._goto(v)))
+        return cmds
+
+    def show_palette(self):
+        cmds = self._palette_commands()
         dlg = Gtk.Dialog(transient_for=self, modal=True)
         dlg.set_decorated(False)
         dlg.set_default_size(520, 360)
@@ -1025,6 +1450,8 @@ class MainWindow(Gtk.ApplicationWindow):
     def _on_close(self, *_):
         w, h = self.get_size()
         self.config["width"], self.config["height"] = w, h
+        self.config["zoom"] = self.reader.zoom
+        self._save_positions()
         try:
             self.config.save()
         except OSError:

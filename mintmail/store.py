@@ -16,7 +16,16 @@ DEFAULTS = {
     "accounts": [], "passwords": {}, "theme": "system", "accent": "#3b82f6",
     "density": "comfortable", "load_images": False, "notifications": True,
     "refresh_minutes": 5, "undo_seconds": 6, "width": 1280, "height": 800,
-    "last_view": "inbox",
+    "last_view": "inbox", "layout": "columns", "pos_cols": 420, "pos_bottom": 300,
+    "side_width": 230, "zoom": 1.0,
+    "swipe": {"right": "archive", "right_long": "trash", "left": "snooze", "left_long": "read"},
+    "swipe_invert": False,
+    "blocked": [], "spam_senders": [], "rules": [], "saved_searches": [], "followups": [],
+    "templates": [
+        {"name": "Accusé de réception", "html": "<p>Bonjour,</p><p>Merci pour votre message, je reviens vers vous rapidement.</p><p>Cordialement,</p>"},
+        {"name": "Proposition de rendez-vous", "html": "<p>Bonjour,</p><p>Seriez-vous disponible cette semaine pour un court échange (20 minutes) ? Je vous propose mardi ou jeudi en fin de matinée.</p><p>Bien cordialement,</p>"},
+        {"name": "Relance aimable", "html": "<p>Bonjour,</p><p>Je me permets de revenir vers vous au sujet de mon précédent message. Avez-vous eu l'occasion d'y jeter un œil ?</p><p>Merci d'avance,</p>"},
+    ],
 }
 
 
@@ -60,6 +69,18 @@ class Config:
         except Exception:
             pass
         return self.data.get("passwords", {}).get(account_id, "")
+
+    def delete_password(self, account_id):
+        try:
+            import keyring
+            keyring.delete_password(APP, account_id)
+        except Exception:
+            pass
+        self.data.get("passwords", {}).pop(account_id, None)
+
+    def reset(self, keys):
+        for k in keys:
+            self.data[k] = copy.deepcopy(DEFAULTS[k])
 
     def set_password(self, account_id, pw):
         try:
@@ -147,6 +168,11 @@ class Cache:
             self.db.execute("DELETE FROM messages WHERE id=?", (mid,))
             self.db.commit()
 
+    def clear_all(self):
+        with self.lock:
+            self.db.execute("DELETE FROM messages")
+            self.db.commit()
+
     def delete_account(self, account):
         with self.lock:
             self.db.execute("DELETE FROM messages WHERE account=?", (account,))
@@ -208,6 +234,15 @@ class Cache:
               " ORDER BY date DESC LIMIT ?"
         with self.lock:
             rows = self.db.execute(sql, args + [limit]).fetchall()
+        return [Message.from_dict(json.loads(r[0])) for r in rows]
+
+    def by_sender(self, key, folders=("inbox", "archive")):
+        """Messages d'un expéditeur (adresse complète ou '@domaine')."""
+        marks = ",".join("?" * len(folders))
+        with self.lock:
+            rows = self.db.execute(
+                "SELECT data FROM messages WHERE sender LIKE ? AND folder IN (%s)" % marks,
+                ["%" + key.lower() + "%"] + list(folders)).fetchall()
         return [Message.from_dict(json.loads(r[0])) for r in rows]
 
     def counts(self, account="all"):

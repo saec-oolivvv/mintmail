@@ -269,21 +269,31 @@ class IMAPBackend:
             self._in_folder(msg.real_folder, op)
 
     def move(self, msg, dest):
-        if msg.uid <= 0 or not msg.real_folder:
+        return self.move_many([msg], dest)
+
+    def move_many(self, msgs, dest):
+        """Déplace plusieurs messages en une seule connexion."""
+        by = {}
+        for m in msgs:
+            if m.uid > 0 and m.real_folder:
+                by.setdefault(m.real_folder, []).append(m.uid)
+        if not by:
             return None
         imap = self._connect()
         try:
-            folders = self._folders(imap)
-            target = folders.get(dest)
-            imap.select(_q(msg.real_folder))
-            u = str(msg.uid)
-            if target and target != msg.real_folder:
-                if "MOVE" in getattr(imap, "capabilities", ()):
-                    imap.uid("MOVE", u, _q(target))
-                    return None
-                imap.uid("COPY", u, _q(target))
-            imap.uid("STORE", u, "+FLAGS", "(\\Deleted)")
-            imap.expunge()
+            target = self._folders(imap).get(dest)
+            if not target and dest != "trash":
+                raise BackendError("Dossier « %s » introuvable sur le serveur." % dest)
+            for real, uids in by.items():
+                imap.select(_q(real))
+                ids = ",".join(str(u) for u in uids)
+                if target and target != real:
+                    if "MOVE" in getattr(imap, "capabilities", ()):
+                        imap.uid("MOVE", ids, _q(target))
+                        continue
+                    imap.uid("COPY", ids, _q(target))
+                imap.uid("STORE", ids, "+FLAGS", "(\\Deleted)")
+                imap.expunge()
         finally:
             try:
                 imap.logout()
@@ -415,6 +425,9 @@ class DemoBackend:
         pass
 
     def move(self, msg, dest):
+        return None
+
+    def move_many(self, msgs, dest):
         return None
 
     def delete_forever(self, msg):

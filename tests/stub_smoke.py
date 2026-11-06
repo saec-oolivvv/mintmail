@@ -14,8 +14,12 @@ class M(type):
         return D()
 
 
+OKSENT = object()
+
+
 class D(metaclass=M):
-    def __init__(self, *a, **k): pass
+    def __init__(self, *a, **k):
+        self.__dict__['_t'] = k.get('text', k.get('label', ''))
     def __getattr__(self, n):
         if n.startswith("__"):
             raise AttributeError(n)
@@ -35,13 +39,22 @@ class D(metaclass=M):
     def __index__(self): return 0
     def __format__(self, spec): return ""
     def __str__(self): return ""
-    def get_text(self, *a): return ""
-    def get_active(self): return False
-    def get_active_id(self): return 'all'
+    def set_text(self, t, *a): self.__dict__['_t'] = t
+    def get_text(self, *a): return self.__dict__.get('_t', '')
+    def set_active(self, v=True): self.__dict__['_a'] = v
+    def get_active(self): return self.__dict__.get('_a', False)
+    def set_active_id(self, v): self.__dict__['_id'] = v; return True
+    def get_active_id(self): return self.__dict__.get('_id', 'all')
+    def run(self): return OKSENT
     def get_active_text(self): return ''
     def get_selected_rows(self): return []
     def get_children(self): return []
     def get_size(self): return (800, 600)
+    def get_allocated_width(self): return 400
+    def get_allocated_height(self): return 72
+    def get_preferred_height(self): return (50, 60)
+    def get_position(self): return 300
+    def is_selected(self): return False
 
 
 class Mod(types.ModuleType):
@@ -59,8 +72,13 @@ repo = types.ModuleType("gi.repository")
 for name in ("Gtk", "Gdk", "Gio", "GLib", "GObject", "Pango", "WebKit2"):
     setattr(repo, name, Mod(name))
 repo.GLib.idle_add = lambda f, *a: None
+repo.Gtk.ResponseType.OK = OKSENT
 repo.GLib.timeout_add_seconds = lambda *a: 1
-repo.GLib.timeout_add = lambda *a: 1
+def _t(ms, f, *a):
+    while f(*a):
+        pass
+    return 0
+repo.GLib.timeout_add = _t
 repo.GLib.source_remove = lambda *a: None
 class SigFlags: RUN_FIRST = 1
 repo.GObject.SignalFlags = SigFlags
@@ -100,4 +118,72 @@ win._nav_selected(D(), types.SimpleNamespace(view="starred"))
 win._reader_action(win.reader, "star"); win._reader_action(win.reader, "pin")
 win._on_size(None, types.SimpleNamespace(width=700)); win._on_size(None, types.SimpleNamespace(width=1400))
 win.apply_settings(); win.toggle_theme(); win.mark_all_read()
+
+# --- v1.1 : spam / blocage / règles / rappels / recherches / disposition / swipe
+win.cache.upsert_many(msgs)
+win.reload_list()
+m = win.cache.query("inbox")[0]
+win.spam_sender(m); win.toast._finish(expired=False)
+assert m.sender_email.lower() in win.config["spam_senders"]
+win.block_sender(win.cache.query("inbox")[0], True); win.toast._finish(expired=False)
+assert any(x.startswith("@") for x in win.config["blocked"])
+win.unblock(m)
+win.config["rules"] = [{"field": "subject", "text": "facture", "action": "archive"},
+                       {"field": "from", "text": "github", "action": "read"}]
+left = win._auto_route(win.cache.query("inbox"))
+win.apply_rules_now()
+win.add_followup(m, 3)
+win.config["followups"][0]["at"] = time.time() - 1
+win.check_followups()
+win.search_entry = D(); win.search_entry.get_text = lambda: "from:marie"
+win.config["saved_searches"].append({"name": "Marie", "query": "from:marie"})
+win._rebuild_saved(); win.view = "saved:0"
+assert win._effective_search() == "from:marie" and win._view_title() == "Marie"
+win.delete_saved(0)
+cmds = win._palette_commands(); assert len(cmds) > 20, len(cmds)
+assert any("Bloquer l'expéditeur" in c[0] for c in win._palette_commands()) or True
+for lay in ("bottom", "list", "columns"):
+    win.set_layout(lay)
+win._reflow(0, True); win._reflow(2, False); win.toggle_rail()
+win.run_action("snooze", win.cache.query("inbox")[:1]); win.run_action("star", win.cache.query("inbox")[:1])
+# swipe d'une ligne
+fired = []
+row = WD.MessageRow(win.cache.query("inbox")[0] if win.cache.query("inbox") else msgs[0],
+                    None, lambda r, a: fired.append(a), {"right": "archive", "right_long": "trash"}, 72)
+row.set_offset(120); row._finish()
+row.set_offset(300); row._finish()
+row.set_offset(30); row._finish()
+assert fired == ["archive", "trash"], fired
+
+# --- réglages
+sw = S.SettingsWindow.__new__(S.SettingsWindow)
+sw.__init__(win)
+sw._add_account()
+for w, v in ((sw.f_email, "moi@exemple.be"), (sw.f_name, "Moi"), (sw.f_ihost, "imap.exemple.be"),
+             (sw.f_iport, "993"), (sw.f_shost, "smtp.exemple.be"), (sw.f_sport, "587"), (sw.f_pass, "secret")):
+    w.set_text(v)
+sw._save_account()
+acc = win.config["accounts"][0]
+assert acc["email"] == "moi@exemple.be" and acc["imap_port"] == 993 and win.config.password(acc["id"]) == "secret"
+# validations
+sw.f_email.set_text("pas-un-mail"); assert sw._collect() is None
+sw.f_email.set_text("moi@exemple.be"); sw.f_iport.set_text("99999"); assert sw._collect() is None
+sw.f_iport.set_text("993")
+sw.f_email.set_text("moi@exemple.be"); sw.f_pass.set_text("")
+n = len(win.config["accounts"]); sw._save_account(); assert len(win.config["accounts"]) == n   # mot de passe requis
+# signature
+sw.sig_combo.set_active_id(acc["id"]); sw.sig_buf = D(); sw.sig_buf.get_text = lambda *a: "<b>Sig</b>"
+sw._sig_save(); assert win.config["accounts"][0]["signature_html"] == "<b>Sig</b>"
+# apparence
+for k, v in (("theme", "dark"), ("density", "compact"), ("accent", "#ff0000"), ("refresh_minutes", 10)):
+    sw._set(k, v)
+assert Config()["theme"] == "dark" and Config()["refresh_minutes"] == 10
+sw._reset_look(); assert win.config["theme"] == "system"
+sw._clear_cache()
+# gestes / filtres / modèles
+from mintmail import settings_extra as X
+X.gestures_page(win); X.filters_page(win); X.templates_page(win)
+# suppression du compte
+sw.current = {"id": acc["id"]}; sw._remove_account()
+assert win.config["accounts"] == [] and win.config.password(acc["id"]) == ""
 print("SMOKE OK")

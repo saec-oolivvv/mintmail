@@ -88,6 +88,10 @@ class BodyView(Gtk.Box):
         else:
             self.tv.get_buffer().set_text(msg.text or "")
 
+    def set_zoom(self, z):
+        if self.web:
+            self.web.set_zoom_level(z)
+
     def clear(self):
         if self.web:
             self.web.load_html("", "about:blank")
@@ -104,6 +108,7 @@ class Reader(Gtk.Stack):
     def __init__(self, snooze_menu_factory):
         super().__init__()
         self.msg, self.dark, self.load_images = None, False, False
+        self.secondary, self.zoom, self._wide = [], 1.0, True
         self._snooze_factory = snooze_menu_factory
         self.get_style_context().add_class("mm-reader")
 
@@ -143,6 +148,8 @@ class Reader(Gtk.Stack):
                                ("mail-forward-symbolic", "Transférer (F)", "forward")):
             b = icon_button(name, tip, relief=False)
             b.connect("clicked", lambda _b, a=act: self.emit("action", a))
+            if act != "reply":
+                self.secondary.append(b)
             tb.pack_start(b, False, False, 0)
         tb.pack_start(Gtk.Separator(orientation=Gtk.Orientation.VERTICAL), False, False, 6)
         for name, tip, act in (("folder-symbolic", "Archiver (E)", "archive"),
@@ -162,19 +169,35 @@ class Reader(Gtk.Stack):
         self.pin_btn.connect("clicked", lambda *_: self.emit("action", "pin"))
         tb.pack_start(self.star_btn, False, False, 0)
         tb.pack_start(self.pin_btn, False, False, 0)
+        self.secondary += [self.star_btn, self.pin_btn]
         more = Gtk.MenuButton()
         more.set_image(icon("view-more-symbolic", Gtk.IconSize.LARGE_TOOLBAR))
         more.set_relief(Gtk.ReliefStyle.NONE)
         menu = Gtk.Menu()
-        for label, act in (("Marquer comme non lu (U)", "unread"), ("Signaler comme spam", "spam"),
-                           ("Afficher les images distantes", "images")):
+        for entry in (("Répondre à tous", "reply_all"), ("Transférer", "forward"), ("Favori", "star"),
+                      ("Épingler", "pin"), None,
+                      ("Marquer comme non lu (U)", "unread"), ("Afficher les images distantes", "images"), None,
+                      ("Signaler comme spam (!)", "spam"), ("Mettre l'expéditeur en spam", "spam_sender"),
+                      ("Bloquer l'expéditeur", "block"), ("Bloquer son domaine", "block_domain"), None,
+                      ("Voir tous ses messages", "from_sender"), ("Copier son adresse", "copy_addr"),
+                      ("Me rappeler si pas de réponse — 3 jours", "followup_3"),
+                      ("Me rappeler si pas de réponse — 7 jours", "followup_7"), None,
+                      ("Texte plus grand", "zoom_in"), ("Texte plus petit", "zoom_out"),
+                      ("Taille normale", "zoom_reset")):
+            if entry is None:
+                menu.append(Gtk.SeparatorMenuItem())
+                continue
+            label, act = entry
             it = Gtk.MenuItem(label=label)
-            it.connect("activate", lambda _i, a=act: self.emit("action", a))
+            it.connect("activate", lambda _i, a=act: self._menu_action(a))
             menu.append(it)
         menu.show_all()
         more.set_popup(menu)
         tb.pack_end(more, False, False, 0)
-        page.pack_start(tb, False, False, 0)
+        tsw = Gtk.ScrolledWindow()
+        tsw.set_policy(Gtk.PolicyType.EXTERNAL, Gtk.PolicyType.NEVER)
+        tsw.add(tb)
+        page.pack_start(tsw, False, False, 0)
 
         head = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
         head.get_style_context().add_class("mm-reader-head")
@@ -190,6 +213,7 @@ class Reader(Gtk.Stack):
         col = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=2)
         self.from_lbl = Gtk.Label(xalign=0)
         self.from_lbl.set_selectable(True)
+        self.from_lbl.set_ellipsize(Pango.EllipsizeMode.END)
         self.to_lbl = Gtk.Label(xalign=0)
         self.to_lbl.set_ellipsize(Pango.EllipsizeMode.END)
         self.to_lbl.get_style_context().add_class("dim")
@@ -208,12 +232,13 @@ class Reader(Gtk.Stack):
 
         self.banner = Gtk.Box(spacing=10)
         self.banner.get_style_context().add_class("banner")
-        self.banner_lbl = Gtk.Label(label="Les images distantes sont bloquées pour protéger votre vie privée.")
+        self.banner_lbl = Gtk.Label(label="Images distantes bloquées (vie privée).")
+        self.banner_lbl.set_line_wrap(True)
         self.banner.pack_start(self.banner_lbl, True, True, 0)
-        b_img = Gtk.Button(label="Afficher les images")
+        b_img = Gtk.Button(label="Afficher")
         b_img.connect("clicked", lambda *_: self.emit("action", "images"))
         self.banner.pack_end(b_img, False, False, 0)
-        self.unsub_btn = Gtk.Button(label="Se désabonner")
+        self.unsub_btn = Gtk.Button(label="Désabonner")
         self.unsub_btn.connect("clicked", self._unsub)
         self.banner.pack_end(self.unsub_btn, False, False, 0)
         self.banner.set_no_show_all(True)
@@ -231,7 +256,10 @@ class Reader(Gtk.Stack):
             b.get_style_context().add_class("pill")
             b.connect("clicked", lambda _b, tx=t: self.emit("quick-reply", tx))
             chips.pack_start(b, False, False, 0)
-        qr.pack_start(chips, False, False, 0)
+        csw = Gtk.ScrolledWindow()
+        csw.set_policy(Gtk.PolicyType.EXTERNAL, Gtk.PolicyType.NEVER)
+        csw.add(chips)
+        qr.pack_start(csw, False, False, 0)
         row = Gtk.Box(spacing=6)
         self.quick = Gtk.Entry()
         self.quick.set_placeholder_text("Réponse rapide…")
@@ -243,10 +271,29 @@ class Reader(Gtk.Stack):
         qr.pack_start(row, False, False, 0)
         page.pack_start(qr, False, False, 0)
         self.add_named(page, "message")
+        self.connect("size-allocate", self._on_alloc)
         self.show_all()
         self.back_btn.hide()
         self.banner.hide()
         self.set_visible_child_name("empty")
+
+    # -- adaptation à la largeur disponible
+    def _on_alloc(self, w, alloc):
+        wide = alloc.width >= 560
+        if wide != self._wide:
+            self._wide = wide
+            for b in self.secondary:
+                b.set_visible(wide)
+
+    def _menu_action(self, act):
+        if act.startswith("zoom"):
+            self.zoom = 1.0 if act == "zoom_reset" else max(0.5, min(2.5, self.zoom + (0.1 if act == "zoom_in" else -0.1)))
+            self.body.set_zoom(self.zoom)
+        else:
+            self.emit("action", act)
+
+    def apply_zoom(self):
+        self.body.set_zoom(self.zoom)
 
     # -- API
     def set_narrow(self, narrow):
