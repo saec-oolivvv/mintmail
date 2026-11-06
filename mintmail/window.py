@@ -15,6 +15,7 @@ from .backend import make_backend
 from .compose import ComposeWindow
 from .models import Message, Outgoing
 from .store import DATA_DIR
+from .log import log_exception, tail, LOG
 from .reader import Reader
 from .settings import SettingsPage
 from .style import build_css
@@ -69,6 +70,7 @@ class MainWindow(Gtk.ApplicationWindow):
         self.connect("key-press-event", self._on_key)
         self.connect("delete-event", self._on_close)
         self.show_all()
+        threading.Thread(target=self.config.preload_passwords, daemon=True).start()
         self.apply_layout()
         self.reader.zoom = self.config["zoom"]
         self.reader.apply_zoom()
@@ -105,16 +107,22 @@ class MainWindow(Gtk.ApplicationWindow):
         menu_btn = Gtk.MenuButton()
         menu_btn.set_image(icon("open-menu-symbolic", Gtk.IconSize.LARGE_TOOLBAR))
         menu = Gtk.Menu()
-        for label, fn in (("Palette de commandes (Ctrl+K)", self.show_palette), ("Paramètres", self.show_settings),
+        for label, fn in (("Palette de commandes (Ctrl+K)", self.show_palette), ("Paramètres (Ctrl+,)", self.show_settings), ("Paramètres dans une fenêtre séparée", lambda: self.show_settings(window=True)),
                           ("Basculer clair / sombre", self.toggle_theme), ("Tout marquer comme lu", self.mark_all_read),
-                          ("À propos", self.show_about)):
+                          ("Journal d'erreurs", self.show_log), ("À propos", self.show_about)):
             it = Gtk.MenuItem(label=label)
             it.connect("activate", lambda _i, f=fn: f())
             menu.append(it)
         menu.show_all()
         menu_btn.set_popup(menu)
         hb.pack_end(menu_btn)
-        gear = icon_button("preferences-system-symbolic", "Paramètres (Ctrl+,)")
+        gear = Gtk.Button()
+        gb = Gtk.Box(spacing=6)
+        gb.pack_start(icon("preferences-system-symbolic"), False, False, 0)
+        gb.pack_start(Gtk.Label(label="Paramètres"), False, False, 0)
+        gear.add(gb)
+        gear.set_tooltip_text("Paramètres (Ctrl+,)")
+        gear.get_style_context().add_class("pill")
         gear.connect("clicked", lambda *_: self.show_settings())
         hb.pack_end(gear)
         self.refresh_btn = icon_button("view-refresh-symbolic", "Actualiser (Ctrl+R)")
@@ -381,23 +389,76 @@ class MainWindow(Gtk.ApplicationWindow):
         self.config.save()
         self.apply_settings()
 
-    def show_settings(self, page=None):
-        """Ouvre la page des paramètres (dans la fenêtre) ; Échap ou « Retour » pour revenir."""
-        cur = self.root_stack.get_child_by_name("settings")
-        if cur is None:
-            cur = SettingsPage(self, page)
-            self.root_stack.add_named(cur, "settings")
-            cur.show_all()
-        elif page:
-            cur.show_page(page)
-        self.root_stack.set_visible_child_name("settings")
+    def show_settings(self, page=None, window=False):
+        """Page des paramètres dans la fenêtre (Échap / « Retour »). Repli : fenêtre séparée, puis message d'erreur."""
+        try:
+            if window:
+                self._settings_window(page)
+                return
+            cur = self.root_stack.get_child_by_name("settings")
+            if cur is None:
+                cur = SettingsPage(self, page)
+                self.root_stack.add_named(cur, "settings")
+                cur.show_all()
+            elif page:
+                cur.show_page(page)
+            self.root_stack.set_visible_child_name("settings")
+        except Exception as e:
+            log_exception("show_settings")
+            try:
+                self._settings_window(page)
+            except Exception as e2:
+                log_exception("show_settings (fenêtre séparée)")
+                self.show_error("Impossible d'ouvrir les paramètres", e2 or e)
+
+    def _settings_window(self, page=None):
+        w = getattr(self, "_swin", None)
+        if w is not None:
+            w.present()
+            if page:
+                w.page.show_page(page)
+            return
+        w = Gtk.Window(title="Paramètres de MintMail")
+        w.set_transient_for(self)
+        w.set_default_size(960, 660)
+        w.page = SettingsPage(self, page)
+        w.add(w.page)
+        w.show_all()
+        self._swin = w
+        w.connect("destroy", lambda *_: setattr(self, "_swin", None))
 
     def close_settings(self):
+        sw = getattr(self, "_swin", None)
+        if sw is not None:
+            sw.destroy()
+            return
         cur = self.root_stack.get_child_by_name("settings")
         self.root_stack.set_visible_child_name("mail")
         if cur is not None:
             self.root_stack.remove(cur)
             cur.destroy()
+
+    def show_error(self, title, exc):
+        d = Gtk.MessageDialog(transient_for=self, modal=True, message_type=Gtk.MessageType.ERROR,
+                              text=title, secondary_text="%s\n\nDétails dans le journal : %s" % (exc, LOG))
+        d.add_buttons("Fermer", Gtk.ResponseType.CLOSE)
+        d.run()
+        d.destroy()
+
+    def show_log(self):
+        d = Gtk.Dialog(title="Journal d'erreurs", transient_for=self, modal=True)
+        d.add_buttons("Fermer", Gtk.ResponseType.CLOSE)
+        d.set_default_size(720, 420)
+        tv = Gtk.TextView()
+        tv.set_editable(False)
+        tv.set_monospace(True)
+        tv.get_buffer().set_text("%s\n\n%s" % (LOG, tail()))
+        sw = Gtk.ScrolledWindow()
+        sw.add(tv)
+        d.get_content_area().pack_start(sw, True, True, 0)
+        d.show_all()
+        d.run()
+        d.destroy()
 
     def show_about(self):
         d = Gtk.AboutDialog(transient_for=self, modal=True)
@@ -1053,8 +1114,8 @@ class MainWindow(Gtk.ApplicationWindow):
         key = Gdk.keyval_name(ev.keyval) or ""
         ctrl = bool(ev.state & Gdk.ModifierType.CONTROL_MASK)
         typing = isinstance(focus, (Gtk.Entry, Gtk.TextView, Gtk.SpinButton))
-        if ctrl and key == "comma":
-            self.show_settings()
+        if ctrl and key in ("comma", "less"):
+            self.show_settings(window=bool(ev.state & Gdk.ModifierType.SHIFT_MASK))
             return True
         if self.root_stack.get_visible_child_name() == "settings":
             if key == "Escape":
@@ -1427,7 +1488,8 @@ class MainWindow(Gtk.ApplicationWindow):
             ("Disposition : lecture en bas", lambda: self.set_layout("bottom")),
             ("Disposition : liste seule", lambda: self.set_layout("list")),
             ("Barre latérale : réduire / étendre", self.toggle_rail),
-            ("Paramètres", self.show_settings), ("Gestes de swipe (réglages)", lambda: self.show_settings("gestures")),
+            ("Paramètres", self.show_settings), ("Paramètres dans une fenêtre séparée", lambda: self.show_settings(window=True)),
+            ("Journal d'erreurs", self.show_log), ("Gestes de swipe (réglages)", lambda: self.show_settings("gestures")),
             ("Basculer thème clair / sombre", self.toggle_theme),
             ("Tout marquer comme lu", self.mark_all_read), ("Tout sélectionner", lambda: self.listbox.select_all()),
             ("Rechercher", lambda: self.search_entry.grab_focus()),

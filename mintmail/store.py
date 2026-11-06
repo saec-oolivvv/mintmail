@@ -33,6 +33,7 @@ class Config:
     def __init__(self, path=None):
         self.path = Path(path) if path else CONFIG_DIR / "config.json"
         self.data = copy.deepcopy(DEFAULTS)
+        self._pw = {}
         self.load()
 
     def load(self):
@@ -61,23 +62,22 @@ class Config:
     def get(self, k, d=None):
         return self.data.get(k, d)
 
-    # -- mots de passe : trousseau système si disponible, sinon fichier 0600
+    # -- mots de passe : trousseau système si disponible (jamais bloquant), sinon fichier 0600
     def password(self, account_id):
-        try:
-            import keyring
-            pw = keyring.get_password(APP, account_id)
-            if pw:
-                return pw
-        except Exception:
-            pass
-        return self.data.get("passwords", {}).get(account_id, "")
+        if account_id in self._pw:
+            return self._pw[account_id]
+        pw = _keyring("get_password", APP, account_id) or self.data.get("passwords", {}).get(account_id, "")
+        if pw:
+            self._pw[account_id] = pw
+        return pw or ""
+
+    def preload_passwords(self):
+        for a in self.data.get("accounts", []):
+            self.password(a["id"])
 
     def delete_password(self, account_id):
-        try:
-            import keyring
-            keyring.delete_password(APP, account_id)
-        except Exception:
-            pass
+        self._pw.pop(account_id, None)
+        _keyring("delete_password", APP, account_id)
         self.data.get("passwords", {}).pop(account_id, None)
 
     def reset(self, keys):
@@ -85,14 +85,31 @@ class Config:
             self.data[k] = copy.deepcopy(DEFAULTS[k])
 
     def set_password(self, account_id, pw):
+        self._pw[account_id] = pw
+        if _keyring("set_password", APP, account_id, pw):
+            self.data.get("passwords", {}).pop(account_id, None)
+        else:
+            self.data.setdefault("passwords", {})[account_id] = pw
+
+
+def _keyring(op, *args, timeout=4):
+    """Appelle le trousseau dans un thread : un trousseau verrouillé ne gèle plus l'interface."""
+    box = {}
+
+    def run():
         try:
             import keyring
-            keyring.set_password(APP, account_id, pw)
-            self.data.get("passwords", {}).pop(account_id, None)
-            return
+            if op == "set_password":
+                keyring.set_password(*args)
+                box["v"] = True
+            else:
+                box["v"] = getattr(keyring, op)(*args)
         except Exception:
             pass
-        self.data.setdefault("passwords", {})[account_id] = pw
+    t = threading.Thread(target=run, daemon=True)
+    t.start()
+    t.join(timeout)
+    return box.get("v")
 
 
 def parse_search(q):

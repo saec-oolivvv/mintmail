@@ -174,7 +174,9 @@ class SettingsPage(Gtk.Box):
         self.f_name.set_text(a.get("name", ""))
         self.f_email.set_text(a.get("email", ""))
         self.f_user.set_text(a.get("username", ""))
-        self.f_pass.set_text(self.cfg.password(a["id"]) if a.get("email") else "")
+        self.f_pass.set_text("")
+        self.f_pass.set_placeholder_text("Enregistré — laisser vide pour le conserver"
+                                         if a.get("email") and a.get("has_password", True) else "Mot de passe")
         self.f_ihost.set_text(a.get("imap_host", ""))
         self.f_iport.set_text(str(a.get("imap_port", 993)))
         self.f_shost.set_text(a.get("smtp_host", ""))
@@ -223,17 +225,19 @@ class SettingsPage(Gtk.Box):
         a = self._collect()
         if not a:
             return
-        if not self.f_pass.get_text():
+        typed = self.f_pass.get_text()
+        if not typed and not a.get("has_password", True):
             self._say("Saisissez le mot de passe (ou mot de passe d'application).", True)
             return
         self._say("Test de connexion en cours…")
-        pw = self.f_pass.get_text()
-        class _C:  # config minimale pour make_backend
-            def password(self_, _id): return pw
-        be = make_backend(a, _C())
 
         def work():
-            err = be.test()
+            pw = typed or self.cfg.password(a["id"])
+
+            class _C:  # config minimale pour make_backend
+                def password(self_, _id):
+                    return pw
+            err = make_backend(a, _C()).test()
             GLib.idle_add(lambda: self._say("Connexion réussie (IMAP + SMTP)." if not err else err, bool(err)))
         threading.Thread(target=work, daemon=True).start()
 
@@ -241,14 +245,20 @@ class SettingsPage(Gtk.Box):
         a = self._collect()
         if not a:
             return
-        if not self.f_pass.get_text():
+        pw = self.f_pass.get_text()
+        existing = next((x for x in self.cfg["accounts"] if x["id"] == a["id"]), None)
+        if not pw and not (existing and existing.get("has_password", True)):
             self._say("Mot de passe requis.", True)
             return
         if any(x["email"].lower() == a["email"].lower() and x["id"] != a["id"] for x in self.cfg["accounts"]):
             self._say("Ce compte existe déjà.", True)
             return
         first = not self.cfg["accounts"]
-        self.cfg.set_password(a["id"], self.f_pass.get_text())
+        if pw:
+            self.cfg.set_password(a["id"], pw)
+            a["has_password"] = True
+        else:
+            a["has_password"] = existing.get("has_password", True)
         accs = [x for x in self.cfg["accounts"] if x["id"] != a["id"]]
         old = next((x for x in self.cfg["accounts"] if x["id"] == a["id"]), {})
         a["signature_html"] = old.get("signature_html", "")
