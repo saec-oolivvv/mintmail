@@ -1,8 +1,10 @@
-"""Pages de réglages : gestes & disposition, filtres & blocage, modèles de réponse."""
+"""Pages de réglages : gestes & disposition, filtres & blocage, modèles de réponse, aide & synchronisation."""
 import gi
-gi.require_version("Gtk", "3.0")
-from gi.repository import Gtk
 
+gi.require_version("Gtk", "3.0")
+from gi.repository import Gdk, GLib, Gtk
+
+from . import APP_NAME, __version__
 from .widgets import SWIPE_ACTIONS, icon
 
 LAYOUTS = [("columns", "Colonnes : liste | lecture"), ("bottom", "Lecture en bas"), ("list", "Liste seule (lecture plein écran)")]
@@ -226,8 +228,8 @@ def templates_page(win):
         for i, t in enumerate(cfg["templates"]):
             r = Gtk.ListBoxRow()
             r.idx = i
+            r.set_border_width(8)
             l = Gtk.Label(label=t["name"], xalign=0)
-            l.set_border_width(8)
             r.add(l)
             lb.add(r)
         lb.show_all()
@@ -272,3 +274,239 @@ def templates_page(win):
     rm.connect("clicked", on_rm)
     refresh(0)
     return page
+
+
+# ------------------------------------------------------------------ synchronisation
+_SYNC_NOUNS = {"rules": "règles", "templates": "modèles", "blocked": "expéditeurs bloqués",
+               "spam_senders": "expéditeurs en spam", "saved_searches": "recherches", "signatures": "signatures"}
+
+
+def p2p_page(win):
+    """Synchronisation des préférences entre machines du même réseau (code de jumelage obligatoire)."""
+    import secrets
+    import socket
+    import threading
+    from .p2p import MIN_SECRET, local_ip
+    cfg = win.config
+    grid = Gtk.Grid(column_spacing=14, row_spacing=10)
+    grid.set_border_width(18)
+    alive = {"v": True}
+
+    def label(text, dim=True, wrap=True):
+        l = Gtk.Label(xalign=0, label=text)
+        l.set_line_wrap(wrap)
+        if dim:
+            l.get_style_context().add_class("dim")
+        return l
+    title = label("Synchronisation entre machines", dim=False)
+    title.get_style_context().add_class("list-title")
+    grid.attach(title, 0, 0, 2, 1)
+    grid.attach(label("Partage automatiquement, entre vos machines MintMail du même réseau : règles, modèles, "
+                      "expéditeurs bloqués ou en spam, recherches enregistrées et signatures. Les mots de passe, "
+                      "clés API, comptes et courriers ne sont jamais échangés. Seuls les ajouts sont synchronisés."),
+                0, 1, 2, 1)
+
+    # --- code de jumelage
+    secret = Gtk.Entry()
+    secret.set_visibility(False)
+    secret.set_hexpand(True)
+    secret.set_text(cfg.get("p2p_secret") or "")
+    secret.set_placeholder_text("%d caractères minimum, identique sur les deux machines" % MIN_SECRET)
+    show = Gtk.CheckButton(label="Afficher")
+    show.connect("toggled", lambda b: secret.set_visibility(b.get_active()))
+    gen = Gtk.Button(label="Générer")
+    apply_btn = Gtk.Button(label="Appliquer")
+    srow = Gtk.Box(spacing=6)
+    for w, ex in ((secret, True), (show, False), (gen, False), (apply_btn, False)):
+        srow.pack_start(w, ex, ex, 0)
+    grid.attach(Gtk.Label(label="Code de jumelage", xalign=1), 0, 2, 1, 1)
+    grid.attach(srow, 1, 2, 1, 1)
+
+    def on_generate(_b):
+        secret.set_text(secrets.token_urlsafe(9))
+        show.set_active(True)
+    gen.connect("clicked", on_generate)
+
+    # --- activation
+    enabled = Gtk.Switch()
+    enabled.set_active(bool(cfg["p2p_enabled"]))
+    enabled.set_halign(Gtk.Align.START)
+    guard = {"busy": False}
+
+    def apply_settings(*_):
+        code = secret.get_text().strip()
+        want = enabled.get_active()
+        if want and len(code) < MIN_SECRET:
+            win.toast.popup("Définissez d'abord un code de jumelage (%d caractères minimum)" % MIN_SECRET, timeout=4)
+            guard["busy"] = True
+            enabled.set_active(False)
+            guard["busy"] = False
+            want = False
+        cfg["p2p_secret"], cfg["p2p_enabled"] = code, want
+        cfg.save()
+        win._init_sync()
+        refresh()
+
+    def on_switch(sw, _p):
+        if not guard["busy"]:
+            apply_settings()
+    enabled.connect("notify::active", on_switch)
+    apply_btn.connect("clicked", apply_settings)
+    secret.connect("activate", apply_settings)
+    grid.attach(Gtk.Label(label="Synchronisation activée", xalign=1), 0, 3, 1, 1)
+    grid.attach(enabled, 1, 3, 1, 1)
+
+    # --- état, identifiant, pairs
+    state_lbl = label("")
+    id_lbl = Gtk.Label(xalign=0)
+    id_lbl.set_selectable(True)
+    peers_lbl = label("")
+    grid.attach(Gtk.Label(label="État", xalign=1), 0, 4, 1, 1)
+    grid.attach(state_lbl, 1, 4, 1, 1)
+    grid.attach(Gtk.Label(label="Cet appareil", xalign=1), 0, 5, 1, 1)
+    grid.attach(id_lbl, 1, 5, 1, 1)
+    grid.attach(Gtk.Label(label="Pairs détectés", xalign=1), 0, 6, 1, 1)
+    grid.attach(peers_lbl, 1, 6, 1, 1)
+
+    sync_btn = Gtk.Button(label="↔ Synchroniser maintenant")
+    sync_btn.set_halign(Gtk.Align.START)
+
+    def do_sync(_b):
+        sync_btn.set_sensitive(False)
+
+        def work():
+            res = win.sync_engine.sync_now() or {}
+
+            def done():
+                sync_btn.set_sensitive(True)
+                parts = ["%d %s" % (v, _SYNC_NOUNS.get(k[6:], k[6:])) for k, v in res.items()
+                         if k.startswith("added_") and v]
+                if not win.sync_engine.can_run():
+                    msg = "Synchronisation inactive (code de jumelage requis)"
+                elif not res.get("peers_checked"):
+                    msg = "Aucune autre machine détectée"
+                else:
+                    msg = " + ".join(parts) if parts else "À jour"
+                win.toast.popup(msg, timeout=3)
+                refresh()
+                return False
+            GLib.idle_add(done)
+        threading.Thread(target=work, daemon=True).start()
+    sync_btn.connect("clicked", do_sync)
+    grid.attach(sync_btn, 1, 7, 1, 1)
+
+    # --- pairs statiques (secours si la découverte automatique est bloquée)
+    grid.attach(label("Secours si la découverte automatique est bloquée (isolation Wi-Fi de certaines box) : "
+                      "adresse IP de l'autre machine. Votre adresse : %s" % local_ip()), 0, 8, 2, 1)
+    peer_entry = Gtk.Entry()
+    peer_entry.set_placeholder_text("192.168.1.42 ou 192.168.1.42:54322")
+    peer_entry.set_text(", ".join(cfg.get("p2p_static_peers") or []))
+    peer_entry.set_hexpand(True)
+    save_peers_btn = Gtk.Button(label="Enregistrer")
+    test_peer_btn = Gtk.Button(label="Tester")
+
+    def parse_peers(text):
+        out = []
+        for tok in text.replace(",", " ").split():
+            host, sep, port = tok.partition(":")
+            if not host or any(c in host for c in "/\\"):
+                continue
+            if sep and (not port.isdigit() or not 0 < int(port) < 65536):
+                continue
+            if tok not in out:
+                out.append(tok)
+        return out
+
+    def save_peers(_b):
+        lst = parse_peers(peer_entry.get_text())
+        cfg["p2p_static_peers"] = lst
+        cfg.save()
+        win._init_sync()
+        win.toast.popup("%d pair(s) statique(s) enregistré(s)" % len(lst), timeout=3)
+    save_peers_btn.connect("clicked", save_peers)
+
+    def test_peer(_b):
+        lst = parse_peers(peer_entry.get_text())
+        if not lst:
+            return
+        host, _, port = lst[0].partition(":")
+        port = int(port) if port else int(cfg.get("p2p_port", 54322))
+
+        def work():
+            try:
+                socket.create_connection((host, port), timeout=3).close()
+                msg = "Connexion TCP vers %s:%d : OK" % (host, port)
+            except OSError as e:
+                msg = "Impossible de joindre %s:%d (%s)" % (host, port, e.strerror or e)
+            GLib.idle_add(lambda: (win.toast.popup(msg, timeout=4), False)[1])
+        threading.Thread(target=work, daemon=True).start()
+    test_peer_btn.connect("clicked", test_peer)
+    prow = Gtk.Box(spacing=6)
+    prow.pack_start(peer_entry, True, True, 0)
+    prow.pack_start(save_peers_btn, False, False, 0)
+    prow.pack_start(test_peer_btn, False, False, 0)
+    grid.attach(prow, 0, 9, 2, 1)
+    grid.attach(label("Pare-feu : autoriser UDP 54321 et TCP 54322 entre les machines "
+                      "(ex. sudo ufw allow from 192.168.1.0/24 to any port 54322 proto tcp). "
+                      "Les données échangées ne sont pas chiffrées : réseau de confiance uniquement."), 0, 10, 2, 1)
+
+    def refresh(*_):
+        eng = win.sync_engine
+        state_lbl.set_text(eng.state_label())
+        id_lbl.set_markup("<b>%s</b>" % GLib.markup_escape_text(eng.node_id() or "—"))
+        peers_lbl.set_text("\n".join("%s @ %s:%s" % (p["node_id"], p["host"], p["port"]) for p in eng.peers())
+                           or "Aucune autre machine détectée pour l'instant.")
+
+    sw = _scrolled(grid)
+    sw.connect("destroy", lambda *_: alive.update(v=False))
+
+    def tick():
+        if alive["v"]:
+            refresh()
+        return alive["v"]
+    GLib.timeout_add_seconds(5, tick)
+    refresh()
+    return sw
+
+
+# ------------------------------------------------------------------ aide
+def help_page():
+    """Page d'aide et crédits."""
+    sw = Gtk.ScrolledWindow()
+    page = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=12)
+    page.set_border_width(14)
+    sw.add(page)
+
+    # Titre
+    title = Gtk.Label(label=f"{APP_NAME} {__version__}", xalign=0)
+    title.get_style_context().add_class("list-title")
+    page.pack_start(title, False, False, 0)
+
+    # Description
+    desc = Gtk.Label(xalign=0, label="Un client mail moderne pour Linux Mint.\n\nBoîte intelligente, reports, envoi annulable, signatures HTML.")
+    desc.get_style_context().add_class("dim")
+    desc.set_line_wrap(True)
+    page.pack_start(desc, False, False, 8)
+
+    # Fonctionnalités
+    feats = Gtk.Label(xalign=0, label="✓ Boîte de réception intelligente avec filtres automatiques\n✓ Support des rapports (snooze) avec rappel\n✓ Rédaction d'e-mails avec assistance IA NVIDIA\n✓ Synchronisation P2P entre machines\n✓ Interface GTK 3.0 moderne")
+    feats.get_style_context().add_class("dim")
+    feats.set_line_wrap(True)
+    page.pack_start(feats, False, False, 8)
+
+    # Aide
+    help_label = Gtk.Label(xalign=0, label="Raccourcis clavier :\nCtrl+,: Ouvrir les paramètres\nCtrl+K Palette de commandes\nCtrl+R Actualiser\nCtrl+N Nouveau message\nCtrl+F Rechercher\nEsc Fermer/annuler")
+    help_label.get_style_context().add_class("dim")
+    help_label.set_line_wrap(True)
+    page.pack_start(help_label, False, False, 12)
+
+    # Crédits
+    sep = Gtk.Separator(orientation=Gtk.Orientation.HORIZONTAL)
+    page.pack_start(sep, False, False, 12)
+
+    credit_label = Gtk.Label(xalign=0, label="Développé par saec - https://saec.me\n\nMintMail est un projet open source.\nUtilisez MintMail librement selon vos besoins.")
+    credit_label.get_style_context().add_class("dim")
+    credit_label.set_line_wrap(True)
+    page.pack_start(credit_label, False, False, 0)
+
+    return sw

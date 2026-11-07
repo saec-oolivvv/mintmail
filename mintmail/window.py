@@ -1,26 +1,41 @@
 import datetime
 import html
-import re
 import threading
 import time
 import uuid
 
 import gi
+
 gi.require_version("Gtk", "3.0")
 gi.require_version("Gdk", "3.0")
-from gi.repository import Gtk, Gdk, Gio, GLib
+from gi.repository import Gdk, Gio, GLib, Gtk
 
-from . import __version__, APP_NAME
+from . import APP_NAME, __version__
+from .ai_service import AIService
 from .backend import make_backend
 from .compose import ComposeWindow
 from .models import Message, Outgoing
-from .store import DATA_DIR
-from .log import log_exception, tail, LOG
+from .p2p import SyncEngine
 from .reader import Reader
 from .settings import SettingsPage
+from .log import LOG, log_exception, tail
+from .store import DATA_DIR
 from .style import build_css
-from .util import (format_full, normalize_subject, sanitize_html, split_addresses, text_to_html)
-from .widgets import (MessageRow, Toast, icon, icon_button, row_header, row_sort, SWIPE_ACTIONS)
+from .util import (
+    format_full,
+    normalize_subject,
+    sanitize_html,
+    split_addresses,
+    text_to_html,
+)
+from .widgets import (
+    MessageRow,
+    Toast,
+    icon,
+    icon_button,
+    row_header,
+    row_sort,
+)
 
 NAV = [
     ("inbox", "Boîte intelligente", "mail-inbox-symbolic"),
@@ -70,6 +85,7 @@ class MainWindow(Gtk.ApplicationWindow):
         self.connect("key-press-event", self._on_key)
         self.connect("delete-event", self._on_close)
         self.show_all()
+        self._init_sync()
         threading.Thread(target=self.config.preload_passwords, daemon=True).start()
         self.apply_layout()
         self.reader.zoom = self.config["zoom"]
@@ -276,9 +292,10 @@ class MainWindow(Gtk.ApplicationWindow):
         self.list_stack.add_named(self.empty_lbl, "empty")
         self.list_box.pack_start(self.list_stack, True, True, 0)
 
-        self.reader = Reader(self.build_snooze_menu)
+        self.reader = Reader(self.build_snooze_menu, ai_service=self._get_ai_service())
         self.reader.connect("action", self._reader_action)
         self.reader.connect("quick-reply", lambda _r, t: self.quick_reply(t))
+        self.reader.connect("ai-request", self._handle_ai_request)
 
         self.paned_in = Gtk.Paned(orientation=Gtk.Orientation.HORIZONTAL)
         self.paned_in.set_wide_handle(True)
@@ -325,6 +342,22 @@ class MainWindow(Gtk.ApplicationWindow):
         return box
 
     # --------------------------------------------------------------- comptes
+    def _get_ai_service(self):
+        """Service IA configuré, ou None (IA désactivée / clé absente)."""
+        if not self.config.get("ai_enabled", False):
+            return None
+        key = self.config.ai_key()
+        if not key:
+            return None
+        return AIService(api_key=key, api_base=self.config.get("nvidia_api_base") or None,
+                         model=self.config.get("ai_model") or None)
+
+    def refresh_ai(self):
+        """Met à jour l'interface après un changement des réglages IA."""
+        svc = self._get_ai_service()
+        self.reader.ai_service = svc
+        self.reader.ai_reply_btn.set_visible(bool(svc))
+
     def accounts(self):
         return self.config["accounts"] or [DEMO_ACCOUNT]
 
@@ -737,65 +770,6 @@ class MainWindow(Gtk.ApplicationWindow):
                 GLib.idle_add(cb)
         threading.Thread(target=work, daemon=True).start()
 
-    # ------------------------------------------------------------ synchro
-    def sync(self, manual=False, folders=("inbox", "sent"), quiet=False):
-        if self._sync_busy or self._pending:
-            if manual:
-                self.toast.popup("Synchronisation déjà en cours…", timeout=2)
-            return
-        self._sync_busy = True
-        if not quiet:
-            self.status.set_text("Synchronisation…")
-        accounts = list(self.accounts())
-        known = {(a["id"], f): self.cache.uids(a["id"], f) for a in accounts for f in folders}
-
-        def work():
-            out = []
-            for a in accounts:
-                be = self.backend(a["id"])
-                for f in folders:
-                    try:
-                        out.append((a["id"], f, be.sync(f, known[(a["id"], f)]), None))
-                    except Exception as e:
-                        out.append((a["id"], f, None, e))
-            return out
-        self.run_bg(work, lambda res, err: self._sync_done(res or [], err, known, manual))
-
-    def _sync_done(self, results, err, known, manual):
-        self._sync_busy = False
-        errors, fresh = [], []
-        for aid, f, data, e in results:
-            if e or not data:
-                if e:
-                    errors.append(str(e))
-                continue
-            msgs, flags, present, minuid = data
-            self.cache.upsert_many(msgs)
-            kn = known[(aid, f)]
-            for uid, (unread, starred) in flags.items():
-                mid = kn.get(uid)
-                m = self.cache.get(mid) if mid else None
-                if m and (m.unread != unread or m.starred != starred):
-                    self.cache.update(mid, unread=unread, starred=starred)
-            if present is not None:
-                for uid, mid in kn.items():
-                    if uid >= minuid and uid not in present:
-                        self.cache.delete(mid)
-            if f == "inbox":
-                keep = self._auto_route([m for m in msgs if m.folder == "inbox"])
-                if kn:
-                    fresh += [m for m in keep if m.unread]
-        self._last_sync = time.time()
-        if errors:
-            self.status.set_text("⚠ " + errors[0][:120])
-            if manual:
-                self.toast.popup(errors[0][:100], timeout=6)
-        else:
-            self.status.set_text("Synchronisé à " + time.strftime("%H:%M"))
-        self.reload_list()
-        self.update_counts()
-        self._notify(fresh)
-
     def _notify(self, msgs):
         if not msgs or not self.config["notifications"]:
             return
@@ -973,6 +947,110 @@ class MainWindow(Gtk.ApplicationWindow):
             self.set_unread(msgs, False)
             self.reload_list()
 
+    # ------------------------------------------------------------ Synchronisation
+    def _init_sync(self):
+        """(Re)démarre le moteur de synchronisation P2P selon les réglages. Le moteur existe toujours."""
+        old = getattr(self, "sync_engine", None)
+        if old is not None:
+            old.stop()
+        self.sync_engine = SyncEngine(self.config, cache=self.cache, on_update=self._on_p2p_update)
+        self.sync_engine.start()   # sans effet si désactivé ou sans code de jumelage
+
+    def _on_p2p_update(self, summary):
+        """Appelé depuis un thread de synchro : l'interface est mise à jour dans le thread principal."""
+        names = {"added_rules": "règles", "added_templates": "modèles", "added_blocked": "expéditeurs bloqués",
+                 "added_spam_senders": "expéditeurs en spam", "added_saved_searches": "recherches",
+                 "added_signatures": "signatures"}
+        parts = ["+%d %s" % (v, names[k]) for k, v in summary.items() if k in names and v]
+
+        def ui():
+            self._rebuild_saved()
+            self.reload_list()
+            self.toast.popup("Synchro : " + (", ".join(parts) or "à jour"), timeout=4)
+            return False
+        GLib.idle_add(ui)
+
+    def sync(self, manual=False, folders=("inbox", "sent"), quiet=False):
+        """Synchronisation mail et état local."""
+        if self._sync_busy or self._pending:
+            if manual:
+                self.toast.popup("Synchronisation déjà en cours…", timeout=2)
+            return
+        self._sync_busy = True
+        if not quiet:
+            self.status.set_text("Synchronisation…")
+        accounts = list(self.accounts())
+        known = {(a["id"], f): self.cache.uids(a["id"], f) for a in accounts for f in folders}
+
+        ai = self._get_ai_service() if self.config.get("ai_classify") else None
+
+        def work():
+            out = []
+            for a in accounts:
+                be = self.backend(a["id"])
+                for f in folders:
+                    try:
+                        data = be.sync(f, known[(a["id"], f)])
+                        if ai and f == "inbox" and not be.demo:
+                            self._ai_classify(ai, data[0])
+                        out.append((a["id"], f, data, None))
+                    except Exception as e:
+                        out.append((a["id"], f, None, e))
+            return out
+        self.run_bg(work, lambda res, err: self._sync_done(res or [], err, known, manual))
+
+    @staticmethod
+    def _ai_classify(ai, msgs, budget=15):
+        """Classe quelques nouveaux messages avec l'IA (thread de travail, erreurs ignorées)."""
+        for m in [m for m in msgs if m.category == "people"][:budget]:
+            try:
+                m.category = ai.classify_category(m)
+            except Exception:
+                break   # service injoignable : on s'arrête là, la classification locale reste valable
+
+    def _sync_done(self, results, err, known, manual):
+        """Intègre les résultats de synchronisation dans le cache et l'interface."""
+        self._sync_busy = False
+        errors, fresh = [], []
+        for aid, f, data, e in results:
+            if e or not data:
+                if e:
+                    errors.append(str(e))
+                continue
+            msgs, flags, present, minuid = data
+            self.cache.upsert_many(msgs)
+            kn = known[(aid, f)]
+            for uid, (unread, starred) in flags.items():
+                mid = kn.get(uid)
+                m = self.cache.get(mid) if mid else None
+                if m and (m.unread != unread or m.starred != starred):
+                    self.cache.update(mid, unread=unread, starred=starred)
+            if present is not None:
+                for uid, mid in kn.items():
+                    if uid >= minuid and uid not in present:
+                        self.cache.delete(mid)
+            if f == "inbox":
+                keep = self._auto_route([m for m in msgs if m.folder == "inbox"])
+                if kn:
+                    fresh += [m for m in keep if m.unread]
+
+        self._last_sync = time.time()
+        if errors:
+            self.status.set_text("⚠ " + errors[0][:120])
+            if manual:
+                self.toast.popup(errors[0][:100], timeout=6)
+        else:
+            self.status.set_text("Synchronisé à " + time.strftime("%H:%M"))
+        self.reload_list()
+        self.update_counts()
+        self._notify(fresh)
+
+    def sync_from_store(self):
+        """Déclenche un échange P2P immédiat avec les pairs."""
+        if hasattr(self, 'sync_engine') and self.sync_engine.is_enabled():
+            return self.sync_engine.sync_now()
+        return {}
+
     # ------------------------------------------------------------ rédaction
     def _default_account(self, msg=None):
         if msg and any(a["id"] == msg.account for a in self.accounts()):
@@ -1023,6 +1101,50 @@ class MainWindow(Gtk.ApplicationWindow):
         out = Outgoing(account=acc["id"], to=(msg.reply_to or msg.sender_email), subject="Re: " + normalize_subject(msg.subject),
                        html=body, in_reply_to=msg.message_id, references=msg.references)
         self.queue_send(out, 0)
+
+    def _handle_ai_request(self, reader, request_type):
+        """Gère les requêtes IA depuis le reader."""
+        if request_type == "generate_reply":
+            self._ai_generate_reply()
+
+    def _ai_generate_reply(self):
+        """Génère une réponse IA pour le message affiché."""
+        if self.reader.msg:
+            self._ai_generate_reply_from_msg(self.reader.msg)
+
+    def _ai_generate_reply_from_msg(self, msg):
+        """Génère une réponse IA (thread de travail) puis ouvre le composeur pré-rempli."""
+        ai = self._get_ai_service()
+        if not ai:
+            self.toast.popup("IA non configurée : Paramètres → IA NVIDIA.", timeout=5)
+            return
+
+        def work():
+            return ai.generate_reply(msg)
+
+        def done(text, err):
+            if err:
+                self.toast.popup("Erreur IA : %s" % str(err)[:90], timeout=6)
+            else:
+                self._show_ai_reply(msg, text)
+        self.toast.popup("Génération de la réponse par l'IA…", timeout=3)
+        self.run_bg(work, done)
+
+    def _show_ai_reply(self, msg, reply_text):
+        """Affiche la réponse IA générée dans le composeur."""
+        if not reply_text:
+            self.toast.popup("L'IA n'a pas généré de réponse.", timeout=5)
+            return
+        # Ouvrir le composeur avec le texte IA pré-rempli
+        self.compose(
+            account_id=self._default_account(msg),
+            to=msg.reply_to or msg.sender_email,
+            subject="Re: " + normalize_subject(msg.subject),
+            ai_suggested_text=reply_text,
+            in_reply_to=msg.message_id,
+            references=msg.references
+        )
+        self.toast.popup("Réponse IA générée. Vérifiez et envoyez.", timeout=5)
 
     # ---------------------------------------------------------------- envoi
     def queue_send(self, out, delay=0, scheduled=False):
@@ -1479,6 +1601,10 @@ class MainWindow(Gtk.ApplicationWindow):
             ]
             if self.is_blocked(m):
                 cmds.insert(6, ("Débloquer " + who, lambda: self.unblock(m)))
+        # Commandes IA NVIDIA
+        ai = self._get_ai_service()
+        if ai and m:
+            cmds.insert(6, ("Générer une réponse IA", lambda: self._ai_generate_reply_from_msg(m)))
         cmds += [
             ("Nouveau message", self.compose), ("Actualiser", lambda: self.sync(True)),
             ("Gérer les expéditeurs bloqués et les règles", lambda: self.show_settings("filters")),
@@ -1559,4 +1685,8 @@ class MainWindow(Gtk.ApplicationWindow):
         except OSError:
             pass
         self.toast._finish(expired=True)   # valide les actions en attente
+        try:
+            self.sync_engine.stop()
+        except Exception:
+            pass
         return False

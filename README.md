@@ -1,11 +1,11 @@
-# MintMail 1.2.0
+# MintMail 1.3.0
 
 Client mail moderne pour Linux Mint (Python / GTK3), inspiré de Spark Mail.
 
 ## Installation / mise à jour
 ```bash
-unzip mintmail-1.2.0.zip && cd mintmail-1.2.0
-./install.sh            # pour l'utilisateur courant (~/.local)
+unzip mintmail-1.3.0.zip && cd mintmail-1.3.0
+./install.sh            # pour l'utilisateur courant (~/.local) — si « Permission denied » : bash install.sh
 ./install.sh --system   # pour tous les utilisateurs (/opt, sudo)
 ```
 Relancer `install.sh` d'une version plus récente = mise à jour : configuration et courrier en cache sont conservés,
@@ -24,6 +24,13 @@ Dépendances (installées automatiquement via apt) : `python3-gi`, `gir1.2-gtk-3
 - Palette de commandes `Ctrl+K`, raccourcis clavier (voir Paramètres → Raccourcis), thème clair/sombre, couleur d'accent
 - Interface adaptative (panneau latéral escamotable, mode une colonne en fenêtre étroite), notifications de bureau, gestionnaire `mailto:`
 - Sans compte configuré : mode démonstration avec messages d'exemple
+
+## Nouveautés 1.3.0 — correctifs et sécurité
+- **Démarrage** : correction du plantage au lancement (import `httpx` invalide) et de l'erreur d'initialisation de la fenêtre (synchro)
+- **Paramètres** : la page s'ouvre de nouveau (erreur de nom dans la page de synchronisation, `set_border_width` sur un libellé) ; repli automatique sur une fenêtre séparée + journal d'erreurs (menu ☰ → Journal d'erreurs) ; `mintmail --diagnose`
+- **IA NVIDIA** : endpoint et modèle valides par défaut, plus aucune dépendance (stdlib), vraies erreurs (clé refusée, quota…), appels hors de l'interface (plus de gel), clé stockée dans le trousseau, texte généré toujours échappé, classification automatique optionnelle
+- **Synchronisation entre machines** : réécrite. Désactivée par défaut, code de jumelage obligatoire (authentification HMAC mutuelle), **mots de passe, comptes et clés jamais échangés**, données validées, ajouts uniquement
+- Trousseau non bloquant, installeur `--full-reset` corrigé (confirmation demandée)
 
 ## Nouveautés 1.2.0
 - **Paramètres accessibles partout** : icône ⚙ dans la barre d'en-tête, bouton en bas de la barre latérale, `Ctrl+,`, menu ☰ et palette `Ctrl+K`. Ils s'ouvrent comme une page dans la fenêtre (bouton « Retour » ou Échap) — plus de fenêtre qui se perd.

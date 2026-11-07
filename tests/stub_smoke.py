@@ -188,4 +188,19 @@ X.gestures_page(win); X.filters_page(win); X.templates_page(win)
 # suppression du compte
 sw.current = {"id": acc["id"]}; sw._remove_account()
 assert win.config["accounts"] == [] and win.config.password(acc["id"]) == ""
+
+# --- v1.3 : IA, P2P, composeur
+assert win._get_ai_service() is None
+win.config["ai_enabled"] = True
+win.config.set_password("ai:nvidia", "nvapi-test")
+svc = win._get_ai_service(); assert svc and svc.api_base.startswith("https://integrate.api.nvidia.com")
+win.refresh_ai()
+win._ai_classify(svc, [], budget=3)
+win._init_sync(); assert not win.sync_engine.can_run()
+win._on_p2p_update({"added_rules": 2, "added_templates": 1})
+win.config["p2p_secret"] = "code-de-jumelage"; win.config["p2p_enabled"] = True
+win._init_sync(); assert win.sync_engine.can_run(); win.sync_engine.stop()
+cw = C.ComposeWindow.__new__(C.ComposeWindow)
+cw.__init__(win, win.accounts(), ai_suggested_text="Bonjour <script>alert(1)</script>\nMerci")
+assert "<script>" not in cw.initial_body and "&lt;script&gt;" in cw.initial_body
 print("SMOKE OK")

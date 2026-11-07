@@ -37,3 +37,13 @@ def test_util():
     assert util.has_remote_content('<img src="//x.y/z.png">')
     assert util.normalize_subject("Re: RE: Fwd: Salut") == "Salut"
     assert util.initials("Marie Dupont") == "MD"
+
+def test_wrap_html():
+    from mintmail.reader import wrap_html
+    class M:
+        html, text = "<p>Salut</p>", "Salut"
+    out = wrap_html(M(), False, False)
+    assert out.startswith("<html>") and "Salut" in out   # CSS %% ne doit pas casser le format
+    class M2:
+        html, text = None, "brut"
+    assert "brut" in wrap_html(M2(), False, True)

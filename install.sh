@@ -1,15 +1,16 @@
 #!/usr/bin/env bash
 # MintMail — installeur / mise à jour (Linux Mint, Ubuntu, Debian)
-# Usage : ./install.sh [--system] [--no-deps]
+# Usage : ./install.sh [--system] [--no-deps] [--full-reset]
 #   (sans option)  installation pour l'utilisateur courant dans ~/.local
 #   --system       installation pour tous les utilisateurs dans /opt (sudo requis)
 #   --no-deps      ne tente pas d'installer les dépendances APT
+#   --full-reset   supprime d'abord l'installation, la configuration et le cache (confirmation demandée)
 # Relancer le script avec une version plus récente = mise à jour (config et mails conservés).
 set -euo pipefail
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 NEW_VERSION="$(cat "$HERE/VERSION")"
-SYSTEM=0; DEPS=1
-for a in "$@"; do case "$a" in --system) SYSTEM=1;; --no-deps) DEPS=0;; -h|--help) sed -n '2,8p' "$0"; exit 0;; esac; done
+SYSTEM=0; DEPS=1; RESET=0
+for a in "$@"; do case "$a" in --system) SYSTEM=1;; --no-deps) DEPS=0;; --full-reset) RESET=1;; -h|--help) sed -n '2,8p' "$0"; exit 0;; esac; done
 
 if [ "$SYSTEM" = 1 ]; then
   PREFIX=/opt/mintmail; BIN=/usr/local/bin; APPS=/usr/share/applications; ICONS=/usr/share/icons/hicolor/scalable/apps
@@ -17,6 +18,18 @@ if [ "$SYSTEM" = 1 ]; then
 else
   PREFIX="$HOME/.local/share/mintmail-app"; BIN="$HOME/.local/bin"
   APPS="$HOME/.local/share/applications"; ICONS="$HOME/.local/share/icons/hicolor/scalable/apps"; SUDO=""
+fi
+
+# --- réinitialisation complète (option --full-reset : supprime aussi réglages, mots de passe en fichier et cache)
+if [ "$RESET" = 1 ]; then
+  if [ -t 0 ]; then
+    read -r -p "Supprimer MintMail ET toute sa configuration/son cache ? Tapez OUI : " ANSWER
+    [ "$ANSWER" = "OUI" ] || { echo "Abandon."; exit 1; }
+  fi
+  echo "==> Réinitialisation complète"
+  $SUDO rm -rf "$PREFIX" "$BIN/mintmail" "$APPS/mintmail.desktop" "$ICONS/mintmail.svg"
+  rm -rf "$HOME/.config/mintmail" "$HOME/.local/share/mintmail" 2>/dev/null || true
+  echo "==> Configuration et cache supprimés"
 fi
 
 echo "==> MintMail $NEW_VERSION"

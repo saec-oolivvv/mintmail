@@ -8,8 +8,10 @@ from gi.repository import Gtk, Gdk, GLib
 
 from .backend import PRESETS, make_backend, new_account_id
 from .reader import WebKit2, HAS_WEBKIT
-from .settings_extra import gestures_page, filters_page, templates_page
+from .settings_extra import (gestures_page, filters_page, templates_page,
+                              p2p_page, help_page)
 from .widgets import icon
+from .ai_service import AIService, DEFAULT_API_BASE, DEFAULT_MODEL
 
 SHORTCUTS = [
     ("C", "Nouveau message"), ("R", "Répondre"), ("A", "Répondre à tous"), ("F", "Transférer"),
@@ -61,10 +63,13 @@ class SettingsPage(Gtk.Box):
         stack.add_titled(self._scr(self._accounts_page()), "accounts", "Comptes")
         stack.add_titled(self._scr(self._signature_page()), "sig", "Signatures")
         stack.add_titled(self._scr(self._appearance_page()), "look", "Apparence")
+        stack.add_titled(self._scr(self._ai_page()), "ai", "IA NVIDIA")
+        stack.add_titled(p2p_page(win), "p2p", "Synchronisation P2P")
         stack.add_titled(gestures_page(win), "gestures", "Gestes & disposition")
         stack.add_titled(filters_page(win), "filters", "Filtres & blocage")
         stack.add_titled(templates_page(win), "templates", "Modèles de réponse")
         stack.add_titled(self._shortcuts_page(), "keys", "Raccourcis")
+        stack.add_titled(self._scr(help_page()), "help", "Aide & Crédits")
         side = Gtk.StackSidebar()
         side.set_stack(stack)
         box = Gtk.Box()
@@ -154,7 +159,7 @@ class SettingsPage(Gtk.Box):
             r = Gtk.ListBoxRow()
             r.acc = a
             l = Gtk.Label(label=a.get("name") or a["email"], xalign=0)
-            l.set_border_width(8)
+            r.set_border_width(8)
             r.add(l)
             self.acc_list.add(r)
             if select and a["id"] == select:
@@ -433,6 +438,113 @@ class SettingsPage(Gtk.Box):
         self.cfg[key] = val
         self.cfg.save()
         self.win.apply_settings()
+
+    def _ai_page(self):
+        """Assistance IA NVIDIA : désactivée par défaut, clé dans le trousseau, tests hors interface."""
+        cfg = self.cfg
+        grid = Gtk.Grid(column_spacing=12, row_spacing=10)
+        grid.set_border_width(18)
+        ttl = Gtk.Label(label="Assistance IA (NVIDIA)", xalign=0)
+        ttl.get_style_context().add_class("list-title")
+        grid.attach(ttl, 0, 0, 2, 1)
+        note = Gtk.Label(xalign=0, label="Désactivée par défaut. Quand elle est active, le texte des messages que vous "
+                                         "traitez avec l'IA (réponse suggérée, aide à la rédaction) est envoyé à l'API "
+                                         "NVIDIA. La clé API est stockée dans le trousseau du système, pas dans le "
+                                         "fichier de configuration.")
+        note.set_line_wrap(True)
+        note.get_style_context().add_class("dim")
+        grid.attach(note, 0, 1, 2, 1)
+
+        def switch(row, label, key):
+            sw = Gtk.Switch()
+            sw.set_active(bool(cfg.get(key, False)))
+            sw.set_halign(Gtk.Align.START)
+
+            def changed(w, _p):
+                cfg[key] = w.get_active()
+                cfg.save()
+                self.win.refresh_ai()
+            sw.connect("notify::active", changed)
+            grid.attach(Gtk.Label(label=label, xalign=1), 0, row, 1, 1)
+            grid.attach(sw, 1, row, 1, 1)
+        switch(2, "IA activée", "ai_enabled")
+        switch(3, "Classer les nouveaux messages", "ai_classify")
+
+        self.ai_key_entry = Gtk.Entry()
+        self.ai_key_entry.set_visibility(False)
+        self.ai_key_entry.set_hexpand(True)
+        has_key = bool(cfg.get("ai_has_key") or cfg.get("nvidia_api_key"))
+        self.ai_key_entry.set_placeholder_text("Clé enregistrée — saisir pour la remplacer" if has_key else "Clé API NVIDIA (nvapi-…)")
+        save_key = Gtk.Button(label="Enregistrer la clé")
+        krow = Gtk.Box(spacing=6)
+        krow.pack_start(self.ai_key_entry, True, True, 0)
+        krow.pack_start(save_key, False, False, 0)
+        grid.attach(Gtk.Label(label="Clé API", xalign=1), 0, 4, 1, 1)
+        grid.attach(krow, 1, 4, 1, 1)
+
+        endpoint = Gtk.Entry()
+        endpoint.set_placeholder_text(DEFAULT_API_BASE)
+        endpoint.set_text(cfg.get("nvidia_api_base") or "")
+        model = Gtk.Entry()
+        model.set_placeholder_text(DEFAULT_MODEL)
+        model.set_text(cfg.get("ai_model") or "")
+        for row, (lab, w) in enumerate((("Endpoint API", endpoint), ("Modèle", model)), start=5):
+            w.set_hexpand(True)
+            grid.attach(Gtk.Label(label=lab, xalign=1), 0, row, 1, 1)
+            grid.attach(w, 1, row, 1, 1)
+        self.ai_status = Gtk.Label(xalign=0)
+        self.ai_status.set_line_wrap(True)
+        test_btn = Gtk.Button(label="Tester la connexion")
+        test_btn.set_halign(Gtk.Align.START)
+        grid.attach(test_btn, 1, 7, 1, 1)
+        grid.attach(self.ai_status, 1, 8, 1, 1)
+
+        def say(text, error=False):
+            self.ai_status.set_markup("<span foreground='%s'>%s</span>" % (
+                "#dc2626" if error else "#16a34a", GLib.markup_escape_text(text)))
+
+        def store_key(*_):
+            text = self.ai_key_entry.get_text().strip()
+            if not text:
+                return
+            cfg.set_password("ai:nvidia", text)
+            cfg["ai_has_key"] = True
+            cfg.data.pop("nvidia_api_key", None)   # migration : plus jamais en clair
+            cfg.save()
+            self.ai_key_entry.set_text("")
+            self.ai_key_entry.set_placeholder_text("Clé enregistrée — saisir pour la remplacer")
+            self.win.refresh_ai()
+            say("Clé enregistrée dans le trousseau.")
+
+        def store_text(key, entry, https=False):
+            def save(*_):
+                v = entry.get_text().strip()
+                if https and v and not v.startswith("https://"):
+                    say("L'endpoint doit commencer par https://", True)
+                    return False
+                cfg[key] = v
+                cfg.save()
+                self.win.refresh_ai()
+                return False
+            entry.connect("activate", save)
+            entry.connect("focus-out-event", lambda *_: save() or False)
+        store_text("nvidia_api_base", endpoint, https=True)
+        store_text("ai_model", model)
+        save_key.connect("clicked", store_key)
+        self.ai_key_entry.connect("activate", store_key)
+
+        def test(*_):
+            typed = self.ai_key_entry.get_text().strip()
+            base, mdl = endpoint.get_text().strip() or None, model.get_text().strip() or None
+            say("Test en cours…")
+
+            def work():
+                key = typed or cfg.ai_key()
+                err, ok = AIService(api_key=key, api_base=base, model=mdl).test_connection()
+                GLib.idle_add(lambda: (say("Connexion réussie." if ok else err, not ok), False)[1])
+            threading.Thread(target=work, daemon=True).start()
+        test_btn.connect("clicked", test)
+        return grid
 
     def _shortcuts_page(self):
         grid = Gtk.Grid(column_spacing=24, row_spacing=6)

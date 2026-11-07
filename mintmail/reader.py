@@ -1,5 +1,6 @@
 import html
 import re
+import threading
 
 import gi
 gi.require_version("Gtk", "3.0")
@@ -41,7 +42,7 @@ def wrap_html(msg, load_images, dark):
         return ('<html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width">'
                 '<style>html{background:#fff;color:#111}body{margin:0;padding:18px 22px;'
                 'font-family:system-ui,Arial,sans-serif;font-size:14px;word-wrap:break-word}'
-                'img{max-width:100%%;height:auto}table{max-width:100%%}pre{white-space:pre-wrap}'
+                'img{max-width:100%%;height:auto}table{max-width:100%%;}pre{white-space:pre-wrap}'
                 'blockquote{border-left:3px solid #ccc;margin-left:0;padding-left:12px;color:#555}'
                 '</style></head><body>%s</body></html>' % body)
     bg, fg = ("#1f2229", "#e8eaed") if dark else ("#ffffff", "#1f2328")
@@ -103,12 +104,14 @@ class Reader(Gtk.Stack):
     __gsignals__ = {
         "action": (GObject.SignalFlags.RUN_FIRST, None, (str,)),
         "quick-reply": (GObject.SignalFlags.RUN_FIRST, None, (str,)),
+        "ai-request": (GObject.SignalFlags.RUN_FIRST, None, (str,)),  # Nouveau signal pour requêtes IA
     }
 
-    def __init__(self, snooze_menu_factory):
+    def __init__(self, snooze_menu_factory, ai_service=None):
         super().__init__()
         self.msg, self.dark, self.load_images = None, False, False
         self.secondary, self.zoom, self._wide = [], 1.0, True
+        self.ai_service = ai_service
         self._snooze_factory = snooze_menu_factory
         self.get_style_context().add_class("mm-reader")
 
@@ -151,6 +154,12 @@ class Reader(Gtk.Stack):
             if act != "reply":
                 self.secondary.append(b)
             tb.pack_start(b, False, False, 0)
+        # Bouton IA NVIDIA
+        self.ai_reply_btn = icon_button("computer-symbolic", "Réponse IA", relief=False)
+        self.ai_reply_btn.connect("clicked", lambda *_: self._ai_reply())
+        self.ai_reply_btn.set_no_show_all(True)
+        tb.pack_start(Gtk.Separator(orientation=Gtk.Orientation.VERTICAL), False, False, 6)
+        tb.pack_start(self.ai_reply_btn, False, False, 0)
         tb.pack_start(Gtk.Separator(orientation=Gtk.Orientation.VERTICAL), False, False, 6)
         for name, tip, act in (("folder-symbolic", "Archiver (E)", "archive"),
                                ("user-trash-symbolic", "Supprimer (#)", "trash")):
@@ -273,6 +282,7 @@ class Reader(Gtk.Stack):
         self.add_named(page, "message")
         self.connect("size-allocate", self._on_alloc)
         self.show_all()
+        self.ai_reply_btn.set_visible(bool(self.ai_service))
         self.back_btn.hide()
         self.banner.hide()
         self.set_visible_child_name("empty")
@@ -284,6 +294,12 @@ class Reader(Gtk.Stack):
             self._wide = wide
             for b in self.secondary:
                 b.set_visible(wide)
+
+    def _ai_reply(self):
+        """Génère une réponse IA pour le message actuel."""
+        if not self.msg or not self.ai_service:
+            return
+        self.emit("ai-request", "generate_reply")
 
     def _menu_action(self, act):
         if act.startswith("zoom"):
@@ -345,6 +361,7 @@ class Reader(Gtk.Stack):
                 ch.set_visible(remote)
         self.unsub_btn.set_visible(bool(msg.unsubscribe))
         self.banner.set_visible(remote or bool(msg.unsubscribe))
+        self.ai_reply_btn.set_visible(bool(self.ai_service))
         self.body.show_message(msg, self.load_images, self.dark)
         self.quick.set_text("")
         self.set_visible_child_name("message")
@@ -356,9 +373,12 @@ class Reader(Gtk.Stack):
             self.quick.set_text("")
 
     def _unsub(self, *_):
-        m = re.search(r"<(https?://[^>]+)>", self.msg.unsubscribe if self.msg else "")
-        m2 = re.search(r"<(mailto:[^>]+)>", self.msg.unsubscribe if self.msg else "")
-        uri = m.group(1) if m else (m2.group(1) if m2 else None)
+        if not self.msg:
+            return
+        m = re.search(r"<(https?://[^>]+)>", self.msg.unsubscribe or "")
+        if not m:
+            m = re.search(r"<(mailto:[^>]+)>", self.msg.unsubscribe or "")
+        uri = m.group(1) if m else None
         if uri:
             open_uri(self, uri)
 

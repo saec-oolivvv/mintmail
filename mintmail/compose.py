@@ -12,7 +12,7 @@ from gi.repository import Gtk, GLib
 
 from .models import Message, Outgoing
 from .reader import WebKit2, HAS_WEBKIT, open_uri
-from .util import text_to_html, split_addresses, normalize_subject, format_full, human_size
+from .util import html_to_text, sanitize_html, text_to_html, split_addresses, normalize_subject, format_full, human_size
 from .widgets import icon, icon_button
 
 EDITOR_TPL = """<html><head><meta charset="utf-8"><style>
@@ -80,13 +80,15 @@ class Editor(Gtk.Box):
 
 class ComposeWindow(Gtk.Window):
     def __init__(self, win, accounts, account_id=None, to="", cc="", subject="", body_html="",
-                 quote_html="", in_reply_to="", references="", attachments=None, draft_id=None, raw=False):
+                 quote_html="", in_reply_to="", references="", attachments=None, draft_id=None, raw=False,
+                 ai_suggested_text=""):
         super().__init__(title="Nouveau message")
         self.win, self.accounts = win, accounts
         self.in_reply_to, self.references = in_reply_to, references
         self.draft_id, self.attachments = draft_id, list(attachments or [])
         self.body_html, self.quote_html = body_html, quote_html
         self.initial_body, self.sent, self.raw = None, False, raw
+        self.ai_suggested_text = ai_suggested_text
         self.set_default_size(780, 640)
         self.set_transient_for(win)
 
@@ -177,7 +179,7 @@ class ComposeWindow(Gtk.Window):
         tmenu = Gtk.Menu()
         for t in self.win.config["templates"]:
             it = Gtk.MenuItem(label=t["name"])
-            it.connect("activate", lambda _i, h=t["html"]: self.editor.exec("insertHTML", h))
+            it.connect("activate", lambda _i, h=t["html"]: self.editor.exec("insertHTML", sanitize_html(h)))
             tmenu.append(it)
         if not self.win.config["templates"]:
             empty = Gtk.MenuItem(label="Aucun modèle (voir Paramètres)")
@@ -186,6 +188,11 @@ class ComposeWindow(Gtk.Window):
         tmenu.show_all()
         tpl.set_popup(tmenu)
         fmt.pack_start(tpl, False, False, 8)
+        # Bouton IA pour aide à la rédaction
+        self.ai_btn = icon_button("computer-symbolic", "Aide IA", relief=False)
+        self.ai_btn.set_no_show_all(True)
+        self.ai_btn.connect("clicked", self._ai_assist)
+        fmt.pack_start(self.ai_btn, False, False, 8)
         fsw = Gtk.ScrolledWindow()
         fsw.set_policy(Gtk.PolicyType.EXTERNAL, Gtk.PolicyType.NEVER)
         fsw.add(fmt)
@@ -193,6 +200,9 @@ class ComposeWindow(Gtk.Window):
 
         self.editor = Editor()
         root.pack_start(self.editor, True, True, 0)
+        # Bouton IA - visible si IA activée
+        ai_visible = bool(self.win._get_ai_service())
+        self.ai_btn.set_visible(ai_visible)
         self.att_flow = Gtk.FlowBox()
         self.att_flow.set_selection_mode(Gtk.SelectionMode.NONE)
         root.pack_start(self.att_flow, False, False, 4)
@@ -215,8 +225,12 @@ class ComposeWindow(Gtk.Window):
         return '<div id="sig">-- <br>%s</div>' % sig if sig.strip() else ""
 
     def _render_body(self):
-        content = self.body_html if self.raw else \
-            self.body_html + "<div><br></div>" + self._signature() + self.quote_html
+        if self.raw:
+            content = self.body_html
+        else:
+            ai = ("<div><br></div><div id='ai-text'>%s</div>" % text_to_html(self.ai_suggested_text)
+                  if self.ai_suggested_text else "")
+            content = self.body_html + ai + "<div><br></div>" + self._signature() + self.quote_html
         self.initial_body = content
         self.editor.set_html(content)
 
@@ -265,6 +279,31 @@ class ComposeWindow(Gtk.Window):
             for w in self.row_widgets[lab]:
                 w.show()
         btn.hide()
+
+    # -- assistance IA
+    def _ai_assist(self, *_):
+        """Demande à l'IA un projet de message (texte brut, inséré échappé)."""
+        ai = self.win._get_ai_service()
+        if not ai:
+            self.win.toast.popup("IA non configurée : Paramètres → IA NVIDIA.", timeout=4)
+            return
+        self.ai_btn.set_sensitive(False)
+        subject, to = self.subject.get_text().strip(), self.to.get_text().strip()
+        quoted = html_to_text(self.quote_html) if self.quote_html else ""
+
+        def work():
+            return ai.assist_draft(subject, to, quoted)
+
+        def done(text, err):
+            self.ai_btn.set_sensitive(True)
+            if err:
+                self.win.toast.popup("Erreur IA : %s" % str(err)[:90], timeout=6)
+            elif text:
+                self.editor.exec("insertHTML", text_to_html(text) + "<br><br>")
+                self.win.toast.popup("Texte IA inséré. Relisez avant d'envoyer.", timeout=4)
+            else:
+                self.win.toast.popup("L'IA n'a pas généré de texte.", timeout=3)
+        self.win.run_bg(work, done)
 
     # -- pièces jointes
     def _attach(self, *_):

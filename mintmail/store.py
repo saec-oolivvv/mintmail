@@ -26,6 +26,11 @@ DEFAULTS = {
         {"name": "Proposition de rendez-vous", "html": "<p>Bonjour,</p><p>Seriez-vous disponible cette semaine pour un court échange (20 minutes) ? Je vous propose mardi ou jeudi en fin de matinée.</p><p>Bien cordialement,</p>"},
         {"name": "Relance aimable", "html": "<p>Bonjour,</p><p>Je me permets de revenir vers vous au sujet de mon précédent message. Avez-vous eu l'occasion d'y jeter un œil ?</p><p>Merci d'avance,</p>"},
     ],
+    # Synchronisation P2P (désactivée par défaut ; exige un code de jumelage commun)
+    "p2p_enabled": False, "p2p_node_id": None, "p2p_secret": "", "p2p_port": 54322,
+    "p2p_disc_port": 54321, "p2p_static_peers": [],
+    # Assistance IA (désactivée par défaut ; la clé est stockée dans le trousseau, pas dans ce fichier)
+    "ai_enabled": False, "ai_classify": False, "nvidia_api_base": "", "ai_model": "",
 }
 
 
@@ -34,6 +39,7 @@ class Config:
         self.path = Path(path) if path else CONFIG_DIR / "config.json"
         self.data = copy.deepcopy(DEFAULTS)
         self._pw = {}
+        self._save_lock = threading.Lock()
         self.load()
 
     def load(self):
@@ -42,16 +48,19 @@ class Config:
                 self.data.update(json.load(f))
         except (OSError, ValueError):
             pass
+        if self.data.get("p2p_enabled") and len(str(self.data.get("p2p_secret") or "")) < 8:
+            self.data["p2p_enabled"] = False   # jamais de synchro ouverte sans code de jumelage
         if self.data.get("accent") == "#3b82f6":   # ancien bleu par défaut
             self.data["accent"] = DEFAULTS["accent"]
 
     def save(self):
-        self.path.parent.mkdir(parents=True, exist_ok=True)
-        tmp = str(self.path) + ".tmp"
-        with open(tmp, "w", encoding="utf-8") as f:
-            json.dump(self.data, f, indent=2, ensure_ascii=False)
-        os.chmod(tmp, 0o600)
-        os.replace(tmp, self.path)
+        with self._save_lock:   # plusieurs threads (UI, synchro P2P) peuvent enregistrer
+            self.path.parent.mkdir(parents=True, exist_ok=True)
+            tmp = str(self.path) + ".tmp"
+            with open(tmp, "w", encoding="utf-8") as f:
+                json.dump(self.data, f, indent=2, ensure_ascii=False)
+            os.chmod(tmp, 0o600)
+            os.replace(tmp, self.path)
 
     def __getitem__(self, k):
         return self.data[k]
@@ -74,6 +83,12 @@ class Config:
     def preload_passwords(self):
         for a in self.data.get("accounts", []):
             self.password(a["id"])
+        if self.data.get("ai_has_key"):
+            self.password("ai:nvidia")
+
+    def ai_key(self):
+        """Clé API IA : trousseau, sinon ancienne clé en clair (migrée au premier enregistrement)."""
+        return self.password("ai:nvidia") or self.data.get("nvidia_api_key", "")
 
     def delete_password(self, account_id):
         self._pw.pop(account_id, None)
