@@ -14,6 +14,8 @@ from . import APP_NAME, __version__
 from .ai_service import AIService
 from .backend import make_backend
 from .compose import ComposeWindow
+from .ai_features import AIMixin
+from .listing import ListMixin, PAGE
 from .models import Message, Outgoing
 from .p2p import SyncEngine
 from .reader import Reader
@@ -56,7 +58,7 @@ DEMO_ACCOUNT = {"id": "demo", "name": "Démo", "email": "demo@mintmail.local", "
 NARROW, RAIL_BELOW, HIDE_BELOW = 700, 1250, 900
 
 
-class MainWindow(Gtk.ApplicationWindow):
+class MainWindow(ListMixin, AIMixin, Gtk.ApplicationWindow):
     def __init__(self, app, config, cache):
         super().__init__(application=app, title=APP_NAME)
         self.config, self.cache = config, cache
@@ -67,6 +69,8 @@ class MainWindow(Gtk.ApplicationWindow):
         self._zone, self.sidebar_mode, self._reflow_src = None, "full", 0
         self._saved_rows, self.nav_labels = [], []
         self.search, self._search_src = "", 0
+        self._limit, self._partial_ids = PAGE, set()
+        self._init_ai()
         self._loading, self._pending, self._sync_busy = False, 0, False
         self._backends, self._sending, self.rows = {}, set(), {}
         self._last_sync, self._ticks = 0.0, 0
@@ -74,6 +78,7 @@ class MainWindow(Gtk.ApplicationWindow):
         s = Gtk.Settings.get_default()
         self._system_dark = bool(s.get_property("gtk-application-prefer-dark-theme")) or \
             "dark" in (s.get_property("gtk-theme-name") or "").lower()
+        s.set_property("gtk-decoration-layout", ":minimize,maximize,close")   # boutons de fenêtre toujours présents
         self.css = Gtk.CssProvider()
         Gtk.StyleContext.add_provider_for_screen(Gdk.Screen.get_default(), self.css,
                                                  Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
@@ -92,15 +97,19 @@ class MainWindow(Gtk.ApplicationWindow):
         self.reader.apply_zoom()
         self.demo_banner.set_visible(not self.config["accounts"])
         self.cat_sw.set_visible(self.view == "inbox")
-        self.reload_list()
+        self.reload_list(full=True)
         self.update_counts()
+        self.refresh_ai()
+        threading.Thread(target=self.cache.backfill_meta, daemon=True).start()
         GLib.idle_add(lambda: (self.sync(), False)[1])
+        GLib.timeout_add_seconds(3, lambda: (self._start_push(), False)[1])
         GLib.timeout_add_seconds(1, self._tick)
 
     # ------------------------------------------------------------------ UI
     def _build(self):
         hb = Gtk.HeaderBar()
         hb.set_show_close_button(True)
+        hb.set_decoration_layout(":minimize,maximize,close")   # réduire / agrandir / fermer toujours présents
         self.set_titlebar(hb)
         self.side_toggle = Gtk.ToggleButton()
         self.side_toggle.set_image(icon("view-sidebar-start-symbolic", Gtk.IconSize.LARGE_TOOLBAR))
@@ -115,10 +124,11 @@ class MainWindow(Gtk.ApplicationWindow):
         comp.connect("clicked", lambda *_: self.compose())
         hb.pack_start(comp)
         self.search_entry = Gtk.SearchEntry()
-        self.search_entry.set_placeholder_text("Rechercher…  (from:, is:unread, has:attachment)")
+        self.search_entry.set_placeholder_text("Rechercher — ou « ? » + une question pour l'IA")
         self.search_entry.set_width_chars(22)
         self.search_entry.get_style_context().add_class("mm-search")
         self.search_entry.connect("search-changed", self._search_changed)
+        self.search_entry.connect("activate", self._search_activate)
         hb.set_custom_title(self.search_entry)
         menu_btn = Gtk.MenuButton()
         menu_btn.set_image(icon("open-menu-symbolic", Gtk.IconSize.LARGE_TOOLBAR))
@@ -141,6 +151,11 @@ class MainWindow(Gtk.ApplicationWindow):
         gear.get_style_context().add_class("pill")
         gear.connect("clicked", lambda *_: self.show_settings())
         hb.pack_end(gear)
+        self.ai_btn = Gtk.ToggleButton(label="✨ Assistant")
+        self.ai_btn.get_style_context().add_class("ai-btn")
+        self.ai_btn.set_tooltip_text("Assistant IA (Ctrl+J)")
+        self.ai_btn.connect("toggled", lambda b: self.toggle_assistant(b.get_active()))
+        hb.pack_end(self.ai_btn)
         self.refresh_btn = icon_button("view-refresh-symbolic", "Actualiser (Ctrl+R)")
         self.refresh_btn.connect("clicked", lambda *_: self.sync(True))
         hb.pack_end(self.refresh_btn)
@@ -178,6 +193,15 @@ class MainWindow(Gtk.ApplicationWindow):
         self.compose_btn.get_style_context().add_class("compose-btn")
         self.compose_btn.connect("clicked", lambda *_: self.compose())
         self.sidebar.pack_start(self.compose_btn, False, False, 0)
+        self.ai_nav_btn = Gtk.Button()
+        abox = Gtk.Box(spacing=8)
+        abox.pack_start(Gtk.Label(label="✨"), False, False, 0)
+        self.ai_nav_lbl = Gtk.Label(label="Assistant IA")
+        abox.pack_start(self.ai_nav_lbl, False, False, 0)
+        self.ai_nav_btn.add(abox)
+        self.ai_nav_btn.get_style_context().add_class("ai-nav-btn")
+        self.ai_nav_btn.connect("clicked", lambda *_: self.toggle_assistant())
+        self.sidebar.pack_start(self.ai_nav_btn, False, False, 0)
         self.acc_combo = Gtk.ComboBoxText()
         self.acc_combo.set_margin_start(10)
         self.acc_combo.set_margin_end(10)
@@ -193,6 +217,7 @@ class MainWindow(Gtk.ApplicationWindow):
             r = Gtk.ListBoxRow()
             r.view = vid
             r.get_style_context().add_class("nav-row")
+            r.get_style_context().add_class("nav-" + vid)
             b = Gtk.Box(spacing=10)
             b.pack_start(icon(ic), False, False, 0)
             lab = Gtk.Label(label=label, xalign=0)
@@ -241,7 +266,7 @@ class MainWindow(Gtk.ApplicationWindow):
         self.f_unread = Gtk.ToggleButton(label="Non lus")
         self.f_att = Gtk.ToggleButton(label="Pièces jointes")
         for w, a in ((self.f_unread, "unread_only"), (self.f_att, "att_only")):
-            w.connect("toggled", lambda b, attr=a: (setattr(self, attr, b.get_active()), self.reload_list()))
+            w.connect("toggled", lambda b, attr=a: (setattr(self, attr, b.get_active()), self.reload_list(reset=True)))
             w.get_style_context().add_class("pill-toggle")
             flt.pack_start(w, False, False, 0)
         bar.pack_start(flt, False, False, 0)
@@ -249,10 +274,15 @@ class MainWindow(Gtk.ApplicationWindow):
         self.demo_banner = Gtk.Box(spacing=8)
         self.demo_banner.get_style_context().add_class("banner")
         self.demo_banner.pack_start(Gtk.Label(label="Mode démonstration"), True, True, 0)
+        abtn = Gtk.Button(label="✨ Activer l'IA")
+        abtn.get_style_context().add_class("ai-chip")
+        abtn.connect("clicked", lambda *_: self.show_settings("ai"))
+        self.demo_banner.pack_end(abtn, False, False, 0)
         ab = Gtk.Button(label="Ajouter mon compte")
         ab.connect("clicked", lambda *_: self.show_settings())
         self.demo_banner.pack_end(ab, False, False, 0)
         self.list_box.pack_start(self.demo_banner, False, False, 0)
+        self.list_box.pack_start(self.build_digest_box(), False, False, 0)
 
         self.bulk_rev = Gtk.Revealer()
         bulk = Gtk.Box(spacing=6)
@@ -264,7 +294,7 @@ class MainWindow(Gtk.ApplicationWindow):
                           ("Lu", lambda: self.set_unread(self.selected_msgs(), False)),
                           ("Non lu", lambda: self.set_unread(self.selected_msgs(), True)),
                           ("★", lambda: self.set_flag(self.selected_msgs(), "starred", True)),
-                          ("Tout", lambda: self.listbox.select_all()),
+                          ("Tout", lambda: self.listbox.select_all() if self.select_mode else None),
                           ("✕", lambda: self.listbox.unselect_all())):
             b = Gtk.Button(label=label)
             b.connect("clicked", lambda _b, f=fn: f())
@@ -276,15 +306,17 @@ class MainWindow(Gtk.ApplicationWindow):
         self.list_box.pack_start(self.bulk_rev, False, False, 0)
 
         self.listbox = Gtk.ListBox()
-        self.listbox.set_selection_mode(Gtk.SelectionMode.MULTIPLE)
+        self.listbox.set_selection_mode(Gtk.SelectionMode.SINGLE)   # un clic = un message ouvert
         self.listbox.set_sort_func(row_sort)
         self.listbox.set_header_func(row_header)
-        self.listbox.connect("selected-rows-changed", self._on_selection)
+        self.listbox.connect("row-selected", self._on_row_selected)
+        self.listbox.connect("selected-rows-changed", self._on_selection_changed)
         self.listbox.connect("row-activated", self._on_activated)
         self.listbox.connect("button-press-event", self._on_list_click)
         self.listbox.connect("button-press-event", self._on_list_context)
-        sw = Gtk.ScrolledWindow()
+        sw = self.list_scroll = Gtk.ScrolledWindow()
         sw.add(self.listbox)
+        sw.connect("edge-reached", self._on_edge)
         self.empty_lbl = Gtk.Label(label="Aucun message")
         self.empty_lbl.get_style_context().add_class("empty-state")
         self.list_stack = Gtk.Stack()
@@ -292,10 +324,10 @@ class MainWindow(Gtk.ApplicationWindow):
         self.list_stack.add_named(self.empty_lbl, "empty")
         self.list_box.pack_start(self.list_stack, True, True, 0)
 
-        self.reader = Reader(self.build_snooze_menu, ai_service=self._get_ai_service())
+        self.reader = Reader(self.build_snooze_menu)
         self.reader.connect("action", self._reader_action)
         self.reader.connect("quick-reply", lambda _r, t: self.quick_reply(t))
-        self.reader.connect("ai-request", self._handle_ai_request)
+        self.reader.connect("ai-action", self._on_ai_action)
 
         self.paned_in = Gtk.Paned(orientation=Gtk.Orientation.HORIZONTAL)
         self.paned_in.set_wide_handle(True)
@@ -309,6 +341,7 @@ class MainWindow(Gtk.ApplicationWindow):
         self.paned_out.set_position(self.config["side_width"])
         body = Gtk.Box()
         body.pack_start(self.paned_out, True, True, 0)
+        body.pack_start(self.build_assistant(), False, False, 0)
         body.get_style_context().add_class("mm-root")
         self.root_stack = Gtk.Stack()
         self.root_stack.set_transition_type(Gtk.StackTransitionType.CROSSFADE)
@@ -342,21 +375,7 @@ class MainWindow(Gtk.ApplicationWindow):
         return box
 
     # --------------------------------------------------------------- comptes
-    def _get_ai_service(self):
-        """Service IA configuré, ou None (IA désactivée / clé absente)."""
-        if not self.config.get("ai_enabled", False):
-            return None
-        key = self.config.ai_key()
-        if not key:
-            return None
-        return AIService(api_key=key, api_base=self.config.get("nvidia_api_base") or None,
-                         model=self.config.get("ai_model") or None)
 
-    def refresh_ai(self):
-        """Met à jour l'interface après un changement des réglages IA."""
-        svc = self._get_ai_service()
-        self.reader.ai_service = svc
-        self.reader.ai_reply_btn.set_visible(bool(svc))
 
     def accounts(self):
         return self.config["accounts"] or [DEMO_ACCOUNT]
@@ -380,6 +399,12 @@ class MainWindow(Gtk.ApplicationWindow):
         self.acc_combo.handler_unblock_by_func(self._account_changed)
 
     def accounts_changed(self):
+        self._stop_push()
+        for be in list(self._backends.values()):
+            try:
+                be.close()
+            except Exception:
+                pass
         self._backends.clear()
         if self.config["accounts"]:
             self.cache.delete_account("demo")
@@ -390,13 +415,15 @@ class MainWindow(Gtk.ApplicationWindow):
                 pass
         self._fill_accounts()
         self.demo_banner.set_visible(not self.config["accounts"])
-        self.reload_list()
+        self.reload_list(full=True)
         self.update_counts()
         self.sync(True)
+        self._start_push()
 
     def _account_changed(self, combo):
         self.account = combo.get_active_id() or "all"
-        self.reload_list()
+        self._digest_key = None
+        self.reload_list(reset=True, full=True)
         self.update_counts()
 
     # -------------------------------------------------------------- réglages
@@ -415,7 +442,7 @@ class MainWindow(Gtk.ApplicationWindow):
         if self.reader.msg:
             self.reader.show_message(self.reader.msg, self.config["load_images"])
         if hasattr(self, "listbox"):
-            self.reload_list()
+            self.reload_list(full=True)
 
     def toggle_theme(self):
         self.config["theme"] = "light" if self.is_dark else "dark"
@@ -518,7 +545,7 @@ class MainWindow(Gtk.ApplicationWindow):
         self.reader.show_empty()
         self.reader_open = False
         self._layout()
-        self.reload_list()
+        self.reload_list(reset=True, full=True)
         if self._zone == 0:
             self.side_toggle.set_active(False)
         if self.view in ("sent", "archive", "trash", "spam"):
@@ -527,7 +554,7 @@ class MainWindow(Gtk.ApplicationWindow):
     def _category_toggled(self, btn, key):
         if btn.get_active():
             self.category = key
-            self.reload_list()
+            self.reload_list(reset=True)
 
     def _search_changed(self, entry):
         if self._search_src:
@@ -535,143 +562,26 @@ class MainWindow(Gtk.ApplicationWindow):
 
         def go():
             self._search_src = 0
-            self.search = entry.get_text().strip()
+            text = entry.get_text().strip()
+            if text.startswith(("?", "✨")):
+                return False   # question pour l'IA : attendre la touche Entrée
+            self.search = text
             self.title_lbl.set_markup("<b>Résultats</b>" if self.search else "<b>%s</b>" % GLib.markup_escape_text(self._view_title()))
             self.cat_sw.set_visible(self.view == "inbox" and not self.search)
-            self.reload_list()
+            self.reload_list(reset=True)
             return False
         self._search_src = GLib.timeout_add(250, go)
 
     # ----------------------------------------------------------------- liste
-    def reload_list(self, select_index=None):
-        keep = {r.msg.id for r in self.listbox.get_selected_rows()}
-        msgs = self.cache.query(self.view, self.account, self.category if self.view == "inbox" else None,
-                                self.unread_only, self.att_only, self._effective_search())
-        self._loading = True
-        for ch in self.listbox.get_children():
-            self.listbox.remove(ch)
-        self.rows = {}
-        for m in msgs:
-            row = MessageRow(m, self._row_checked, self._on_swipe,
-                             dict(self.config["swipe"], invert=self.config["swipe_invert"]), self._row_height())
-            row.set_select_mode(self.select_mode)
-            self.rows[m.id] = row
-            self.listbox.add(row)
-        self.listbox.invalidate_headers()
-        for mid in keep:
-            if mid in self.rows:
-                self.listbox.select_row(self.rows[mid])
-        if select_index is not None and msgs and not self.single:
-            r = self.listbox.get_row_at_index(min(select_index, len(msgs) - 1))
-            if r:
-                self.listbox.select_row(r)
-        self._loading = False
-        self.list_stack.set_visible_child_name("list" if msgs else "empty")
-        self.empty_lbl.set_text("Aucun résultat" if self._effective_search() else "Aucun message ici — profitez-en 🎉")
-        self._on_selection(self.listbox)
 
-    def selected_msgs(self):
-        msgs = [r.msg for r in self.listbox.get_selected_rows()]
-        if not msgs and self.reader.msg:
-            msgs = [self.reader.msg]
-        return msgs
 
-    def _selected_index(self):
-        idx = [r.get_index() for r in self.listbox.get_selected_rows()]
-        return min(idx) if idx else None
 
-    def _on_selection(self, lb):
-        if self._loading:
-            return
-        rows = lb.get_selected_rows()
-        sel = set(rows)
-        for r in self.rows.values():
-            r.set_checked(r in sel)
-        n = len(rows)
-        self.bulk_rev.set_reveal_child(n > 1 or (self.select_mode and n >= 1))
-        self.bulk_lbl.set_text("%d sélectionné%s" % (n, "s" if n > 1 else ""))
-        if n == 0:
-            self.reader.show_empty()
-        elif n == 1:
-            if not (self.reader.msg and self.reader.msg.id == rows[0].msg.id):
-                self.open_message(rows[0].msg)
-        else:
-            self.reader.show_multi(n)
 
-    def open_message(self, msg):
-        self.reader.show_message(msg, self.config["load_images"])
-        if self.single:
-            self.reader_open = True
-            self._layout()
-        if msg.unread and msg.folder != "drafts":
-            self.set_unread([msg], False, reload=False)
 
-    def _on_activated(self, lb, row):
-        if self.select_mode:
-            return
-        if self.view == "drafts" or row.msg.folder == "drafts":
-            self.open_draft(row.msg)
-        elif self.single:
-            self.open_message(row.msg)
 
-    def _row_checked(self, row, active):
-        if active:
-            self.listbox.select_row(row)
-        else:
-            self.listbox.unselect_row(row)
 
-    def _on_list_click(self, lb, ev):
-        if self.select_mode and ev.button == 1:
-            row = lb.get_row_at_y(int(ev.y))
-            if row:
-                (lb.unselect_row if row.is_selected() else lb.select_row)(row)
-                return True
-        return False
 
-    def _on_list_context(self, lb, ev):
-        if ev.button != 3:
-            return False
-        row = lb.get_row_at_y(int(ev.y))
-        if not row:
-            return False
-        if not row.is_selected():
-            lb.unselect_all()
-            lb.select_row(row)
-        m = row.msg
-        menu = Gtk.Menu()
-        items = [("Répondre", lambda: self.reply(m)), ("Répondre à tous", lambda: self.reply(m, True)),
-                 ("Transférer", lambda: self.forward(m)), None,
-                 ("Archiver", lambda: self.move_messages(self.selected_msgs(), "archive")),
-                 ("Supprimer", lambda: self.move_messages(self.selected_msgs(), "trash")),
-                 ("Marquer comme %s" % ("lu" if m.unread else "non lu"),
-                  lambda: self.set_unread(self.selected_msgs(), not m.unread)),
-                 ("Retirer des favoris" if m.starred else "Ajouter aux favoris",
-                  lambda: self.set_flag(self.selected_msgs(), "starred", not m.starred)),
-                 ("Désépingler" if m.pinned else "Épingler",
-                  lambda: self.set_flag(self.selected_msgs(), "pinned", not m.pinned)), None,
-                 ("Signaler comme spam", lambda: self.move_messages(self.selected_msgs(), "spam")),
-                 ("Mettre l'expéditeur en spam", lambda: self.spam_sender(m)),
-                 ("Bloquer l'expéditeur", lambda: self.block_sender(m)),
-                 ("Voir tous ses messages", lambda: self.show_from(m))]
-        for it in items:
-            if it is None:
-                menu.append(Gtk.SeparatorMenuItem())
-                continue
-            mi = Gtk.MenuItem(label=it[0])
-            mi.connect("activate", lambda _i, f=it[1]: f())
-            menu.append(mi)
-        sn = Gtk.MenuItem(label="Reporter")
-        sn.set_submenu(self.build_snooze_menu())
-        menu.append(sn)
-        menu.show_all()
-        menu.popup_at_pointer(ev)
-        return True
 
-    def _toggle_select_mode(self, btn):
-        self.select_mode = btn.get_active()
-        for r in self.rows.values():
-            r.set_select_mode(self.select_mode)
-        self._on_selection(self.listbox)
 
     # ----------------------------------------------------------- disposition
     @property
@@ -712,6 +622,7 @@ class MainWindow(Gtk.ApplicationWindow):
             wdg.set_visible(not rail)
         self.settings_btn.set_label("" if rail else "Paramètres")
         self.compose_lbl.set_visible(not rail)
+        self.ai_nav_lbl.set_visible(not rail)
         self.sidebar.set_size_request(60 if rail else 190, -1)
         if visible:
             self.paned_out.set_position(60 if rail else max(190, self.config["side_width"]))
@@ -802,82 +713,9 @@ class MainWindow(Gtk.ApplicationWindow):
         return True
 
     # ------------------------------------------------------------ actions
-    def set_unread(self, msgs, unread, reload=True):
-        for m in msgs:
-            m.unread = unread
-            self.cache.update(m.id, unread=unread)
-            if m.id in self.rows:
-                self.rows[m.id].msg.unread = unread
-                self.rows[m.id].refresh()
-            self._flag_remote(m, seen=not unread)
-        self.update_counts()
-        if reload and self.view == "unread":
-            self.reload_list(self._selected_index())
 
-    def set_flag(self, msgs, field, value):
-        idx = self._selected_index()
-        for m in msgs:
-            setattr(m, field, value)
-            self.cache.update(m.id, **{field: value})
-            if field == "starred":
-                self._flag_remote(m, flagged=value)
-        self.reload_list(idx)
 
-    def _flag_remote(self, m, seen=None, flagged=None):
-        try:
-            be = self.backend(m.account)
-        except Exception:
-            return
-        if not be.demo:
-            self.run_bg(lambda: be.set_flags(m, seen=seen, flagged=flagged))
 
-    def move_messages(self, msgs, dest):
-        if not msgs:
-            return
-        if dest == "trash" and all(m.folder == "trash" for m in msgs):
-            d = Gtk.MessageDialog(transient_for=self, modal=True, message_type=Gtk.MessageType.QUESTION,
-                                  text="Supprimer définitivement %d message(s) ?" % len(msgs))
-            d.add_buttons("Annuler", Gtk.ResponseType.CANCEL, "Supprimer", Gtk.ResponseType.OK)
-            ok = d.run() == Gtk.ResponseType.OK
-            d.destroy()
-            if not ok:
-                return
-            idx = self._selected_index()
-            for m in msgs:
-                self.cache.delete(m.id)
-                be = self.backend(m.account)
-                self.run_bg(lambda m=m, be=be: be.delete_forever(m))
-            self.reload_list(idx)
-            self.update_counts()
-            return
-        verb = {"archive": "archivé", "trash": "supprimé", "spam": "signalé comme spam", "inbox": "déplacé"}[dest]
-        prev = [(m.id, m.folder, m.snoozed_until) for m in msgs]
-        idx = self._selected_index()
-        for m in msgs:
-            self.cache.update(m.id, folder=dest, snoozed_until=0.0)
-        self._pending += 1
-        self.reload_list(idx)
-        self.update_counts()
-        state = {"done": False}
-
-        def undo():
-            state["done"] = True
-            self._pending -= 1
-            for mid, f, s in prev:
-                self.cache.update(mid, folder=f, snoozed_until=s)
-            self.reload_list()
-            self.update_counts()
-
-        def commit():
-            if state["done"]:
-                return
-            state["done"] = True
-            self._pending -= 1
-
-            self._bg_move(msgs, dest)
-        n = len(msgs)
-        self.toast.popup("%d message%s %s%s" % (n, "s" if n > 1 else "", verb, "s" if n > 1 else ""),
-                         "Annuler", undo, timeout=self.config["undo_seconds"], on_expire=commit)
 
     # ---------------------------------------------------------------- report
     def build_snooze_menu(self, callback=None):
@@ -921,31 +759,8 @@ class MainWindow(Gtk.ApplicationWindow):
         if ok:
             cb(datetime.datetime(y, mo + 1, d, h).timestamp())
 
-    def snooze_selected(self, ts):
-        self.snooze_msgs(self.selected_msgs(), ts)
 
-    def snooze_msgs(self, msgs, ts):
-        if not msgs or ts <= time.time():
-            return
-        prev = [(m.id, m.snoozed_until) for m in msgs]
-        idx = self._selected_index()
-        for m in msgs:
-            self.cache.update(m.id, snoozed_until=ts)
 
-        def undo():
-            for mid, s in prev:
-                self.cache.update(mid, snoozed_until=s)
-            self.reload_list()
-            self.update_counts()
-        self.reload_list(idx)
-        self.update_counts()
-        self.toast.popup("Reporté au %s" % format_full(ts), "Annuler", undo, timeout=5)
-
-    def mark_all_read(self):
-        msgs = [m for m in self.cache.query(self.view, self.account, None, True, False, self._effective_search())]
-        if msgs:
-            self.set_unread(msgs, False)
-            self.reload_list()
 
     # ------------------------------------------------------------ Synchronisation
     def _init_sync(self):
@@ -970,80 +785,8 @@ class MainWindow(Gtk.ApplicationWindow):
             return False
         GLib.idle_add(ui)
 
-    def sync(self, manual=False, folders=("inbox", "sent"), quiet=False):
-        """Synchronisation mail et état local."""
-        if self._sync_busy or self._pending:
-            if manual:
-                self.toast.popup("Synchronisation déjà en cours…", timeout=2)
-            return
-        self._sync_busy = True
-        if not quiet:
-            self.status.set_text("Synchronisation…")
-        accounts = list(self.accounts())
-        known = {(a["id"], f): self.cache.uids(a["id"], f) for a in accounts for f in folders}
 
-        ai = self._get_ai_service() if self.config.get("ai_classify") else None
 
-        def work():
-            out = []
-            for a in accounts:
-                be = self.backend(a["id"])
-                for f in folders:
-                    try:
-                        data = be.sync(f, known[(a["id"], f)])
-                        if ai and f == "inbox" and not be.demo:
-                            self._ai_classify(ai, data[0])
-                        out.append((a["id"], f, data, None))
-                    except Exception as e:
-                        out.append((a["id"], f, None, e))
-            return out
-        self.run_bg(work, lambda res, err: self._sync_done(res or [], err, known, manual))
-
-    @staticmethod
-    def _ai_classify(ai, msgs, budget=15):
-        """Classe quelques nouveaux messages avec l'IA (thread de travail, erreurs ignorées)."""
-        for m in [m for m in msgs if m.category == "people"][:budget]:
-            try:
-                m.category = ai.classify_category(m)
-            except Exception:
-                break   # service injoignable : on s'arrête là, la classification locale reste valable
-
-    def _sync_done(self, results, err, known, manual):
-        """Intègre les résultats de synchronisation dans le cache et l'interface."""
-        self._sync_busy = False
-        errors, fresh = [], []
-        for aid, f, data, e in results:
-            if e or not data:
-                if e:
-                    errors.append(str(e))
-                continue
-            msgs, flags, present, minuid = data
-            self.cache.upsert_many(msgs)
-            kn = known[(aid, f)]
-            for uid, (unread, starred) in flags.items():
-                mid = kn.get(uid)
-                m = self.cache.get(mid) if mid else None
-                if m and (m.unread != unread or m.starred != starred):
-                    self.cache.update(mid, unread=unread, starred=starred)
-            if present is not None:
-                for uid, mid in kn.items():
-                    if uid >= minuid and uid not in present:
-                        self.cache.delete(mid)
-            if f == "inbox":
-                keep = self._auto_route([m for m in msgs if m.folder == "inbox"])
-                if kn:
-                    fresh += [m for m in keep if m.unread]
-
-        self._last_sync = time.time()
-        if errors:
-            self.status.set_text("⚠ " + errors[0][:120])
-            if manual:
-                self.toast.popup(errors[0][:100], timeout=6)
-        else:
-            self.status.set_text("Synchronisé à " + time.strftime("%H:%M"))
-        self.reload_list()
-        self.update_counts()
-        self._notify(fresh)
 
     def sync_from_store(self):
         """Déclenche un échange P2P immédiat avec les pairs."""
@@ -1057,94 +800,15 @@ class MainWindow(Gtk.ApplicationWindow):
             return msg.account
         return self.account if self.account != "all" else self.accounts()[0]["id"]
 
-    def compose(self, **kw):
-        kw.setdefault("account_id", self._default_account())
-        ComposeWindow(self, self.accounts(), **kw)
 
-    def _quote(self, msg):
-        orig = sanitize_html(msg.html) if msg.html else text_to_html(msg.text)
-        return '<br><div>Le %s, %s a écrit :</div><blockquote>%s</blockquote>' % (
-            format_full(msg.date), html.escape(msg.display_sender), orig)
 
-    def reply(self, msg, all_=False):
-        to = msg.to if msg.folder == "sent" else (msg.reply_to or msg.sender_email)
-        cc = ""
-        if all_:
-            mine = {a["email"].lower() for a in self.accounts()}
-            others = [a for a in split_addresses(msg.to) + split_addresses(msg.cc)
-                      if a.lower() not in mine and a.lower() != msg.sender_email.lower()]
-            cc = ", ".join(dict.fromkeys(others))
-        self.compose(account_id=self._default_account(msg), to=to, cc=cc,
-                     subject="Re: " + normalize_subject(msg.subject), quote_html=self._quote(msg),
-                     in_reply_to=msg.message_id, references=msg.references)
 
-    def forward(self, msg):
-        head = ("<br>---------- Message transféré ----------<br>De : %s &lt;%s&gt;<br>Date : %s<br>Objet : %s<br>À : %s<br>"
-                % (html.escape(msg.sender_name), html.escape(msg.sender_email), format_full(msg.date),
-                   html.escape(msg.subject), html.escape(msg.to)))
-        self.compose(account_id=self._default_account(msg), subject="Fwd: " + normalize_subject(msg.subject),
-                     quote_html=head + (sanitize_html(msg.html) if msg.html else text_to_html(msg.text)),
-                     attachments=[a["path"] for a in msg.attachments])
 
-    def open_draft(self, msg):
-        self.compose(account_id=msg.account, to=msg.to, cc=msg.cc, subject=msg.subject, body_html=sanitize_html(msg.html), raw=True,
-                     in_reply_to=msg.message_id, references=msg.references,
-                     attachments=[a["path"] for a in msg.attachments], draft_id=msg.id)
 
-    def quick_reply(self, text):
-        msg = self.reader.msg
-        if not msg:
-            return
-        acc = next((a for a in self.accounts() if a["id"] == self._default_account(msg)), self.accounts()[0])
-        sig = acc.get("signature_html", "")
-        body = text_to_html(text) + ("<br><br>-- <br>" + sig if sig.strip() else "")
-        out = Outgoing(account=acc["id"], to=(msg.reply_to or msg.sender_email), subject="Re: " + normalize_subject(msg.subject),
-                       html=body, in_reply_to=msg.message_id, references=msg.references)
-        self.queue_send(out, 0)
 
-    def _handle_ai_request(self, reader, request_type):
-        """Gère les requêtes IA depuis le reader."""
-        if request_type == "generate_reply":
-            self._ai_generate_reply()
 
-    def _ai_generate_reply(self):
-        """Génère une réponse IA pour le message affiché."""
-        if self.reader.msg:
-            self._ai_generate_reply_from_msg(self.reader.msg)
 
-    def _ai_generate_reply_from_msg(self, msg):
-        """Génère une réponse IA (thread de travail) puis ouvre le composeur pré-rempli."""
-        ai = self._get_ai_service()
-        if not ai:
-            self.toast.popup("IA non configurée : Paramètres → IA NVIDIA.", timeout=5)
-            return
 
-        def work():
-            return ai.generate_reply(msg)
-
-        def done(text, err):
-            if err:
-                self.toast.popup("Erreur IA : %s" % str(err)[:90], timeout=6)
-            else:
-                self._show_ai_reply(msg, text)
-        self.toast.popup("Génération de la réponse par l'IA…", timeout=3)
-        self.run_bg(work, done)
-
-    def _show_ai_reply(self, msg, reply_text):
-        """Affiche la réponse IA générée dans le composeur."""
-        if not reply_text:
-            self.toast.popup("L'IA n'a pas généré de réponse.", timeout=5)
-            return
-        # Ouvrir le composeur avec le texte IA pré-rempli
-        self.compose(
-            account_id=self._default_account(msg),
-            to=msg.reply_to or msg.sender_email,
-            subject="Re: " + normalize_subject(msg.subject),
-            ai_suggested_text=reply_text,
-            in_reply_to=msg.message_id,
-            references=msg.references
-        )
-        self.toast.popup("Réponse IA générée. Vérifiez et envoyez.", timeout=5)
 
     # ---------------------------------------------------------------- envoi
     def queue_send(self, out, delay=0, scheduled=False):
@@ -1211,8 +875,7 @@ class MainWindow(Gtk.ApplicationWindow):
                 self.reader_open = False
                 self._layout()
         elif act == "star" and m:
-            self.set_flag(msgs, "starred", not m.starred)
-            reader.show_message(self.cache.get(m.id) or m)
+            self.set_flag(msgs, "starred", not m.starred)   # met à jour la ligne et le lecteur en place
         elif act == "pin" and m:
             self.set_flag(msgs, "pinned", not m.pinned)
         elif act == "unread":
@@ -1251,6 +914,12 @@ class MainWindow(Gtk.ApplicationWindow):
             else:
                 self.listbox.unselect_all()
             return typing is False
+        if key == "F11":
+            self.toggle_fullscreen()
+            return True
+        if ctrl and key in ("j", "J"):
+            self.toggle_assistant()
+            return True
         if ctrl and key in ("k", "K"):
             self.show_palette()
             return True
@@ -1266,6 +935,7 @@ class MainWindow(Gtk.ApplicationWindow):
         if typing:
             return False
         if ctrl and key in ("a", "A"):
+            self.sel_btn.set_active(True)   # sélection multiple uniquement à la demande
             self.listbox.select_all()
             return True
         if ctrl or (ev.state & Gdk.ModifierType.MOD1_MASK):
@@ -1293,80 +963,15 @@ class MainWindow(Gtk.ApplicationWindow):
             return True
         return False
 
-    def _step(self, d):
-        cur = self._selected_index()
-        n = len(self.rows)
-        if not n:
-            return
-        i = 0 if cur is None else max(0, min(n - 1, cur + d))
-        r = self.listbox.get_row_at_index(i)
-        if r:
-            self.listbox.unselect_all()
-            self.listbox.select_row(r)
-            r.grab_focus()
 
     # ----------------------------------------------------- gestes & actions
-    def _row_height(self):
-        return {"compact": 64, "comfortable": 72, "spacious": 80}.get(self.config["density"], 72)
 
-    def _on_swipe(self, row, action):
-        sel = [r.msg for r in self.listbox.get_selected_rows()] if row.is_selected() else []
-        msgs = sel if row.msg.id in {m.id for m in sel} else [row.msg]
-        self.run_action(action, msgs)
 
-    def run_action(self, action, msgs):
-        if not msgs:
-            return
-        m = msgs[0]
-        if action in ("archive", "trash", "spam"):
-            self.move_messages(msgs, action)
-        elif action == "read":
-            self.set_unread(msgs, not m.unread)
-        elif action in ("star", "pin"):
-            fld = "starred" if action == "star" else "pinned"
-            self.set_flag(msgs, fld, not getattr(m, fld))
-        elif action == "snooze":
-            ts = (datetime.datetime.now() + datetime.timedelta(days=1)).replace(
-                hour=8, minute=0, second=0, microsecond=0).timestamp()
-            self.snooze_msgs(msgs, ts)
-        elif action == "block":
-            self.block_sender(m)
 
     # ------------------------------------------------- spam / blocage / règles
-    @staticmethod
-    def _key(msg, domain=False):
-        em = msg.sender_email.lower()
-        return "@" + em.split("@")[-1] if domain else em
 
-    def _gather(self, msg, key):
-        msgs = self.cache.by_sender(key, ("inbox", "archive"))
-        if msg.id not in {x.id for x in msgs} and msg.folder in ("inbox", "archive"):
-            msgs.append(msg)
-        return msgs
 
-    def spam_sender(self, msg, domain=False):
-        """L'expéditeur (ou son domaine) part en Spam, maintenant et pour les prochains messages."""
-        key = self._key(msg, domain)
-        if key not in self.config["spam_senders"]:
-            self.config["spam_senders"].append(key)
-            self.config.save()
-        msgs = self._gather(msg, key)
-        if msgs:
-            self.move_messages(msgs, "spam")
-        self.status.set_text("En spam : " + key)
 
-    def block_sender(self, msg, domain=False):
-        """Bloque l'expéditeur : ses messages vont à la corbeille (lus), les futurs aussi."""
-        key = self._key(msg, domain)
-        if key not in self.config["blocked"]:
-            self.config["blocked"].append(key)
-            self.config.save()
-        msgs = self._gather(msg, key)
-        if msgs:
-            self.move_messages(msgs, "trash")
-        else:
-            self.toast.popup("Expéditeur bloqué : " + key, timeout=4)
-        self.status.set_text("Bloqué : " + key)
 
     def unblock(self, msg):
         em, dom = self._key(msg), self._key(msg, True)
@@ -1436,42 +1041,7 @@ class MainWindow(Gtk.ApplicationWindow):
         self.update_counts()
         self.toast.popup("Règles appliquées (%d message(s) restent dans la boîte)" % len(left), timeout=4)
 
-    def _auto_move(self, msgs, dest):
-        for m in msgs:
-            self.cache.update(m.id, folder=dest, unread=False if dest in ("trash", "spam") else m.unread)
-        self._bg_move(msgs, dest)
 
-    def _bg_move(self, msgs, dest):
-        self._pending += 1
-
-        def work():
-            errs, by = [], {}
-            for m in msgs:
-                by.setdefault(m.account, []).append(m)
-            for aid, lst in by.items():
-                try:
-                    self.backend(aid).move_many(lst, dest)
-                except Exception as e:
-                    errs.append(str(e))
-            return errs
-
-        def done(errs, err):
-            self._pending -= 1
-            if err or errs:
-                self.toast.popup("Échec du déplacement : %s" % ((errs or [str(err)])[0][:80]), timeout=6)
-            real = False
-            for m in msgs:
-                try:
-                    if not self.backend(m.account).demo:
-                        self.cache.delete(m.id)
-                        real = True
-                except Exception:
-                    pass
-            if real:
-                self.sync(folders=("inbox", dest), quiet=True)
-            self.reload_list()
-            self.update_counts()
-        self.run_bg(work, done)
 
     # ------------------------------------------------------------- rappels
     def add_followup(self, msg, days):
@@ -1575,14 +1145,231 @@ class MainWindow(Gtk.ApplicationWindow):
         self._rebuild_saved()
 
     # -------------------------------------------------------------- palette
+
+
+    def _goto(self, vid):
+        for r in self.nav.get_children():
+            if r.view == vid:
+                self.nav.select_row(r)
+
+    # --------------------------------------------------------------- fermeture
+    # ----------------------------------------------------------- synchronisation
+    def sync(self, manual=False, folders=("inbox", "sent"), quiet=False):
+        """Synchronise les comptes en arrière-plan ; les nouveaux messages apparaissent par lots, les plus récents d'abord."""
+        if self._sync_busy or self._pending:
+            if manual:
+                self.toast.popup("Synchronisation déjà en cours…", timeout=2)
+            return
+        self._sync_busy = True
+        if not quiet:
+            self.status.set_text("Synchronisation…")
+        accounts = list(self.accounts())
+        known = {(a["id"], f): self.cache.uids(a["id"], f) for a in accounts for f in folders}
+        self._partial_ids = set()
+
+        def on_batch(batch):
+            GLib.idle_add(self._partial, batch)
+
+        def work():
+            out = []
+            for a in accounts:
+                be = self.backend(a["id"])
+                for f in folders:
+                    try:
+                        out.append((a["id"], f, be.sync(f, known[(a["id"], f)], on_batch=on_batch), None))
+                    except Exception as e:
+                        out.append((a["id"], f, None, e))
+            return out
+        self.run_bg(work, lambda res, err: self._sync_done(res or [], err, known, manual))
+
+    def _partial(self, batch):
+        """Un lot de nouveaux messages vient d'arriver : on l'affiche tout de suite."""
+        self.cache.upsert_many(batch)
+        self._partial_ids.update(m.id for m in batch)
+        self.reload_list()
+        self.update_counts()
+        return False
+
+    def _sync_done(self, results, err, known, manual):
+        """Intègre les résultats de synchronisation dans le cache et l'interface."""
+        self._sync_busy = False
+        errors, fresh, routed_inbox = [], [], []
+        for aid, f, data, e in results:
+            if e or not data:
+                if e:
+                    errors.append(str(e))
+                continue
+            msgs, flags, present, minuid = data
+            self.cache.upsert_many([m for m in msgs if m.id not in self._partial_ids])
+            kn = known[(aid, f)]
+            ups = {}
+            for uid, (unread, starred) in flags.items():
+                mid = kn.get(uid)
+                if mid:
+                    ups.setdefault((unread, starred), []).append(mid)
+            for (unread, starred), ids in ups.items():
+                self.cache.update_many(ids, unread=unread, starred=starred)
+            if present is not None:
+                gone = [mid for uid, mid in kn.items() if uid >= minuid and uid not in present]
+                if gone:
+                    self.cache.delete_many(gone)
+            if f == "inbox":
+                keep = self._auto_route([m for m in msgs if m.folder == "inbox"])
+                routed_inbox += keep
+                if kn:
+                    fresh += [m for m in keep if m.unread]
+        self._last_sync = time.time()
+        if errors:
+            self.status.set_text("⚠ " + errors[0][:120])
+            if manual:
+                self.toast.popup(errors[0][:100], timeout=6)
+        else:
+            self.status.set_text("Synchronisé à " + time.strftime("%H:%M"))
+        self.reload_list()
+        self.update_counts()
+        self._notify(fresh)
+        self.ai_triage(routed_inbox)
+
+    # ----------------------------------------------------- push (IMAP IDLE)
+    def _start_push(self):
+        self._stop_push()
+        self._push_stop = threading.Event()
+        for a in self.accounts():
+            if a.get("demo"):
+                continue
+            try:
+                be = self.backend(a["id"])
+            except Exception:
+                continue
+            threading.Thread(target=be.watch, args=(lambda: GLib.idle_add(self._push_ping), self._push_stop),
+                             daemon=True, name="mintmail-idle").start()
+
+    def _stop_push(self):
+        ev = getattr(self, "_push_stop", None)
+        if ev is not None:
+            ev.set()
+
+    def _push_ping(self):
+        self.sync(False, ("inbox",), quiet=True)
+        return False
+
+    # -------------------------------------------------- déplacements en arrière-plan
+    def _auto_move(self, msgs, dest):
+        self.cache.update_many([m.id for m in msgs], folder=dest,
+                               **({"unread": False} if dest in ("trash", "spam") else {}))
+        self._bg_move(msgs, dest)
+
+    def _bg_move(self, msgs, dest):
+        self._pending += 1
+
+        def work():
+            errs, by = [], {}
+            for m in msgs:
+                by.setdefault(m.account, []).append(m)
+            for aid, lst in by.items():
+                try:
+                    self.backend(aid).move_many(lst, dest)
+                except Exception as e:
+                    errs.append(str(e))
+            return errs
+
+        def done(errs, err):
+            self._pending -= 1
+            if err or errs:
+                self.toast.popup("Échec du déplacement : %s" % ((errs or [str(err)])[0][:80]), timeout=6)
+            real = []
+            for m in msgs:
+                try:
+                    if not self.backend(m.account).demo:
+                        real.append(m.id)
+                except Exception:
+                    pass
+            if real:
+                self.cache.delete_many(real)
+                self.sync(folders=("inbox", dest), quiet=True)
+            self.reload_list()
+            self.update_counts()
+        self.run_bg(work, done)
+
+    # ------------------------------------------------------------ rédaction
+    def _full(self, msg):
+        """Message complet (avec corps) : la liste ne contient que des versions allégées."""
+        if getattr(msg, "light", False):
+            return self.cache.get(msg.id) or msg
+        return msg
+
+    def compose(self, **kw):
+        kw.setdefault("account_id", self._default_account())
+        ComposeWindow(self, self.accounts(), **kw)
+
+    def _quote(self, msg):
+        orig = sanitize_html(msg.html) if msg.html else text_to_html(msg.text)
+        return '<div id="qt"><br><div>Le %s, %s a écrit :</div><blockquote>%s</blockquote></div>' % (
+            format_full(msg.date), html.escape(msg.display_sender), orig)
+
+    def reply(self, msg, all_=False, ai_text=""):
+        msg = self._full(msg)
+        to = msg.to if msg.folder == "sent" else (msg.reply_to or msg.sender_email)
+        cc = ""
+        if all_:
+            mine = {a["email"].lower() for a in self.accounts()}
+            others = [a for a in split_addresses(msg.to) + split_addresses(msg.cc)
+                      if a.lower() not in mine and a.lower() != msg.sender_email.lower()]
+            cc = ", ".join(dict.fromkeys(others))
+        self.compose(account_id=self._default_account(msg), to=to, cc=cc,
+                     subject="Re: " + normalize_subject(msg.subject), quote_html=self._quote(msg),
+                     in_reply_to=msg.message_id, references=msg.references, ai_suggested_text=ai_text)
+
+    def forward(self, msg):
+        msg = self._full(msg)
+        head = ("<br>---------- Message transféré ----------<br>De : %s &lt;%s&gt;<br>Date : %s<br>Objet : %s<br>À : %s<br>"
+                % (html.escape(msg.sender_name), html.escape(msg.sender_email), format_full(msg.date),
+                   html.escape(msg.subject), html.escape(msg.to)))
+        self.compose(account_id=self._default_account(msg), subject="Fwd: " + normalize_subject(msg.subject),
+                     quote_html='<div id="qt">' + head + (sanitize_html(msg.html) if msg.html else text_to_html(msg.text)) + "</div>",
+                     attachments=[a["path"] for a in msg.attachments])
+
+    def open_draft(self, msg):
+        msg = self._full(msg)
+        self.compose(account_id=msg.account, to=msg.to, cc=msg.cc, subject=msg.subject,
+                     body_html=sanitize_html(msg.html), raw=True, in_reply_to=msg.message_id,
+                     references=msg.references, attachments=[a["path"] for a in msg.attachments], draft_id=msg.id)
+
+    def quick_reply(self, text):
+        msg = self.reader.msg
+        if not msg:
+            return
+        acc = next((a for a in self.accounts() if a["id"] == self._default_account(msg)), self.accounts()[0])
+        sig = acc.get("signature_html", "")
+        body = text_to_html(text) + ("<br><br>-- <br>" + sig if sig.strip() else "")
+        out = Outgoing(account=acc["id"], to=(msg.reply_to or msg.sender_email),
+                       subject="Re: " + normalize_subject(msg.subject), html=body,
+                       in_reply_to=msg.message_id, references=msg.references)
+        self.queue_send(out, 0)
+
+    # -------------------------------------------------------- recherche & fenêtre
+    def _search_activate(self, entry):
+        """Entrée dans la barre de recherche : « ? … » ou une phrase libre déclenche la recherche IA."""
+        text = entry.get_text().strip()
+        words = text.split()
+        if text.startswith(("?", "✨")) or (self.engine.enabled() and len(words) >= 4 and ":" not in text):
+            self.ai_search(text)
+
+    def toggle_fullscreen(self):
+        fs = bool(self.get_window() and self.get_window().get_state() & Gdk.WindowState.FULLSCREEN)
+        (self.unfullscreen if fs else self.fullscreen)()
+
+    # ------------------------------------------------------------- palette
     def _palette_commands(self):
         sel = self.selected_msgs()
         m = self.reader.msg or (sel[0] if sel else None)
         cmds = []
         if m:
             who, dom = m.sender_email, "@" + m.sender_email.split("@")[-1]
-            tomorrow = lambda: self.run_action("snooze", self.selected_msgs() or [m])
             cmds += [
+                ("✨ Résumer / analyser ce message", lambda: self.ai_fetch(self._full(m), force=True)),
+                ("✨ Répondre avec l'IA", lambda: self.ai_reply_with_ai(m)),
+                ("✨ Traduire ce message", lambda: self._on_ai_action(self.reader, "translate", "")),
                 ("Répondre", lambda: self.reply(m)), ("Répondre à tous", lambda: self.reply(m, True)),
                 ("Transférer", lambda: self.forward(m)),
                 ("Archiver", lambda: self.move_messages(self.selected_msgs() or [m], "archive")),
@@ -1594,18 +1381,16 @@ class MainWindow(Gtk.ApplicationWindow):
                 ("Bloquer le domaine — " + dom, lambda: self.block_sender(m, True)),
                 ("Voir tous les messages de " + who, lambda: self.show_from(m)),
                 ("Copier l'adresse " + who, lambda: self.copy_text(who)),
-                ("Reporter à demain 8 h", tomorrow),
+                ("Reporter à demain 8 h", lambda: self.run_action("snooze", self.selected_msgs() or [m])),
                 ("Me rappeler si pas de réponse (3 jours)", lambda: self.add_followup(m, 3)),
                 ("Me rappeler si pas de réponse (7 jours)", lambda: self.add_followup(m, 7)),
                 ("Créer une règle pour " + who, lambda: self.show_settings("filters")),
             ]
             if self.is_blocked(m):
-                cmds.insert(6, ("Débloquer " + who, lambda: self.unblock(m)))
-        # Commandes IA NVIDIA
-        ai = self._get_ai_service()
-        if ai and m:
-            cmds.insert(6, ("Générer une réponse IA", lambda: self._ai_generate_reply_from_msg(m)))
+                cmds.insert(9, ("Débloquer " + who, lambda: self.unblock(m)))
         cmds += [
+            ("✨ Ouvrir l'assistant IA", lambda: self.toggle_assistant(True)),
+            ("✨ Résumer ma boîte de réception", lambda: self._maybe_digest(force=True)),
             ("Nouveau message", self.compose), ("Actualiser", lambda: self.sync(True)),
             ("Gérer les expéditeurs bloqués et les règles", lambda: self.show_settings("filters")),
             ("Appliquer les règles à la boîte de réception", self.apply_rules_now),
@@ -1614,10 +1399,13 @@ class MainWindow(Gtk.ApplicationWindow):
             ("Disposition : lecture en bas", lambda: self.set_layout("bottom")),
             ("Disposition : liste seule", lambda: self.set_layout("list")),
             ("Barre latérale : réduire / étendre", self.toggle_rail),
-            ("Paramètres", self.show_settings), ("Paramètres dans une fenêtre séparée", lambda: self.show_settings(window=True)),
+            ("Paramètres (Ctrl+,)", self.show_settings),
+            ("Paramètres dans une fenêtre séparée", lambda: self.show_settings(window=True)),
+            ("Réglages de l'IA", lambda: self.show_settings("ai")),
             ("Journal d'erreurs", self.show_log), ("Gestes de swipe (réglages)", lambda: self.show_settings("gestures")),
-            ("Basculer thème clair / sombre", self.toggle_theme),
-            ("Tout marquer comme lu", self.mark_all_read), ("Tout sélectionner", lambda: self.listbox.select_all()),
+            ("Basculer thème clair / sombre", self.toggle_theme), ("Plein écran (F11)", self.toggle_fullscreen),
+            ("Tout marquer comme lu", self.mark_all_read),
+            ("Tout sélectionner", lambda: (self.sel_btn.set_active(True), self.listbox.select_all())),
             ("Rechercher", lambda: self.search_entry.grab_focus()),
         ]
         for i, sv in enumerate(self.config["saved_searches"]):
@@ -1630,25 +1418,28 @@ class MainWindow(Gtk.ApplicationWindow):
         cmds = self._palette_commands()
         dlg = Gtk.Dialog(transient_for=self, modal=True)
         dlg.set_decorated(False)
-        dlg.set_default_size(520, 360)
+        dlg.set_default_size(560, 400)
         box = dlg.get_content_area()
         box.set_border_width(8)
         e = Gtk.SearchEntry()
-        e.set_placeholder_text("Tapez une commande…")
+        e.set_placeholder_text("Tapez une commande — ou demandez n'importe quoi à l'IA…")
         box.pack_start(e, False, False, 4)
         lb = Gtk.ListBox()
         sw = Gtk.ScrolledWindow()
         sw.add(lb)
         box.pack_start(sw, True, True, 0)
         rows = []
+        ai_row = Gtk.ListBoxRow()
+        ai_lbl = Gtk.Label(label="", xalign=0, margin=8)
+        ai_row.add(ai_lbl)
+        ai_row.label = ""
+        lb.add(ai_row)
         for label, fn in cmds:
             r = Gtk.ListBoxRow()
             r.fn, r.label = fn, label.lower()
             r.add(Gtk.Label(label=label, xalign=0, margin=8))
             lb.add(r)
             rows.append(r)
-        lb.set_filter_func(lambda r: e.get_text().lower() in r.label)
-
         closed = []
 
         def run(fn):
@@ -1656,25 +1447,38 @@ class MainWindow(Gtk.ApplicationWindow):
             dlg.destroy()
             GLib.idle_add(lambda: (fn(), False)[1])
 
+        def ask_ai():
+            text = e.get_text().strip()
+            run(lambda: self.assistant_ask(text))
+
+        def visible(r):
+            t = e.get_text().lower()
+            if r is ai_row:
+                return len(t.strip()) > 2
+            return t in r.label
+
+        def changed(*_):
+            ai_lbl.set_text("✨ Demander à l'assistant : « %s »" % e.get_text().strip())
+            lb.invalidate_filter()
+        lb.set_filter_func(visible)
+        e.connect("search-changed", changed)
+
         def activate(*_):
+            t = e.get_text().lower()
             for r in rows:
-                if e.get_text().lower() in r.label:
+                if t in r.label:
                     run(r.fn)
                     return
-        e.connect("search-changed", lambda *_: lb.invalidate_filter())
+            if len(t.strip()) > 2:
+                ask_ai()
         e.connect("activate", activate)
-        lb.connect("row-activated", lambda _l, r: run(r.fn))
+        lb.connect("row-activated", lambda _l, r: ask_ai() if r is ai_row else run(r.fn))
         dlg.show_all()
         dlg.run()
         if not closed:
             dlg.destroy()
 
-    def _goto(self, vid):
-        for r in self.nav.get_children():
-            if r.view == vid:
-                self.nav.select_row(r)
 
-    # --------------------------------------------------------------- fermeture
     def _on_close(self, *_):
         w, h = self.get_size()
         self.config["width"], self.config["height"] = w, h
@@ -1685,6 +1489,12 @@ class MainWindow(Gtk.ApplicationWindow):
         except OSError:
             pass
         self.toast._finish(expired=True)   # valide les actions en attente
+        self._stop_push()
+        for be in list(self._backends.values()):
+            try:
+                be.close()
+            except Exception:
+                pass
         try:
             self.sync_engine.stop()
         except Exception:

@@ -1,0 +1,144 @@
+"""Test fidèle de la liste : un clic ouvre toujours le message, actions instantanées, sélection du suivant."""
+import sys, time, os
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import gtkstub   # noqa: F401  (installe les doublures de gi)
+from mintmail.store import Config, Cache
+from mintmail import window as W, widgets as WD
+from mintmail.models import Message
+
+
+class FakeLB:
+    """ListBox minimale : mode simple, tri par épingle puis date, signaux row-selected."""
+    def __init__(self):
+        self.rows, self.sel, self.h = [], None, {}
+
+    def connect(self, sig, fn, *a): self.h[sig] = fn
+    def add(self, row): self.rows.append(row); row._lb = self
+    def get_children(self): return list(self.rows)
+    def _sorted(self): return sorted(self.rows, key=lambda r: (not r.msg.pinned, -r.msg.date))
+    def remove(self, row):
+        self.rows.remove(row)
+        if self.sel is row:
+            self.sel = None
+            self.h["row-selected"](self, None)
+    def select_row(self, row): self.sel = row; self.h["row-selected"](self, row)
+    def unselect_all(self): self.sel = None
+    def get_selected_row(self): return self.sel
+    def get_selected_rows(self): return [self.sel] if self.sel else []
+    def get_row_at_index(self, i):
+        s = self._sorted()
+        return s[i] if 0 <= i < len(s) else None
+    def invalidate_sort(self): pass
+    def invalidate_headers(self): pass
+    def set_selection_mode(self, m): pass
+
+
+class FakeReader:
+    def __init__(self): self.msg, self.shown, self.opened = None, [], True
+    def show_message(self, m, load_images=None): self.msg = m; self.shown.append(m.id)
+    def show_empty(self, *a): self.msg = None
+    def show_multi(self, n): self.msg = None
+    def is_open(self): return self.opened
+    def refresh_flags(self): pass
+    def __getattr__(self, n): return lambda *a, **k: None
+
+
+WD.MessageRow.get_index = lambda self: self._lb._sorted().index(self)
+
+
+def make_window(n=300):
+    cfg, cache = Config(os.path.join(gtkstub.tmp, "c%d.json" % n)), Cache(os.path.join(gtkstub.tmp, "c%d.db" % n))
+    now = time.time()
+    cache.upsert_many([Message(id="m%d" % i, account="demo", folder="inbox", uid=i + 1, sender_name="Exp %d" % i,
+                               sender_email="e%d@x.be" % (i % 7), subject="Sujet %d" % i, date=now - i * 60,
+                               snippet="aperçu", text="corps %d" % i, html="<p>corps</p>", unread=(i % 2 == 0))
+                       for i in range(n)])
+    w = W.MainWindow.__new__(W.MainWindow)
+    w.config, w.cache = cfg, cache
+    w.view, w.account, w.category, w.search = "inbox", "all", None, ""
+    w.unread_only = w.att_only = w.select_mode = False
+    w.narrow = w.reader_open = False
+    w._limit, w._loading, w._pending, w.rows = 100, False, 0, {}
+    w.listbox, w.reader = FakeLB(), FakeReader()
+    w.listbox.connect("row-selected", w._on_row_selected)
+    w.list_stack, w.empty_lbl, w.status, w.toast = gtkstub.D(), gtkstub.D(), gtkstub.D(), gtkstub.D()
+    w.toast.popup = lambda *a, **k: w.__dict__.setdefault("toasts", []).append(a)
+    w.bulk_rev, w.bulk_lbl, w.digest_box = gtkstub.D(), gtkstub.D(), gtkstub.D()
+    w.ai_open_message = lambda m: None
+    w.refresh_digest_visibility = lambda: None
+    w.update_counts = lambda: None
+    w._layout = lambda: None
+    w.run_bg = lambda fn, done=None: None
+    w._effective_search = lambda: ""
+    w._view_title = lambda: "Boîte"
+    w._backends = {}
+    w.backend = lambda aid: gtkstub.D()
+    return w
+
+
+def test_one_click_always_opens():
+    w = make_window()
+    w.reload_list(full=True)
+    assert len(w.rows) == 100                      # pagination : 100 lignes d'abord
+    a, b, c = (w.listbox.get_row_at_index(i) for i in (0, 1, 2))
+    w.listbox.select_row(a); assert w.reader.msg.id == a.msg.id
+    w.listbox.select_row(b); assert w.reader.msg.id == b.msg.id      # 1 seul clic suffit même si un message est chargé
+    w.listbox.select_row(c); assert w.reader.msg.id == c.msg.id
+    assert w.reader.shown[-3:] == [a.msg.id, b.msg.id, c.msg.id]
+    assert not w.reader.msg.light and w.reader.msg.text               # le lecteur reçoit le message complet
+
+
+def test_archive_is_instant_and_selects_next():
+    w = make_window()
+    w.reload_list(full=True)
+    row = w.listbox.get_row_at_index(3)
+    w.listbox.select_row(row)
+    t = time.perf_counter()
+    w.move_messages([row.msg], "archive")
+    ms = (time.perf_counter() - t) * 1000
+    assert row.msg.id not in w.rows and len(w.rows) == 99
+    assert w.cache.get(row.msg.id).folder == "archive"
+    assert w.reader.msg is not None and w.reader.msg.id == w.listbox.get_selected_row().msg.id != row.msg.id
+    print("archivage d'un message : %.1f ms" % ms)
+    assert ms < 150
+
+
+def test_bulk_spam_sender_is_one_transaction():
+    w = make_window()
+    w.reload_list(full=True)
+    target = w.listbox.get_row_at_index(0).msg
+    w.config["spam_senders"] = []
+    t = time.perf_counter()
+    w.spam_sender(target)
+    ms = (time.perf_counter() - t) * 1000
+    spam = w.cache.query("spam", limit=1000)
+    same = [m for m in w.cache.query("archive") + w.cache.query("inbox", limit=1000)
+            if m.sender_email == target.sender_email]
+    assert len(spam) > 30 and not same and target.sender_email in w.config["spam_senders"]
+    assert all(m.id not in w.rows for m in spam)
+    print("expéditeur en spam (%d messages) : %.1f ms" % (len(spam), ms))
+    assert ms < 400
+
+
+def test_incremental_reload_keeps_selection_and_rows():
+    w = make_window()
+    w.reload_list(full=True)
+    row = w.listbox.get_row_at_index(5)
+    w.listbox.select_row(row)
+    ids = set(w.rows)
+    shown = len(w.reader.shown)
+    w.cache.update_many(["m50"], starred=True)           # changement ailleurs (synchro) : pas de reconstruction
+    w.reload_list()
+    assert set(w.rows) == ids and w.rows[row.msg.id] is row and w.listbox.get_selected_row() is row
+    assert len(w.reader.shown) == shown                   # le message affiché n'est pas rechargé inutilement
+    assert w.rows["m50"].msg.starred
+
+
+def test_unselected_removal_keeps_current_message():
+    w = make_window()
+    w.reload_list(full=True)
+    cur = w.listbox.get_row_at_index(2)
+    w.listbox.select_row(cur)
+    other = w.listbox.get_row_at_index(7).msg
+    w.move_messages([other], "trash")                     # action « au survol » sur une autre ligne
+    assert w.reader.msg.id == cur.msg.id and w.listbox.get_selected_row() is cur

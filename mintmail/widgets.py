@@ -48,9 +48,11 @@ SWIPE_SHORT, SWIPE_LONG = 90, 230
 class MessageRow(Gtk.ListBoxRow):
     """Ligne de message avec gestes de swipe (souris, pavé tactile, écran tactile)."""
 
-    def __init__(self, msg, on_check=None, on_swipe=None, swipe_cfg=None, height=72):
+    def __init__(self, msg, on_check=None, on_swipe=None, swipe_cfg=None, height=72, ai=None):
         super().__init__()
         self.msg = msg
+        self.ai = ai or {}
+        self._sig = None
         self._on_check = on_check
         self.on_swipe = on_swipe
         self.swipe_cfg = dict(DEFAULT_SWIPE)
@@ -92,6 +94,7 @@ class MessageRow(Gtk.ListBoxRow):
         col.pack_start(self.snippet, False, False, 0)
         outer.pack_start(col, True, True, 0)
         self.content = outer
+        self.on_quick = None
 
         # couche d'actions (dessous) + carte glissante (dessus)
         self.actions = Gtk.Box()
@@ -117,6 +120,21 @@ class MessageRow(Gtk.ListBoxRow):
                              Gdk.EventMask.BUTTON1_MOTION_MASK | Gdk.EventMask.TOUCH_MASK |
                              Gdk.EventMask.SMOOTH_SCROLL_MASK | Gdk.EventMask.SCROLL_MASK)
         self.overlay.add_overlay(self.card)
+        self.hover = Gtk.Box(spacing=0)
+        self.hover.get_style_context().add_class("hover-actions")
+        self.hover.set_halign(Gtk.Align.END)
+        self.hover.set_valign(Gtk.Align.START)
+        self.hover.set_margin_top(6)
+        for act, ic, tip in (("archive", "folder-symbolic", "Archiver"), ("trash", "user-trash-symbolic", "Supprimer"),
+                             ("snooze", "alarm-symbolic", "Reporter à demain"), ("star", "starred-symbolic", "Favori"),
+                             ("spam", "mail-mark-junk-symbolic", "Spam")):
+            b = icon_button(ic, tip, relief=False)
+            b.connect("clicked", lambda _b, a=act: self.on_quick and self.on_quick(self, a))
+            self.hover.pack_start(b, False, False, 0)
+        self.overlay.add_overlay(self.hover)
+        self.card.add_events(Gdk.EventMask.ENTER_NOTIFY_MASK | Gdk.EventMask.LEAVE_NOTIFY_MASK)
+        self.card.connect("enter-notify-event", self._enter)
+        self.card.connect("leave-notify-event", self._leave)
         self.overlay.connect("get-child-position", self._child_pos)
         self.add(self.overlay)
 
@@ -133,6 +151,7 @@ class MessageRow(Gtk.ListBoxRow):
         self.revealer.set_reveal_child(False)
         self.l_box.hide()
         self.r_box.hide()
+        self.hover.hide()
 
     # ---- cases à cocher
     def _toggled(self, btn):
@@ -149,6 +168,16 @@ class MessageRow(Gtk.ListBoxRow):
             self.check.handler_unblock_by_func(self._toggled)
 
     # ---- swipe
+    def _enter(self, w, ev):
+        if abs(self.offset) < 1:
+            self.hover.show_all()
+        return False
+
+    def _leave(self, w, ev):
+        if ev.detail != Gdk.NotifyType.INFERIOR:   # le pointeur reste dans la carte (sur un enfant)
+            self.hover.hide()
+        return False
+
     def _child_pos(self, overlay, widget, alloc):
         if widget is not self.card:
             return False
@@ -181,6 +210,8 @@ class MessageRow(Gtk.ListBoxRow):
         moving = abs(self.offset) >= 0.5
         (ctx.add_class if moving else ctx.remove_class)("swiping")
         self.actions.set_opacity(1.0 if moving else 0.0)
+        if moving:
+            self.hover.hide()
         self.overlay.queue_resize()
 
     def set_offset(self, dx):
@@ -278,16 +309,47 @@ class MessageRow(Gtk.ListBoxRow):
         self._finish()
         return False
 
+    def signature(self):
+        m = self.msg
+        return (m.unread, m.starred, m.pinned, m.snoozed_until > 0, bool(m.attachments), m.subject, m.snippet,
+                m.date, m.category, self.ai.get("summary"), self.ai.get("priority"), bool(self.ai.get("spam")))
+
+    def update_msg(self, msg, ai=None):
+        """Met à jour la ligne en place (sans la reconstruire) ; retourne True si quelque chose a changé."""
+        self.msg = msg
+        if ai is not None:
+            self.ai = ai
+        if self.signature() != self._sig:
+            self.refresh()
+            return True
+        return False
+
     def refresh(self):
         m = self.msg
+        self._sig = self.signature()
         ctx = self.get_style_context()
         (ctx.add_class if m.unread else ctx.remove_class)("unread")
         self.sender.set_text(m.display_sender)
         self.subject.set_text(m.subject)
-        self.snippet.set_text(m.snippet)
+        summary = (self.ai.get("summary") or "").strip()
+        sctx = self.snippet.get_style_context()
+        if summary:
+            self.snippet.set_text("✨ " + summary)
+            sctx.add_class("ai-line")
+        else:
+            self.snippet.set_text(m.snippet)
+            sctx.remove_class("ai-line")
         self.time.set_text(format_time(m.date))
         for ch in self.icons.get_children():
             self.icons.remove(ch)
+        if self.ai.get("spam"):
+            lab = Gtk.Label(label="Suspect")
+            lab.get_style_context().add_class("badge-suspect")
+            self.icons.pack_start(lab, False, False, 0)
+        elif self.ai.get("priority") == 3:
+            lab = Gtk.Label(label="Important")
+            lab.get_style_context().add_class("badge-important")
+            self.icons.pack_start(lab, False, False, 0)
         if m.unread:
             dot = Gtk.Box()
             dot.set_size_request(9, 9)

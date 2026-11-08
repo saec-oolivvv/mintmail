@@ -65,6 +65,49 @@ class Editor(Gtk.Box):
                 json.dumps(cmd), json.dumps(value))
             self.web.run_javascript(js, None, None, None)
 
+    def get_user_text(self, cb):
+        """cb(texte, est_sélection) : sélection, sinon texte écrit (hors signature et citation)."""
+        if self.web:
+            js = ("(function(){var s=window.getSelection();var t=(s&&s.rangeCount)?s.toString():'';"
+                  "if(t&&t.trim()){return JSON.stringify({sel:true,text:t});}"
+                  "var ed=document.getElementById('ed').cloneNode(true);"
+                  "ed.querySelectorAll('#sig,#qt').forEach(function(n){n.remove();});"
+                  "return JSON.stringify({sel:false,text:ed.innerText});})()")
+
+            def done(web, res, _d=None):
+                try:
+                    obj = json.loads(web.run_javascript_finish(res).get_js_value().to_string() or "{}")
+                    cb(obj.get("text", ""), bool(obj.get("sel")))
+                except Exception:
+                    cb("", False)
+            self.web.run_javascript(js, None, done, None)
+        else:
+            b = self.tv.get_buffer()
+            if b.get_has_selection():
+                a, z = b.get_selection_bounds()
+                cb(b.get_text(a, z, False), True)
+            else:
+                cb(b.get_text(b.get_start_iter(), b.get_end_iter(), False), False)
+
+    def replace_user_text(self, html_text, selection):
+        if self.web:
+            if selection:
+                self.exec("insertHTML", html_text)
+            else:
+                js = ("(function(h){var ed=document.getElementById('ed');var keep='';"
+                      "['sig','qt'].forEach(function(id){var n=document.getElementById(id);if(n){keep+=n.outerHTML;}});"
+                      "ed.innerHTML=h+'<div><br></div>'+keep;})(%s)" % json.dumps(html_text))
+                self.web.run_javascript(js, None, None, None)
+        else:
+            from .util import html_to_text
+            b = self.tv.get_buffer()
+            if selection and b.get_has_selection():
+                a, z = b.get_selection_bounds()
+                b.delete(a, z)
+                b.insert(a, html_to_text(html_text))
+            else:
+                b.set_text(html_to_text(html_text))
+
     def get_html(self, cb):
         if self.web:
             def done(web, res, _d=None):
@@ -94,6 +137,7 @@ class ComposeWindow(Gtk.Window):
 
         hb = Gtk.HeaderBar()
         hb.set_show_close_button(True)
+        hb.set_decoration_layout(":minimize,maximize,close")
         hb.set_title("Nouveau message")
         self.set_titlebar(hb)
         self.send_btn = Gtk.Button(label="Envoyer")
@@ -137,6 +181,9 @@ class ComposeWindow(Gtk.Window):
         self.cc = Gtk.Entry(text=cc)
         self.bcc = Gtk.Entry()
         self.subject = Gtk.Entry(text=subject)
+        self.subject.set_icon_from_icon_name(Gtk.EntryIconPosition.SECONDARY, "starred-symbolic")
+        self.subject.set_icon_tooltip_text(Gtk.EntryIconPosition.SECONDARY, "✨ Suggérer un objet")
+        self.subject.connect("icon-press", self._ai_subject_icon)
         self._attach_completion(self.to)
         self._attach_completion(self.cc)
         self._attach_completion(self.bcc)
@@ -189,9 +236,26 @@ class ComposeWindow(Gtk.Window):
         tpl.set_popup(tmenu)
         fmt.pack_start(tpl, False, False, 8)
         # Bouton IA pour aide à la rédaction
-        self.ai_btn = icon_button("computer-symbolic", "Aide IA", relief=False)
+        self.ai_btn = Gtk.MenuButton(label="✨ IA")
+        self.ai_btn.get_style_context().add_class("ai-btn")
         self.ai_btn.set_no_show_all(True)
-        self.ai_btn.connect("clicked", self._ai_assist)
+        aim = Gtk.Menu()
+        for entry in (("Rédiger à partir d'une idée…", "write"), None,
+                      ("Améliorer le texte", "improve"), ("Corriger l'orthographe", "fix"),
+                      ("Raccourcir", "shorten"), ("Développer", "expand"),
+                      ("Ton plus formel", "formal"), ("Ton plus amical", "friendly"), None,
+                      ("Traduire en français", "translate:fr"), ("Traduire en anglais", "translate:en"),
+                      ("Traduire en néerlandais", "translate:nl"), ("Traduire en allemand", "translate:de"),
+                      ("Traduire en espagnol", "translate:es"), None,
+                      ("Suggérer un objet", "subject")):
+            if entry is None:
+                aim.append(Gtk.SeparatorMenuItem())
+                continue
+            it = Gtk.MenuItem(label=entry[0])
+            it.connect("activate", lambda _i, op=entry[1]: self._ai_op(op))
+            aim.append(it)
+        aim.show_all()
+        self.ai_btn.set_popup(aim)
         fmt.pack_start(self.ai_btn, False, False, 8)
         fsw = Gtk.ScrolledWindow()
         fsw.set_policy(Gtk.PolicyType.EXTERNAL, Gtk.PolicyType.NEVER)
@@ -281,29 +345,82 @@ class ComposeWindow(Gtk.Window):
         btn.hide()
 
     # -- assistance IA
-    def _ai_assist(self, *_):
-        """Demande à l'IA un projet de message (texte brut, inséré échappé)."""
-        ai = self.win._get_ai_service()
-        if not ai:
-            self.win.toast.popup("IA non configurée : Paramètres → IA NVIDIA.", timeout=4)
+    def _ai_busy(self, busy):
+        self.ai_btn.set_sensitive(not busy)
+        self.ai_btn.set_label("✨ …" if busy else "✨ IA")
+
+    def _ai_op(self, op):
+        """Opérations IA du composeur : rédiger, améliorer, corriger, raccourcir, traduire, objet…"""
+        eng = self.win.engine
+        if not eng.enabled():
+            self.win.toast.popup("IA non configurée : Paramètres → IA.", timeout=4)
+            self.win.show_settings("ai")
             return
-        self.ai_btn.set_sensitive(False)
         subject, to = self.subject.get_text().strip(), self.to.get_text().strip()
-        quoted = html_to_text(self.quote_html) if self.quote_html else ""
 
-        def work():
-            return ai.assist_draft(subject, to, quoted)
-
-        def done(text, err):
-            self.ai_btn.set_sensitive(True)
+        def finish(text, err, apply):
+            self._ai_busy(False)
             if err:
                 self.win.toast.popup("Erreur IA : %s" % str(err)[:90], timeout=6)
             elif text:
-                self.editor.exec("insertHTML", text_to_html(text) + "<br><br>")
-                self.win.toast.popup("Texte IA inséré. Relisez avant d'envoyer.", timeout=4)
+                apply(text)
+                self.win.toast.popup("✨ Fait. Relisez avant d'envoyer.", timeout=3)
             else:
-                self.win.toast.popup("L'IA n'a pas généré de texte.", timeout=3)
-        self.win.run_bg(work, done)
+                self.win.toast.popup("L'IA n'a rien renvoyé.", timeout=3)
+
+        if op == "write":
+            idea = self._ask_idea()
+            if not idea:
+                return
+            self._ai_busy(True)
+            quoted = html_to_text(self.quote_html) if self.quote_html else ""
+
+            def got(text, selection):
+                self.win.run_bg(lambda: eng.write_from_prompt(idea, subject, to, quoted),
+                                lambda t, e: finish(t, e, lambda x: self.editor.replace_user_text(
+                                    text_to_html(x), selection) if (selection or text.strip()) else
+                                    self.editor.exec("insertHTML", text_to_html(x))))
+            self.editor.get_user_text(got)
+            return
+
+        def got(text, selection):
+            if not text.strip():
+                self._ai_busy(False)
+                self.win.toast.popup("Écrivez d'abord un peu de texte.", timeout=3)
+                return
+            if op == "subject":
+                self.win.run_bg(lambda: eng.subject_for(text),
+                                lambda t, e: finish(t, e, lambda x: self.subject.set_text(x)))
+            else:
+                self.win.run_bg(lambda: eng.rewrite(text, op),
+                                lambda t, e: finish(t, e, lambda x: self.editor.replace_user_text(text_to_html(x), selection)))
+        self._ai_busy(True)
+        self.editor.get_user_text(got)
+
+    def _ask_idea(self):
+        d = Gtk.Dialog(title="✨ Rédiger avec l'IA", transient_for=self, modal=True)
+        d.add_buttons("Annuler", Gtk.ResponseType.CANCEL, "Rédiger", Gtk.ResponseType.OK)
+        d.set_default_size(460, 200)
+        tv = Gtk.TextView()
+        tv.set_wrap_mode(Gtk.WrapMode.WORD_CHAR)
+        tv.set_left_margin(8)
+        tv.set_top_margin(8)
+        sw = Gtk.ScrolledWindow()
+        sw.add(tv)
+        box = d.get_content_area()
+        box.set_spacing(8)
+        box.set_border_width(12)
+        box.pack_start(Gtk.Label(label="Que voulez-vous dire ? (quelques mots suffisent)", xalign=0), False, False, 0)
+        box.pack_start(sw, True, True, 0)
+        d.show_all()
+        ok = d.run() == Gtk.ResponseType.OK
+        b = tv.get_buffer()
+        text = b.get_text(b.get_start_iter(), b.get_end_iter(), False).strip()
+        d.destroy()
+        return text if ok else ""
+
+    def _ai_subject_icon(self, entry, pos, ev):
+        self._ai_op("subject")
 
     # -- pièces jointes
     def _attach(self, *_):

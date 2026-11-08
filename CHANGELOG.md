@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.4.0
+- IA omniprésente : assistant conversationnel à actions confirmées, carte d'analyse par message, tri et résumés dans la liste, bloc « En bref », rédaction assistée, recherche en langage naturel, agenda (.ics), traduction
+- Performance : cache allégé (méta sans corps), mises à jour par colonnes en une transaction, liste incrémentale, pagination, connexions IMAP persistantes, lots progressifs, IMAP IDLE
+- Un clic ouvre un message (sélection simple) ; multi-sélection à la demande
+- Boutons réduire / agrandir / fermer garantis ; plein écran F11
+- Design : cartes, actions au survol, thème IA, couleurs prédéfinies, bouton Assistant
+
 ## 1.3.0
 - Correctif : plantage au démarrage (`httpx` absent) et NameError à l'initialisation de la fenêtre
 - Correctif : page des paramètres inutilisable (NameError dans la page de synchro, set_border_width sur Gtk.Label)

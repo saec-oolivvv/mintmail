@@ -28,6 +28,8 @@ class Message:
     references: str = ""
     unsubscribe: str = ""
 
+    light = False   # True : version allégée (sans corps) issue de la liste — jamais réécrite en base
+
     @property
     def display_sender(self):
         return self.sender_name or self.sender_email

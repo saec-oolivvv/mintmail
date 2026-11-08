@@ -11,6 +11,7 @@ from .reader import WebKit2, HAS_WEBKIT
 from .settings_extra import (gestures_page, filters_page, templates_page,
                               p2p_page, help_page)
 from .widgets import icon
+from .style import ACCENTS
 from .ai_service import AIService, DEFAULT_API_BASE, DEFAULT_MODEL
 
 SHORTCUTS = [
@@ -19,6 +20,7 @@ SHORTCUTS = [
     ("U", "Marquer lu / non lu"), ("H", "Reporter à demain 8 h"), ("J / K", "Message suivant / précédent"),
     ("/  ou  Ctrl+F", "Rechercher"), ("Ctrl+K", "Palette de commandes"), ("Ctrl+A", "Tout sélectionner"),
     ("!", "Signaler comme spam"), ("\\", "Basculer colonnes / liste seule"), ("X", "Mode sélection"),
+    ("Ctrl+J", "Assistant IA"), ("F11", "Plein écran"), ("? … (recherche)", "Poser une question à l'IA"),
     ("Ctrl+,", "Ouvrir les paramètres"), ("Ctrl+R", "Actualiser"), ("Échap", "Annuler la sélection / la recherche"),
 ]
 SIG_TEMPLATE = ('<p><b>Prénom Nom</b><br>Fonction — Société<br>'
@@ -63,7 +65,7 @@ class SettingsPage(Gtk.Box):
         stack.add_titled(self._scr(self._accounts_page()), "accounts", "Comptes")
         stack.add_titled(self._scr(self._signature_page()), "sig", "Signatures")
         stack.add_titled(self._scr(self._appearance_page()), "look", "Apparence")
-        stack.add_titled(self._scr(self._ai_page()), "ai", "IA NVIDIA")
+        stack.add_titled(self._ai_page(), "ai", "✨ Intelligence artificielle")
         stack.add_titled(p2p_page(win), "p2p", "Synchronisation P2P")
         stack.add_titled(gestures_page(win), "gestures", "Gestes & disposition")
         stack.add_titled(filters_page(win), "filters", "Filtres & blocage")
@@ -396,6 +398,16 @@ class SettingsPage(Gtk.Box):
             w.set_halign(Gtk.Align.START)
             grid.attach(l, 0, i, 1, 1)
             grid.attach(w, 1, i, 1, 1)
+        swatches = Gtk.FlowBox()
+        swatches.set_selection_mode(Gtk.SelectionMode.NONE)
+        swatches.set_max_children_per_line(6)
+        for name, hexcol in ACCENTS:
+            b = Gtk.Button(label=name)
+            b.get_style_context().add_class("pill")
+            b.connect("clicked", lambda _b, h=hexcol: (self._set("accent", h), color.set_rgba(self._rgba(h))))
+            swatches.add(b)
+        grid.attach(Gtk.Label(label="Couleurs prédéfinies", xalign=1), 0, 7, 1, 1)
+        grid.attach(swatches, 1, 7, 1, 1)
         clear = Gtk.Button(label="Vider le cache des messages")
         clear.set_halign(Gtk.Align.START)
         clear.connect("clicked", self._clear_cache)
@@ -431,44 +443,77 @@ class SettingsPage(Gtk.Box):
         self.win.show_settings("look")
 
     @staticmethod
+    def _rgba(hexcol):
+        c = Gdk.RGBA()
+        c.parse(hexcol)
+        return c
+
+    @staticmethod
     def _hex(c):
         return "#%02x%02x%02x" % (int(c.red * 255), int(c.green * 255), int(c.blue * 255))
 
     def _set(self, key, val):
         self.cfg[key] = val
         self.cfg.save()
-        self.win.apply_settings()
+        if key in ("theme", "accent", "density", "load_images"):   # les autres réglages n'exigent pas de rafraîchir l'interface
+            self.win.apply_settings()
 
     def _ai_page(self):
-        """Assistance IA NVIDIA : désactivée par défaut, clé dans le trousseau, tests hors interface."""
+        """L'IA est l'ADN de MintMail : réglages des fonctions, de la confidentialité et du fournisseur NVIDIA."""
         cfg = self.cfg
         grid = Gtk.Grid(column_spacing=12, row_spacing=10)
         grid.set_border_width(18)
-        ttl = Gtk.Label(label="Assistance IA (NVIDIA)", xalign=0)
+        ttl = Gtk.Label(label="✨ Intelligence artificielle", xalign=0)
         ttl.get_style_context().add_class("list-title")
         grid.attach(ttl, 0, 0, 2, 1)
-        note = Gtk.Label(xalign=0, label="Désactivée par défaut. Quand elle est active, le texte des messages que vous "
-                                         "traitez avec l'IA (réponse suggérée, aide à la rédaction) est envoyé à l'API "
-                                         "NVIDIA. La clé API est stockée dans le trousseau du système, pas dans le "
-                                         "fichier de configuration.")
+        note = Gtk.Label(xalign=0, label="Résumés, réponses suggérées, tri par priorité, détection d'hameçonnage, rédaction, "
+                                         "traduction, assistant conversationnel capable d'agir sur votre boîte. Désactivée "
+                                         "par défaut : une fois activée, le texte des messages traités est envoyé à l'API "
+                                         "NVIDIA (voir « Confidentialité »). Aucune action n'est exécutée sans votre accord.")
         note.set_line_wrap(True)
         note.get_style_context().add_class("dim")
         grid.attach(note, 0, 1, 2, 1)
+        row = [2]
 
-        def switch(row, label, key):
+        def add(label, widget):
+            grid.attach(Gtk.Label(label=label, xalign=1), 0, row[0], 1, 1)
+            widget.set_halign(Gtk.Align.START) if not isinstance(widget, (Gtk.Entry, Gtk.Box)) else None
+            grid.attach(widget, 1, row[0], 1, 1)
+            row[0] += 1
+
+        def switch(label, key, default=False):
             sw = Gtk.Switch()
-            sw.set_active(bool(cfg.get(key, False)))
-            sw.set_halign(Gtk.Align.START)
+            sw.set_active(bool(cfg.get(key, default)))
 
             def changed(w, _p):
                 cfg[key] = w.get_active()
                 cfg.save()
                 self.win.refresh_ai()
             sw.connect("notify::active", changed)
-            grid.attach(Gtk.Label(label=label, xalign=1), 0, row, 1, 1)
-            grid.attach(sw, 1, row, 1, 1)
-        switch(2, "IA activée", "ai_enabled")
-        switch(3, "Classer les nouveaux messages", "ai_classify")
+            add(label, sw)
+
+        def combo(label, key, options, default):
+            c = Gtk.ComboBoxText()
+            for k, v in options:
+                c.append(k, v)
+            c.set_active_id(cfg.get(key, default))
+
+            def changed(w):
+                cfg[key] = w.get_active_id()
+                cfg.save()
+                self.win.refresh_ai()
+            c.connect("changed", changed)
+            add(label, c)
+        switch("IA activée", "ai_enabled")
+        switch("Analyser chaque message à l'ouverture", "ai_auto", True)
+        switch("Trier les nouveaux messages (priorité, spam)", "ai_triage", True)
+        switch("Résumé « En bref » de la boîte", "ai_digest", True)
+        combo("Confidentialité", "ai_privacy", (("full", "Texte complet (meilleurs résultats)"),
+                                                ("minimal", "Minimal : 500 premiers caractères")), "full")
+        combo("Langue de l'IA", "ai_lang", (("fr", "Français"), ("en", "English"), ("nl", "Nederlands"),
+                                            ("de", "Deutsch"), ("es", "Español")), "fr")
+        combo("Ton des rédactions", "ai_tone", (("neutral", "Neutre et poli"), ("formal", "Formel"),
+                                                 ("friendly", "Amical")), "neutral")
 
         self.ai_key_entry = Gtk.Entry()
         self.ai_key_entry.set_visibility(False)
@@ -479,25 +524,25 @@ class SettingsPage(Gtk.Box):
         krow = Gtk.Box(spacing=6)
         krow.pack_start(self.ai_key_entry, True, True, 0)
         krow.pack_start(save_key, False, False, 0)
-        grid.attach(Gtk.Label(label="Clé API", xalign=1), 0, 4, 1, 1)
-        grid.attach(krow, 1, 4, 1, 1)
-
-        endpoint = Gtk.Entry()
+        add("Clé API", krow)
+        endpoint, model = Gtk.Entry(), Gtk.Entry()
         endpoint.set_placeholder_text(DEFAULT_API_BASE)
         endpoint.set_text(cfg.get("nvidia_api_base") or "")
-        model = Gtk.Entry()
         model.set_placeholder_text(DEFAULT_MODEL)
         model.set_text(cfg.get("ai_model") or "")
-        for row, (lab, w) in enumerate((("Endpoint API", endpoint), ("Modèle", model)), start=5):
-            w.set_hexpand(True)
-            grid.attach(Gtk.Label(label=lab, xalign=1), 0, row, 1, 1)
-            grid.attach(w, 1, row, 1, 1)
+        for e in (endpoint, model):
+            e.set_hexpand(True)
+        add("Endpoint API", endpoint)
+        add("Modèle", model)
         self.ai_status = Gtk.Label(xalign=0)
         self.ai_status.set_line_wrap(True)
         test_btn = Gtk.Button(label="Tester la connexion")
-        test_btn.set_halign(Gtk.Align.START)
-        grid.attach(test_btn, 1, 7, 1, 1)
-        grid.attach(self.ai_status, 1, 8, 1, 1)
+        clear_btn = Gtk.Button(label="Vider le cache IA (%d éléments)" % self.win.cache.ai_count())
+        brow = Gtk.Box(spacing=6)
+        brow.pack_start(test_btn, False, False, 0)
+        brow.pack_start(clear_btn, False, False, 0)
+        add("", brow)
+        add("", self.ai_status)
 
         def say(text, error=False):
             self.ai_status.set_markup("<span foreground='%s'>%s</span>" % (
@@ -544,7 +589,13 @@ class SettingsPage(Gtk.Box):
                 GLib.idle_add(lambda: (say("Connexion réussie." if ok else err, not ok), False)[1])
             threading.Thread(target=work, daemon=True).start()
         test_btn.connect("clicked", test)
-        return grid
+
+        def clear(*_):
+            self.win.cache.ai_clear()
+            clear_btn.set_label("Vider le cache IA (0 élément)")
+            self.win.reload_list()
+        clear_btn.connect("clicked", clear)
+        return self._scr(grid)
 
     def _shortcuts_page(self):
         grid = Gtk.Grid(column_spacing=24, row_spacing=6)

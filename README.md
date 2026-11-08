@@ -1,10 +1,10 @@
-# MintMail 1.3.0
+# MintMail 1.4.0
 
 Client mail moderne pour Linux Mint (Python / GTK3), inspiré de Spark Mail.
 
 ## Installation / mise à jour
 ```bash
-unzip mintmail-1.3.0.zip && cd mintmail-1.3.0
+unzip mintmail-1.4.0.zip && cd mintmail-1.4.0
 ./install.sh            # pour l'utilisateur courant (~/.local) — si « Permission denied » : bash install.sh
 ./install.sh --system   # pour tous les utilisateurs (/opt, sudo)
 ```
@@ -24,6 +24,18 @@ Dépendances (installées automatiquement via apt) : `python3-gi`, `gir1.2-gtk-3
 - Palette de commandes `Ctrl+K`, raccourcis clavier (voir Paramètres → Raccourcis), thème clair/sombre, couleur d'accent
 - Interface adaptative (panneau latéral escamotable, mode une colonne en fenêtre étroite), notifications de bureau, gestionnaire `mailto:`
 - Sans compte configuré : mode démonstration avec messages d'exemple
+
+## Nouveautés 1.4.0 — l'IA au cœur de l'application
+- **Assistant IA** (`Ctrl+J`) : panneau de conversation qui comprend votre boîte et propose des actions (archiver, spam, blocage, règles, brouillons, réglages…). Rien ne s'exécute sans votre clic.
+- **Carte IA sur chaque message** : résumé, points clés, priorité, alerte hameçonnage, 3 réponses suggérées, ajout à l'agenda (.ics), traduction, questions libres
+- **Liste augmentée** : résumé d'une ligne, badges « Important » / « Suspect », bloc « En bref » en haut de la boîte
+- **Rédaction assistée** : écrire depuis une idée, améliorer, corriger, raccourcir, ton formel/amical, traduction, objet
+- **Palette `Ctrl+K` et recherche** : toute phrase libre peut être confiée à l'IA (`? mails non lus de Marie`)
+- **Rapidité** : liste mise à jour sans reconstruction, actions en une transaction (archiver / supprimer / spam d'expéditeur : quelques millisecondes), connexions IMAP persistantes, messages affichés par lots, réception en temps réel (IMAP IDLE), pagination
+- **Un clic suffit** pour ouvrir un message (sélection simple ; sélection multiple à la demande avec `Ctrl+A` ou le bouton dédié)
+- **Boutons réduire / agrandir / fermer** toujours présents ; `F11` plein écran
+- **Design repensé** : cartes, actions au survol, identité visuelle IA, couleurs prédéfinies
+- Sécurité IA : contenu des messages traité comme non fiable, sorties validées, confirmations, clé dans le trousseau, niveau de confidentialité réglable
 
 ## Nouveautés 1.3.0 — correctifs et sécurité
 - **Démarrage** : correction du plantage au lancement (import `httpx` invalide) et de l'erreur d'initialisation de la fenêtre (synchro)

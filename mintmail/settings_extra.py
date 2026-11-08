@@ -483,19 +483,19 @@ def help_page():
     page.pack_start(title, False, False, 0)
 
     # Description
-    desc = Gtk.Label(xalign=0, label="Un client mail moderne pour Linux Mint.\n\nBoîte intelligente, reports, envoi annulable, signatures HTML.")
+    desc = Gtk.Label(xalign=0, label="Le client mail dont l'IA est l'ADN : elle lit, trie, résume, rédige et agit avec vous.")
     desc.get_style_context().add_class("dim")
     desc.set_line_wrap(True)
     page.pack_start(desc, False, False, 8)
 
     # Fonctionnalités
-    feats = Gtk.Label(xalign=0, label="✓ Boîte de réception intelligente avec filtres automatiques\n✓ Support des rapports (snooze) avec rappel\n✓ Rédaction d'e-mails avec assistance IA NVIDIA\n✓ Synchronisation P2P entre machines\n✓ Interface GTK 3.0 moderne")
+    feats = Gtk.Label(xalign=0, label="✨ Assistant IA (Ctrl+J) : demandez-lui d'archiver, bloquer, créer une règle, rédiger… chaque action est confirmée\n✨ Carte IA sur chaque message : résumé, points clés, priorité, alerte hameçonnage, réponses suggérées, agenda, traduction, questions\n✨ Tri automatique des nouveaux messages et résumé « En bref » de la boîte\n✨ Rédaction : écrire depuis une idée, améliorer, corriger, raccourcir, ton formel/amical, traduire, objet\n✨ Recherche en langage naturel : tapez « ? les mails non lus de Marie »\n✓ Actions instantanées (archiver, supprimer, spam, blocage), swipe, actions au survol\n✓ Réception en temps réel (IMAP IDLE), chargement progressif, connexions persistantes\n✓ Règles, modèles de réponse, recherches enregistrées, rappels sans réponse, sync entre machines")
     feats.get_style_context().add_class("dim")
     feats.set_line_wrap(True)
     page.pack_start(feats, False, False, 8)
 
     # Aide
-    help_label = Gtk.Label(xalign=0, label="Raccourcis clavier :\nCtrl+,: Ouvrir les paramètres\nCtrl+K Palette de commandes\nCtrl+R Actualiser\nCtrl+N Nouveau message\nCtrl+F Rechercher\nEsc Fermer/annuler")
+    help_label = Gtk.Label(xalign=0, label="Raccourcis clavier :\nCtrl+,: Ouvrir les paramètres\nCtrl+J Assistant IA\nCtrl+K Palette de commandes\nF11 Plein écran\nCtrl+R Actualiser\nCtrl+N Nouveau message\nCtrl+F Rechercher\nEsc Fermer/annuler")
     help_label.get_style_context().add_class("dim")
     help_label.set_line_wrap(True)
     page.pack_start(help_label, False, False, 12)

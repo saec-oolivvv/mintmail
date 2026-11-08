@@ -48,6 +48,8 @@ class D(metaclass=M):
     def run(self): return OKSENT
     def get_active_text(self): return ''
     def get_selected_rows(self): return []
+    def get_selected_row(self): return None
+    def get_row_at_index(self, i): return None
     def get_children(self): return []
     def get_size(self): return (800, 600)
     def get_allocated_width(self): return 400

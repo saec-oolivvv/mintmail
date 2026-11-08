@@ -5,8 +5,11 @@ import imaplib
 import mimetypes
 import os
 import re
+import select
 import smtplib
+import socket
 import ssl
+import threading
 import time
 import uuid
 from email import policy
@@ -134,12 +137,20 @@ def _flagset(b):
     return set(m.group(1).decode().lower().split()) if m else set()
 
 
+class _Conn:
+    """Connexion IMAP persistante (évite un handshake TLS + login à chaque action)."""
+    def __init__(self):
+        self.lock = threading.RLock()
+        self.imap, self.sel, self.ts = None, None, 0.0
+
+
 class IMAPBackend:
     demo = False
 
     def __init__(self, account, password):
         self.acc, self.password = account, password
         self._folders_cache = None
+        self._conns = {"sync": _Conn(), "act": _Conn()}
 
     # -- connexion
     def _connect(self):
@@ -185,10 +196,51 @@ class IMAPBackend:
         return found
 
     # -- API
+    # ----------------------------------------------------- connexions persistantes
+    def _drop(self, conn):
+        try:
+            if conn.imap:
+                conn.imap.logout()
+        except Exception:
+            pass
+        conn.imap, conn.sel = None, None
+
+    def close(self):
+        for c in self._conns.values():
+            with c.lock:
+                self._drop(c)
+
+    def _run(self, kind, fn):
+        """Exécute fn(conn) sur la connexion « sync » ou « act » (reconnexion automatique, un nouvel essai)."""
+        conn = self._conns[kind]
+        with conn.lock:
+            for attempt in (0, 1):
+                try:
+                    if conn.imap is None:
+                        conn.imap, conn.sel = self._connect(), None
+                    elif time.time() - conn.ts > 20:
+                        conn.imap.noop()
+                    res = fn(conn)
+                    conn.ts = time.time()
+                    return res
+                except (imaplib.IMAP4.abort, ssl.SSLError, OSError) as e:
+                    self._drop(conn)
+                    if attempt:
+                        raise BackendError("Connexion IMAP perdue : %s" % e)
+
+    def _select(self, conn, real, readonly=False):
+        key = (real, readonly)
+        if conn.sel != key:
+            typ, _ = conn.imap.select(_q(real), readonly=readonly)
+            if typ != "OK":
+                conn.sel = None
+                raise BackendError("Dossier introuvable : %s" % real)
+            conn.sel = key
+
+    # ------------------------------------------------------------------------ API
     def test(self):
         try:
             self._connect().logout()
-            a = self.acc
             s = self._smtp()
             s.quit()
             return None
@@ -197,16 +249,15 @@ class IMAPBackend:
         except Exception as e:
             return "SMTP : %s" % e
 
-    def sync(self, logical, known, limit=80):
-        """Retourne (nouveaux messages, {uid: (unread, starred)}, uids présents, uid minimum)."""
-        imap = self._connect()
-        try:
+    def sync(self, logical, known, limit=60, on_batch=None):
+        """Retourne (nouveaux messages, {uid: (non lu, favori)}, uids présents, uid minimum).
+        Les nouveaux messages arrivent par lots, les plus récents d'abord (on_batch)."""
+        def fn(conn):
+            imap = conn.imap
             real = self._folders(imap).get(logical)
             if not real:
                 return [], {}, None, 0
-            typ, _ = imap.select(_q(real), readonly=True)
-            if typ != "OK":
-                return [], {}, None, 0
+            self._select(conn, real, readonly=True)
             typ, data = imap.uid("SEARCH", None, "ALL")
             uids = [int(x) for x in data[0].split()] if data and data[0] else []
             window = uids[-limit:]
@@ -221,10 +272,10 @@ class IMAPBackend:
                             fl = _flagset(item)
                             flags[int(mu.group(1))] = ("\\seen" not in fl, "\\flagged" in fl)
             msgs = []
-            new = [u for u in window if u not in known]
-            for chunk in _chunks(new, 15):
+            new = sorted((u for u in window if u not in known), reverse=True)
+            for chunk in _chunks(new, 10):
                 typ, d = imap.uid("FETCH", ",".join(map(str, chunk)), "(UID FLAGS BODY.PEEK[])")
-                items = list(d or [])
+                items, batch = list(d or []), []
                 for i, item in enumerate(items):
                     if not isinstance(item, tuple):
                         continue
@@ -236,56 +287,55 @@ class IMAPBackend:
                     if not fl and i + 1 < len(items) and isinstance(items[i + 1], bytes):
                         fl = _flagset(items[i + 1])
                     try:
-                        msgs.append(parse_message(raw, self.acc["id"], logical, real,
-                                                  int(mu.group(1)), fl))
+                        batch.append(parse_message(raw, self.acc["id"], logical, real, int(mu.group(1)), fl))
                     except Exception:
                         continue
+                msgs += batch
+                if on_batch and batch:
+                    on_batch(batch)
             return msgs, flags, set(window), (window[0] if window else 0)
-        finally:
-            try:
-                imap.logout()
-            except Exception:
-                pass
-
-    def _in_folder(self, real, fn):
-        imap = self._connect()
-        try:
-            imap.select(_q(real))
-            return fn(imap)
-        finally:
-            try:
-                imap.logout()
-            except Exception:
-                pass
+        return self._run("sync", fn)
 
     def set_flags(self, msg, seen=None, flagged=None):
-        def op(imap):
-            u = str(msg.uid)
-            if seen is not None:
-                imap.uid("STORE", u, "+FLAGS" if seen else "-FLAGS", "(\\Seen)")
-            if flagged is not None:
-                imap.uid("STORE", u, "+FLAGS" if flagged else "-FLAGS", "(\\Flagged)")
-        if msg.uid > 0 and msg.real_folder:
-            self._in_folder(msg.real_folder, op)
+        self.set_flags_many([msg], seen, flagged)
+
+    def set_flags_many(self, msgs, seen=None, flagged=None):
+        by = {}
+        for m in msgs:
+            if m.uid > 0 and m.real_folder:
+                by.setdefault(m.real_folder, []).append(m.uid)
+        if not by:
+            return
+
+        def fn(conn):
+            for real, uids in by.items():
+                self._select(conn, real)
+                ids = ",".join(str(u) for u in uids)
+                if seen is not None:
+                    conn.imap.uid("STORE", ids, "+FLAGS" if seen else "-FLAGS", "(\\Seen)")
+                if flagged is not None:
+                    conn.imap.uid("STORE", ids, "+FLAGS" if flagged else "-FLAGS", "(\\Flagged)")
+        self._run("act", fn)
 
     def move(self, msg, dest):
         return self.move_many([msg], dest)
 
     def move_many(self, msgs, dest):
-        """Déplace plusieurs messages en une seule connexion."""
+        """Déplace plusieurs messages en une seule opération."""
         by = {}
         for m in msgs:
             if m.uid > 0 and m.real_folder:
                 by.setdefault(m.real_folder, []).append(m.uid)
         if not by:
             return None
-        imap = self._connect()
-        try:
+
+        def fn(conn):
+            imap = conn.imap
             target = self._folders(imap).get(dest)
             if not target and dest != "trash":
                 raise BackendError("Dossier « %s » introuvable sur le serveur." % dest)
             for real, uids in by.items():
-                imap.select(_q(real))
+                self._select(conn, real)
                 ids = ",".join(str(u) for u in uids)
                 if target and target != real:
                     if "MOVE" in getattr(imap, "capabilities", ()):
@@ -294,19 +344,83 @@ class IMAPBackend:
                     imap.uid("COPY", ids, _q(target))
                 imap.uid("STORE", ids, "+FLAGS", "(\\Deleted)")
                 imap.expunge()
-        finally:
-            try:
-                imap.logout()
-            except Exception:
-                pass
+        self._run("act", fn)
         return None
 
     def delete_forever(self, msg):
-        if msg.uid > 0 and msg.real_folder:
-            def op(imap):
-                imap.uid("STORE", str(msg.uid), "+FLAGS", "(\\Deleted)")
-                imap.expunge()
-            self._in_folder(msg.real_folder, op)
+        self.delete_many([msg])
+
+    def delete_many(self, msgs):
+        by = {}
+        for m in msgs:
+            if m.uid > 0 and m.real_folder:
+                by.setdefault(m.real_folder, []).append(m.uid)
+
+        def fn(conn):
+            for real, uids in by.items():
+                self._select(conn, real)
+                conn.imap.uid("STORE", ",".join(str(u) for u in uids), "+FLAGS", "(\\Deleted)")
+                conn.imap.expunge()
+        if by:
+            self._run("act", fn)
+
+    # ------------------------------------------------------------ push (IMAP IDLE)
+    def watch(self, on_change, stop):
+        """Boucle IDLE sur la boîte de réception : on_change() à l'arrivée d'un message. Bloquant (thread dédié)."""
+        backoff = 5
+        while not stop.is_set():
+            imap = None
+            try:
+                imap = self._connect()
+                imap.select("INBOX", readonly=True)
+                backoff = 5
+                while not stop.is_set():
+                    if self._idle_once(imap, stop):
+                        on_change()
+            except Exception:
+                if stop.wait(backoff):
+                    break
+                backoff = min(backoff * 2, 300)
+            finally:
+                try:
+                    if imap:
+                        imap.logout()
+                except Exception:
+                    pass
+
+    @staticmethod
+    def _idle_once(imap, stop, max_wait=540):
+        sock = imap.sock
+        tag = imap._new_tag()
+
+        def read(timeout):
+            if not (hasattr(sock, "pending") and sock.pending()):
+                r, _, _ = select.select([sock], [], [], timeout)
+                if not r:
+                    return b""
+            data = sock.recv(4096)
+            if not data:
+                raise imaplib.IMAP4.abort("connexion fermée")
+            return data
+        sock.sendall(tag + b" IDLE\r\n")
+        buf, t0 = b"", time.time()
+        while b"\n" not in buf:
+            buf += read(2)
+            if time.time() - t0 > 15:
+                raise imaplib.IMAP4.abort("IDLE sans réponse")
+        if not buf.startswith(b"+"):
+            raise imaplib.IMAP4.error("IDLE non pris en charge")
+        buf = buf.split(b"\n", 1)[1]
+        changed, end = False, time.time() + max_wait
+        while not stop.is_set() and time.time() < end and not changed:
+            buf += read(5)
+            if re.search(rb"\* \d+ (EXISTS|EXPUNGE|RECENT)", buf):
+                changed = True
+        sock.sendall(b"DONE\r\n")
+        t0 = time.time()
+        while tag not in buf and time.time() - t0 < 15:
+            buf += read(3)
+        return changed
 
     def _smtp(self):
         a = self.acc
@@ -396,7 +510,7 @@ class DemoBackend:
     def test(self):
         return None
 
-    def sync(self, logical, known, limit=80):
+    def sync(self, logical, known, limit=60, on_batch=None):
         msgs = []
         marker = DATA_DIR / "demo_seeded"
         if logical == "inbox" and not known and not marker.exists():
@@ -430,7 +544,19 @@ class DemoBackend:
     def move_many(self, msgs, dest):
         return None
 
+    def set_flags_many(self, msgs, seen=None, flagged=None):
+        pass
+
     def delete_forever(self, msg):
+        pass
+
+    def delete_many(self, msgs):
+        pass
+
+    def watch(self, on_change, stop):
+        stop.wait()
+
+    def close(self):
         pass
 
     def send(self, out):
