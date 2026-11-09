@@ -169,12 +169,11 @@ def test_sender_menus_block_and_spam_by_address_and_domain():
     assert any(l.startswith("Marquer comme") for l in more) and any("Copier l'adresse" in l for l in more)
 
 
-def test_row_buttons_open_menus():
-    w = make_window(30)
+def test_message_rows_have_no_hover_action_bar():
+    """La barre d'actions au survol des cadres de messages est supprimée (actions : clic droit, raccourcis, balayage)."""
+    import inspect
+    src = inspect.getsource(WD.MessageRow)
+    assert "hover" not in src.lower() and "_quick" not in src
+    w = make_window(10)
     w.reload_list(full=True)
-    row = w.listbox.get_row_at_index(0)
-    opened = []
-    w._row_menu = lambda r, kind: opened.append((r.msg.id, kind))
-    for act in ("spam_menu", "block_menu", "more_menu"):
-        w._on_swipe(row, act)
-    assert opened == [(row.msg.id, "spam"), (row.msg.id, "block"), (row.msg.id, "more")]
+    assert "hover_ev" not in w.listbox.get_row_at_index(0).__dict__

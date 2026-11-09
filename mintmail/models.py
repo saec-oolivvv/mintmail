@@ -27,6 +27,9 @@ class Message:
     message_id: str = ""
     references: str = ""
     unsubscribe: str = ""
+    unsub_post: bool = False      # List-Unsubscribe-Post : désabonnement en un clic (RFC 8058)
+    thread_id: str = ""           # clé de conversation (racine des References)
+    invite: dict = field(default_factory=dict)   # invitation iCalendar reçue
 
     light = False   # True : version allégée (sans corps) issue de la liste — jamais réécrite en base
 
@@ -55,6 +58,10 @@ class Outgoing:
     attachments: list = field(default_factory=list)  # chemins de fichiers
     in_reply_to: str = ""
     references: str = ""
+    from_email: str = ""          # identité d'envoi (alias) ; vide : adresse du compte
+    from_name: str = ""
+    ics: str = ""                 # partie text/calendar (réponse à une invitation)
+    ics_method: str = ""
 
     def to_dict(self):
         return asdict(self)

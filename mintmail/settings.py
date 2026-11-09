@@ -12,7 +12,8 @@ from .settings_extra import (gestures_page, filters_page, templates_page,
                               p2p_page, help_page)
 from .widgets import icon
 from .style import ACCENTS, STYLES
-from .ai_service import AIService, DEFAULT_API_BASE, DEFAULT_MODEL
+from .ai_service import AIService, AIServiceError, DEFAULT_API_BASE, DEFAULT_MODEL, PROVIDERS, is_local_endpoint, list_models
+from .settings_more import OAuthMixin, calendar_page, contacts_page, identities_page
 
 SHORTCUTS = [
     ("C", "Nouveau message"), ("R", "Répondre"), ("A", "Répondre à tous"), ("F", "Transférer"),
@@ -36,7 +37,7 @@ def _row(grid, i, label, widget):
     grid.attach(widget, 1, i, 1, 1)
 
 
-class SettingsPage(Gtk.Box):
+class SettingsPage(OAuthMixin, Gtk.Box):
     """Page des paramètres, affichée dans la fenêtre principale (retour : bouton, Échap)."""
 
     def __init__(self, win, page=None):
@@ -70,6 +71,9 @@ class SettingsPage(Gtk.Box):
         stack.add_titled(gestures_page(win), "gestures", "Gestes & disposition")
         stack.add_titled(filters_page(win), "filters", "Filtres & blocage")
         stack.add_titled(templates_page(win), "templates", "Modèles de réponse")
+        stack.add_titled(contacts_page(win), "contacts", "Contacts")
+        stack.add_titled(identities_page(win), "identities", "Identités d'envoi")
+        stack.add_titled(self._scr(calendar_page(win)), "calendar", "Agenda (CalDAV)")
         stack.add_titled(self._shortcuts_page(), "keys", "Raccourcis")
         stack.add_titled(self._scr(help_page()), "help", "Aide & Crédits")
         side = Gtk.StackSidebar()
@@ -140,9 +144,18 @@ class SettingsPage(Gtk.Box):
         save.connect("clicked", self._save_account)
         rm = Gtk.Button(label="Supprimer ce compte")
         rm.connect("clicked", self._remove_account)
-        for b in (test, save, rm):
+        self.oauth_btn = Gtk.Button(label="🔑 Se connecter")
+        self.oauth_btn.get_style_context().add_class("suggested-action")
+        self.oauth_btn.set_no_show_all(True)
+        self.oauth_btn.connect("clicked", self._oauth_login)
+        for b in (self.oauth_btn, test, save, rm):
             btns.pack_start(b, False, False, 0)
         grid.attach(btns, 1, 10, 1, 1)
+        self.oauth_lbl = Gtk.Label(xalign=0)
+        self.oauth_lbl.set_line_wrap(True)
+        self.oauth_lbl.get_style_context().add_class("dim")
+        self.oauth_lbl.set_no_show_all(True)
+        grid.attach(self.oauth_lbl, 1, 13, 1, 1)
         self.status = Gtk.Label(xalign=0)
         self.status.set_line_wrap(True)
         grid.attach(self.status, 1, 11, 1, 1)
@@ -190,6 +203,9 @@ class SettingsPage(Gtk.Box):
         self.f_sport.set_text(str(a.get("smtp_port", 587)))
         self.f_ssl.set_active(a.get("imap_ssl", True))
         self.status.set_text("")
+        self._oauth = a.get("oauth_provider") if a.get("auth") == "oauth2" else None
+        self._oauth_token = None
+        self._oauth_ui()
 
     def _add_account(self, *_):
         self.acc_list.unselect_all()
@@ -199,6 +215,10 @@ class SettingsPage(Gtk.Box):
 
     def _preset(self, combo):
         p = PRESETS.get(combo.get_active_text() or "")
+        self._oauth = p.get("oauth") if p else None
+        if p:
+            self._oauth_token = None
+            self._oauth_ui()
         if p:
             self.f_ihost.set_text(p["imap_host"])
             self.f_iport.set_text(str(p["imap_port"]))
@@ -217,6 +237,11 @@ class SettingsPage(Gtk.Box):
                  imap_port=ip, smtp_host=self.f_shost.get_text().strip(), smtp_port=sp,
                  imap_ssl=self.f_ssl.get_active())
         a.pop("demo", None)
+        if self._oauth:
+            a["auth"], a["oauth_provider"] = "oauth2", self._oauth
+        else:
+            a.pop("auth", None)
+            a.pop("oauth_provider", None)
         if not re.match(r"^[^@\s]+@[^@\s]+\.[^@\s]+$", a["email"]):
             self._say("Adresse e-mail invalide.", True)
             return None
@@ -232,7 +257,7 @@ class SettingsPage(Gtk.Box):
         a = self._collect()
         if not a:
             return
-        typed = self.f_pass.get_text()
+        typed = self._oauth_token or self.f_pass.get_text()
         if not typed and not a.get("has_password", True):
             self._say("Saisissez le mot de passe (ou mot de passe d'application).", True)
             return
@@ -241,9 +266,17 @@ class SettingsPage(Gtk.Box):
         def work():
             pw = typed or self.cfg.password(a["id"])
 
+            outer = self.cfg
+
             class _C:  # config minimale pour make_backend
                 def password(self_, _id):
                     return pw
+
+                def get(self_, key, default=None):
+                    return outer.get(key, default)
+
+                def set_password(self_, *_a):
+                    pass
             err = make_backend(a, _C()).test()
             GLib.idle_add(lambda: self._say("Connexion réussie (IMAP + SMTP)." if not err else err, bool(err)))
         threading.Thread(target=work, daemon=True).start()
@@ -252,9 +285,12 @@ class SettingsPage(Gtk.Box):
         a = self._collect()
         if not a:
             return
-        pw = self.f_pass.get_text()
+        pw = self._oauth_token or self.f_pass.get_text()
         existing = next((x for x in self.cfg["accounts"] if x["id"] == a["id"]), None)
-        if not pw and not (existing and existing.get("has_password", True)):
+        if self._oauth and not pw and not (existing and existing.get("auth") == "oauth2" and existing.get("has_password", True)):
+            self._say("Connectez-vous d'abord avec le bouton « Se connecter ».", True)
+            return
+        if not self._oauth and not pw and not (existing and existing.get("has_password", True)):
             self._say("Mot de passe requis.", True)
             return
         if any(x["email"].lower() == a["email"].lower() and x["id"] != a["id"] for x in self.cfg["accounts"]):
@@ -478,8 +514,9 @@ class SettingsPage(Gtk.Box):
         grid.attach(ttl, 0, 0, 2, 1)
         note = Gtk.Label(xalign=0, label="Résumés, réponses suggérées, tri par priorité, détection d'hameçonnage, rédaction, "
                                          "traduction, assistant conversationnel capable d'agir sur votre boîte. Désactivée "
-                                         "par défaut : une fois activée, le texte des messages traités est envoyé à l'API "
-                                         "NVIDIA (voir « Confidentialité »). Aucune action n'est exécutée sans votre accord.")
+                                         "par défaut : une fois activée, le texte des messages traités est envoyé au fournisseur choisi "
+                                         "(voir « Confidentialité »). Avec Ollama, tout reste sur votre machine. Aucune action "
+                                         "n'est exécutée sans votre accord.")
         note.set_line_wrap(True)
         note.get_style_context().add_class("dim")
         grid.attach(note, 0, 1, 2, 1)
@@ -525,6 +562,11 @@ class SettingsPage(Gtk.Box):
         combo("Ton des rédactions", "ai_tone", (("neutral", "Neutre et poli"), ("formal", "Formel"),
                                                  ("friendly", "Amical")), "neutral")
 
+        prov = Gtk.ComboBoxText()
+        for k, (lab, _b, _m, _needs) in PROVIDERS.items():
+            prov.append(k, lab)
+        prov.set_active_id(cfg.get("ai_provider", "nvidia"))
+        add("Fournisseur", prov)
         self.ai_key_entry = Gtk.Entry()
         self.ai_key_entry.set_visibility(False)
         self.ai_key_entry.set_hexpand(True)
@@ -544,13 +586,39 @@ class SettingsPage(Gtk.Box):
             e.set_hexpand(True)
         add("Endpoint API", endpoint)
         add("Modèle", model)
+        detect = Gtk.Button(label="🔍 Détecter les modèles installés")
+        add("", detect)
+
+        def provider_changed(c):
+            k = c.get_active_id() or "nvidia"
+            _lab, base, mdl, needs_key = PROVIDERS[k]
+            if cfg.get("ai_provider", "nvidia") != k:
+                cfg["ai_provider"] = k
+                cfg["nvidia_api_base"] = ""      # chaque fournisseur a son adresse par défaut
+                cfg["ai_model"] = ""
+                endpoint.set_text("")
+                model.set_text("")
+                cfg.save()
+                self.win.refresh_ai()
+            endpoint.set_placeholder_text(base or "https://…/v1 (compatible OpenAI)")
+            model.set_placeholder_text(mdl or "nom du modèle")
+            self.ai_key_entry.set_sensitive(needs_key or k == "custom")
+            detect.set_visible(k != "nvidia")
+            self.ai_key_entry.set_placeholder_text("Clé enregistrée — saisir pour la remplacer" if has_key else (
+                "Clé API NVIDIA (nvapi-…)" if needs_key else "Facultatif (service local : aucune clé nécessaire)"))
+        prov.connect("changed", provider_changed)
+        detect.set_no_show_all(True)
         self.ai_status = Gtk.Label(xalign=0)
         self.ai_status.set_line_wrap(True)
         test_btn = Gtk.Button(label="Tester la connexion")
         clear_btn = Gtk.Button(label="Vider le cache IA (%d éléments)" % self.win.cache.ai_count())
+        learn_btn = Gtk.Button(label="Oublier mes habitudes de rangement")
+        learn_btn.set_tooltip_text("Efface ce que MintMail a retenu de vos rangements (expéditeur → dossier)")
+        learn_btn.connect("clicked", lambda *_: (self.win.cache.learn_clear(), say("Habitudes de rangement effacées.")))
         brow = Gtk.Box(spacing=6)
         brow.pack_start(test_btn, False, False, 0)
         brow.pack_start(clear_btn, False, False, 0)
+        brow.pack_start(learn_btn, False, False, 0)
         add("", brow)
         add("", self.ai_status)
 
@@ -574,8 +642,8 @@ class SettingsPage(Gtk.Box):
         def store_text(key, entry, https=False):
             def save(*_):
                 v = entry.get_text().strip()
-                if https and v and not v.startswith("https://"):
-                    say("L'endpoint doit commencer par https://", True)
+                if https and v and not (v.startswith("https://") or (v.startswith("http://") and is_local_endpoint(v))):
+                    say("L'endpoint doit commencer par https:// (http:// seulement sur cette machine ou le réseau local).", True)
                     return False
                 cfg[key] = v
                 cfg.save()
@@ -590,7 +658,8 @@ class SettingsPage(Gtk.Box):
 
         def test(*_):
             typed = self.ai_key_entry.get_text().strip()
-            base, mdl = endpoint.get_text().strip() or None, model.get_text().strip() or None
+            _l, pbase, pmodel, _n = PROVIDERS[cfg.get("ai_provider", "nvidia")]
+            base, mdl = endpoint.get_text().strip() or pbase or None, model.get_text().strip() or pmodel or None
             say("Test en cours…")
 
             def work():
@@ -599,6 +668,35 @@ class SettingsPage(Gtk.Box):
                 GLib.idle_add(lambda: (say("Connexion réussie." if ok else err, not ok), False)[1])
             threading.Thread(target=work, daemon=True).start()
         test_btn.connect("clicked", test)
+
+        def do_detect(*_):
+            _l, pbase, _m, _n = PROVIDERS[cfg.get("ai_provider", "nvidia")]
+            base = endpoint.get_text().strip() or pbase
+            say("Recherche des modèles…")
+
+            def work():
+                try:
+                    names, err = list_models(base, self.ai_key_entry.get_text().strip() or cfg.ai_key() or ""), ""
+                except AIServiceError as e:
+                    names, err = [], str(e)
+
+                def show():
+                    if err:
+                        say(err + " — Ollama est-il lancé (ollama serve) et un modèle installé (ollama pull llama3.2) ?", True)
+                        return False
+                    menu = Gtk.Menu()
+                    for n in names[:40]:
+                        mi = Gtk.MenuItem(label=n)
+                        mi.connect("activate", lambda _i, n=n: (model.set_text(n), cfg.__setitem__("ai_model", n), cfg.save(), self.win.refresh_ai()))
+                        menu.append(mi)
+                    menu.show_all()
+                    menu.popup_at_widget(detect, Gdk.Gravity.SOUTH_WEST, Gdk.Gravity.NORTH_WEST, None)
+                    say("%d modèle(s) trouvé(s) : choisissez-en un." % len(names))
+                    return False
+                GLib.idle_add(show)
+            threading.Thread(target=work, daemon=True).start()
+        detect.connect("clicked", do_detect)
+        provider_changed(prov)
 
         def clear(*_):
             self.win.cache.ai_clear()

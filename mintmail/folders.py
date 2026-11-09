@@ -456,6 +456,7 @@ class FolderMixin:
 
     def _move_to(self, msgs, dest, name):
         self.move_messages(msgs, dest, label="déplacé vers « %s »" % name)
+        self._learn_move(msgs, dest, name)
 
     def choose_folder_dialog(self, msgs):
         """Sélecteur de dossier avec filtre (palette de commandes)."""

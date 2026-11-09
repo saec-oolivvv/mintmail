@@ -1,4 +1,4 @@
-# MintMail 1.7.0
+# MintMail 1.8.0
 
 Client mail moderne pour Linux Mint (Python / GTK3), inspiré de Spark Mail.
 
@@ -24,6 +24,20 @@ Dépendances (installées automatiquement via apt) : `python3-gi`, `gir1.2-gtk-3
 - Palette de commandes `Ctrl+K`, raccourcis clavier (voir Paramètres → Raccourcis), thème clair/sombre, couleur d'accent
 - Interface adaptative (panneau latéral escamotable, mode une colonne en fenêtre étroite), notifications de bureau, gestionnaire `mailto:`
 - Sans compte configuré : mode démonstration avec messages d'exemple
+
+## Nouveautés 1.8.0
+- **Barre d'actions au survol des cadres de messages : supprimée** (actions par clic droit, raccourcis, balayage).
+- **Conversations** : une ligne par fil (nombre de messages), actions sur tout le fil, liste des autres messages dans le lecteur, « ✨ Résumer la conversation ». Désactivable : Paramètres → Gestes & disposition.
+- **Connexion Google / Microsoft (OAuth)**, sans mot de passe : Paramètres → Comptes → fournisseur « OAuth ». Il faut créer votre propre identifiant client (gratuit) et le coller une fois ; le jeton est stocké comme un mot de passe et synchronisé.
+- **Recherche sur le serveur** : bouton « Chercher aussi sur le serveur » sous une recherche (messages jamais téléchargés).
+- **IA locale (Ollama)** ou tout service compatible OpenAI : Paramètres → IA → Fournisseur ; clé facultative ; « Détecter les modèles installés ».
+- **Apprentissage de vos rangements** : suggestion « selon vos habitudes », règle proposée au 3e rangement identique, classement IA qui s'y conforme ; effaçable (Paramètres → IA).
+- **Pièces jointes** : miniatures, aperçu (images, texte), « Tout enregistrer », glisser vers le gestionnaire de fichiers, dépôt de fichiers dans la rédaction, alerte au-delà de 20 Mo.
+- **Mode hors ligne** : déplacements, drapeaux et suppressions conservés puis rejoués dans l'ordre ; envois jamais perdus (réessais automatiques, « Boîte d'envoi… » dans la palette).
+- **Contacts** (import/export vCard, synchronisés) et **invitations** : Accepter / Peut-être / Refuser envoie la réponse iCalendar à l'organisateur ; ajout à l'agenda (CalDAV facultatif : Paramètres → Agenda).
+- **Identités d'envoi (alias)** avec signature propre ; la réponse part de l'alias qui a reçu le message.
+- **Envoi programmé fenêtre fermée** : `mintmail --send-due`, lancé chaque minute par la minuterie utilisateur `mintmail-outbox.timer` (activée à l'installation ; session en cours : `systemctl --user daemon-reload && systemctl --user enable --now mintmail-outbox.timer`). Réservation atomique : jamais d'envoi en double.
+- **Désabonnement en un clic** (RFC 8058), sinon par e-mail, sinon dans le navigateur.
 
 ## Nouveautés 1.7.0
 - **Classement par l'IA, pour de vrai** : demandez à l'assistant (`Ctrl+J`) « classe mes derniers emails dans des dossiers » ou « crée un dossier Factures et range mes factures dedans ». L'IA propose un classement (dossiers existants d'abord, nouveaux dossiers seulement si besoin, 6 au maximum) ; **rien n'est créé ni déplacé avant votre validation**, ligne par ligne ou en bloc. Les dossiers manquants sont créés sur le serveur au moment de valider.

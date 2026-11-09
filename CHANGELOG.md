@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.8.0
+- Suppression de la barre d'actions au survol des messages
+- Conversations, recherche sur le serveur, OAuth Google/Microsoft, IA locale (Ollama), apprentissage des rangements
+- Pièces jointes (aperçu, tout enregistrer, glisser-déposer), mode hors ligne, contacts, invitations, CalDAV, identités d'envoi
+- Envoi programmé fenêtre fermée (--send-due + minuterie systemd utilisateur), désabonnement en un clic
+
 ## 1.7.0
 - IA : classement des emails avec validation, création de dossiers, actions « classer » et « créer un dossier » pour l'assistant, règles « ranger dans un dossier »
 - Clic droit : section ✨ IA (ranger, classer, répondre selon l'intention, résumer, traduire, agenda, assistant)

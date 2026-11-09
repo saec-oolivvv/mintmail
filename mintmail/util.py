@@ -140,3 +140,61 @@ def sanitize_html(h):
     h = re.sub(r"(?is)(href|src)\s*=\s*([\"']?)\s*javascript:[^\"'>\s]*\2", "", h)
     h = re.sub(r"(?is)</?(html|body)[^>]*>", "", h)
     return block_remote_content(h)
+
+
+# ------------------------------------------------------------ conversations
+def thread_key(message_id: str, references: str, subject: str, nsubj_hint: str = "") -> str:
+    """Clé de conversation : racine des « References » ; sinon identifiant du message ; sinon objet normalisé."""
+    refs = re.findall(r"<[^>]+>", references or "")
+    if refs:
+        return refs[0]
+    if message_id and message_id.strip():
+        mid = re.findall(r"<[^>]+>", message_id)
+        return mid[0] if mid else message_id.strip()
+    return "s:" + normalize_subject(subject).lower()[:120]
+
+
+# -------------------------------------------------------------- pièces jointes
+TEXT_PREVIEW_EXT = (".txt", ".md", ".csv", ".log", ".json", ".xml", ".ini", ".conf", ".yml", ".yaml", ".ics", ".vcf")
+IMAGE_EXT = (".png", ".jpg", ".jpeg", ".gif", ".bmp", ".webp", ".svg")
+
+
+def attachment_kind(att) -> str:
+    """'image' | 'text' | 'pdf' | 'archive' | 'file' (pour l'icône et l'aperçu)."""
+    name = (att.get("filename") or "").lower()
+    if name.endswith(IMAGE_EXT):
+        return "image"
+    if name.endswith(TEXT_PREVIEW_EXT):
+        return "text"
+    if name.endswith(".pdf"):
+        return "pdf"
+    if name.endswith((".zip", ".tar", ".gz", ".7z", ".rar", ".bz2", ".xz")):
+        return "archive"
+    return "file"
+
+
+def unique_path(directory: str, name: str) -> str:
+    """Chemin libre dans `directory` (« fichier (2).pdf » si le nom existe déjà)."""
+    import os
+    base, ext = os.path.splitext(os.path.basename(name) or "fichier")
+    path, n = os.path.join(directory, base + ext), 2
+    while os.path.exists(path):
+        path = os.path.join(directory, "%s (%d)%s" % (base, n, ext))
+        n += 1
+    return path
+
+
+def save_attachments(atts, directory: str):
+    """Copie les pièces jointes dans `directory` sans rien écraser ; retourne les chemins créés."""
+    import os
+    import shutil
+    os.makedirs(directory, exist_ok=True)
+    out = []
+    for a in atts:
+        try:
+            dst = unique_path(directory, a["filename"])
+            shutil.copyfile(a["path"], dst)
+            out.append(dst)
+        except OSError:
+            continue
+    return out

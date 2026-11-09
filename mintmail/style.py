@@ -122,8 +122,9 @@ button.ai-btn:hover { opacity: 0.9; }
 .rail-unread { background: @accent; }
 .rail-news { background: #a78bfa; } .rail-notif { background: #2dd4bf; }
 .rail-p3 { background: #ef4444; } .rail-spam { background: #ef4444; }
-.hover-actions { background: %(card)s; border: 1px solid %(line)s; border-radius: %(rp)dpx; padding: 2px 4px; margin: 0 8px; }
-.hover-actions button { padding: 4px 6px; }
+.badge-thread { background: rgba(127,127,160,0.28); border-radius: %(rp)dpx; padding: 0 7px; font-size: 11px; font-weight: 700; }
+.thread-row { padding: 6px 10px; }
+.invite-box { border-radius: 10px; padding: 8px 12px; background: rgba(91,108,255,0.16); }
 .badge-important { background: #ef4444; color: #fff; border-radius: %(rp)dpx; padding: 0 8px; font-size: 11px; font-weight: 700; }
 .badge-suspect { background: #7f1d1d; color: #fff; border-radius: %(rp)dpx; padding: 0 8px; font-size: 11px; font-weight: 700; }
 .group-header { background: transparent; color: %(dim)s; font-size: 12px; font-weight: 700; padding: 14px 20px 4px 20px; }
@@ -240,7 +241,6 @@ button.ai-btn { background-image: linear-gradient(to bottom right, @ai1, @ai2); 
 .msg-row:hover { box-shadow: 0 6px 20px rgba(0, 0, 0, 0.22); }
 .msg-row:selected, .msg-row:selected:hover { background-image: linear-gradient(to right, alpha(@accent, 0.22), alpha(@accent, 0.06));
                                              box-shadow: 0 0 18px alpha(@accent, 0.25); }
-.hover-actions { box-shadow: 0 4px 14px rgba(0, 0, 0, 0.25); }
 .cat-tab:checked { background: alpha(@accent, 0.18); }
 .nav-row:selected { background-image: linear-gradient(to right, alpha(@accent, 0.22), alpha(@accent, 0)); }
 .orb-active, .orb-active:hover { box-shadow: 0 0 14px alpha(@accent, 0.7); }

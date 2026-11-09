@@ -134,6 +134,45 @@ def reset_data() -> int:
     return 0
 
 
+def send_due() -> int:
+    """Envoie les messages programmés (ou en attente après une coupure) dont l'heure est venue, SANS ouvrir l'interface.
+    Appelé chaque minute par la minuterie systemd de l'utilisateur ; une réservation atomique évite tout double envoi
+    si la fenêtre MintMail est ouverte en même temps."""
+    from .backend import make_backend, is_retryable
+    from .store import Cache, Config
+    cache = Cache()
+    due = cache.outbox_due()
+    if not due:
+        return 0
+    cfg = Config()
+    sent = failed = 0
+    for oid, out in due:
+        if not cache.outbox_claim(oid):
+            continue
+        acc = next((a for a in cfg["accounts"] if a["id"] == out.account), None)
+        if acc is None or acc.get("demo"):
+            cache.outbox_remove(oid)
+            continue
+        try:
+            make_backend(acc, cfg).send(out)
+            cache.outbox_remove(oid)
+            sent += 1
+        except Exception as e:
+            if is_retryable(e) and cache.outbox_tries(oid) < 10:
+                cache.outbox_reschedule(oid, time.time() + 120)           # réseau absent : on réessaie plus tard
+            else:
+                cache.outbox_remove(oid)
+                failed += 1
+                log("Envoi différé abandonné (%s) : %s" % (out.subject[:40], e))
+                try:
+                    import subprocess
+                    subprocess.run(["notify-send", "MintMail : envoi impossible", "%s — %s" % (out.subject[:50], str(e)[:120])], timeout=5)
+                except Exception:
+                    pass
+    print("Envois différés : %d envoyé(s), %d abandonné(s)." % (sent, failed))
+    return 0
+
+
 def main(argv=None) -> int:
     argv = list(argv if argv is not None else sys.argv)
     if "--version" in argv:
@@ -146,6 +185,8 @@ def main(argv=None) -> int:
         return remove_local_install(argv)
     if "--reset" in argv:
         return reset_data()
+    if "--send-due" in argv:
+        return send_due()
     install_hook()
     log("Démarrage MintMail %s (%s)" % (__version__, sys.executable))
     try:

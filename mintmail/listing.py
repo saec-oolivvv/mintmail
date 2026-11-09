@@ -23,7 +23,6 @@ class ListMixin:
     def _make_row(self, m, ai):
         row = MessageRow(m, self._row_checked, self._on_swipe,
                          dict(self.config["swipe"], invert=self.config["swipe_invert"]), self._row_height(), ai)
-        row.on_quick = self._on_swipe
         row.set_select_mode(self.select_mode)
         return row
 
@@ -31,8 +30,10 @@ class ListMixin:
         """Synchronise la liste avec la base : ajoute / retire / met à jour les lignes concernées seulement."""
         if reset:
             self._limit = PAGE
+        grouped = self.threads_on() and not self._effective_search() and self.view not in ("drafts", "outbox")
         msgs = self.cache.query(self.view, self.account, self.category if self.view == "inbox" else None,
-                                self.unread_only, self.att_only, self._effective_search(), limit=self._limit)
+                                self.unread_only, self.att_only, self._effective_search(), limit=self._limit, threads=grouped)
+        self.srv_btn.set_visible(bool(self._effective_search()) and any(not a.get("demo") for a in self.accounts()))
         ai = self.cache.ai_meta([m.id for m in msgs])
         sel = self.listbox.get_selected_row()
         sel_id = sel.msg.id if sel is not None else None
@@ -83,7 +84,9 @@ class ListMixin:
                 if self.single:
                     self.reader_open = False
                     self._layout()
-        elif self.reader.msg is None or self.reader.msg.id != row.msg.id:
+        elif self.reader.msg is None or (self.reader.msg.id != row.msg.id and not (
+                self.threads_on() and getattr(row.msg, "thread_id", None) and
+                getattr(self.reader.msg, "thread_id", "") == row.msg.thread_id)):
             self.open_message(row.msg)
 
     def _on_edge(self, sw, pos):
@@ -105,7 +108,7 @@ class ListMixin:
             msgs = [r.msg] if r is not None else []
         if not msgs and self.reader.msg:
             msgs = [self.reader.msg]
-        return msgs
+        return self._expand_threads(msgs)
 
     def _selected_index(self):
         r = self.listbox.get_selected_row()
@@ -149,6 +152,7 @@ class ListMixin:
             self._layout()
         if msg.unread and msg.folder != "drafts":
             self.set_unread([msg], False, reload=False)
+        self._open_thread_extras(msg, full)
         self.ai_open_message(full)
 
     def _on_activated(self, lb, row):
@@ -197,7 +201,10 @@ class ListMixin:
                  ("Signaler comme spam", lambda: self.move_messages(self.selected_msgs(), "spam")),
                  ("Mettre l'expéditeur en spam", lambda: self.spam_sender(m)),
                  ("Bloquer l'expéditeur", lambda: self.block_sender(m)),
-                 ("Voir tous ses messages", lambda: self.show_from(m))]
+                 ("Voir tous ses messages", lambda: self.show_from(m)),
+                 ("Ajouter aux contacts", lambda: self.contact_add(m))]
+        if getattr(m, "unsubscribe", ""):
+            items.append(("Se désabonner de cet expéditeur", lambda: self.unsubscribe(m)))
         items += [None] + self.ai_menu_items(m)    # section IA : classement, réponses, résumé, traduction, agenda…
         for it in items:
             if it is None:
@@ -316,17 +323,10 @@ class ListMixin:
         menu.show_all()
         return menu
 
-    def _row_menu(self, row, kind):
-        """Menu déroulant ouvert depuis un bouton de la barre d'actions d'une ligne."""
-        self.sender_menu(kind, row.msg).popup_at_widget(row.hover_ev, Gdk.Gravity.SOUTH_EAST, Gdk.Gravity.NORTH_EAST, None)
-
     def _on_swipe(self, row, action):
-        if action.endswith("_menu"):
-            self._row_menu(row, action[:-5])
-            return
         sel = [r.msg for r in self.listbox.get_selected_rows()] if (self.select_mode and row.is_selected()) else []
         msgs = sel if row.msg.id in {m.id for m in sel} else [row.msg]
-        self.run_action(action, msgs)
+        self.run_action(action, self._expand_threads(msgs))
 
     def run_action(self, action, msgs):
         if not msgs:
@@ -359,7 +359,10 @@ class ListMixin:
             except Exception:
                 continue
             if not be.demo:
-                self.run_bg(lambda be=be, lst=lst: be.set_flags_many(lst, seen=seen, flagged=flagged))
+                kw = {k: v for k, v in (("seen", seen), ("flagged", flagged)) if v is not None}
+                op_ids = self.op_enqueue("flags", lst, **kw)
+                self.run_bg(lambda ids=op_ids: self.op_run([o for o in self.cache.ops_pending() if o["id"] in ids]),
+                            lambda res, err: self._set_offline(res[2]) if res else None)
 
     def set_unread(self, msgs, unread, reload=True):
         ids = [m.id for m in msgs]
@@ -410,11 +413,9 @@ class ListMixin:
             self.cache.delete_many(ids)
             self.remove_rows(ids)
             self.update_counts()
-            by = {}
-            for m in msgs:
-                by.setdefault(m.account, []).append(m)
-            for aid, lst in by.items():
-                self.run_bg(lambda aid=aid, lst=lst: self.backend(aid).delete_many(lst))
+            op_ids = self.op_enqueue("delete", msgs)
+            self.run_bg(lambda: self.op_run([o for o in self.cache.ops_pending() if o["id"] in op_ids]),
+                        lambda res, err: self._set_offline(res[2]) if res else None)
             return
         ids = [m.id for m in msgs]
         prev = [(m.id, m.folder, m.snoozed_until) for m in msgs]

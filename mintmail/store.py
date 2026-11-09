@@ -7,6 +7,7 @@ import time
 from pathlib import Path
 
 from .models import Message, Outgoing
+from .util import thread_key, normalize_subject
 
 APP = "mintmail"
 P2P_MIN_SECRET = 12   # code de jumelage : 12 caractères minimum (les identifiants circulent entre machines)
@@ -18,6 +19,7 @@ DEFAULTS = {
     "density": "comfortable", "load_images": False, "notifications": True,
     "refresh_minutes": 5, "undo_seconds": 6, "width": 1280, "height": 800,
     "folders": {}, "collapsed_folders": [], "style": "aurora", "design_v2": False,
+    "threads": True, "ai_provider": "nvidia", "oauth_clients": {}, "caldav": {}, "identities": [], "contacts": {},
     "last_view": "inbox", "layout": "columns", "pos_cols": 420, "pos_bottom": 300,
     "side_width": 230, "zoom": 1.0,
     "swipe": {"right": "archive", "right_long": "trash", "left": "snooze", "left_long": "read"},
@@ -172,7 +174,7 @@ class Cache:
             except OSError:
                 pass
         self.lock = threading.RLock()
-        self.db = sqlite3.connect(str(path or DATA_DIR / "cache.db"), check_same_thread=False)
+        self.db = sqlite3.connect(str(path or DATA_DIR / "cache.db"), check_same_thread=False, timeout=15)   # plusieurs processus (interface, envois différés)
         with self.lock:
             for pragma in ("journal_mode=WAL", "synchronous=NORMAL", "temp_store=MEMORY"):
                 try:
@@ -183,14 +185,27 @@ class Cache:
                 id TEXT PRIMARY KEY, account TEXT, folder TEXT, uid INTEGER, date REAL,
                 unread INTEGER, starred INTEGER, pinned INTEGER, snoozed REAL,
                 has_att INTEGER, category TEXT, sender TEXT, search TEXT, data TEXT)""")
-            try:
-                self.db.execute("ALTER TABLE messages ADD COLUMN meta TEXT")
-            except sqlite3.OperationalError:
-                pass   # colonne déjà présente
+            for col in ("meta TEXT", "thread TEXT", "nsubj TEXT"):
+                try:
+                    self.db.execute("ALTER TABLE messages ADD COLUMN " + col)
+                except sqlite3.OperationalError:
+                    pass   # colonne déjà présente
+            self.db.execute("CREATE INDEX IF NOT EXISTS i_thread ON messages(account, thread)")
+            self.db.execute("""CREATE TABLE IF NOT EXISTS ops (
+                id INTEGER PRIMARY KEY AUTOINCREMENT, account TEXT, kind TEXT, payload TEXT, ts REAL, tries INTEGER DEFAULT 0)""")
+            self.db.execute("""CREATE TABLE IF NOT EXISTS learn (
+                account TEXT, sender TEXT, folder TEXT, n INTEGER, ts REAL, PRIMARY KEY (account, sender, folder))""")
+            self.db.execute("""CREATE TABLE IF NOT EXISTS contacts (
+                email TEXT PRIMARY KEY, name TEXT, phone TEXT, org TEXT, notes TEXT, source TEXT, n INTEGER DEFAULT 0, ts REAL)""")
             self.db.execute("CREATE INDEX IF NOT EXISTS i_msg ON messages(account, folder, date)")
             self.db.execute("CREATE INDEX IF NOT EXISTS i_sender ON messages(sender)")
             self.db.execute("""CREATE TABLE IF NOT EXISTS outbox (
                 id TEXT PRIMARY KEY, send_at REAL, data TEXT)""")
+            for col in ("claim REAL", "tries INTEGER DEFAULT 0"):
+                try:
+                    self.db.execute("ALTER TABLE outbox ADD COLUMN " + col)
+                except sqlite3.OperationalError:
+                    pass
             self.db.execute("""CREATE TABLE IF NOT EXISTS ai (
                 msg_id TEXT, kind TEXT, data TEXT, ts REAL, PRIMARY KEY (msg_id, kind))""")
             self.db.commit()
@@ -217,13 +232,20 @@ class Cache:
             raise ValueError("message allégé : utiliser update()")
         sender = ("%s %s" % (m.sender_name, m.sender_email)).lower()
         search = ("%s %s %s %s" % (m.subject, sender, m.to, m.text[:4000])).lower()
+        thread = m.thread_id or thread_key(m.message_id, m.references, m.subject)
+        nsubj = normalize_subject(m.subject).lower()[:120]
         with self.lock:
+            if thread.startswith("s:"):   # sans en-têtes de fil : rattaché à une conversation de même objet déjà connue
+                r = self.db.execute("SELECT thread FROM messages WHERE account=? AND nsubj=? AND thread IS NOT NULL LIMIT 1",
+                                    (m.account, nsubj)).fetchone()
+                thread = r[0] if r else thread
+            m.thread_id = thread
             self.db.execute(
                 "INSERT OR REPLACE INTO messages (id,account,folder,uid,date,unread,starred,pinned,snoozed,"
-                "has_att,category,sender,search,data,meta) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                "has_att,category,sender,search,data,meta,thread,nsubj) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
                 (m.id, m.account, m.folder, m.uid, m.date, int(m.unread), int(m.starred),
                  int(m.pinned), m.snoozed_until, int(bool(m.attachments)), m.category,
-                 sender, search, json.dumps(m.to_dict(), ensure_ascii=False), self._meta_of(m)))
+                 sender, search, json.dumps(m.to_dict(), ensure_ascii=False), self._meta_of(m), thread, nsubj))
             if commit:
                 self.db.commit()
 
@@ -264,20 +286,24 @@ class Cache:
             self.db.commit()
 
     def backfill_meta(self):
-        """Complète les méta des anciennes lignes (thread de fond au démarrage)."""
+        """Complète les méta et la clé de conversation des anciennes lignes (thread de fond au démarrage)."""
         while True:
             with self.lock:
-                rows = self.db.execute("SELECT id, data FROM messages WHERE meta IS NULL LIMIT 200").fetchall()
+                rows = self.db.execute("SELECT id, data FROM messages WHERE meta IS NULL OR thread IS NULL LIMIT 200").fetchall()
                 if not rows:
                     return
                 for mid, blob in rows:
                     try:
                         d = json.loads(blob)
+                        th = d.get("thread_id") or thread_key(d.get("message_id", ""), d.get("references", ""), d.get("subject", ""))
+                        d["thread_id"] = th
+                        full = json.dumps(d, ensure_ascii=False)
                         d["text"], d["html"] = "", ""
                         meta = json.dumps(d, ensure_ascii=False)
+                        ns = normalize_subject(d.get("subject", "")).lower()[:120]
                     except ValueError:
-                        meta = "{}"
-                    self.db.execute("UPDATE messages SET meta=? WHERE id=?", (meta, mid))
+                        meta, full, th, ns = "{}", blob, mid, ""
+                    self.db.execute("UPDATE messages SET meta=?, data=?, thread=?, nsubj=? WHERE id=?", (meta, full, th, ns, mid))
                 self.db.commit()
 
     def clear_all(self):
@@ -325,7 +351,7 @@ class Cache:
                                 ["%" + key.lower() + "%"] + list(folders))
 
     def query(self, view="inbox", account="all", category=None, unread_only=False,
-              attachments_only=False, search="", limit=400):
+              attachments_only=False, search="", limit=400, threads=False):
         now = time.time()
         where, args = [], []
         if account != "all":
@@ -369,7 +395,155 @@ class Cache:
             where.append("unread=1")
         if attachments_only:
             where.append("has_att=1")
+        if threads:
+            return self.query_threads(" AND ".join(where), args, limit)
         return self._light_rows("WHERE " + " AND ".join(where) + " ORDER BY date DESC LIMIT ?", args + [limit])
+
+    def thread_members(self, account, thread, exclude=("trash", "spam")):
+        """Messages (allégés) d'une conversation, du plus ancien au plus récent."""
+        marks = ",".join("?" * len(exclude))
+        msgs = self._light_rows("WHERE account=? AND thread=? AND folder NOT IN (%s) ORDER BY date ASC" % marks,
+                                [account, thread] + list(exclude))
+        return msgs
+
+    def query_threads(self, where, args, limit):
+        """Un message par conversation (le plus récent), avec le nombre de messages et l'état « non lu » du fil."""
+        sql = ("SELECT COALESCE(meta,data), folder, unread, starred, pinned, snoozed, category, tcnt, tun FROM ("
+               "SELECT *, ROW_NUMBER() OVER (PARTITION BY account, COALESCE(NULLIF(thread,''), id) ORDER BY date DESC) rn,"
+               " COUNT(*) OVER (PARTITION BY account, COALESCE(NULLIF(thread,''), id)) tcnt,"
+               " SUM(unread) OVER (PARTITION BY account, COALESCE(NULLIF(thread,''), id)) tun FROM messages WHERE " + where +
+               ") WHERE rn=1 ORDER BY date DESC LIMIT ?")
+        with self.lock:
+            rows = self.db.execute(sql, args + [limit]).fetchall()
+        out = []
+        for r in rows:
+            m = self._build(*r[:7], light=True)
+            m.thread_count, m.thread_unread = int(r[7] or 1), bool(r[8])
+            out.append(m)
+        return out
+
+    # ------------------------------------------------ apprentissage (habitudes de rangement)
+    def learn_record(self, account, sender, folder):
+        sender = (sender or "").lower()
+        if not sender or not folder:
+            return 0
+        with self.lock:
+            self.db.execute("INSERT INTO learn (account, sender, folder, n, ts) VALUES (?,?,?,1,?) "
+                            "ON CONFLICT(account, sender, folder) DO UPDATE SET n=n+1, ts=excluded.ts",
+                            (account, sender, folder, time.time()))
+            self.db.commit()
+            return self.db.execute("SELECT n FROM learn WHERE account=? AND sender=? AND folder=?",
+                                   (account, sender, folder)).fetchone()[0]
+
+    def learn_best(self, account, sender, min_count=2):
+        """Dossier où l'utilisateur range habituellement les messages de cet expéditeur (ou de son domaine)."""
+        sender = (sender or "").lower()
+        with self.lock:
+            for key in (sender, "@" + sender.split("@")[-1]):
+                r = self.db.execute("SELECT folder, n FROM learn WHERE account=? AND sender=? ORDER BY n DESC, ts DESC LIMIT 1",
+                                    (account, key)).fetchone()
+                if r and r[1] >= min_count:
+                    return r[0]
+        return None
+
+    def learn_examples(self, account, limit=12):
+        with self.lock:
+            return self.db.execute("SELECT sender, folder FROM learn WHERE account=? AND n>=2 ORDER BY n DESC, ts DESC LIMIT ?",
+                                   (account, limit)).fetchall()
+
+    def learn_clear(self):
+        with self.lock:
+            self.db.execute("DELETE FROM learn")
+            self.db.commit()
+
+    # ------------------------------------------------ actions serveur en attente (mode hors ligne)
+    def ops_add(self, account, kind, payload):
+        with self.lock:
+            cur = self.db.execute("INSERT INTO ops (account, kind, payload, ts) VALUES (?,?,?,?)",
+                                  (account, kind, json.dumps(payload, ensure_ascii=False), time.time()))
+            self.db.commit()
+            return cur.lastrowid
+
+    def ops_pending(self, limit=200):
+        with self.lock:
+            rows = self.db.execute("SELECT id, account, kind, payload, tries FROM ops ORDER BY id LIMIT ?", (limit,)).fetchall()
+        return [{"id": i, "account": a, "kind": k, "payload": json.loads(p), "tries": t} for i, a, k, p, t in rows]
+
+    def ops_done(self, op_id):
+        with self.lock:
+            self.db.execute("DELETE FROM ops WHERE id=?", (op_id,))
+            self.db.commit()
+
+    def ops_fail(self, op_id):
+        with self.lock:
+            self.db.execute("UPDATE ops SET tries=tries+1 WHERE id=?", (op_id,))
+            self.db.commit()
+
+    def ops_count(self):
+        with self.lock:
+            return self.db.execute("SELECT COUNT(*) FROM ops").fetchone()[0]
+
+    # ------------------------------------------------------------------- contacts
+    def contact_upsert(self, email, name="", phone="", org="", notes="", source="auto", bump=0):
+        email = (email or "").strip().lower()
+        if not email:
+            return
+        with self.lock:
+            old = self.db.execute("SELECT name, phone, org, notes, source, n FROM contacts WHERE email=?", (email,)).fetchone()
+            if old is None:
+                self.db.execute("INSERT INTO contacts (email, name, phone, org, notes, source, n, ts) VALUES (?,?,?,?,?,?,?,?)",
+                                (email, name, phone, org, notes, source, bump, time.time()))
+            elif source == "manual":     # une saisie manuelle l'emporte et verrouille la fiche
+                self.db.execute("UPDATE contacts SET name=?, phone=?, org=?, notes=?, source='manual', ts=? WHERE email=?",
+                                (name, phone, org, notes, time.time(), email))
+            else:
+                self.db.execute("UPDATE contacts SET name=?, n=n+?, ts=? WHERE email=?",
+                                (old[0] or name, bump, time.time(), email))
+            self.db.commit()
+
+    def contact_delete(self, email):
+        with self.lock:
+            self.db.execute("DELETE FROM contacts WHERE email=?", (email.lower(),))
+            self.db.commit()
+
+    def contacts_list(self, query="", source=None, limit=500):
+        q, args = "SELECT email, name, phone, org, notes, source, n FROM contacts WHERE 1=1", []
+        if query:
+            q += " AND (email LIKE ? OR LOWER(name) LIKE ? OR LOWER(org) LIKE ?)"
+            args += ["%" + query.lower() + "%"] * 3
+        if source:
+            q += " AND source=?"
+            args.append(source)
+        q += " ORDER BY (source='manual') DESC, n DESC, name LIMIT ?"
+        with self.lock:
+            rows = self.db.execute(q, args + [limit]).fetchall()
+        return [dict(zip(("email", "name", "phone", "org", "notes", "source", "n"), r)) for r in rows]
+
+    def contacts_rebuild(self, limit=3000):
+        """Alimente le carnet avec les expéditeurs / destinataires des messages récents (arrière-plan)."""
+        from .contacts import parse_addresses
+        with self.lock:
+            rows = self.db.execute("SELECT COALESCE(meta,data) FROM messages WHERE folder IN ('inbox','sent','archive') "
+                                   "ORDER BY date DESC LIMIT ?", (limit,)).fetchall()
+        counts = {}
+        for (blob,) in rows:
+            try:
+                d = json.loads(blob)
+            except ValueError:
+                continue
+            for hdr in ((d.get("sender_name", "") + " <" + d.get("sender_email", "") + ">"), d.get("to", ""), d.get("cc", "")):
+                for name, addr in parse_addresses(hdr):
+                    n, c = counts.get(addr, ("", 0))
+                    counts[addr] = (n or name, c + 1)
+        with self.lock:
+            for addr, (name, c) in counts.items():
+                old = self.db.execute("SELECT source FROM contacts WHERE email=?", (addr,)).fetchone()
+                if old is None:
+                    self.db.execute("INSERT INTO contacts (email, name, source, n, ts) VALUES (?,?,?,?,?)", (addr, name, "auto", c, time.time()))
+                elif old[0] == "auto":
+                    self.db.execute("UPDATE contacts SET n=?, name=COALESCE(NULLIF(name,''), ?) WHERE email=?", (c, name, addr))
+            self.db.commit()
+        return len(counts)
 
     def counts(self, account="all"):
         acc = "" if account == "all" else " AND account=?"
@@ -393,6 +567,10 @@ class Cache:
         return [m for m in (self.get_light(i) for i in ids) if m]
 
     def contacts(self, limit=300):
+        """(nom, adresse) pour l'auto-complétion : carnet d'adresses d'abord, puis expéditeurs récents."""
+        found = [(c["name"], c["email"]) for c in self.contacts_list(limit=limit)]
+        if len(found) >= 20:
+            return found
         with self.lock:
             rows = self.db.execute(
                 "SELECT COALESCE(meta,data) FROM messages WHERE folder IN ('inbox','sent','archive') "
@@ -406,7 +584,8 @@ class Cache:
                 out.append((m.get("sender_name") or "", e))
             if len(out) >= limit:
                 break
-        return out
+        known = {e for _n, e in found}
+        return found + [x for x in out if x[1] not in known]
 
     # ------------------------------------------------------------------ IA (cache)
     def ai_get(self, msg_id, kind):
@@ -451,7 +630,7 @@ class Cache:
     # -- boîte d'envoi (envoi différé / annulable)
     def outbox_add(self, oid, send_at, out):
         with self.lock:
-            self.db.execute("INSERT OR REPLACE INTO outbox VALUES (?,?,?)",
+            self.db.execute("INSERT OR REPLACE INTO outbox (id, send_at, data) VALUES (?,?,?)",
                             (oid, send_at, json.dumps(out.to_dict(), ensure_ascii=False)))
             self.db.commit()
 
@@ -460,6 +639,29 @@ class Cache:
             rows = self.db.execute("SELECT id, data FROM outbox WHERE send_at<=?",
                                    (time.time(),)).fetchall()
         return [(i, Outgoing.from_dict(json.loads(d))) for i, d in rows]
+
+    def outbox_claim(self, oid, ttl=180):
+        """Réserve un envoi (atomique entre processus) : évite qu'il parte deux fois (interface + minuterie)."""
+        now = time.time()
+        with self.lock:
+            cur = self.db.execute("UPDATE outbox SET claim=? WHERE id=? AND (claim IS NULL OR claim<?)", (now + ttl, oid, now))
+            self.db.commit()
+            return cur.rowcount == 1
+
+    def outbox_reschedule(self, oid, at):
+        with self.lock:
+            self.db.execute("UPDATE outbox SET send_at=?, claim=NULL, tries=COALESCE(tries,0)+1 WHERE id=?", (at, oid))
+            self.db.commit()
+
+    def outbox_tries(self, oid):
+        with self.lock:
+            r = self.db.execute("SELECT COALESCE(tries,0) FROM outbox WHERE id=?", (oid,)).fetchone()
+        return r[0] if r else 0
+
+    def outbox_list(self):
+        with self.lock:
+            rows = self.db.execute("SELECT id, send_at, data, COALESCE(tries,0) FROM outbox ORDER BY send_at").fetchall()
+        return [(i, t, Outgoing.from_dict(json.loads(d)), n) for i, t, d, n in rows]
 
     def outbox_remove(self, oid):
         with self.lock:

@@ -97,7 +97,6 @@ class MessageRow(Gtk.ListBoxRow):
         col.pack_start(self.snippet, False, False, 0)
         outer.pack_start(col, True, True, 0)
         self.content = outer
-        self.on_quick = None
 
         # couche d'actions (dessous) + carte glissante (dessus)
         self.actions = Gtk.Box()
@@ -123,29 +122,6 @@ class MessageRow(Gtk.ListBoxRow):
                              Gdk.EventMask.BUTTON1_MOTION_MASK | Gdk.EventMask.TOUCH_MASK |
                              Gdk.EventMask.SMOOTH_SCROLL_MASK | Gdk.EventMask.SCROLL_MASK)
         self.overlay.add_overlay(self.card)
-        self.hover = Gtk.Box(spacing=0)
-        self.hover.get_style_context().add_class("hover-actions")
-        self.hover.set_margin_top(6)
-        for act, ic, tip in (("archive", "folder-symbolic", "Archiver"), ("trash", "user-trash-symbolic", "Supprimer"),
-                             ("snooze", "alarm-symbolic", "Reporter à demain"), ("star", "starred-symbolic", "Favori"),
-                             ("spam_menu", "mail-mark-junk-symbolic", "Spam : ce message, l'expéditeur ou tout le domaine…"),
-                             ("block_menu", "action-unavailable-symbolic", "Bloquer l'adresse ou le domaine…"),
-                             ("more_menu", "view-more-symbolic", "Plus d'actions…")):
-            b = icon_button(ic, tip, relief=False)
-            b.connect("clicked", lambda _b, a=act: GLib.idle_add(self._quick, a))   # différé : la ligne peut disparaître
-            self.hover.pack_start(b, False, False, 0)
-        self.hover_ev = Gtk.EventBox()
-        self.hover_ev.set_halign(Gtk.Align.END)
-        self.hover_ev.set_valign(Gtk.Align.START)
-        self.hover_ev.add(self.hover)
-        self.hover.set_halign(Gtk.Align.FILL)
-        self.overlay.add_overlay(self.hover_ev)
-        self._hover_timer = 0
-        # la barre reste affichée tant que le pointeur est sur la carte, la barre ou l'un de ses boutons
-        for w in [self.card, self.hover_ev] + list(self.hover.get_children()):
-            w.add_events(Gdk.EventMask.ENTER_NOTIFY_MASK | Gdk.EventMask.LEAVE_NOTIFY_MASK)
-            w.connect("enter-notify-event", self._hover_enter)
-            w.connect("leave-notify-event", self._hover_leave)
         self.overlay.connect("get-child-position", self._child_pos)
         self.add(self.overlay)
 
@@ -162,7 +138,6 @@ class MessageRow(Gtk.ListBoxRow):
         self.revealer.set_reveal_child(False)
         self.l_box.hide()
         self.r_box.hide()
-        self.hover_ev.hide()
 
     # ---- cases à cocher
     def _toggled(self, btn):
@@ -179,31 +154,6 @@ class MessageRow(Gtk.ListBoxRow):
             self.check.handler_unblock_by_func(self._toggled)
 
     # ---- swipe
-    def _quick(self, act):
-        if self.on_quick:
-            self.on_quick(self, act)
-        return False
-
-    def _hover_enter(self, w, ev):
-        """Pointeur sur la carte / la barre / un bouton : on annule tout masquage en attente et on affiche la barre."""
-        if self._hover_timer:
-            GLib.source_remove(self._hover_timer)
-            self._hover_timer = 0
-        if abs(self.offset) < 1:
-            self.hover_ev.show()
-        return False
-
-    def _hover_leave(self, w, ev):
-        """Masquage différé : passer de la carte à la barre (ou à un bouton) ne provoque donc plus de clignotement."""
-        if not self._hover_timer:
-            self._hover_timer = GLib.timeout_add(220, self._hover_hide)
-        return False
-
-    def _hover_hide(self):
-        self._hover_timer = 0
-        self.hover_ev.hide()
-        return False
-
     def _child_pos(self, overlay, widget, alloc):
         if widget is not self.card:
             return False
@@ -224,9 +174,6 @@ class MessageRow(Gtk.ListBoxRow):
         return act or self.swipe_cfg.get(side) or "none"
 
     def _cancel_anim(self):
-        if getattr(self, "_hover_timer", 0):
-            GLib.source_remove(self._hover_timer)
-            self._hover_timer = 0
         if self._anim:
             GLib.source_remove(self._anim)
             self._anim = 0
@@ -239,8 +186,6 @@ class MessageRow(Gtk.ListBoxRow):
         moving = abs(self.offset) >= 0.5
         (ctx.add_class if moving else ctx.remove_class)("swiping")
         self.actions.set_opacity(1.0 if moving else 0.0)
-        if moving:
-            self.hover_ev.hide()
         self.overlay.queue_resize()
 
     def set_offset(self, dx):
@@ -341,7 +286,7 @@ class MessageRow(Gtk.ListBoxRow):
     def signature(self):
         m = self.msg
         return (m.unread, m.starred, m.pinned, m.snoozed_until > 0, bool(m.attachments), m.subject, m.snippet,
-                m.date, m.category, self.ai.get("summary"), self.ai.get("priority"), bool(self.ai.get("spam")))
+                m.date, m.category, getattr(m, "thread_count", 1), self.ai.get("summary"), self.ai.get("priority"), bool(self.ai.get("spam")))
 
     def update_msg(self, msg, ai=None):
         """Met à jour la ligne en place (sans la reconstruire) ; retourne True si quelque chose a changé."""
@@ -382,6 +327,12 @@ class MessageRow(Gtk.ListBoxRow):
             rctx.add_class("rail-" + m.category)
         for ch in self.icons.get_children():
             self.icons.remove(ch)
+        n = getattr(m, "thread_count", 1)
+        if n > 1:   # conversation : nombre de messages
+            cnt = Gtk.Label(label=str(n))
+            cnt.set_tooltip_text("%d messages dans cette conversation" % n)
+            cnt.get_style_context().add_class("badge-thread")
+            self.icons.pack_start(cnt, False, False, 0)
         if self.ai.get("spam"):
             lab = Gtk.Label(label="Suspect")
             lab.get_style_context().add_class("badge-suspect")

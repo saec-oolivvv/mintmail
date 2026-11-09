@@ -17,6 +17,8 @@ from .compose import ComposeWindow
 from .ai_features import AIMixin
 from .listing import ListMixin, PAGE
 from .folders import FolderMixin, SMART_VIEWS, dest_of
+from .offline import OfflineMixin, is_retryable
+from .extras import ExtrasMixin
 from .models import Message, Outgoing
 from .p2p import SyncEngine
 from .syncdata import apply_items, describe as describe_sync
@@ -61,7 +63,7 @@ DEMO_ACCOUNT = {"id": "demo", "name": "Démo", "email": "demo@mintmail.local", "
 NARROW, RAIL_BELOW, HIDE_BELOW = 700, 1250, 900
 
 
-class MainWindow(ListMixin, AIMixin, FolderMixin, Gtk.ApplicationWindow):
+class MainWindow(ExtrasMixin, OfflineMixin, ListMixin, AIMixin, FolderMixin, Gtk.ApplicationWindow):
     NAV_ROWS = NAV
     TITLES = TITLES
 
@@ -110,6 +112,7 @@ class MainWindow(ListMixin, AIMixin, FolderMixin, Gtk.ApplicationWindow):
         threading.Thread(target=self.cache.backfill_meta, daemon=True).start()
         GLib.idle_add(lambda: (self.sync(), False)[1])
         GLib.timeout_add(800, lambda: (self.refresh_folders(), False)[1])
+        GLib.timeout_add(6000, lambda: (self.contacts_refresh(), self.flush_ops(), False)[2])   # carnet d'adresses + actions en attente
         if self.config.p2p_notice == "short_code":   # l'ancien code (moins de 12 caractères) a désactivé la synchro
             GLib.timeout_add(2500, lambda: (self.toast.popup(
                 "Synchronisation désactivée : l'ancien code de jumelage est trop court (12 caractères minimum).",
@@ -206,6 +209,12 @@ class MainWindow(ListMixin, AIMixin, FolderMixin, Gtk.ApplicationWindow):
         self.count_lbl = Gtk.Label(xalign=0)
         self.count_lbl.get_style_context().add_class("count-lbl")
         bar.pack_start(self.count_lbl, False, False, 0)
+        self.srv_btn = Gtk.Button(label="🔎 Chercher aussi sur le serveur")
+        self.srv_btn.get_style_context().add_class("pill")
+        self.srv_btn.set_tooltip_text("Cherche dans tous les messages du serveur, même ceux qui ne sont pas encore téléchargés")
+        self.srv_btn.set_no_show_all(True)
+        self.srv_btn.connect("clicked", lambda *_: self.search_server_now())
+        bar.pack_start(self.srv_btn, False, False, 0)
         bar.pack_start(self.title_lbl, False, False, 0)
         self.cat_box = Gtk.Box(spacing=6)
         first = None
@@ -286,6 +295,7 @@ class MainWindow(ListMixin, AIMixin, FolderMixin, Gtk.ApplicationWindow):
         self.reader.connect("action", self._reader_action)
         self.reader.connect("quick-reply", lambda _r, t: self.quick_reply(t))
         self.reader.connect("ai-action", self._on_ai_action)
+        self.reader.connect("open-message", self._on_open_thread_message)
 
         self.paned_in = Gtk.Paned(orientation=Gtk.Orientation.HORIZONTAL)
         self.paned_in.set_wide_handle(True)
@@ -644,6 +654,8 @@ class MainWindow(ListMixin, AIMixin, FolderMixin, Gtk.ApplicationWindow):
     def _tick(self):
         self._ticks += 1
         self.process_outbox()
+        if self._ticks % 10 == 0:
+            self.flush_ops()
         if self._ticks % 3 == 0 and hasattr(self, "p2p_lbl"):
             eng = self.sync_engine
             short = 0 < len(str(self.config.get("p2p_secret") or "")) < P2P_MIN_SECRET
@@ -793,12 +805,18 @@ class MainWindow(ListMixin, AIMixin, FolderMixin, Gtk.ApplicationWindow):
 
     def process_outbox(self):
         for oid, out in self.cache.outbox_due():
-            if oid in self._sending:
-                continue
+            if oid in self._sending or not self.cache.outbox_claim(oid):
+                continue          # déjà en cours ici, ou pris par l'envoi différé en tâche de fond
             self._sending.add(oid)
 
             def done(res, err, oid=oid, out=out):
                 self._sending.discard(oid)
+                if err and is_retryable(err) and self.cache.outbox_tries(oid) < 10:
+                    self.cache.outbox_reschedule(oid, time.time() + 60)        # hors ligne : conservé, nouvel essai dans 1 min
+                    self._net_error = True
+                    self.update_offline_status()
+                    self.toast.popup("Hors ligne : message conservé, nouvel essai automatique.", timeout=5)
+                    return
                 self.cache.outbox_remove(oid)
                 if err:
                     self.toast.popup("Échec de l'envoi : %s" % str(err)[:90], "Rouvrir", lambda: ComposeWindow(
@@ -845,6 +863,12 @@ class MainWindow(ListMixin, AIMixin, FolderMixin, Gtk.ApplicationWindow):
             self.set_flag(msgs, "pinned", not m.pinned)
         elif act == "unread":
             self.set_unread(msgs, True)
+        elif act == "unsubscribe" and m:
+            self.unsubscribe(m)
+        elif act in ("invite_accept", "invite_tentative", "invite_decline") and m:
+            self.invite_respond(m, act.split("_", 1)[1] if act != "invite_accept" else "accept")
+        elif act == "invite_add" and m:
+            self.invite_add(m)
         elif act == "images" and m:
             reader.show_message(m, True)
         elif act == "move_menu":
@@ -1173,12 +1197,19 @@ class MainWindow(ListMixin, AIMixin, FolderMixin, Gtk.ApplicationWindow):
                 if kn:
                     fresh += [m for m in keep if m.unread]
         self._last_sync = time.time()
+        self._net_error = bool(errors) and any(w in errors[0].lower() for w in (
+            "connexion", "connection", "timed out", "resolution", "unreachable", "réseau", "name or service"))
+        if not errors:
+            self._set_offline(False)
         if errors:
             self.status.set_text("⚠ " + errors[0][:120])
             if manual:
                 self.toast.popup(errors[0][:100], timeout=6)
         else:
             self.status.set_text("Synchronisé à " + time.strftime("%H:%M"))
+            self.flush_ops()
+        if errors and self._net_error:
+            self.update_offline_status()
         self.reload_list()
         self.update_counts()
         self._notify(fresh)
@@ -1216,20 +1247,21 @@ class MainWindow(ListMixin, AIMixin, FolderMixin, Gtk.ApplicationWindow):
 
     def _bg_move(self, msgs, dest):
         self._pending += 1
+        op_ids = self.op_enqueue("move", msgs, dest=dest)      # enregistré d'abord : rien n'est perdu si le réseau tombe
 
         def work():
-            errs, by = [], {}
-            for m in msgs:
-                by.setdefault(m.account, []).append(m)
-            for aid, lst in by.items():
-                try:
-                    self.backend(aid).move_many(lst, dest)
-                except Exception as e:
-                    errs.append(str(e))
-            return errs
+            ops = [o for o in self.cache.ops_pending() if o["id"] in op_ids]
+            return self.op_run(ops)
 
-        def done(errs, err):
+        def done(res, err):
             self._pending -= 1
+            _ok, errs, offline = res if res else ([], [], False)
+            self._set_offline(offline)
+            if offline:
+                self.toast.popup("Hors ligne : le déplacement est conservé et sera envoyé dès le retour du réseau.", timeout=6)
+                self.reload_list()
+                self.update_counts()
+                return
             if err or errs:
                 self.toast.popup("Échec du déplacement : %s" % ((errs or [str(err)])[0][:80]), timeout=6)
             real = []
@@ -1267,11 +1299,11 @@ class MainWindow(ListMixin, AIMixin, FolderMixin, Gtk.ApplicationWindow):
         to = msg.to if msg.folder == "sent" else (msg.reply_to or msg.sender_email)
         cc = ""
         if all_:
-            mine = {a["email"].lower() for a in self.accounts()}
+            mine = {a["email"].lower() for a in self.accounts()} | {i["email"].lower() for i in self.config.get("identities", [])}
             others = [a for a in split_addresses(msg.to) + split_addresses(msg.cc)
                       if a.lower() not in mine and a.lower() != msg.sender_email.lower()]
             cc = ", ".join(dict.fromkeys(others))
-        self.compose(account_id=self._default_account(msg), to=to, cc=cc,
+        self.compose(account_id=self._from_choice(msg), to=to, cc=cc,
                      subject="Re: " + normalize_subject(msg.subject), quote_html=self._quote(msg),
                      in_reply_to=msg.message_id, references=msg.references, ai_suggested_text=ai_text)
 
@@ -1295,10 +1327,12 @@ class MainWindow(ListMixin, AIMixin, FolderMixin, Gtk.ApplicationWindow):
         if not msg:
             return
         acc = next((a for a in self.accounts() if a["id"] == self._default_account(msg)), self.accounts()[0])
-        sig = acc.get("signature_html", "")
+        ident = self._addressed_identity(msg)
+        sig = (ident or {}).get("signature_html") or acc.get("signature_html", "")
         body = text_to_html(text) + ("<br><br>-- <br>" + sig if sig.strip() else "")
         out = Outgoing(account=acc["id"], to=(msg.reply_to or msg.sender_email),
                        subject="Re: " + normalize_subject(msg.subject), html=body,
+                       from_email=ident["email"] if ident else "", from_name=ident.get("name", "") if ident else "",
                        in_reply_to=msg.message_id, references=msg.references)
         self.queue_send(out, 0)
 
@@ -1322,6 +1356,7 @@ class MainWindow(ListMixin, AIMixin, FolderMixin, Gtk.ApplicationWindow):
         if m:
             who, dom = m.sender_email, "@" + m.sender_email.split("@")[-1]
             cmds += [
+                ("Se désabonner de cet expéditeur", lambda: self.unsubscribe(m)),
                 ("✨ Résumer / analyser ce message", lambda: self.ai_fetch(self._full(m), force=True)),
                 ("✨ Répondre avec l'IA", lambda: self.ai_reply_with_ai(m)),
                 ("✨ Traduire ce message", lambda: self._on_ai_action(self.reader, "translate", "")),
@@ -1347,6 +1382,10 @@ class MainWindow(ListMixin, AIMixin, FolderMixin, Gtk.ApplicationWindow):
             ("✨ Ouvrir l'assistant IA", lambda: self.toggle_assistant(True)),
             ("✨ Résumer ma boîte de réception", lambda: self._maybe_digest(force=True)),
             ("Nouveau message", self.compose), ("Actualiser", lambda: self.sync(True)),
+            ("Boîte d'envoi (messages en attente ou programmés)…", self.show_outbox),
+            ("Chercher aussi sur le serveur", self.search_server_now),
+            ("Contacts…", lambda: self.show_settings("contacts")),
+            ("Identités d'envoi (alias)…", lambda: self.show_settings("identities")),
             ("Gérer les expéditeurs bloqués et les règles", lambda: self.show_settings("filters")),
             ("Appliquer les règles à la boîte de réception", self.apply_rules_now),
             ("Enregistrer la recherche actuelle", self.save_current_search),

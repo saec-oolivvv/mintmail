@@ -14,10 +14,11 @@ import re
 import time
 from typing import Any, Dict, Optional, Tuple
 
+from .ai_service import is_local_endpoint
 from .store import DEFAULTS
 
 ACCOUNT_FIELDS = ("id", "name", "email", "username", "imap_host", "imap_port", "imap_ssl", "smtp_host", "smtp_port",
-                  "signature_html", "has_password")
+                  "signature_html", "has_password", "auth", "oauth_provider")
 SWIPE_ACTIONS = {"archive", "trash", "snooze", "read", "star", "pin", "spam", "block", "none"}
 RULE_FIELDS = {"from", "subject", "to"}
 RULE_ACTIONS = {"archive", "trash", "spam", "read", "star", "pin", "move"}
@@ -44,8 +45,14 @@ SYNC_SETTINGS = {
     "refresh_minutes": _int(1, 60), "undo_seconds": _int(3, 30), "swipe": _swipe, "swipe_invert": _b,
     "ai_enabled": _b, "ai_auto": _b, "ai_triage": _b, "ai_digest": _b, "ai_privacy": _enum("full", "minimal"),
     "ai_lang": _enum("fr", "en", "nl", "de", "es"), "ai_tone": _enum("neutral", "formal", "friendly"),
-    "nvidia_api_base": lambda v: isinstance(v, str) and len(v) <= 200 and (v == "" or v.startswith("https://")),
-    "ai_model": _str(100), "ai_has_key": _b,
+    "nvidia_api_base": lambda v: isinstance(v, str) and len(v) <= 200 and (v == "" or v.startswith("https://") or (
+        v.startswith("http://") and is_local_endpoint(v))),
+    "ai_model": _str(100), "ai_has_key": _b, "ai_provider": _enum("nvidia", "ollama", "custom"), "threads": _b,
+    "oauth_clients": lambda v: isinstance(v, dict) and set(v) <= {"google", "microsoft"} and all(
+        isinstance(c, dict) and set(c) <= {"client_id", "client_secret"} and all(isinstance(x, str) and len(x) <= 300 for x in c.values())
+        for c in v.values()),
+    "caldav": lambda v: isinstance(v, dict) and set(v) <= {"url", "user"} and all(isinstance(x, str) and len(x) <= 300 for x in v.values())
+        and (not v.get("url") or v["url"].startswith("https://") or (v["url"].startswith("http://") and is_local_endpoint(v["url"]))),
 }
 
 
@@ -83,6 +90,8 @@ def clean_account(v) -> Optional[dict]:
         out[k] = v.get(k, "") if ok(v.get(k, "")) else ""
     out["imap_ssl"] = v.get("imap_ssl", True) if _b(v.get("imap_ssl", True)) else True
     out["has_password"] = v.get("has_password", True) if _b(v.get("has_password", True)) else True
+    if v.get("auth") == "oauth2" and v.get("oauth_provider") in ("google", "microsoft"):
+        out["auth"], out["oauth_provider"] = "oauth2", v["oauth_provider"]
     pw = v.get("password")
     out["password"] = pw if isinstance(pw, str) and len(pw) <= 500 else None
     return out
@@ -95,7 +104,7 @@ def valid_item(key: str, item: Any) -> bool:
     if not isinstance(item.get("ts"), (int, float)) or not _b(item.get("del", False)):
         return False
     if item.get("del"):
-        return kind_of(key) in ("acct", "set", "secret", "rule", "blocked", "spam", "search", "tpl")
+        return kind_of(key) in ("acct", "set", "secret", "rule", "blocked", "spam", "search", "tpl", "ident", "contact")
     v, kind, rest = item.get("v"), kind_of(key), key.split(":", 1)[-1]
     if kind == "acct":
         a = clean_account(v)
@@ -103,7 +112,15 @@ def valid_item(key: str, item: Any) -> bool:
     if kind == "set":
         return rest in SYNC_SETTINGS and SYNC_SETTINGS[rest](v)
     if kind == "secret":
-        return rest == "ai" and isinstance(v, str) and 0 < len(v) <= 500
+        return rest in ("ai", "caldav") and isinstance(v, str) and 0 < len(v) <= 500
+    if kind == "ident":
+        return (isinstance(v, dict) and re.match(r"^[A-Za-z0-9_-]{4,40}$", rest) is not None and v.get("id") == rest
+                and isinstance(v.get("account"), str) and re.match(r"^[A-Za-z0-9_-]{4,40}$", v["account"]) is not None
+                and isinstance(v.get("email"), str) and len(v["email"]) <= 200 and EMAIL_RE.match(v["email"]) is not None
+                and _str(100)(v.get("name", "")) and _str(20000)(v.get("signature_html", "")))
+    if kind == "contact":
+        return (isinstance(v, dict) and EMAIL_RE.match(rest) is not None and len(rest) <= 200 and set(v) <= {"name", "phone", "org", "notes"}
+                and all(isinstance(x, str) and len(x) <= 500 for x in v.values()))
     if kind == "rule":
         return (isinstance(v, dict) and v.get("field") in RULE_FIELDS and v.get("action") in RULE_ACTIONS
                 and _str(200)(v.get("text")) and bool(v.get("text"))
@@ -132,6 +149,13 @@ def collect(config) -> Dict[str, Tuple[Any, Optional[str]]]:
     if config.get("ai_has_key"):
         key = config.password("ai:nvidia")
         out["secret:ai"] = (True, key or None)
+    if (config.get("caldav") or {}).get("url"):
+        out["secret:caldav"] = (True, config.password("caldav") or None)
+    for i in config.get("identities", []):
+        if isinstance(i, dict) and i.get("id"):
+            out["ident:" + i["id"]] = (i, None)
+    for email, c in (config.get("contacts") or {}).items():
+        out["contact:" + email] = (c, None)
     for r in config.get("rules", []):
         out["rule:" + hash_value(r)] = (r, None)
     for v in config.get("blocked", []):
@@ -249,18 +273,21 @@ def apply_items(config, wins: Dict[str, dict], cache=None) -> dict:
                     res["ai"] = res["ai"] or rest.startswith(("ai_", "nvidia"))
                 v_for_hash = v
             elif kind == "secret":
+                slot = "ai:nvidia" if rest == "ai" else "caldav"
                 if deleted:
-                    config.delete_password("ai:nvidia")
-                    config["ai_has_key"] = False
+                    config.delete_password(slot)
+                    if rest == "ai":
+                        config["ai_has_key"] = False
                 else:
-                    config.set_password("ai:nvidia", v)
-                    config["ai_has_key"] = True
+                    config.set_password(slot, v)
+                    if rest == "ai":
+                        config["ai_has_key"] = True
                     ph = hash_value(v)
-                res["ai"] = True
+                res["ai"] = res["ai"] or rest == "ai"
                 v_for_hash = True if not deleted else None
             else:
                 v_for_hash = v
-                _apply_list_item(config, kind, rest, v, deleted)
+                _apply_list_item(config, kind, rest, v, deleted, cache)
                 res["lists"] = True
             res["count"] += 1
             res["kinds"][kind] = res["kinds"].get(kind, 0) + 1
@@ -271,7 +298,7 @@ def apply_items(config, wins: Dict[str, dict], cache=None) -> dict:
     return res
 
 
-def _apply_list_item(config, kind, rest, v, deleted):
+def _apply_list_item(config, kind, rest, v, deleted, cache=None):
     if kind == "rule":
         rules = [r for r in config["rules"] if hash_value(r) != rest]
         config["rules"] = rules if deleted else rules + [v]
@@ -285,9 +312,24 @@ def _apply_list_item(config, kind, rest, v, deleted):
     elif kind == "tpl":
         lst = [t for t in config["templates"] if t["name"] != rest]
         config["templates"] = lst if deleted else lst + [{"name": rest, "html": v}]
+    elif kind == "ident":
+        lst = [i for i in config.get("identities", []) if i.get("id") != rest]
+        config["identities"] = lst if deleted else lst + [v]
+    elif kind == "contact":
+        contacts = dict(config.get("contacts") or {})
+        if deleted:
+            contacts.pop(rest, None)
+        else:
+            contacts[rest] = v
+        config["contacts"] = contacts
+        if cache is not None:   # carnet consultable (auto-complétion) : même contenu dans la base locale
+            if deleted:
+                cache.contact_delete(rest)
+            else:
+                cache.contact_upsert(rest, v.get("name", ""), v.get("phone", ""), v.get("org", ""), v.get("notes", ""), source="manual")
 
 
 def describe(res: dict) -> str:
     names = {"acct": "compte(s)", "set": "réglage(s)", "secret": "clé IA", "rule": "règle(s)", "blocked": "blocage(s)",
-             "spam": "expéditeur(s) en spam", "search": "recherche(s)", "tpl": "modèle(s)"}
+             "spam": "expéditeur(s) en spam", "search": "recherche(s)", "tpl": "modèle(s)", "ident": "identité(s)", "contact": "contact(s)"}
     return ", ".join("%d %s" % (n, names.get(k, k)) for k, n in res.get("kinds", {}).items()) or "à jour"

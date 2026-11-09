@@ -17,7 +17,7 @@ for _v in ("4.1", "4.0"):
         WebKit2 = None
 HAS_WEBKIT = WebKit2 is not None
 
-from .util import (format_full, human_size, has_remote_content, block_remote_content,
+from .util import (attachment_kind, save_attachments, format_full, human_size, has_remote_content, block_remote_content,
                    text_to_html, split_addresses)
 from .widgets import Avatar, icon, icon_button
 
@@ -108,6 +108,7 @@ class Reader(Gtk.Stack):
         "action": (GObject.SignalFlags.RUN_FIRST, None, (str,)),
         "quick-reply": (GObject.SignalFlags.RUN_FIRST, None, (str,)),
         "ai-action": (GObject.SignalFlags.RUN_FIRST, None, (str, str)),   # (action, charge utile)
+        "open-message": (GObject.SignalFlags.RUN_FIRST, None, (str,)),    # identifiant d'un message de la conversation
     }
 
     def __init__(self, snooze_menu_factory):
@@ -258,6 +259,32 @@ class Reader(Gtk.Stack):
         self.att_flow.set_max_children_per_line(4)
         head.pack_start(self.att_flow, False, False, 0)
         page.pack_start(head, False, False, 0)
+        self.thread_exp = Gtk.Expander(label="Conversation")
+        self.thread_exp.set_margin_start(16)
+        self.thread_exp.set_margin_end(16)
+        self.thread_list = Gtk.ListBox()
+        self.thread_list.set_selection_mode(Gtk.SelectionMode.NONE)
+        self.thread_list.connect("row-activated", lambda lb, row: self.emit("open-message", row.mid))
+        self.thread_exp.add(self.thread_list)
+        self.thread_exp.set_no_show_all(True)
+        page.pack_start(self.thread_exp, False, False, 0)
+        self.invite_box = Gtk.Box(spacing=8)
+        self.invite_box.get_style_context().add_class("invite-box")
+        self.invite_box.set_margin_start(16)
+        self.invite_box.set_margin_end(16)
+        self.invite_lbl = Gtk.Label(xalign=0)
+        self.invite_lbl.set_line_wrap(True)
+        self.invite_box.pack_start(self.invite_lbl, True, True, 0)
+        self.invite_btns = []
+        for label, act in (("Accepter", "invite_accept"), ("Peut-être", "invite_tentative"), ("Refuser", "invite_decline"),
+                           ("Ajouter à l'agenda", "invite_add")):
+            b = Gtk.Button(label=label)
+            b.get_style_context().add_class("pill")
+            b.connect("clicked", lambda _b, a=act: self.emit("action", a))
+            self.invite_btns.append((act, b))
+            self.invite_box.pack_end(b, False, False, 0)
+        self.invite_box.set_no_show_all(True)
+        page.pack_start(self.invite_box, False, False, 0)
         page.pack_start(self._build_ai_card(), False, False, 0)
 
         self.banner = Gtk.Box(spacing=10)
@@ -313,6 +340,8 @@ class Reader(Gtk.Stack):
         self.ai_card.hide()
         self.back_btn.hide()
         self.banner.hide()
+        self.thread_exp.hide()
+        self.invite_box.hide()
         self.set_visible_child_name("empty")
 
     # -- adaptation à la largeur disponible
@@ -464,16 +493,14 @@ class Reader(Gtk.Stack):
         for ch in self.att_flow.get_children():
             self.att_flow.remove(ch)
         for a in msg.attachments:
-            b = Gtk.Button()
-            box = Gtk.Box(spacing=6)
-            box.pack_start(icon("mail-attachment-symbolic"), False, False, 0)
-            box.pack_start(Gtk.Label(label="%s (%s)" % (a["filename"], human_size(a["size"]))), False, False, 0)
-            b.add(box)
-            b.get_style_context().add_class("chip")
-            b.set_tooltip_text("Cliquer pour enregistrer")
-            b.connect("clicked", self._save_att, a)
-            self.att_flow.add(b)
+            self.att_flow.add(self._att_chip(a))
+        if len(msg.attachments) > 1:
+            allb = Gtk.Button(label="⬇ Tout enregistrer (%s)" % human_size(sum(a["size"] for a in msg.attachments)))
+            allb.get_style_context().add_class("pill")
+            allb.connect("clicked", self._save_all_att, list(msg.attachments))
+            self.att_flow.add(allb)
         self.att_flow.show_all()
+        self._show_invite(msg)
         remote = bool(msg.html) and has_remote_content(msg.html) and not self.load_images
         self.banner_lbl.set_visible(remote)
         for ch in self.banner.get_children():
@@ -494,6 +521,10 @@ class Reader(Gtk.Stack):
             self.quick.set_text("")
 
     def _unsub(self, *_):
+        if self.msg:
+            self.emit("action", "unsubscribe")
+
+    def _unsub_legacy(self, *_):
         if not self.msg:
             return
         m = re.search(r"<(https?://[^>]+)>", self.msg.unsubscribe or "")
@@ -502,6 +533,146 @@ class Reader(Gtk.Stack):
         uri = m.group(1) if m else None
         if uri:
             open_uri(self, uri)
+
+    # ------------------------------------------------------------ conversation
+    def show_thread(self, members, current_id):
+        """Liste des autres messages de la conversation (cliquables) ; masquée s'il n'y en a pas."""
+        for ch in self.thread_list.get_children():
+            self.thread_list.remove(ch)
+        others = [m for m in members if m.id != current_id]
+        self.thread_exp.set_visible(bool(others))
+        if not others:
+            return
+        self.thread_exp.set_label("Conversation · %d autre%s message%s" % (len(others), "s" if len(others) > 1 else "", "s" if len(others) > 1 else ""))
+        for m in reversed(others):
+            row = Gtk.ListBoxRow()
+            row.mid = m.id
+            box = Gtk.Box(spacing=10)
+            box.get_style_context().add_class("thread-row")
+            who = Gtk.Label(label=m.display_sender, xalign=0)
+            who.set_width_chars(18)
+            who.set_max_width_chars(18)
+            who.set_ellipsize(Pango.EllipsizeMode.END)
+            snip = Gtk.Label(label=m.snippet or m.subject, xalign=0)
+            snip.set_ellipsize(Pango.EllipsizeMode.END)
+            snip.get_style_context().add_class("dim")
+            when = Gtk.Label(label=format_full(m.date), xalign=1)
+            when.get_style_context().add_class("dim")
+            box.pack_start(who, False, False, 0)
+            box.pack_start(snip, True, True, 0)
+            box.pack_end(when, False, False, 0)
+            row.add(box)
+            self.thread_list.add(row)
+        self.thread_list.show_all()
+        self.thread_exp.show()
+
+    # ---------------------------------------------------------------- invitation
+    def _show_invite(self, msg):
+        inv = getattr(msg, "invite", None) or {}
+        if not inv:
+            self.invite_box.hide()
+            return
+        method = inv.get("method", "PUBLISH")
+        when = (inv.get("start") or "").replace("T", " à ")
+        text = "📅 <b>%s</b>\n%s%s" % (html.escape(inv.get("title") or "Événement"), html.escape(when),
+                                       (" · " + html.escape(inv["location"])) if inv.get("location") else "")
+        if method == "CANCEL":
+            text += "\n<i>Cet événement a été annulé par l'organisateur.</i>"
+        elif method == "REPLY":
+            text += "\n<i>Réponse à une invitation.</i>"
+        self.invite_lbl.set_markup(text)
+        can_reply = method == "REQUEST" and bool(inv.get("organizer"))
+        for act, b in self.invite_btns:
+            b.set_visible(can_reply if act != "invite_add" else method in ("REQUEST", "PUBLISH"))
+        self.invite_box.show()
+
+    # ----------------------------------------------------------- pièces jointes
+    def _att_chip(self, a):
+        """Pastille de pièce jointe : miniature (images), nom, taille ; clic = aperçu / ouverture, clic droit = menu,
+        glisser-déposer vers le gestionnaire de fichiers."""
+        b = Gtk.Button()
+        box = Gtk.Box(spacing=8)
+        kind = attachment_kind(a)
+        thumb = None
+        if kind == "image":
+            try:
+                from gi.repository import GdkPixbuf
+                thumb = Gtk.Image.new_from_pixbuf(GdkPixbuf.Pixbuf.new_from_file_at_size(a["path"], 44, 44))
+            except Exception:
+                thumb = None
+        if thumb is None:
+            name = {"image": "image-x-generic-symbolic", "text": "text-x-generic-symbolic", "pdf": "x-office-document-symbolic",
+                    "archive": "package-x-generic-symbolic"}.get(kind, "mail-attachment-symbolic")
+            thumb = icon(name)
+        box.pack_start(thumb, False, False, 0)
+        lab = Gtk.Label(label="%s\n%s" % (a["filename"], human_size(a["size"])), xalign=0)
+        lab.set_ellipsize(Pango.EllipsizeMode.MIDDLE)
+        lab.set_max_width_chars(28)
+        box.pack_start(lab, False, False, 0)
+        b.add(box)
+        b.get_style_context().add_class("chip")
+        b.set_tooltip_text("Cliquer pour ouvrir · clic droit : enregistrer, copier le chemin · glisser vers un dossier")
+        b.connect("clicked", lambda *_: self._open_att(a))
+        b.connect("button-press-event", lambda w, ev: self._att_menu(w, ev, a) if ev.button == 3 else False)
+        b.drag_source_set(Gdk.ModifierType.BUTTON1_MASK, [Gtk.TargetEntry.new("text/uri-list", 0, 0)], Gdk.DragAction.COPY)
+        b.connect("drag-data-get", lambda w, ctx, data, info, t: data.set_uris([Gio.File.new_for_path(a["path"]).get_uri()]))
+        return b
+
+    def _att_menu(self, w, ev, a):
+        menu = Gtk.Menu()
+        for label, fn in (("Ouvrir", lambda: self._open_att(a, preview=False)), ("Aperçu", lambda: self._open_att(a, preview=True)),
+                          ("Enregistrer sous…", lambda: self._save_att(None, a)),
+                          ("Copier le chemin", lambda: Gtk.Clipboard.get(Gdk.SELECTION_CLIPBOARD).set_text(a["path"], -1))):
+            mi = Gtk.MenuItem(label=label)
+            mi.connect("activate", lambda _i, f=fn: f())
+            menu.append(mi)
+        menu.show_all()
+        menu.popup_at_pointer(ev)
+        return True
+
+    def _open_att(self, a, preview=True):
+        kind = attachment_kind(a)
+        if preview and kind in ("image", "text"):
+            self._preview(a, kind)
+        else:
+            open_uri(self, Gio.File.new_for_path(a["path"]).get_uri())
+
+    def _preview(self, a, kind):
+        dlg = Gtk.Dialog(title=a["filename"], transient_for=self.get_toplevel(), modal=False)
+        dlg.set_default_size(820, 620)
+        area = dlg.get_content_area()
+        sw = Gtk.ScrolledWindow()
+        sw.set_hexpand(True)
+        sw.set_vexpand(True)
+        try:
+            if kind == "image":
+                from gi.repository import GdkPixbuf
+                sw.add(Gtk.Image.new_from_pixbuf(GdkPixbuf.Pixbuf.new_from_file_at_size(a["path"], 1600, 1600)))
+            else:
+                with open(a["path"], "rb") as f:
+                    txt = f.read(200_000).decode("utf-8", "replace")
+                tv = Gtk.TextView()
+                tv.set_editable(False)
+                tv.set_monospace(True)
+                tv.set_wrap_mode(Gtk.WrapMode.WORD_CHAR)
+                tv.get_buffer().set_text(txt)
+                sw.add(tv)
+        except Exception:
+            sw.add(Gtk.Label(label="Aperçu impossible : ouvrez le fichier avec « Ouvrir »."))
+        area.pack_start(sw, True, True, 0)
+        dlg.add_button("Ouvrir avec…", 1)
+        dlg.add_button("Fermer", Gtk.ResponseType.CLOSE)
+        dlg.connect("response", lambda d, r: (self._open_att(a, preview=False) if r == 1 else None, d.destroy() if r != 1 else None))
+        dlg.show_all()
+
+    def _save_all_att(self, _b, atts):
+        dlg = Gtk.FileChooserDialog(title="Enregistrer toutes les pièces jointes dans…", parent=self.get_toplevel(),
+                                    action=Gtk.FileChooserAction.SELECT_FOLDER)
+        dlg.add_buttons("Annuler", Gtk.ResponseType.CANCEL, "Enregistrer ici", Gtk.ResponseType.OK)
+        if dlg.run() == Gtk.ResponseType.OK:
+            done = save_attachments(atts, dlg.get_filename())
+            self.emit("ai-action", "toast", "%d fichier(s) enregistré(s) dans %s" % (len(done), dlg.get_filename()))
+        dlg.destroy()
 
     def _save_att(self, _b, att):
         dlg = Gtk.FileChooserDialog(title="Enregistrer la pièce jointe", parent=self.get_toplevel(),

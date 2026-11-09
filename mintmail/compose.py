@@ -8,7 +8,7 @@ import uuid
 
 import gi
 gi.require_version("Gtk", "3.0")
-from gi.repository import Gtk, GLib
+from gi.repository import Gdk, Gio, Gtk, GLib
 
 from .models import Message, Outgoing
 from .reader import WebKit2, HAS_WEBKIT, open_uri
@@ -175,7 +175,11 @@ class ComposeWindow(Gtk.Window):
         self.from_combo = Gtk.ComboBoxText()
         for a in accounts:
             self.from_combo.append(a["id"], "%s <%s>" % (a.get("name") or a["email"], a["email"]))
-        self.from_combo.set_active_id(account_id if account_id in [a["id"] for a in accounts] else accounts[0]["id"])
+            for i in win.config.get("identities", []):       # alias : même compte d'envoi, adresse et signature propres
+                if i.get("account") == a["id"]:
+                    self.from_combo.append("ident:" + i["id"], "%s <%s>  · alias" % (i.get("name") or i["email"], i["email"]))
+        ids = [a["id"] for a in accounts] + ["ident:" + i["id"] for i in win.config.get("identities", [])]
+        self.from_combo.set_active_id(account_id if account_id in ids else accounts[0]["id"])
         self.from_combo.connect("changed", self._account_changed)
         self.to = Gtk.Entry(text=to)
         self.cc = Gtk.Entry(text=cc)
@@ -270,6 +274,16 @@ class ComposeWindow(Gtk.Window):
         self.att_flow = Gtk.FlowBox()
         self.att_flow.set_selection_mode(Gtk.SelectionMode.NONE)
         root.pack_start(self.att_flow, False, False, 4)
+        self.att_total = Gtk.Label(xalign=0)
+        self.att_total.set_no_show_all(True)
+        root.pack_start(self.att_total, False, False, 0)
+        for target in (self, self.att_flow):      # glisser des fichiers depuis le gestionnaire de fichiers
+            try:
+                target.drag_dest_set(Gtk.DestDefaults.ALL, [], Gdk.DragAction.COPY)
+                target.drag_dest_add_uri_targets()
+                target.connect("drag-data-received", self._on_drop)
+            except Exception:
+                pass
         self.add(root)
         self.connect("delete-event", self._on_delete)
         self.show_all()
@@ -283,9 +297,15 @@ class ComposeWindow(Gtk.Window):
         (self.subject if to else self.to).grab_focus()
 
     # -- corps + signature
+    def _identity(self):
+        aid = self.from_combo.get_active_id() or ""
+        if aid.startswith("ident:"):
+            return next((i for i in self.win.config.get("identities", []) if "ident:" + i["id"] == aid), None)
+        return None
+
     def _signature(self):
-        acc = self._account()
-        sig = acc.get("signature_html", "") if acc else ""
+        acc, ident = self._account(), self._identity()
+        sig = (ident or {}).get("signature_html") or (acc.get("signature_html", "") if acc else "")
         return '<div id="sig">-- <br>%s</div>' % sig if sig.strip() else ""
 
     def _render_body(self):
@@ -299,7 +319,10 @@ class ComposeWindow(Gtk.Window):
         self.editor.set_html(content)
 
     def _account(self):
-        aid = self.from_combo.get_active_id()
+        aid = self.from_combo.get_active_id() or ""
+        ident = self._identity() if aid.startswith("ident:") else None
+        if ident:
+            aid = ident["account"]
         return next((a for a in self.accounts if a["id"] == aid), None)
 
     def _account_changed(self, *_):
@@ -433,7 +456,35 @@ class ComposeWindow(Gtk.Window):
             self._refresh_atts()
         dlg.destroy()
 
+    def _on_drop(self, widget, ctx, x, y, data, info, time_):
+        paths = []
+        for uri in data.get_uris() or []:
+            try:
+                p = Gio.File.new_for_uri(uri).get_path()
+            except Exception:
+                p = None
+            if p and os.path.isfile(p) and p not in self.attachments:
+                paths.append(p)
+        if paths:
+            self.attachments += paths
+            self._refresh_atts()
+        ctx.finish(bool(paths), False, time_)
+
     def _refresh_atts(self):
+        total = 0
+        for p in self.attachments:
+            try:
+                total += os.path.getsize(p)
+            except OSError:
+                pass
+        if self.attachments:
+            big = total > 20 * 1024 * 1024
+            self.att_total.set_markup("<span foreground='%s'>%d fichier(s) · %s%s</span>" % (
+                "#dc2626" if big else "#888888", len(self.attachments), human_size(total),
+                " — attention : la plupart des serveurs refusent plus de 20-25 Mo" if big else ""))
+            self.att_total.show()
+        else:
+            self.att_total.hide()
         for ch in self.att_flow.get_children():
             self.att_flow.remove(ch)
         for p in self.attachments:
@@ -526,7 +577,9 @@ class ComposeWindow(Gtk.Window):
                 return
 
         def go(body):
-            out = Outgoing(account=self.from_combo.get_active_id(), to=self.to.get_text().strip(),
+            ident = self._identity()
+            out = Outgoing(account=self._account()["id"], to=self.to.get_text().strip(),
+                           from_email=ident["email"] if ident else "", from_name=ident.get("name", "") if ident else "",
                            cc=self.cc.get_text().strip(), bcc=self.bcc.get_text().strip(),
                            subject=self.subject.get_text().strip() or "(Sans objet)", html=body,
                            attachments=list(self.attachments), in_reply_to=self.in_reply_to,

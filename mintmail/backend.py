@@ -14,13 +14,16 @@ import time
 import uuid
 from email import policy
 from email.message import EmailMessage
-from email.utils import make_msgid, parsedate_to_datetime, parseaddr, formatdate
+from email.utils import formataddr, make_msgid, parsedate_to_datetime, parseaddr, formatdate
 
 from .models import Message
 from .store import DATA_DIR
-from .util import html_to_text, split_addresses, text_to_html
+from . import ical, oauth
+from .util import html_to_text, split_addresses, text_to_html, thread_key
 
 PRESETS = {
+    "Gmail — connexion Google (OAuth, sans mot de passe)": dict(imap_host="imap.gmail.com", imap_port=993, smtp_host="smtp.gmail.com", smtp_port=587, oauth="google"),
+    "Outlook / Microsoft 365 — connexion Microsoft (OAuth)": dict(imap_host="outlook.office365.com", imap_port=993, smtp_host="smtp.office365.com", smtp_port=587, oauth="microsoft"),
     "Gmail (mot de passe d'application)": dict(imap_host="imap.gmail.com", imap_port=993, smtp_host="smtp.gmail.com", smtp_port=587),
     "Outlook / Microsoft 365": dict(imap_host="outlook.office365.com", imap_port=993, smtp_host="smtp.office365.com", smtp_port=587),
     "iCloud": dict(imap_host="imap.mail.me.com", imap_port=993, smtp_host="smtp.mail.me.com", smtp_port=587),
@@ -42,8 +45,16 @@ GUESS = {
 }
 
 
+def is_retryable(exc) -> bool:
+    """Problème de réseau passager (à rejouer) plutôt que refus définitif du serveur."""
+    return bool(getattr(exc, "retryable", False)) or isinstance(exc, (OSError, socket.timeout))
+
+
 class BackendError(Exception):
-    pass
+    """Erreur serveur. retryable=True : problème de réseau passager (l'action est conservée et rejouée plus tard)."""
+    def __init__(self, msg="", retryable=False):
+        super().__init__(msg)
+        self.retryable = retryable
 
 
 def utf7_decode(s):
@@ -165,6 +176,17 @@ def parse_message(raw, account, logical, real_folder, uid, flags):
                              "mime": part.get_content_type()})
             except OSError:
                 pass
+    message_id = str(em.get("Message-ID", "") or "")
+    references = str(em.get("References", "") or "") or str(em.get("In-Reply-To", "") or "")
+    invite = {}
+    for part in em.walk():
+        if part.get_content_type() == "text/calendar":
+            try:
+                invite = ical.parse_invite(part.get_content() if hasattr(part, "get_content") else "") or {}
+            except Exception:
+                invite = {}
+            if invite:
+                break
     return Message(
         id=mid, account=account, folder=logical, real_folder=real_folder, uid=uid,
         sender_name=name, sender_email=addr, to=str(em.get("To", "") or ""),
@@ -173,8 +195,35 @@ def parse_message(raw, account, logical, real_folder, uid, flags):
         text=text_body, html=html_body,
         unread=("\\seen" not in flags) and logical != "drafts",
         starred="\\flagged" in flags, category=classify(addr, em), attachments=atts,
-        message_id=str(em.get("Message-ID", "") or ""), references=str(em.get("References", "") or ""),
-        unsubscribe=str(em.get("List-Unsubscribe", "") or ""))
+        message_id=message_id, references=references, unsubscribe=str(em.get("List-Unsubscribe", "") or ""),
+        unsub_post="one-click" in str(em.get("List-Unsubscribe-Post", "") or "").lower(),
+        thread_id=thread_key(message_id, references, subject), invite=invite)
+
+
+def build_imap_search(text):
+    """Critères IMAP SEARCH depuis la syntaxe de recherche de MintMail (mots, from:, is:unread, is:starred, has:attachment)."""
+    from .store import parse_search
+    terms, flt = parse_search(text)
+    args, utf8 = [], [False]
+
+    def lit(s):
+        if not s.isascii():
+            utf8[0] = True
+            return s.encode("utf-8")
+        return '"%s"' % s.replace("\\", "\\\\").replace('"', '\\"')
+    if flt.get("unread"):
+        args.append("UNSEEN")
+    if flt.get("starred"):
+        args.append("FLAGGED")
+    if flt.get("from"):
+        args += ["FROM", lit(flt["from"])]
+    if flt.get("att"):
+        args += ["HEADER", "Content-Type", '"multipart/mixed"']
+    for t in terms:
+        args += ["TEXT", lit(t)]
+    if utf8[0]:
+        args = ["CHARSET", "UTF-8"] + args
+    return args or ["ALL"]
 
 
 UID_RE = re.compile(rb"UID (\d+)")
@@ -196,8 +245,9 @@ class _Conn:
 class IMAPBackend:
     demo = False
 
-    def __init__(self, account, password):
+    def __init__(self, account, password, token_provider=None):
         self.acc, self.password = account, password
+        self.token_provider = token_provider   # OAuth : fournit un jeton d'accès valide
         self._folders_cache = None
         self._conns = {"sync": _Conn(), "act": _Conn(), "meta": _Conn()}
         self._tree_cache = None
@@ -212,10 +262,17 @@ class IMAPBackend:
             else:
                 imap = imaplib.IMAP4(a["imap_host"], int(a["imap_port"]), timeout=30)
                 imap.starttls(ssl.create_default_context())
-            imap.login(a.get("username") or a["email"], self.password)
+            user = a.get("username") or a["email"]
+            if self.token_provider:
+                token = self.token_provider()
+                imap.authenticate("XOAUTH2", lambda _c: oauth.xoauth2(user, token).encode())
+            else:
+                imap.login(user, self.password)
             return imap
+        except oauth.OAuthError as e:
+            raise BackendError("Connexion OAuth : %s" % e)
         except Exception as e:
-            raise BackendError("Connexion IMAP impossible : %s" % e)
+            raise BackendError("Connexion IMAP impossible : %s" % e, retryable=isinstance(e, (OSError, imaplib.IMAP4.abort)))
 
     def _list_raw(self, imap):
         """Liste complète des dossiers : [{name, path, label, depth, delim, special, selectable}] (arborescence triée)."""
@@ -410,26 +467,51 @@ class IMAPBackend:
             msgs = []
             new = sorted((u for u in window if u not in known), reverse=True)
             for chunk in _chunks(new, 10):
-                typ, d = imap.uid("FETCH", ",".join(map(str, chunk)), "(UID FLAGS BODY.PEEK[])")
-                items, batch = list(d or []), []
-                for i, item in enumerate(items):
-                    if not isinstance(item, tuple):
-                        continue
-                    meta, raw = item[0], item[1]
-                    mu = UID_RE.search(meta)
-                    if not mu:
-                        continue
-                    fl = _flagset(meta)
-                    if not fl and i + 1 < len(items) and isinstance(items[i + 1], bytes):
-                        fl = _flagset(items[i + 1])
-                    try:
-                        batch.append(parse_message(raw, self.acc["id"], logical, real, int(mu.group(1)), fl))
-                    except Exception:
-                        continue
+                batch = self._fetch_batch(imap, chunk, logical, real)
                 msgs += batch
                 if on_batch and batch:
                     on_batch(batch)
             return msgs, flags, set(window), (window[0] if window else 0)
+        return self._run("sync", fn)
+
+    def _fetch_batch(self, imap, chunk, logical, real):
+        """Télécharge et analyse un lot de messages (UID)."""
+        typ, d = imap.uid("FETCH", ",".join(map(str, chunk)), "(UID FLAGS BODY.PEEK[])")
+        items, batch = list(d or []), []
+        for i, item in enumerate(items):
+            if not isinstance(item, tuple):
+                continue
+            meta, raw = item[0], item[1]
+            mu = UID_RE.search(meta)
+            if not mu:
+                continue
+            fl = _flagset(meta)
+            if not fl and i + 1 < len(items) and isinstance(items[i + 1], bytes):
+                fl = _flagset(items[i + 1])
+            try:
+                batch.append(parse_message(raw, self.acc["id"], logical, real, int(mu.group(1)), fl))
+            except Exception:
+                continue
+        return batch
+
+    def search_server(self, text, logicals, known_by_folder, limit=40):
+        """Recherche sur le SERVEUR (messages jamais téléchargés) ; retourne les messages trouvés (les plus récents d'abord)."""
+        crit = build_imap_search(text)
+
+        def fn(conn):
+            imap, found = conn.imap, []
+            for logical in logicals:
+                real = self._resolve(imap, logical)
+                if not real:
+                    continue
+                self._select(conn, real, readonly=True)
+                typ, data = imap.uid("SEARCH", *crit)
+                uids = [int(x) for x in data[0].split()] if data and data[0] else []
+                known = known_by_folder.get(logical, set())
+                new = [u for u in reversed(uids) if u not in known][:limit]
+                for chunk in _chunks(new, 10):
+                    found += self._fetch_batch(imap, chunk, logical, real)
+            return found
         return self._run("sync", fn)
 
     def set_flags(self, msg, seen=None, flagged=None):
@@ -567,23 +649,35 @@ class IMAPBackend:
         else:
             s = smtplib.SMTP(a["smtp_host"], port, timeout=30)
             s.starttls(context=ctx)
-        s.login(a.get("username") or a["email"], self.password)
+        user = a.get("username") or a["email"]
+        if self.token_provider:
+            s.ehlo()
+            code, resp = s.docmd("AUTH", "XOAUTH2 " + base64.b64encode(oauth.xoauth2(user, self.token_provider()).encode()).decode())
+            if code != 235:
+                raise smtplib.SMTPAuthenticationError(code, resp)
+        else:
+            s.login(user, self.password)
         return s
 
     def send(self, out):
         a = self.acc
         em = EmailMessage()
-        em["From"] = ("%s <%s>" % (a.get("name", ""), a["email"])) if a.get("name") else a["email"]
+        from_email = out.from_email or a["email"]
+        from_name = out.from_name if out.from_email else a.get("name", "")
+        em["From"] = formataddr((from_name, from_email)) if from_name else from_email
         em["To"], em["Subject"] = out.to, out.subject
         if out.cc:
             em["Cc"] = out.cc
         em["Date"] = formatdate(localtime=True)
-        em["Message-ID"] = make_msgid(domain=a["email"].split("@")[-1])
+        em["Message-ID"] = make_msgid(domain=from_email.split("@")[-1])
         if out.in_reply_to:
             em["In-Reply-To"] = out.in_reply_to
             em["References"] = (out.references + " " + out.in_reply_to).strip()
         em.set_content(out.text or html_to_text(out.html))
         em.add_alternative(out.html, subtype="html")
+        if out.ics:   # réponse à une invitation : partie text/calendar (Outlook, Google, Apple la reconnaissent)
+            em.add_attachment(out.ics.encode("utf-8"), maintype="text", subtype="calendar", filename="invite.ics",
+                              params={"method": out.ics_method or "REPLY", "charset": "UTF-8"})
         for path in out.attachments:
             ctype = mimetypes.guess_type(path)[0] or "application/octet-stream"
             mt, st = ctype.split("/", 1)
@@ -594,10 +688,14 @@ class IMAPBackend:
             raise BackendError("Aucun destinataire valide.")
         try:
             s = self._smtp()
-            s.send_message(em, to_addrs=rcpt)
+            s.send_message(em, from_addr=from_email, to_addrs=rcpt)
             s.quit()
-        except Exception as e:
-            raise BackendError("Envoi impossible : %s" % e)
+        except (smtplib.SMTPAuthenticationError, smtplib.SMTPRecipientsRefused, smtplib.SMTPSenderRefused, smtplib.SMTPDataError) as e:
+            raise BackendError("Envoi impossible : %s" % e)                       # refus définitif : inutile de réessayer
+        except oauth.OAuthError as e:
+            raise BackendError("Envoi impossible : %s" % e, retryable="connexion impossible" in str(e))
+        except (OSError, smtplib.SMTPException) as e:
+            raise BackendError("Envoi impossible : %s" % e, retryable=True)       # réseau : conservé et rejoué plus tard
         if "gmail" not in a.get("imap_host", ""):
             try:
                 imap = self._connect()
@@ -739,6 +837,9 @@ class DemoBackend:
     def move_many(self, msgs, dest):
         return None
 
+    def search_server(self, text, logicals, known_by_folder, limit=40):
+        return []
+
     def set_flags_many(self, msgs, seen=None, flagged=None):
         pass
 
@@ -761,6 +862,9 @@ class DemoBackend:
 def make_backend(account, config):
     if account.get("demo"):
         return DemoBackend(account)
+    if account.get("auth") == "oauth2":
+        tm = oauth.manager_for(config)
+        return IMAPBackend(account, "", token_provider=lambda: tm.access_token(account))
     return IMAPBackend(account, config.password(account["id"]))
 
 

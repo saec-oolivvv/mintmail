@@ -150,6 +150,9 @@ class AIMixin:
 
     def _on_ai_action(self, reader, act, payload):
         msg = reader.msg
+        if act == "toast":
+            self.toast.popup(payload, timeout=4)
+            return
         if msg is None and act != "enable_ai":
             return
         if act in ("analyze", "regen"):
@@ -232,11 +235,15 @@ class AIMixin:
         self.run_bg(work, done)
 
     # ------------------------------------------------ classement et menu clic droit IA
+    def _file_into(self, msgs, e):
+        self.move_messages(msgs, dest_of(e), label="rangé dans « %s »" % e["path"])
+        self._learn_move(msgs, dest_of(e), e["path"])
+
     def _apply_group(self, aid, folder, group):
-        self.ensure_folder(aid, folder, lambda e: self.move_messages(group, dest_of(e), label="rangé dans « %s »" % e["path"]))
+        self.ensure_folder(aid, folder, lambda e: self._file_into(group, e))
 
     def ai_file_message(self, msg, spec):
-        self.ensure_folder(msg.account, spec, lambda e: self.move_messages([msg], dest_of(e), label="rangé dans « %s »" % e["path"]))
+        self.ensure_folder(msg.account, spec, lambda e: self._file_into([msg], e))
 
     def ai_classify(self, msgs):
         """Classe des messages dans des dossiers (existants ou à créer). Propose, puis exécute seulement ce que vous validez."""
@@ -261,7 +268,7 @@ class AIMixin:
             out = {}
             for aid, lst in groups.items():
                 existing = [e["path"] for e in self.tree_of(aid) if e["selectable"] and not e["special"]]
-                out[aid] = self.engine.classify(lst, existing)
+                out[aid] = self.engine.classify(lst, existing, account=aid)
             return out
 
         def done(res, err):
@@ -333,7 +340,11 @@ class AIMixin:
         sug, who = ana.get("folder") or "", msg.sender_email
         key = who.lower()
         items = []
-        if sug:
+        habit = "" if sug else (self.cache.learn_best(msg.account, who) or "")      # ce que l'utilisateur fait déjà
+        if habit:
+            sug = habit
+            items.append(("✨ Ranger dans « %s » (selon vos habitudes)" % sug, lambda: self.ai_file_message(msg, sug)))
+        elif sug:
             items.append(("✨ Ranger dans « %s » (suggéré)" % sug, lambda: self.ai_file_message(msg, sug)))
         else:
             items.append(("✨ Suggérer un dossier…", lambda: self.ai_suggest_folder(msg)))
@@ -349,6 +360,8 @@ class AIMixin:
                    ("Proposer un autre créneau", "Propose un autre créneau."), ("Ton formel", "Réponds sur un ton formel."),
                    ("Ton amical", "Réponds sur un ton amical."), ("Très courte", "Réponds en une ou deux phrases.")]
         items.append(("sous-menu", "✨ Répondre avec l'IA", [(lab, lambda i=idea: self.ai_reply_with_ai(msg, i)) for lab, idea in replies]))
+        if getattr(msg, "thread_count", 1) > 1:
+            items.append(("✨ Résumer la conversation (%d messages)" % msg.thread_count, lambda: self.ai_summarize_thread(msg)))
         items.append(("✨ Résumer / analyser ce message", lambda: (self._focus_message(msg), self.ai_fetch(self._full(msg), force=True))))
         items.append(("✨ Traduire ce message", lambda: (self._focus_message(msg), self._on_ai_action(self.reader, "translate", ""))))
         if ana.get("event"):

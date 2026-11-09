@@ -66,6 +66,17 @@ def gestures_page(win):
     inv.connect("notify::active", inv_changed)
     grid.attach(Gtk.Label(label="Inverser le sens au pavé tactile", xalign=1), 0, 6, 1, 1)
     grid.attach(inv, 1, 6, 1, 1)
+    thr = Gtk.Switch()
+    thr.set_active(bool(cfg.get("threads", True)))
+    thr.set_halign(Gtk.Align.START)
+
+    def thr_changed(sw, _p):
+        cfg["threads"] = sw.get_active()
+        cfg.save()
+        win.reload_list(full=True)
+    thr.connect("notify::active", thr_changed)
+    grid.attach(Gtk.Label(label="Regrouper en conversations", xalign=1), 0, 7, 1, 1)
+    grid.attach(thr, 1, 7, 1, 1)
     return _scrolled(grid)
 
 

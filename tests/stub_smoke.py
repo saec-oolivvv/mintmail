@@ -205,4 +205,34 @@ win._init_sync(); assert win.sync_engine.can_run(); win.sync_engine.stop()
 cw = C.ComposeWindow.__new__(C.ComposeWindow)
 cw.__init__(win, win.accounts(), ai_suggested_text="Bonjour <script>alert(1)</script>\nMerci")
 assert "<script>" not in cw.initial_body and "&lt;script&gt;" in cw.initial_body
+
+# --- v1.8 : lecteur (conversation, invitation, pièces jointes), paramètres (OAuth, contacts, identités, agenda), identités
+att = {"filename": "photo.png", "path": "/tmp/inexistant.png", "size": 1234, "mime": "image/png"}
+inv = {"method": "REQUEST", "uid": "u1", "title": "Point", "start": "2026-11-12T14:00", "location": "Salle A", "organizer": "o@x.be", "raw": "x"}
+mm = Message(id="n1", account=acc["id"], folder="inbox", uid=1, sender_name="Orga", sender_email="o@x.be", to="moi@x.be",
+             subject="Invitation", date=time.time(), text="t", html="<p>t</p>", attachments=[att, dict(att, filename="b.txt")],
+             invite=inv, unsubscribe="<https://x.be/u>", unsub_post=True, thread_id="<t>")
+mm2 = Message(id="n2", account=acc["id"], folder="inbox", uid=2, sender_name="Orga", sender_email="o@x.be", subject="Re: Invitation",
+              date=time.time() - 60, text="t", thread_id="<t>")
+win.reader.show_message(mm, False)
+win.reader.show_thread([mm2, mm], mm.id); win.reader.show_thread([mm], mm.id)
+win.reader._show_invite(mm); win.reader._show_invite(Message(id="n3", account="a", folder="inbox", uid=3))
+win.reader._att_chip(att); win.reader._att_chip(dict(att, filename="a.zip"))
+for act in ("unsubscribe", "invite_add"):
+    win.reader.msg = mm
+win.cache.upsert_many([mm, mm2])
+win.reload_list(full=True)
+win._expand_threads([win.cache.query("inbox", threads=True)[0]])
+from mintmail import settings_more as SM
+SM.contacts_page(win); SM.identities_page(win); SM.calendar_page(win)
+sp2 = S.SettingsPage(win)
+acc1 = win.accounts()[0]
+win.config["identities"] = [{"id": "ident1", "account": acc1["id"], "name": "Pro", "email": "pro@x.be", "signature_html": "<b>Pro</b>"}]
+cw2 = C.ComposeWindow.__new__(C.ComposeWindow)
+cw2.__init__(win, win.accounts(), account_id="ident:ident1")
+assert cw2._identity()["email"] == "pro@x.be" and cw2._account()["id"] == acc1["id"] and "<b>Pro</b>" in cw2._signature()
+cw2.attachments = ["/tmp/inexistant"]; cw2._refresh_atts()
+win.contacts_refresh(); win.flush_ops(); win.update_offline_status()
+win._palette_commands()
+print("SMOKE 1.8 OK")
 print("SMOKE OK")
