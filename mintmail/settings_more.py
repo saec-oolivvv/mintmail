@@ -52,16 +52,26 @@ class OAuthMixin:
 
     def _oauth_client_dialog(self, provider):
         prov = oauth.PROVIDERS[provider]
-        cur = (self.cfg.get("oauth_clients") or {}).get(provider, {})
-        dlg = Gtk.Dialog(title="Identifiant client OAuth — %s" % prov["label"], transient_for=self.win, modal=True)
+        cur = oauth.client_for(self.cfg, provider)
+        dlg = Gtk.Dialog(title="Configurer %s — une seule fois" % prov["label"], transient_for=self.win, modal=True)
         dlg.add_buttons("Annuler", Gtk.ResponseType.CANCEL, "Enregistrer", Gtk.ResponseType.OK)
         box = dlg.get_content_area()
         box.set_border_width(16)
         box.set_spacing(8)
-        box.pack_start(_note("MintMail n'embarque pas d'identifiant commun : créez le vôtre (gratuit, 5 minutes) puis collez-le ici.\n\n"
-                             "Où : %s\n\nType : application de bureau / client public. URI de redirection : http://127.0.0.1 (ou http://localhost). "
-                             "Google : ajoutez votre adresse aux « utilisateurs test » tant que l'application n'est pas publiée." % prov["help"]),
-                       False, False, 0)
+        box.pack_start(_note("MintMail ne peut pas créer cet identifiant à votre place (Google exige que ce soit vous, connecté à votre compte). "
+                             "Suivez les étapes ci-dessous : chaque bouton ouvre la bonne page. Ensuite, collez l'ID client et le secret. "
+                             "C'est à faire UNE FOIS : le réglage se synchronise avec vos autres machines (ou voir l'aide F1 pour le déployer "
+                             "sur plusieurs postes)."), False, False, 0)
+        for i, (text, url) in enumerate(oauth.WIZARD.get(provider, []), 1):
+            row = Gtk.Box(spacing=8)
+            lab = Gtk.Label(label="%d. %s" % (i, text), xalign=0)
+            lab.set_line_wrap(True)
+            lab.set_max_width_chars(70)
+            btn = Gtk.Button(label="Ouvrir ↗")
+            btn.connect("clicked", lambda _b, u=url: Gio.AppInfo.launch_default_for_uri(u, None))
+            row.pack_start(lab, True, True, 0)
+            row.pack_start(btn, False, False, 0)
+            box.pack_start(row, False, False, 0)
         cid, secret = Gtk.Entry(), Gtk.Entry()
         cid.set_text(cur.get("client_id", ""))
         secret.set_text(cur.get("client_secret", ""))
@@ -83,10 +93,10 @@ class OAuthMixin:
         provider = self._oauth
         if not provider:
             return
-        client = (self.cfg.get("oauth_clients") or {}).get(provider, {})
+        client = oauth.client_for(self.cfg, provider)
         if not client.get("client_id") and not self._oauth_client_dialog(provider):
             return
-        client = (self.cfg.get("oauth_clients") or {}).get(provider, {})
+        client = oauth.client_for(self.cfg, provider)
         self._say("Connexion dans le navigateur… (3 minutes maximum)")
         self.oauth_btn.set_sensitive(False)
         hint = self.f_email.get_text().strip()
@@ -453,7 +463,7 @@ def _google_section(win):
 
     def do_auth(*_):
         acc = account()
-        client = (cfg.get("oauth_clients") or {}).get("google", {})
+        client = oauth.client_for(cfg, "google")
         if not acc:
             say("Ajoutez d'abord un compte Gmail avec le fournisseur « OAuth » (Paramètres → Comptes).", True)
             return

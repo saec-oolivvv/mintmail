@@ -165,3 +165,37 @@ def test_contacts_parsing_and_vcard_roundtrip():
     cs = contacts.parse_vcf(vcf)
     assert len(cs) == 1 and cs[0] == {"name": "Marie Dupont", "email": "marie@x.be", "phone": "+32 475 00 00 00", "org": "Alpha; SPRL", "notes": "VIP\nclient"}
     assert contacts.parse_vcf(contacts.to_vcf(cs)) == cs
+
+
+def test_preinstalled_oauth_clients_and_wizard():
+    p = os.path.join(tmp, "clients.json")
+    open(p, "w").write(json.dumps({"google": {"client_id": " GID ", "client_secret": "S"}, "evil": {"client_id": "x"},
+                                   "microsoft": {"client_id": 5}}))
+    assert oauth.default_clients(p) == {"google": {"client_id": "GID", "client_secret": "S"}}      # inconnus et mal formés ignorés
+    open(p, "w").write("pas du json")
+    assert oauth.default_clients(p) == {} and oauth.default_clients(os.path.join(tmp, "absent.json")) == {}
+    open(p, "w").write("[1, 2]")
+    assert oauth.default_clients(p) == {}
+    ok = os.path.join(tmp, "ok.json")
+    open(ok, "w").write(json.dumps({"google": {"client_id": "SYS", "client_secret": ""}}))
+    orig = oauth.SYSTEM_CLIENTS
+    oauth.SYSTEM_CLIENTS = ok
+    try:
+        c = Config(os.path.join(tmp, "cl.json"))
+        assert oauth.client_for(c, "google")["client_id"] == "SYS"                                   # aucun réglage : celui de la machine
+        c.data["oauth_clients"] = {"google": {"client_id": "MIEN", "client_secret": ""}}
+        assert oauth.client_for(c, "google")["client_id"] == "MIEN"                                  # la saisie de l'utilisateur l'emporte
+        assert oauth.client_for(c, "microsoft") == {}
+        calls = []
+        orig_refresh = oauth.refresh_access_token
+        oauth.refresh_access_token = lambda prov, cid, sec, rt: (calls.append(cid), {"access_token": "AT", "expires_in": 3600})[1]
+        try:
+            c.data["oauth_clients"] = {}
+            c.set_password("acc7", "RT")
+            assert oauth.TokenManager(c).access_token({"id": "acc7", "oauth_provider": "google"}) == "AT" and calls == ["SYS"]   # jetons sans aucune saisie
+        finally:
+            oauth.refresh_access_token = orig_refresh
+    finally:
+        oauth.SYSTEM_CLIENTS = orig
+    for prov, steps in oauth.WIZARD.items():
+        assert prov in oauth.PROVIDERS and len(steps) >= 2 and all(u.startswith("https://") and t for t, u in steps)

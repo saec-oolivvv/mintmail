@@ -40,6 +40,53 @@ class OAuthError(Exception):
     pass
 
 
+SYSTEM_CLIENTS = "/etc/mintmail/oauth-clients.json"
+
+# Assistant de configuration : étapes à faire UNE FOIS chez le fournisseur (libellé, adresse exacte à ouvrir)
+WIZARD: Dict[str, list] = {
+    "google": [
+        ("Créer un projet nommé « MintMail »", "https://console.cloud.google.com/projectcreate"),
+        ("Activer « Google Calendar API » (pour l'agenda ; facultatif pour le courrier seul)",
+         "https://console.cloud.google.com/apis/library/calendar-json.googleapis.com"),
+        ("Écran de consentement : type « Externe », nom « MintMail », votre e-mail ; ajoutez les portées https://mail.google.com/ et "
+         ".../auth/calendar.events ; ajoutez-vous comme utilisateur test ; puis « Publier l'application » (sinon le jeton expire après 7 jours)",
+         "https://console.cloud.google.com/apis/credentials/consent"),
+        ("Créer l'identifiant : type « Application de bureau », nom « MintMail », puis copier l'ID client et le secret",
+         "https://console.cloud.google.com/apis/credentials/oauthclient"),
+    ],
+    "microsoft": [
+        ("Nouvelle inscription : nom « MintMail », comptes de tous annuaires + comptes Microsoft personnels, URI de redirection de type "
+         "« Client public » : http://localhost",
+         "https://entra.microsoft.com/#view/Microsoft_AAD_RegisteredApps/CreateApplicationBlade/isMSAApp~/false"),
+        ("Autorisations d'API → Exchange Online : IMAP.AccessAsUser.All et SMTP.Send (+ offline_access), puis copier l'ID d'application (client)",
+         "https://entra.microsoft.com/#view/Microsoft_AAD_RegisteredApps/ApplicationsListBlade"),
+    ],
+}
+
+
+def default_clients(path: Optional[str] = None) -> Dict[str, Dict[str, str]]:
+    """Identifiants préinstallés pour tous les utilisateurs de la machine (/etc/mintmail/oauth-clients.json) : permet de
+    déployer MintMail sans que chacun ne configure Google ou Microsoft. Fichier invalide : ignoré."""
+    try:
+        with open(path or SYSTEM_CLIENTS, encoding="utf-8") as f:
+            data = json.load(f)
+    except (OSError, ValueError):
+        return {}
+    out = {}
+    if isinstance(data, dict):
+        for prov, c in data.items():
+            if (prov in PROVIDERS and isinstance(c, dict) and isinstance(c.get("client_id"), str) and c["client_id"].strip()
+                    and isinstance(c.get("client_secret", ""), str)):
+                out[prov] = {"client_id": c["client_id"].strip()[:300], "client_secret": c.get("client_secret", "").strip()[:300]}
+    return out
+
+
+def client_for(config, provider: str) -> Dict[str, str]:
+    """Identifiant client à utiliser : celui saisi par l'utilisateur (synchronisé entre ses machines), sinon celui de la machine."""
+    c = (config.get("oauth_clients") or {}).get(provider) or {}
+    return c if c.get("client_id") else default_clients().get(provider, {})
+
+
 def _b64url(b: bytes) -> str:
     return base64.urlsafe_b64encode(b).rstrip(b"=").decode()
 
@@ -190,7 +237,7 @@ class TokenManager:
             if tok and exp > time.time() + 60:
                 return tok
             provider = account.get("oauth_provider")
-            client = (self.config.get("oauth_clients") or {}).get(provider, {})
+            client = client_for(self.config, provider)
             rt = self.config.password(aid)
             if provider not in PROVIDERS or not client.get("client_id") or not rt:
                 raise OAuthError("connexion OAuth incomplète : reconnectez le compte (Paramètres → Comptes)")

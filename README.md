@@ -1,4 +1,4 @@
-# MintMail 1.9.0
+# MintMail 1.9.1
 
 Client mail moderne pour Linux Mint (Python / GTK3), inspiré de Spark Mail.
 
@@ -24,6 +24,10 @@ Dépendances (installées automatiquement via apt) : `python3-gi`, `gir1.2-gtk-3
 - Palette de commandes `Ctrl+K`, raccourcis clavier (voir Paramètres → Raccourcis), thème clair/sombre, couleur d'accent
 - Interface adaptative (panneau latéral escamotable, mode une colonne en fenêtre étroite), notifications de bureau, gestionnaire `mailto:`
 - Sans compte configuré : mode démonstration avec messages d'exemple
+
+## Nouveautés 1.9.1
+- **Assistant de configuration Google / Microsoft** : au premier « Se connecter », une fenêtre guide pas à pas avec un bouton « Ouvrir ↗ » par page de la console (projet, API Agenda, écran de consentement, identifiant). À faire **une seule fois** : l'identifiant se synchronise avec vos autres machines.
+- **Déploiement sans aucune saisie** : un fichier `/etc/mintmail/oauth-clients.json` (exemple : `/usr/share/doc/mintmail/oauth-clients.json.example`) est utilisé par tous les utilisateurs de la machine ; le paquet peut l'embarquer.
 
 ## Nouveautés 1.9.0
 - **Google Agenda** (compte Gmail connecté en OAuth) : les invitations acceptées et les rendez-vous détectés par l'IA sont ajoutés directement à votre agenda, **sans doublon** ; palette → « Agenda : prochains rendez-vous » (14 jours) et « Nouvel événement… » ; à l'ouverture d'une invitation, **alerte de conflit** ou « vous êtes libre sur ce créneau ». Mise en place : Paramètres → Agenda (Google / CalDAV) → « Autoriser Google Agenda » (activer aussi « Google Calendar API » dans la console Google Cloud). CalDAV reste disponible pour les autres agendas.

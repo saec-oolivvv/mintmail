@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.9.1
+- Assistant guidé de création de l'identifiant OAuth (liens exacts), identifiants préinstallables (/etc/mintmail/oauth-clients.json), aide mise à jour
+
 ## 1.9.0
 - Google Agenda : ajout sans doublon des invitations et rendez-vous IA, agenda des 14 jours, nouvel événement, alerte de conflit ; autorisation « calendar.events » ajoutée séparément à celle de Gmail
 - Aide mise à jour (Google Agenda, expiration à 7 jours du jeton en mode Test)
