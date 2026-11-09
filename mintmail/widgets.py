@@ -128,7 +128,9 @@ class MessageRow(Gtk.ListBoxRow):
         self.hover.set_margin_top(6)
         for act, ic, tip in (("archive", "folder-symbolic", "Archiver"), ("trash", "user-trash-symbolic", "Supprimer"),
                              ("snooze", "alarm-symbolic", "Reporter à demain"), ("star", "starred-symbolic", "Favori"),
-                             ("spam", "mail-mark-junk-symbolic", "Spam")):
+                             ("spam_menu", "mail-mark-junk-symbolic", "Spam : ce message, l'expéditeur ou tout le domaine…"),
+                             ("block_menu", "action-unavailable-symbolic", "Bloquer l'adresse ou le domaine…"),
+                             ("more_menu", "view-more-symbolic", "Plus d'actions…")):
             b = icon_button(ic, tip, relief=False)
             b.connect("clicked", lambda _b, a=act: GLib.idle_add(self._quick, a))   # différé : la ligne peut disparaître
             self.hover.pack_start(b, False, False, 0)

@@ -5,7 +5,8 @@ import time
 
 import gi
 gi.require_version("Gtk", "3.0")
-from gi.repository import Gtk, GLib
+gi.require_version("Gdk", "3.0")
+from gi.repository import Gtk, Gdk, GLib
 
 from .util import format_full
 from .widgets import MessageRow
@@ -263,7 +264,53 @@ class ListMixin:
                 self.reader_open = False
                 self._layout()
 
+    def sender_menu_items(self, kind, msg):
+        """Entrées (libellé, action) des menus Spam / Bloquer / Plus d'actions ; les libellés montrent l'adresse et le domaine."""
+        who = msg.sender_email
+        dom = "@" + who.split("@")[-1]
+        if kind == "spam":
+            return [("Signaler ce message comme spam", lambda: self.move_messages([msg], "spam")),
+                    ("Mettre %s en spam" % who, lambda: self.spam_sender(msg)),
+                    ("Mettre tout le domaine %s en spam" % dom, lambda: self.spam_sender(msg, True))]
+        if kind == "block":
+            items = [("Bloquer %s" % who, lambda: self.block_sender(msg)),
+                     ("Bloquer tout le domaine %s" % dom, lambda: self.block_sender(msg, True))]
+            if self.is_blocked(msg):
+                items.append(("Débloquer %s" % who, lambda: self.unblock(msg)))
+            return items
+        return [("Marquer comme %s" % ("lu" if msg.unread else "non lu"), lambda: self.set_unread([msg], not msg.unread)),
+                ("Désépingler" if msg.pinned else "Épingler", lambda: self.set_flag([msg], "pinned", not msg.pinned)),
+                ("Retirer des favoris" if msg.starred else "Ajouter aux favoris",
+                 lambda: self.set_flag([msg], "starred", not msg.starred)),
+                ("✨ Répondre avec l'IA", lambda: self.ai_reply_with_ai(msg)),
+                ("Voir tous les messages de %s" % who, lambda: self.show_from(msg)),
+                ("Copier l'adresse %s" % who, lambda: self.copy_text(who)),
+                ("Me rappeler si pas de réponse (3 jours)", lambda: self.add_followup(msg, 3))]
+
+    def sender_menu(self, kind, msg):
+        menu = Gtk.Menu()
+        for label, fn in self.sender_menu_items(kind, msg):
+            mi = Gtk.MenuItem(label=label)
+            mi.connect("activate", lambda _i, f=fn: f())
+            menu.append(mi)
+        if kind == "more":
+            sn = Gtk.MenuItem(label="Reporter")
+            sn.set_submenu(self.build_snooze_menu(lambda ts: self.snooze_msgs([msg], ts)))
+            menu.append(sn)
+            mv = Gtk.MenuItem(label="Déplacer vers un dossier")
+            mv.set_submenu(self.build_move_menu([msg]))
+            menu.append(mv)
+        menu.show_all()
+        return menu
+
+    def _row_menu(self, row, kind):
+        """Menu déroulant ouvert depuis un bouton de la barre d'actions d'une ligne."""
+        self.sender_menu(kind, row.msg).popup_at_widget(row.hover_ev, Gdk.Gravity.SOUTH_EAST, Gdk.Gravity.NORTH_EAST, None)
+
     def _on_swipe(self, row, action):
+        if action.endswith("_menu"):
+            self._row_menu(row, action[:-5])
+            return
         sel = [r.msg for r in self.listbox.get_selected_rows()] if (self.select_mode and row.is_selected()) else []
         msgs = sel if row.msg.id in {m.id for m in sel} else [row.msg]
         self.run_action(action, msgs)

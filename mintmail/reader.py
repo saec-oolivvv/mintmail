@@ -171,6 +171,16 @@ class Reader(Gtk.Stack):
             b = icon_button(name, tip, relief=False)
             b.connect("clicked", lambda _b, a=act: self.emit("action", a))
             tb.pack_start(b, False, False, 0)
+        self.spam_btn = Gtk.Button(label="Spam ▾")
+        self.spam_btn.set_tooltip_text("Spam : ce message, l'expéditeur ou tout le domaine")
+        self.spam_btn.get_style_context().add_class("pill")
+        self.spam_btn.connect("clicked", lambda *_: self.emit("action", "menu_spam"))
+        self.block_btn = Gtk.Button(label="Bloquer ▾")
+        self.block_btn.set_tooltip_text("Bloquer l'adresse ou tout le domaine")
+        self.block_btn.get_style_context().add_class("pill")
+        self.block_btn.connect("clicked", lambda *_: self.emit("action", "menu_block"))
+        tb.pack_start(self.spam_btn, False, False, 2)
+        tb.pack_start(self.block_btn, False, False, 2)
         self.move_btn = icon_button("folder-open-symbolic", "Déplacer vers un dossier (V)", relief=False)
         self.move_btn.connect("clicked", lambda *_: self.emit("action", "move_menu"))
         tb.pack_start(self.move_btn, False, False, 0)
@@ -195,7 +205,9 @@ class Reader(Gtk.Stack):
                       ("Épingler", "pin"), None,
                       ("Marquer comme non lu (U)", "unread"), ("Afficher les images distantes", "images"), None,
                       ("Signaler comme spam (!)", "spam"), ("Mettre l'expéditeur en spam", "spam_sender"),
-                      ("Bloquer l'expéditeur", "block"), ("Bloquer son domaine", "block_domain"), None,
+                      ("Mettre son domaine en spam", "spam_domain"),
+                      ("Bloquer l'expéditeur", "block"), ("Bloquer son domaine", "block_domain"),
+                      ("Débloquer l'expéditeur", "unblock"), None,
                       ("Voir tous ses messages", "from_sender"), ("Copier son adresse", "copy_addr"),
                       ("Me rappeler si pas de réponse — 3 jours", "followup_3"),
                       ("Me rappeler si pas de réponse — 7 jours", "followup_7"), None,

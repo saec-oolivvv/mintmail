@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.6.2
+- Barre d'actions des messages et barre du lecteur : boutons directs Spam ▾ / Bloquer ▾ (message, adresse ou domaine entier, débloquer) et menu ⋯ ; touche B
+
 ## 1.6.1
 - Correctif : la barre d'actions au survol d'un message clignotait et n'était pas utilisable (masquage différé, boutons surveillés)
 - Livraison sous forme de paquet .deb ; option --remove-local-install pour retirer l'ancienne installation locale

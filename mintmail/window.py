@@ -845,6 +845,14 @@ class MainWindow(ListMixin, AIMixin, FolderMixin, Gtk.ApplicationWindow):
             self.build_move_menu(msgs).popup_at_widget(reader.move_btn, Gdk.Gravity.SOUTH_WEST, Gdk.Gravity.NORTH_WEST, None)
         elif act == "spam_sender" and m:
             self.spam_sender(m)
+        elif act == "spam_domain" and m:
+            self.spam_sender(m, True)
+        elif act == "unblock" and m:
+            self.unblock(m)
+        elif act in ("menu_spam", "menu_block") and m:
+            btn = reader.spam_btn if act == "menu_spam" else reader.block_btn
+            self.sender_menu("spam" if act == "menu_spam" else "block", m).popup_at_widget(
+                btn, Gdk.Gravity.SOUTH_WEST, Gdk.Gravity.NORTH_WEST, None)
         elif act in ("block", "block_domain") and m:
             self.block_sender(m, act == "block_domain")
         elif act == "from_sender" and m:
@@ -915,6 +923,7 @@ class MainWindow(ListMixin, AIMixin, FolderMixin, Gtk.ApplicationWindow):
             "j": lambda: self._step(1), "k": lambda: self._step(-1),
             "slash": lambda: self.search_entry.grab_focus(),
             "v": lambda: self.build_move_menu(msgs).popup_at_pointer(None),
+            "b": lambda: m and self.sender_menu("block", m).popup_at_pointer(None),
             "exclam": lambda: self.move_messages(msgs, "spam"),
             "backslash": lambda: self.set_layout("columns" if self.config["layout"] == "list" else "list"),
             "x": lambda: self.sel_btn.set_active(not self.sel_btn.get_active()),

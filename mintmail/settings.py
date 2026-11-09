@@ -19,7 +19,7 @@ SHORTCUTS = [
     ("E", "Archiver"), ("# / Suppr", "Supprimer"), ("S", "Favori"), ("P", "Épingler"),
     ("U", "Marquer lu / non lu"), ("H", "Reporter à demain 8 h"), ("J / K", "Message suivant / précédent"),
     ("/  ou  Ctrl+F", "Rechercher"), ("Ctrl+K", "Palette de commandes"), ("Ctrl+A", "Tout sélectionner"),
-    ("!", "Signaler comme spam"), ("\\", "Basculer colonnes / liste seule"), ("X", "Mode sélection"),
+    ("!", "Signaler comme spam"), ("B", "Menu Bloquer (adresse / domaine)"), ("\\", "Basculer colonnes / liste seule"), ("X", "Mode sélection"),
     ("Ctrl+J", "Assistant IA"), ("F11", "Plein écran"), ("? … (recherche)", "Poser une question à l'IA"),
     ("Ctrl+,", "Ouvrir les paramètres"), ("Ctrl+R", "Actualiser"), ("Échap", "Annuler la sélection / la recherche"),
 ]

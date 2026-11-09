@@ -142,3 +142,39 @@ def test_unselected_removal_keeps_current_message():
     other = w.listbox.get_row_at_index(7).msg
     w.move_messages([other], "trash")                     # action « au survol » sur une autre ligne
     assert w.reader.msg.id == cur.msg.id and w.listbox.get_selected_row() is cur
+
+
+def test_sender_menus_block_and_spam_by_address_and_domain():
+    w = make_window(60)
+    w.reload_list(full=True)
+    msg = w.listbox.get_row_at_index(0).msg
+    who, dom = msg.sender_email, "@" + msg.sender_email.split("@")[-1]
+    items = w.sender_menu_items("spam", msg)
+    assert [lab for lab, _ in items] == ["Signaler ce message comme spam", "Mettre %s en spam" % who,
+                                         "Mettre tout le domaine %s en spam" % dom]
+    items[1][1]()                                                       # expéditeur en spam
+    assert who in w.config["spam_senders"] and w.cache.query("spam", limit=500)
+    assert all(m.sender_email != who for m in w.cache.query("inbox", limit=500))
+    items[2][1]()                                                       # tout le domaine en spam
+    assert dom in w.config["spam_senders"] and not w.cache.query("inbox", limit=500)
+    w2 = make_window(61)
+    w2.reload_list(full=True)
+    m2 = w2.listbox.get_row_at_index(0).msg
+    b = w2.sender_menu_items("block", m2)
+    assert b[0][0] == "Bloquer %s" % m2.sender_email and b[1][0].startswith("Bloquer tout le domaine @")
+    b[0][1]()
+    assert m2.sender_email in w2.config["blocked"] and w2.cache.query("trash", limit=500)
+    assert w2.sender_menu_items("block", m2)[-1][0] == "Débloquer %s" % m2.sender_email   # l'entrée de déblocage apparaît
+    more = [lab for lab, _ in w2.sender_menu_items("more", m2)]
+    assert any(l.startswith("Marquer comme") for l in more) and any("Copier l'adresse" in l for l in more)
+
+
+def test_row_buttons_open_menus():
+    w = make_window(30)
+    w.reload_list(full=True)
+    row = w.listbox.get_row_at_index(0)
+    opened = []
+    w._row_menu = lambda r, kind: opened.append((r.msg.id, kind))
+    for act in ("spam_menu", "block_menu", "more_menu"):
+        w._on_swipe(row, act)
+    assert opened == [(row.msg.id, "spam"), (row.msg.id, "block"), (row.msg.id, "more")]
