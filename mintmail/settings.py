@@ -11,7 +11,7 @@ from .reader import WebKit2, HAS_WEBKIT
 from .settings_extra import (gestures_page, filters_page, templates_page,
                               p2p_page, help_page)
 from .widgets import icon
-from .style import ACCENTS
+from .style import ACCENTS, STYLES
 from .ai_service import AIService, DEFAULT_API_BASE, DEFAULT_MODEL
 
 SHORTCUTS = [
@@ -364,6 +364,16 @@ class SettingsPage(Gtk.Box):
     def _appearance_page(self):
         grid = Gtk.Grid(column_spacing=12, row_spacing=10)
         grid.set_border_width(18)
+        stylec = Gtk.ComboBoxText()
+        for k, v in STYLES.items():
+            stylec.append(k, v["label"])
+        stylec.set_active_id(self.cfg["style"])
+
+        def style_changed(c):
+            k = c.get_active_id()
+            self.cfg["accent"] = STYLES[k]["accent"]   # chaque style a sa couleur signature (modifiable ensuite)
+            self._set("style", k)
+        stylec.connect("changed", style_changed)
         theme = Gtk.ComboBoxText()
         for k, v in (("system", "Système"), ("light", "Clair"), ("dark", "Sombre")):
             theme.append(k, v)
@@ -391,7 +401,7 @@ class SettingsPage(Gtk.Box):
         undo = Gtk.SpinButton.new_with_range(3, 30, 1)
         undo.set_value(self.cfg["undo_seconds"])
         undo.connect("value-changed", lambda s: self._set("undo_seconds", int(s.get_value())))
-        for i, (lab, w) in enumerate((("Thème", theme), ("Densité de la liste", dens), ("Couleur d'accent", color),
+        for i, (lab, w) in enumerate((("Style visuel", stylec), ("Mode", theme), ("Densité de la liste", dens), ("Couleur d'accent", color),
                                       ("Charger les images distantes", imgs), ("Notifications de bureau", notif),
                                       ("Actualiser toutes les (min)", refresh), ("Délai d'annulation d'envoi (s)", undo))):
             l = Gtk.Label(label=lab, xalign=1)
@@ -406,16 +416,16 @@ class SettingsPage(Gtk.Box):
             b.get_style_context().add_class("pill")
             b.connect("clicked", lambda _b, h=hexcol: (self._set("accent", h), color.set_rgba(self._rgba(h))))
             swatches.add(b)
-        grid.attach(Gtk.Label(label="Couleurs prédéfinies", xalign=1), 0, 7, 1, 1)
-        grid.attach(swatches, 1, 7, 1, 1)
+        grid.attach(Gtk.Label(label="Couleurs prédéfinies", xalign=1), 0, 8, 1, 1)
+        grid.attach(swatches, 1, 8, 1, 1)
         clear = Gtk.Button(label="Vider le cache des messages")
         clear.set_halign(Gtk.Align.START)
         clear.connect("clicked", self._clear_cache)
         reset = Gtk.Button(label="Rétablir l'apparence et la disposition par défaut")
         reset.set_halign(Gtk.Align.START)
         reset.connect("clicked", self._reset_look)
-        grid.attach(clear, 1, 8, 1, 1)
-        grid.attach(reset, 1, 9, 1, 1)
+        grid.attach(clear, 1, 9, 1, 1)
+        grid.attach(reset, 1, 10, 1, 1)
         return grid
 
     def _clear_cache(self, *_):
@@ -433,7 +443,7 @@ class SettingsPage(Gtk.Box):
         d.destroy()
         if not ok:
             return
-        self.cfg.reset(["theme", "accent", "density", "load_images", "notifications", "refresh_minutes",
+        self.cfg.reset(["theme", "style", "accent", "density", "load_images", "notifications", "refresh_minutes",
                         "undo_seconds", "layout", "pos_cols", "pos_bottom", "side_width", "zoom",
                         "swipe", "swipe_invert"])
         self.cfg.save()
@@ -455,7 +465,7 @@ class SettingsPage(Gtk.Box):
     def _set(self, key, val):
         self.cfg[key] = val
         self.cfg.save()
-        if key in ("theme", "accent", "density", "load_images"):   # les autres réglages n'exigent pas de rafraîchir l'interface
+        if key in ("theme", "style", "accent", "density", "load_images"):   # les autres réglages n'exigent pas de rafraîchir l'interface
             self.win.apply_settings()
 
     def _ai_page(self):

@@ -139,6 +139,14 @@ def test_nl_search_and_digest_cache():
     assert eng2.digest(ms) == t and len(eng2.calls) == n
 
 
+def test_move_action_is_validated():
+    plan = E.validate_plan({"actions": [{"type": "move", "query": "from:alpha", "folder": "Clients/Alpha"},
+                                        {"type": "move", "query": "x"},                    # sans dossier : ignorée
+                                        {"type": "move", "query": "y", "folder": "F" * 500}]})
+    assert [a["type"] for a in plan["actions"]] == ["move", "move"] and len(plan["actions"][1]["folder"]) == 120
+    assert "Clients/Alpha" in E.describe_action(plan["actions"][0], 3) and "3 messages" in E.describe_action(plan["actions"][0], 3)
+
+
 def _isolated(fn):
     def run():
         try:
@@ -151,3 +159,4 @@ def _isolated(fn):
 
 for _n in [n for n in list(globals()) if n.startswith("test_")]:
     globals()[_n] = _isolated(globals()[_n])
+

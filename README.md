@@ -1,10 +1,10 @@
-# MintMail 1.4.0
+# MintMail 1.5.0
 
 Client mail moderne pour Linux Mint (Python / GTK3), inspiré de Spark Mail.
 
 ## Installation / mise à jour
 ```bash
-unzip mintmail-1.4.0.zip && cd mintmail-1.4.0
+unzip mintmail-1.5.0.zip && cd mintmail-1.5.0
 ./install.sh            # pour l'utilisateur courant (~/.local) — si « Permission denied » : bash install.sh
 ./install.sh --system   # pour tous les utilisateurs (/opt, sudo)
 ```
@@ -24,6 +24,15 @@ Dépendances (installées automatiquement via apt) : `python3-gi`, `gir1.2-gtk-3
 - Palette de commandes `Ctrl+K`, raccourcis clavier (voir Paramètres → Raccourcis), thème clair/sombre, couleur d'accent
 - Interface adaptative (panneau latéral escamotable, mode une colonne en fenêtre étroite), notifications de bureau, gestionnaire `mailto:`
 - Sans compte configuré : mode démonstration avec messages d'exemple
+
+## Nouveautés 1.5.0 — tous vos dossiers, une identité visuelle à part
+- **Tous les dossiers de chaque boîte** dans la barre latérale : arborescence complète (sous-dossiers repliables, dossiers « parents » comme `[Gmail]`, accents décodés), compteurs de non lus par dossier, un compte = un groupe repliable
+- **Navigation partout** : clic sur n'importe quel dossier (synchronisation à l'ouverture, chargement des anciens messages en bas de liste), `Ctrl+K` → « Aller au dossier : … »
+- **Déplacer vers un dossier** : bouton du lecteur, clic droit, touche `V`, palette (« Déplacer vers un dossier… ») et assistant IA (« range mes factures dans Factures »)
+- **Gérer les dossiers** (clic droit) : créer, sous-dossier, renommer, supprimer, actualiser
+- **Trois identités visuelles** (Paramètres → Apparence → Style visuel), chacune en clair et en sombre :
+  **Aurora** (verre dépoli sur dégradé nuit, lueurs de l'IA), **Papier** (éditorial : encre sur papier chaud, titres en empattement, filets fins), **Terminal** (monospace, angles droits, vert phosphore)
+- **Structure inédite** : pastilles de comptes, rail de priorité coloré sur chaque message, barre d'outils flottante, filet dégradé, compteurs de liste
 
 ## Nouveautés 1.4.0 — l'IA au cœur de l'application
 - **Assistant IA** (`Ctrl+J`) : panneau de conversation qui comprend votre boîte et propose des actions (archiver, spam, blocage, règles, brouillons, réglages…). Rien ne s'exécute sans votre clic.

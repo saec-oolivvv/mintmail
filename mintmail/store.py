@@ -16,6 +16,7 @@ DEFAULTS = {
     "accounts": [], "passwords": {}, "theme": "system", "accent": "#1a73ff",
     "density": "comfortable", "load_images": False, "notifications": True,
     "refresh_minutes": 5, "undo_seconds": 6, "width": 1280, "height": 800,
+    "folders": {}, "collapsed_folders": [], "style": "aurora", "design_v2": False,
     "last_view": "inbox", "layout": "columns", "pos_cols": 420, "pos_bottom": 300,
     "side_width": 230, "zoom": 1.0,
     "swipe": {"right": "archive", "right_long": "trash", "left": "snooze", "left_long": "read"},
@@ -51,6 +52,8 @@ class Config:
             pass
         if self.data.get("p2p_enabled") and len(str(self.data.get("p2p_secret") or "")) < 8:
             self.data["p2p_enabled"] = False   # jamais de synchro ouverte sans code de jumelage
+        if not self.data.get("design_v2"):   # refonte 1.5 : nouvelle identité visuelle par défaut, une seule fois
+            self.data.update(style="aurora", theme="dark", accent="#7c8cff", design_v2=True)
         if self.data.get("accent") == "#3b82f6":   # ancien bleu par défaut
             self.data["accent"] = DEFAULTS["accent"]
 
@@ -282,6 +285,11 @@ class Cache:
             for i in range(0, len(ids), 500):
                 chunk = ids[i:i + 500]
                 self.db.execute("DELETE FROM messages WHERE id IN (%s)" % ",".join("?" * len(chunk)), chunk)
+            self.db.commit()
+
+    def delete_folder(self, account, folder):
+        with self.lock:
+            self.db.execute("DELETE FROM messages WHERE account=? AND folder=?", (account, folder))
             self.db.commit()
 
     def delete_account(self, account):

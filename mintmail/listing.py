@@ -66,6 +66,9 @@ class ListMixin:
         self.empty_lbl.set_text("Aucun résultat" if self._effective_search() else "Aucun message ici — profitez-en 🎉")
         self._sync_reader()
         self.refresh_digest_visibility()
+        unread = sum(1 for r in self.rows.values() if r.msg.unread)
+        n = len(self.rows)
+        self.count_lbl.set_text("%d message%s · %d non lu%s" % (n, "s" if n > 1 else "", unread, "s" if unread > 1 else ""))
 
     def _sync_reader(self):
         """Aligne le lecteur sur la sélection après une mise à jour de la liste."""
@@ -84,9 +87,13 @@ class ListMixin:
 
     def _on_edge(self, sw, pos):
         """Défilement jusqu'en bas : charge les messages suivants."""
-        if pos == Gtk.PositionType.BOTTOM and len(self.rows) >= self._limit:
+        if pos != Gtk.PositionType.BOTTOM:
+            return
+        if len(self.rows) >= self._limit:
             self._limit += PAGE
             self.reload_list()
+        else:
+            self.load_older()
 
     # ---------------------------------------------------------------- sélection
     def selected_msgs(self):
@@ -200,6 +207,9 @@ class ListMixin:
         sn = Gtk.MenuItem(label="Reporter")
         sn.set_submenu(self.build_snooze_menu())
         menu.append(sn)
+        mv = Gtk.MenuItem(label="Déplacer vers un dossier")
+        mv.set_submenu(self.build_move_menu(self.selected_msgs()))
+        menu.append(mv)
         menu.show_all()
         menu.popup_at_pointer(ev)
         return True
@@ -325,7 +335,7 @@ class ListMixin:
             setattr(self.reader.msg, field, value)
             self.reader.refresh_flags()
 
-    def move_messages(self, msgs, dest):
+    def move_messages(self, msgs, dest, label=None):
         if not msgs:
             return
         if dest == "trash" and all(m.folder == "trash" for m in msgs):
@@ -372,7 +382,8 @@ class ListMixin:
             self._pending -= 1
             self._bg_move(msgs, dest)
         n = len(msgs)
-        self.toast.popup("%d message%s %s%s" % (n, "s" if n > 1 else "", FOLDER_VERBS[dest], "s" if n > 1 else ""),
+        verb = label or FOLDER_VERBS.get(dest, "déplacé")
+        self.toast.popup("%d message%s %s%s" % (n, "s" if n > 1 else "", verb, "s" if n > 1 and not label else ""),
                          "Annuler", undo, timeout=self.config["undo_seconds"], on_expire=commit)
 
     def snooze_selected(self, ts):

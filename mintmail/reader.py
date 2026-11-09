@@ -34,7 +34,10 @@ def open_uri(widget, uri):
             pass
 
 
-def wrap_html(msg, load_images, dark):
+PLAIN_FONT = {"aurora": "system-ui,sans-serif", "papier": "Georgia,'DejaVu Serif',serif", "terminal": "'DejaVu Sans Mono',monospace"}
+
+
+def wrap_html(msg, load_images, dark, style="aurora"):
     body = msg.html
     if body:
         if not load_images:
@@ -47,9 +50,9 @@ def wrap_html(msg, load_images, dark):
                 '</style></head><body>%s</body></html>' % body)
     bg, fg = ("#1f2229", "#e8eaed") if dark else ("#ffffff", "#1f2328")
     return ('<html><head><meta charset="utf-8"><style>html{background:%s;color:%s}body{margin:0;'
-            'padding:18px 22px;font-family:system-ui,sans-serif;font-size:14px;line-height:1.55}'
+            'padding:18px 22px;font-family:%s;font-size:14px;line-height:1.6}'
             'a{color:#3b82f6}</style></head><body>%s</body></html>'
-            % (bg, fg, text_to_html(msg.text or "")))
+            % (bg, fg, PLAIN_FONT.get(style, PLAIN_FONT["aurora"]), text_to_html(msg.text or "")))
 
 
 class BodyView(Gtk.Box):
@@ -83,9 +86,9 @@ class BodyView(Gtk.Box):
                 return True
         return False
 
-    def show_message(self, msg, load_images, dark):
+    def show_message(self, msg, load_images, dark, style="aurora"):
         if self.web:
-            self.web.load_html(wrap_html(msg, load_images, dark), "about:blank")
+            self.web.load_html(wrap_html(msg, load_images, dark, style), "about:blank")
         else:
             self.tv.get_buffer().set_text(msg.text or "")
 
@@ -111,7 +114,7 @@ class Reader(Gtk.Stack):
         super().__init__()
         self.msg, self.dark, self.load_images = None, False, False
         self.secondary, self.zoom, self._wide = [], 1.0, True
-        self.ai_enabled, self._ai_hidden = False, False
+        self.ai_enabled, self._ai_hidden, self.style = False, False, "aurora"
         self._snooze_factory = snooze_menu_factory
         self.get_style_context().add_class("mm-reader")
 
@@ -168,6 +171,9 @@ class Reader(Gtk.Stack):
             b = icon_button(name, tip, relief=False)
             b.connect("clicked", lambda _b, a=act: self.emit("action", a))
             tb.pack_start(b, False, False, 0)
+        self.move_btn = icon_button("folder-open-symbolic", "Déplacer vers un dossier (V)", relief=False)
+        self.move_btn.connect("clicked", lambda *_: self.emit("action", "move_menu"))
+        tb.pack_start(self.move_btn, False, False, 0)
         self.snooze_btn = Gtk.MenuButton()
         self.snooze_btn.set_image(icon("alarm-symbolic", Gtk.IconSize.LARGE_TOOLBAR))
         self.snooze_btn.set_tooltip_text("Reporter")
@@ -543,7 +549,7 @@ class Reader(Gtk.Stack):
         self.banner.set_visible(remote or bool(msg.unsubscribe))
         self.ai_reply_btn.set_visible(self.ai_enabled)
         self.quick_ai.set_visible(self.ai_enabled)
-        self.body.show_message(msg, self.load_images, self.dark)
+        self.body.show_message(msg, self.load_images, self.dark, self.style)
         self.quick.set_text("")
         self.set_visible_child_name("message")
 

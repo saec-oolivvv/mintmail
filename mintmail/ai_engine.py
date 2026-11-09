@@ -27,7 +27,7 @@ REWRITE = {
 }
 RULE_FIELDS = {"from", "subject", "to"}
 RULE_ACTIONS = {"archive", "trash", "spam", "read", "star", "pin"}
-QUERY_ACTIONS = {"search", "archive", "trash", "spam", "mark_read", "mark_unread", "star", "pin", "snooze"}
+QUERY_ACTIONS = {"search", "archive", "trash", "spam", "mark_read", "mark_unread", "star", "pin", "snooze", "move"}
 SETTINGS_PAGES = {"accounts", "sig", "look", "ai", "p2p", "gestures", "filters", "templates", "keys", "help"}
 SUSPECT_WORDS = ("vérifier votre compte", "verify your account", "mot de passe expir", "password expire",
                  "gagné", "you have won", "bitcoin", "crypto", "colis en attente", "virement", "urgent action",
@@ -154,6 +154,10 @@ def validate_plan(obj: Any) -> Dict[str, Any]:
                 act["until"] = a.get("until") if a.get("until") in ("3h", "tomorrow", "weekend", "nextweek") else "tomorrow"
             if t == "search" and not act["query"]:
                 continue
+            if t == "move":
+                act["folder"] = _s(a.get("folder"), 120)
+                if not act["folder"]:
+                    continue
             plan["actions"].append(act)
         elif t in ("block_sender", "spam_sender"):
             em = _s(a.get("email"), 200).lower()
@@ -181,7 +185,7 @@ def describe_action(a: Dict[str, Any], count: Optional[int] = None) -> str:
     labels = {"search": "Rechercher « %s »" % a.get("query", ""), "archive": "Archiver" + n, "trash": "Supprimer" + n,
               "spam": "Signaler comme spam" + n, "mark_read": "Marquer comme lu" + n,
               "mark_unread": "Marquer comme non lu" + n, "star": "Ajouter aux favoris" + n,
-              "pin": "Épingler" + n, "snooze": "Reporter (%s)%s" % (a.get("until", "demain"), n),
+              "pin": "Épingler" + n, "move": "Déplacer vers « %s »%s" % (a.get("folder", ""), n), "snooze": "Reporter (%s)%s" % (a.get("until", "demain"), n),
               "block_sender": "Bloquer %s" % (a.get("email") or "l'expéditeur sélectionné"),
               "spam_sender": "Mettre %s en spam" % (a.get("email") or "l'expéditeur sélectionné"),
               "compose": "Rédiger un message à %s" % (a.get("to") or "…"),
@@ -382,7 +386,7 @@ class AIEngine:
         system = (
             "Tu es l'assistant intégré d'un client de messagerie. Réponds UNIQUEMENT par un objet JSON "
             "{\"reply\": texte court en %s, \"actions\": [...]}. Actions possibles : "
-            "{type:search|archive|trash|spam|mark_read|mark_unread|star|pin, query}, {type:snooze, query, until:3h|tomorrow|weekend|nextweek}, "
+            "{type:search|archive|trash|spam|mark_read|mark_unread|star|pin, query}, {type:move, query, folder:nom d'un dossier existant}, {type:snooze, query, until:3h|tomorrow|weekend|nextweek}, "
             "{type:block_sender|spam_sender, email ou target:\"selected\"}, {type:compose, to, subject, body}, "
             "{type:create_rule, field:from|subject|to, text, action:archive|trash|spam|read|star|pin}, "
             "{type:open_settings, page}, {type:digest}. %s N'invente pas d'adresses. Si la demande est une question, "

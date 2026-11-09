@@ -10,6 +10,7 @@ from gi.repository import Gtk, Gio, GLib
 
 from .ai_engine import AIEngine, describe_action, local_analysis, make_ics
 from .assistant import AssistantPanel
+from .folders import dest_of
 from .util import text_to_html, normalize_subject
 
 
@@ -289,6 +290,9 @@ class AIMixin:
             tri = self.cache.ai_get(m.id, "triage") or {}
             lines.append("Message ouvert : de %s <%s>, objet « %s » — %s" % (
                 m.sender_name, m.sender_email, m.subject[:100], (tri.get("summary") or m.snippet)[:160]))
+        names = [e["path"] for a in self.accounts() for e in self.tree_of(a["id"]) if e["selectable"]][:40]
+        if names:
+            lines.append("Dossiers existants : " + " ; ".join(names))
         if self.config.get("ai_privacy", "full") == "full":
             unread = self.cache.query("unread", self.account, limit=20)
             if unread:
@@ -334,7 +338,7 @@ class AIMixin:
         items = []
         for a in plan["actions"]:
             msgs = self._resolve(a) if a["type"] in ("archive", "trash", "spam", "mark_read", "mark_unread", "star",
-                                                     "pin", "snooze") else None
+                                                     "pin", "snooze", "move") else None
             if msgs is not None and not msgs:
                 items.append(("%s — aucun message concerné" % describe_action(a), lambda: None))
                 continue
@@ -348,6 +352,12 @@ class AIMixin:
             self.search_entry.set_text(a["query"])
         elif t in ("archive", "trash", "spam"):
             self.move_messages(msgs, t)
+        elif t == "move":
+            found = self.find_folder(a["folder"], msgs[0].account if msgs else self.account)
+            if not found:
+                self.toast.popup("Dossier « %s » introuvable" % a["folder"], timeout=4)
+            else:
+                self.move_messages(msgs, dest_of(found[1]), label="déplacé vers « %s »" % found[1]["path"])
         elif t in ("mark_read", "mark_unread"):
             self.set_unread(msgs, t == "mark_unread")
         elif t in ("star", "pin"):

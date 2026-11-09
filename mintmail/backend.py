@@ -46,6 +46,55 @@ class BackendError(Exception):
     pass
 
 
+def utf7_decode(s):
+    """Décode un nom de dossier IMAP (UTF-7 modifié, RFC 3501) : « &AOk-t&AOk- » -> « été »."""
+    out, i = [], 0
+    while i < len(s):
+        if s[i] != "&":
+            out.append(s[i])
+            i += 1
+            continue
+        j = s.find("-", i)
+        if j == -1:
+            out.append(s[i:])
+            break
+        chunk = s[i + 1:j]
+        if not chunk:
+            out.append("&")
+        else:
+            b64 = chunk.replace(",", "/")
+            b64 += "=" * (-len(b64) % 4)
+            try:
+                out.append(base64.b64decode(b64).decode("utf-16-be"))
+            except Exception:
+                out.append(s[i:j + 1])
+        i = j + 1
+    return "".join(out)
+
+
+def utf7_encode(s):
+    out, buf = [], ""
+
+    def flush():
+        nonlocal buf
+        if buf:
+            b = base64.b64encode(buf.encode("utf-16-be")).decode().rstrip("=").replace("/", ",")
+            out.append("&" + b + "-")
+            buf = ""
+    for ch in s:
+        if 0x20 <= ord(ch) <= 0x7E:
+            flush()
+            out.append("&-" if ch == "&" else ch)
+        else:
+            buf += ch
+    flush()
+    return "".join(out)
+
+
+LIST_RE = re.compile(rb'\((?P<f>[^)]*)\)\s+(?P<d>"(?:[^"\\]|\\.)*"|NIL)\s+(?P<n>.+)')
+TOP_RANK = {"inbox": 0, "drafts": 1, "sent": 2, "archive": 3, "spam": 4, "trash": 5}
+
+
 def _q(name):
     return '"' + name.replace("\\", "\\\\").replace('"', '\\"') + '"'
 
@@ -150,7 +199,8 @@ class IMAPBackend:
     def __init__(self, account, password):
         self.acc, self.password = account, password
         self._folders_cache = None
-        self._conns = {"sync": _Conn(), "act": _Conn()}
+        self._conns = {"sync": _Conn(), "act": _Conn(), "meta": _Conn()}
+        self._tree_cache = None
 
     # -- connexion
     def _connect(self):
@@ -167,33 +217,119 @@ class IMAPBackend:
         except Exception as e:
             raise BackendError("Connexion IMAP impossible : %s" % e)
 
-    def _folders(self, imap):
-        if self._folders_cache:
-            return self._folders_cache
-        found = {"inbox": "INBOX"}
+    def _list_raw(self, imap):
+        """Liste complète des dossiers : [{name, path, label, depth, delim, special, selectable}] (arborescence triée)."""
         typ, data = imap.list()
-        names = []
+        entries, found = [], {"inbox": "INBOX"}
         for line in data or []:
             if not isinstance(line, bytes):
                 continue
-            m = re.match(rb'\((?P<f>[^)]*)\)\s+(?P<d>"[^"]*"|NIL)\s+(?P<n>.+)', line)
+            m = LIST_RE.match(line)
             if not m:
                 continue
             name = m.group("n").decode("utf-8", "replace").strip()
             if name.startswith('"') and name.endswith('"'):
                 name = name[1:-1].replace('\\"', '"').replace("\\\\", "\\")
-            names.append(name)
-            for fl in m.group("f").decode().lower().split():
-                if fl in SPECIAL:
-                    found.setdefault(SPECIAL[fl], name)
-        for logical, guesses in GUESS.items():
-            if logical not in found:
-                for n in names:
-                    if n.split("/")[-1].split(".")[-1].lower() in guesses:
-                        found[logical] = n
+            dtxt = m.group("d").decode().strip('"')
+            delim = "/" if dtxt.upper() == "NIL" else dtxt
+            flags = set(m.group("f").decode().lower().split())
+            special = "inbox" if name.upper() == "INBOX" else ""
+            for fl in flags:
+                if fl in SPECIAL and not special:
+                    special = SPECIAL[fl]
+            entries.append({"name": name, "flags": flags, "delim": delim, "special": special,
+                            "selectable": not ({"\\noselect", "\\nonexistent"} & flags)})
+        for logical, guesses in GUESS.items():     # repli par le nom quand le serveur n'annonce pas l'usage spécial
+            if not any(e["special"] == logical for e in entries):
+                for e in entries:
+                    if not e["special"] and utf7_decode(e["name"]).split(e["delim"])[-1].lower() in guesses:
+                        e["special"] = logical
                         break
-        self._folders_cache = found
-        return found
+        for e in entries:
+            if e["special"] and e["special"] not in found:
+                found[e["special"]] = e["name"]
+        out = []
+        for e in entries:
+            path = utf7_decode(e["name"])
+            parts = path.split(e["delim"]) if e["delim"] else [path]
+            if len(parts) > 1 and parts[0].upper() == "INBOX":    # espace de noms « INBOX.Sent » : dossiers au premier niveau
+                parts = parts[1:]
+            out.append({"name": e["name"], "path": " › ".join(parts), "label": parts[-1], "depth": len(parts) - 1,
+                        "delim": e["delim"], "special": e["special"], "selectable": e["selectable"],
+                        "_key": [p.lower() for p in parts]})
+        top = {e["_key"][0]: TOP_RANK[e["special"]] for e in out if e["depth"] == 0 and e["special"] in TOP_RANK}
+        out.sort(key=lambda e: [(top.get(e["_key"][0], 9) if i == 0 else 0, k) for i, k in enumerate(e["_key"])])
+        for e in out:
+            e.pop("_key")
+        self._folders_cache, self._tree_cache = found, out
+        return out
+
+    def _folders(self, imap):
+        if not self._folders_cache:
+            self._list_raw(imap)
+        return self._folders_cache
+
+    def _resolve(self, imap, key):
+        """Nom réel d'un dossier : « f:<nom> » (dossier quelconque) ou nom logique (sent, trash…)."""
+        return key[2:] if key.startswith("f:") else self._folders(imap).get(key)
+
+    def list_folders(self):
+        def fn(conn):
+            return self._list_raw(conn.imap)
+        return self._run("meta", fn)
+
+    def folder_status(self, names):
+        """{nom: (messages, non lus)} par la commande STATUS (connexion dédiée : n'attend pas les actions)."""
+        def fn(conn):
+            out = {}
+            for n in names:
+                try:
+                    typ, d = conn.imap.status(_q(n), "(MESSAGES UNSEEN)")
+                except imaplib.IMAP4.abort:
+                    raise
+                except imaplib.IMAP4.error:
+                    continue
+                if typ == "OK" and d and d[0]:
+                    t = d[0].decode("utf-8", "replace") if isinstance(d[0], bytes) else str(d[0])
+                    mm, uu = re.search(r"MESSAGES (\d+)", t), re.search(r"UNSEEN (\d+)", t)
+                    out[n] = (int(mm.group(1)) if mm else 0, int(uu.group(1)) if uu else 0)
+            return out
+        return self._run("meta", fn)
+
+    def _reset_selection(self):
+        for c in self._conns.values():
+            c.sel = None
+        self._folders_cache = self._tree_cache = None
+
+    def create_folder(self, path):
+        def fn(conn):
+            typ, d = conn.imap.create(_q(utf7_encode(path)))
+            if typ != "OK":
+                raise BackendError("Création impossible : %s" % (d[0].decode("utf-8", "replace") if d and d[0] else typ))
+        self._run("act", fn)
+        self._reset_selection()
+
+    def rename_folder(self, old_raw, new_path):
+        def fn(conn):
+            typ, d = conn.imap.rename(_q(old_raw), _q(utf7_encode(new_path)))
+            if typ != "OK":
+                raise BackendError("Renommage impossible : %s" % (d[0].decode("utf-8", "replace") if d and d[0] else typ))
+        self._reset_selection()
+        self._run("act", fn)
+        self._reset_selection()
+
+    def delete_folder(self, raw):
+        def fn(conn):
+            try:
+                conn.imap.unselect()
+            except Exception:
+                pass
+            conn.sel = None
+            typ, d = conn.imap.delete(_q(raw))
+            if typ != "OK":
+                raise BackendError("Suppression impossible : %s" % (d[0].decode("utf-8", "replace") if d and d[0] else typ))
+        self._run("act", fn)
+        self._reset_selection()
 
     # -- API
     # ----------------------------------------------------- connexions persistantes
@@ -254,7 +390,7 @@ class IMAPBackend:
         Les nouveaux messages arrivent par lots, les plus récents d'abord (on_batch)."""
         def fn(conn):
             imap = conn.imap
-            real = self._folders(imap).get(logical)
+            real = self._resolve(imap, logical)
             if not real:
                 return [], {}, None, 0
             self._select(conn, real, readonly=True)
@@ -331,7 +467,7 @@ class IMAPBackend:
 
         def fn(conn):
             imap = conn.imap
-            target = self._folders(imap).get(dest)
+            target = self._resolve(imap, dest)
             if not target and dest != "trash":
                 raise BackendError("Dossier « %s » introuvable sur le serveur." % dest)
             for real, uids in by.items():
@@ -501,11 +637,62 @@ _DEMO = [
 ]
 
 
+def _dfolder(name, special="", delim="/"):
+    parts = name.split(delim)
+    return {"name": name, "path": " › ".join(parts), "label": parts[-1], "depth": len(parts) - 1, "delim": delim,
+            "special": special, "selectable": True}
+
+
+DEMO_FOLDERS = [_dfolder("INBOX", "inbox"), _dfolder("Brouillons", "drafts"), _dfolder("Envoyés", "sent"),
+                _dfolder("Archives", "archive"), _dfolder("Spam", "spam"), _dfolder("Corbeille", "trash"),
+                _dfolder("Clients"), _dfolder("Clients/Alpha"), _dfolder("Clients/Beta"), _dfolder("Factures"),
+                _dfolder("Projets"), _dfolder("Projets/CRM"), _dfolder("Projets/CPAS"), _dfolder("À lire plus tard")]
+DEMO_FOLDER_MSGS = {
+    "Clients/Alpha": [("Marie Dupont", "marie.dupont@client-alpha.be", "Cahier des charges v3", "Voici la version 3 du cahier des charges, merci de valider avant vendredi.", 300, True),
+                      ("Marie Dupont", "marie.dupont@client-alpha.be", "Re: Planning de livraison", "Le planning nous convient, on garde la démo du 12.", 2900, False)],
+    "Clients/Beta": [("Paul Henry", "paul@beta-sprl.be", "Demande de devis module stock", "Pouvez-vous nous chiffrer un module de gestion de stock ?", 700, True)],
+    "Factures": [("Compta SAEC", "compta@saec.me", "Facture 2026-114 émise", "La facture 2026-114 a été envoyée au client.", 1500, False),
+                 ("Stripe", "receipts@stripe.com", "Paiement reçu — 1 250,00 €", "Paiement reçu de Client Alpha SPRL.", 4000, False)],
+    "Projets/CRM": [("Julien Moreau", "julien.moreau@saec.me", "Revue de code CRM", "J'ai relu la PR #42 : deux remarques sur les requêtes N+1.", 200, True),
+                    ("GitHub", "notifications@github.com", "[saec/crm] Issue #51 ouverte", "Un nouveau ticket a été ouvert : lenteur du tableau de bord.", 900, False)],
+    "Projets/CPAS": [("Camille Renard", "camille.renard@commune-exemple.be", "Démonstration CPAS : créneaux", "Nous sommes disponibles mardi ou jeudi après-midi.", 1200, True)],
+    "À lire plus tard": [("Le Monde — Newsletter", "newsletter@lemonde.fr", "Dossier : l'IA dans l'entreprise", "Un long dossier à lire ce week-end.", 5000, False)],
+}
+
+
 class DemoBackend:
     demo = True
 
     def __init__(self, account, password=""):
         self.acc, self._sent = account, False
+        self.folders = [dict(f) for f in DEMO_FOLDERS]
+        self._seeded = set()
+
+    def list_folders(self):
+        return [dict(f) for f in self.folders]
+
+    def folder_status(self, names):
+        out = {}
+        for n in names:
+            items = DEMO_FOLDER_MSGS.get(n)
+            if items is not None:
+                out[n] = (len(items), sum(1 for it in items if it[5]))
+        return out
+
+    def create_folder(self, path):
+        if any(f["name"] == path for f in self.folders):
+            raise BackendError("Ce dossier existe déjà.")
+        self.folders.append(_dfolder(path))
+        self.folders.sort(key=lambda f: ([TOP_RANK.get(f["special"], 9)] + [f["path"].lower()]))
+
+    def rename_folder(self, old_raw, new_path):
+        for f in self.folders:
+            if f["name"] == old_raw or f["name"].startswith(old_raw + "/"):
+                nf = _dfolder(new_path + f["name"][len(old_raw):], f["special"])
+                f.update(nf)
+
+    def delete_folder(self, raw):
+        self.folders = [f for f in self.folders if not (f["name"] == raw or f["name"].startswith(raw + "/"))]
 
     def test(self):
         return None
@@ -533,6 +720,14 @@ class DemoBackend:
                     html=_card(s, b, "Ouvrir saec.me" if cat == "news" else None),
                     unread=un, starred=star, category=cat, attachments=atts,
                     unsubscribe="<https://saec.me/unsubscribe>" if cat == "news" else ""))
+        if logical.startswith("f:") and not known and logical not in self._seeded:
+            self._seeded.add(logical)
+            real, now = logical[2:], time.time()
+            for i, (n, e, s, b, mins, un) in enumerate(DEMO_FOLDER_MSGS.get(real, [])):
+                msgs.append(Message(
+                    id="%s|%s|%d" % (self.acc["id"], real, i + 1), account=self.acc["id"], folder=logical,
+                    real_folder=real, uid=i + 1, sender_name=n, sender_email=e, to=self.acc["email"], subject=s,
+                    date=now - mins * 60, snippet=b[:150], text=b, html=_card(s, b), unread=un, category="people"))
         return msgs, {}, None, 0
 
     def set_flags(self, msg, seen=None, flagged=None):

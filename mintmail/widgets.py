@@ -63,6 +63,9 @@ class MessageRow(Gtk.ListBoxRow):
         outer = Gtk.Box(spacing=10)
         outer.get_style_context().add_class("pad")
 
+        self.rail = Gtk.Box()
+        self.rail.get_style_context().add_class("rail")
+        outer.pack_start(self.rail, False, False, 0)
         self.revealer = Gtk.Revealer()
         self.revealer.set_transition_type(Gtk.RevealerTransitionType.SLIDE_RIGHT)
         self.check = Gtk.CheckButton()
@@ -340,6 +343,17 @@ class MessageRow(Gtk.ListBoxRow):
             self.snippet.set_text(m.snippet)
             sctx.remove_class("ai-line")
         self.time.set_text(format_time(m.date))
+        rctx = self.rail.get_style_context()
+        for cls in ("rail-spam", "rail-p3", "rail-unread", "rail-news", "rail-notif"):
+            rctx.remove_class(cls)
+        if self.ai.get("spam"):
+            rctx.add_class("rail-spam")
+        elif self.ai.get("priority") == 3:
+            rctx.add_class("rail-p3")
+        elif m.unread:
+            rctx.add_class("rail-unread")
+        elif m.category in ("news", "notif"):
+            rctx.add_class("rail-" + m.category)
         for ch in self.icons.get_children():
             self.icons.remove(ch)
         if self.ai.get("spam"):

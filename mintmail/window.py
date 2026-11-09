@@ -16,6 +16,7 @@ from .backend import make_backend
 from .compose import ComposeWindow
 from .ai_features import AIMixin
 from .listing import ListMixin, PAGE
+from .folders import FolderMixin, SMART_VIEWS, dest_of
 from .models import Message, Outgoing
 from .p2p import SyncEngine
 from .reader import Reader
@@ -58,7 +59,10 @@ DEMO_ACCOUNT = {"id": "demo", "name": "Démo", "email": "demo@mintmail.local", "
 NARROW, RAIL_BELOW, HIDE_BELOW = 700, 1250, 900
 
 
-class MainWindow(ListMixin, AIMixin, Gtk.ApplicationWindow):
+class MainWindow(ListMixin, AIMixin, FolderMixin, Gtk.ApplicationWindow):
+    NAV_ROWS = NAV
+    TITLES = TITLES
+
     def __init__(self, app, config, cache):
         super().__init__(application=app, title=APP_NAME)
         self.config, self.cache = config, cache
@@ -71,6 +75,7 @@ class MainWindow(ListMixin, AIMixin, Gtk.ApplicationWindow):
         self.search, self._search_src = "", 0
         self._limit, self._partial_ids = PAGE, set()
         self._init_ai()
+        self._init_folders()
         self._loading, self._pending, self._sync_busy = False, 0, False
         self._backends, self._sending, self.rows = {}, set(), {}
         self._last_sync, self._ticks = 0.0, 0
@@ -102,6 +107,7 @@ class MainWindow(ListMixin, AIMixin, Gtk.ApplicationWindow):
         self.refresh_ai()
         threading.Thread(target=self.cache.backfill_meta, daemon=True).start()
         GLib.idle_add(lambda: (self.sync(), False)[1])
+        GLib.timeout_add(800, lambda: (self.refresh_folders(), False)[1])
         GLib.timeout_add_seconds(3, lambda: (self._start_push(), False)[1])
         GLib.timeout_add_seconds(1, self._tick)
 
@@ -180,64 +186,7 @@ class MainWindow(ListMixin, AIMixin, Gtk.ApplicationWindow):
         hb.pack_end(lay)
 
         # barre latérale
-        self.sidebar = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
-        self.sidebar.get_style_context().add_class("mm-sidebar")
-        self.sidebar.set_size_request(190, -1)
-        self.compose_btn = Gtk.Button()
-        cbox = Gtk.Box(spacing=8)
-        cbox.set_halign(Gtk.Align.CENTER)
-        cbox.pack_start(icon("mail-message-new-symbolic", Gtk.IconSize.LARGE_TOOLBAR), False, False, 0)
-        self.compose_lbl = Gtk.Label(label="Nouveau message")
-        cbox.pack_start(self.compose_lbl, False, False, 0)
-        self.compose_btn.add(cbox)
-        self.compose_btn.get_style_context().add_class("compose-btn")
-        self.compose_btn.connect("clicked", lambda *_: self.compose())
-        self.sidebar.pack_start(self.compose_btn, False, False, 0)
-        self.ai_nav_btn = Gtk.Button()
-        abox = Gtk.Box(spacing=8)
-        abox.pack_start(Gtk.Label(label="✨"), False, False, 0)
-        self.ai_nav_lbl = Gtk.Label(label="Assistant IA")
-        abox.pack_start(self.ai_nav_lbl, False, False, 0)
-        self.ai_nav_btn.add(abox)
-        self.ai_nav_btn.get_style_context().add_class("ai-nav-btn")
-        self.ai_nav_btn.connect("clicked", lambda *_: self.toggle_assistant())
-        self.sidebar.pack_start(self.ai_nav_btn, False, False, 0)
-        self.acc_combo = Gtk.ComboBoxText()
-        self.acc_combo.set_margin_start(10)
-        self.acc_combo.set_margin_end(10)
-        self.acc_combo.set_margin_top(10)
-        self.acc_combo.connect("changed", self._account_changed)
-        self.sidebar.pack_start(self.acc_combo, False, False, 0)
-        self.nav = Gtk.ListBox()
-        self.nav.set_selection_mode(Gtk.SelectionMode.SINGLE)
-        self.nav.set_activate_on_single_click(True)
-        self.badges = {}
-        self.nav_labels = []
-        for vid, label, ic in NAV:
-            r = Gtk.ListBoxRow()
-            r.view = vid
-            r.get_style_context().add_class("nav-row")
-            r.get_style_context().add_class("nav-" + vid)
-            b = Gtk.Box(spacing=10)
-            b.pack_start(icon(ic), False, False, 0)
-            lab = Gtk.Label(label=label, xalign=0)
-            self.nav_labels.append(lab)
-            b.pack_start(lab, True, True, 0)
-            badge = Gtk.Label()
-            badge.get_style_context().add_class("badge")
-            badge.set_no_show_all(True)
-            b.pack_end(badge, False, False, 0)
-            self.badges[vid] = badge
-            r.add(b)
-            self.nav.add(r)
-            if vid == self.view:
-                self._nav_initial = r
-        self.nav.connect("row-selected", self._nav_selected)
-        nsw = Gtk.ScrolledWindow()
-        nsw.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC)
-        nsw.add(self.nav)
-        self.sidebar.pack_start(nsw, True, True, 0)
-        self.sidebar.pack_end(self._sidebar_footer(), False, False, 0)
+        self._build_sidebar()
 
         # liste
         self.list_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
@@ -248,6 +197,9 @@ class MainWindow(ListMixin, AIMixin, Gtk.ApplicationWindow):
         self.title_lbl = Gtk.Label(xalign=0)
         self.title_lbl.set_markup("<b>Boîte intelligente</b>")
         self.title_lbl.get_style_context().add_class("list-title")
+        self.count_lbl = Gtk.Label(xalign=0)
+        self.count_lbl.get_style_context().add_class("count-lbl")
+        bar.pack_start(self.count_lbl, False, False, 0)
         bar.pack_start(self.title_lbl, False, False, 0)
         self.cat_box = Gtk.Box(spacing=6)
         first = None
@@ -346,15 +298,22 @@ class MainWindow(ListMixin, AIMixin, Gtk.ApplicationWindow):
         self.root_stack = Gtk.Stack()
         self.root_stack.set_transition_type(Gtk.StackTransitionType.CROSSFADE)
         self.root_stack.set_transition_duration(150)
-        self.root_stack.add_named(body, "mail")
+        mail_page = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
+        line = Gtk.Box()
+        line.get_style_context().add_class("aurora-line")   # filet dégradé signature (style Aurora)
+        mail_page.pack_start(line, False, False, 0)
+        mail_page.pack_start(body, True, True, 0)
+        self.root_stack.add_named(mail_page, "mail")
         overlay = Gtk.Overlay()
         overlay.add(self.root_stack)
         self.toast = Toast()
         overlay.add_overlay(self.toast)
         self.add(overlay)
         self._fill_accounts()
-        self._rebuild_saved()
+        self._rebuild_nav_dynamic()
+        self._nav_guard = True
         self.nav.select_row(self._nav_initial)
+        self._nav_guard = False
 
     def _sidebar_footer(self):
         box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4)
@@ -388,15 +347,6 @@ class MainWindow(ListMixin, AIMixin, Gtk.ApplicationWindow):
             self._backends[aid] = make_backend(acc, self.config)
         return self._backends[aid]
 
-    def _fill_accounts(self):
-        self.acc_combo.handler_block_by_func(self._account_changed)
-        self.acc_combo.remove_all()
-        self.acc_combo.append("all", "Tous les comptes")
-        for a in self.accounts():
-            self.acc_combo.append(a["id"], "%s" % (a.get("name") or a["email"]))
-        self.acc_combo.set_active_id(self.account if self.account in [a["id"] for a in self.accounts()] else "all")
-        self.account = self.acc_combo.get_active_id()
-        self.acc_combo.handler_unblock_by_func(self._account_changed)
 
     def accounts_changed(self):
         self._stop_push()
@@ -406,6 +356,8 @@ class MainWindow(ListMixin, AIMixin, Gtk.ApplicationWindow):
             except Exception:
                 pass
         self._backends.clear()
+        ids = {a["id"] for a in self.accounts()}
+        self.folder_tree = {k: v for k, v in self.folder_tree.items() if k in ids}
         if self.config["accounts"]:
             self.cache.delete_account("demo")
         else:
@@ -414,24 +366,22 @@ class MainWindow(ListMixin, AIMixin, Gtk.ApplicationWindow):
             except OSError:
                 pass
         self._fill_accounts()
+        self._rebuild_nav_dynamic()
+        self.refresh_folders()
         self.demo_banner.set_visible(not self.config["accounts"])
         self.reload_list(full=True)
         self.update_counts()
         self.sync(True)
         self._start_push()
 
-    def _account_changed(self, combo):
-        self.account = combo.get_active_id() or "all"
-        self._digest_key = None
-        self.reload_list(reset=True, full=True)
-        self.update_counts()
 
     # -------------------------------------------------------------- réglages
     def apply_settings(self):
         theme = self.config["theme"]
         self.is_dark = theme == "dark" or (theme == "system" and self._system_dark)
         Gtk.Settings.get_default().set_property("gtk-application-prefer-dark-theme", self.is_dark)
-        base, fancy = build_css(self.is_dark, self.config["accent"], self.config["density"])
+        self.reader.style = self.config["style"]
+        base, fancy = build_css(self.is_dark, self.config["accent"], self.config["density"], self.config["style"])
         for data in (base + fancy, base):   # repli sans effets si un thème GTK refuse la version raffinée
             try:
                 self.css.load_from_data(data)
@@ -531,25 +481,6 @@ class MainWindow(ListMixin, AIMixin, Gtk.ApplicationWindow):
         d.destroy()
 
     # ------------------------------------------------------------ navigation
-    def _nav_selected(self, lb, row):
-        if not row:
-            return
-        self.view = row.view
-        if not self.view.startswith("saved:"):
-            self.config["last_view"] = self.view
-        self.search_entry.set_text("")
-        self.search = ""
-        self.cat_sw.set_visible(self.view == "inbox")
-        self.title_lbl.set_markup("<b>%s</b>" % GLib.markup_escape_text(self._view_title()))
-        self.listbox.unselect_all()
-        self.reader.show_empty()
-        self.reader_open = False
-        self._layout()
-        self.reload_list(reset=True, full=True)
-        if self._zone == 0:
-            self.side_toggle.set_active(False)
-        if self.view in ("sent", "archive", "trash", "spam"):
-            self.sync(folders=(self.view,), quiet=True)
 
     def _category_toggled(self, btn, key):
         if btn.get_active():
@@ -618,8 +549,9 @@ class MainWindow(ListMixin, AIMixin, Gtk.ApplicationWindow):
         self.sidebar.set_visible(visible)
         for lab in self.nav_labels:
             lab.set_visible(not rail)
-        for wdg in (self.acc_combo, self.status):
-            wdg.set_visible(not rail)
+        self.status.set_visible(not rail)
+        for l in self.brand_labels:
+            l.set_visible(not rail)
         self.settings_btn.set_label("" if rail else "Paramètres")
         self.compose_lbl.set_visible(not rail)
         self.ai_nav_lbl.set_visible(not rail)
@@ -696,6 +628,7 @@ class MainWindow(ListMixin, AIMixin, Gtk.ApplicationWindow):
             b = self.badges[key]
             b.set_text(str(val))
             b.set_visible(val > 0)
+        self._update_folder_badges()
         self.set_title("%s%s" % ("(%d) " % c["inbox"] if c["inbox"] else "", APP_NAME))
 
     def _tick(self):
@@ -708,6 +641,8 @@ class MainWindow(ListMixin, AIMixin, Gtk.ApplicationWindow):
                 self.reload_list()
                 self.update_counts()
             self.check_followups()
+            if self._ticks % 120 == 0:
+                self.refresh_folder_counts()
             if time.time() - self._last_sync > self.config["refresh_minutes"] * 60:
                 self.sync()
         return True
@@ -882,6 +817,8 @@ class MainWindow(ListMixin, AIMixin, Gtk.ApplicationWindow):
             self.set_unread(msgs, True)
         elif act == "images" and m:
             reader.show_message(m, True)
+        elif act == "move_menu":
+            self.build_move_menu(msgs).popup_at_widget(reader.move_btn, Gdk.Gravity.SOUTH_WEST, Gdk.Gravity.NORTH_WEST, None)
         elif act == "spam_sender" and m:
             self.spam_sender(m)
         elif act in ("block", "block_domain") and m:
@@ -953,6 +890,7 @@ class MainWindow(ListMixin, AIMixin, Gtk.ApplicationWindow):
                 (datetime.datetime.now() + datetime.timedelta(days=1)).replace(hour=8, minute=0, second=0).timestamp()),
             "j": lambda: self._step(1), "k": lambda: self._step(-1),
             "slash": lambda: self.search_entry.grab_focus(),
+            "v": lambda: self.build_move_menu(msgs).popup_at_pointer(None),
             "exclam": lambda: self.move_messages(msgs, "spam"),
             "backslash": lambda: self.set_layout("columns" if self.config["layout"] == "list" else "list"),
             "x": lambda: self.sel_btn.set_active(not self.sel_btn.get_active()),
@@ -1074,26 +1012,6 @@ class MainWindow(ListMixin, AIMixin, Gtk.ApplicationWindow):
             self.toast.popup("Pas de réponse à « %s »" % f["subject"][:50], timeout=8)
 
     # ---------------------------------------------------- recherches enregistrées
-    def _rebuild_saved(self):
-        for r in self._saved_rows:
-            self.nav_labels = [l for l in self.nav_labels if l is not r.lab]
-            self.nav.remove(r)
-        self._saved_rows = []
-        for i, sv in enumerate(self.config["saved_searches"]):
-            r = Gtk.ListBoxRow()
-            r.view = "saved:%d" % i
-            r.get_style_context().add_class("nav-row")
-            b = Gtk.Box(spacing=10)
-            b.pack_start(icon("system-search-symbolic"), False, False, 0)
-            r.lab = Gtk.Label(label=sv["name"], xalign=0)
-            self.nav_labels.append(r.lab)
-            b.pack_start(r.lab, True, True, 0)
-            r.add(b)
-            r.show_all()
-            self.nav.add(r)
-            self._saved_rows.append(r)
-        if hasattr(self, "settings_btn"):
-            self._apply_sidebar()
 
     def _saved_query(self):
         if self.view.startswith("saved:"):
@@ -1106,13 +1024,6 @@ class MainWindow(ListMixin, AIMixin, Gtk.ApplicationWindow):
     def _effective_search(self):
         return self.search or self._saved_query()
 
-    def _view_title(self):
-        if self.view.startswith("saved:"):
-            try:
-                return self.config["saved_searches"][int(self.view[6:])]["name"]
-            except (ValueError, IndexError):
-                return "Recherche"
-        return TITLES.get(self.view, "")
 
     def save_current_search(self):
         q = (self.search_entry.get_text() or self.search).strip()
@@ -1147,14 +1058,10 @@ class MainWindow(ListMixin, AIMixin, Gtk.ApplicationWindow):
     # -------------------------------------------------------------- palette
 
 
-    def _goto(self, vid):
-        for r in self.nav.get_children():
-            if r.view == vid:
-                self.nav.select_row(r)
 
     # --------------------------------------------------------------- fermeture
     # ----------------------------------------------------------- synchronisation
-    def sync(self, manual=False, folders=("inbox", "sent"), quiet=False):
+    def sync(self, manual=False, folders=("inbox", "sent"), quiet=False, accounts=None):
         """Synchronise les comptes en arrière-plan ; les nouveaux messages apparaissent par lots, les plus récents d'abord."""
         if self._sync_busy or self._pending:
             if manual:
@@ -1163,7 +1070,7 @@ class MainWindow(ListMixin, AIMixin, Gtk.ApplicationWindow):
         self._sync_busy = True
         if not quiet:
             self.status.set_text("Synchronisation…")
-        accounts = list(self.accounts())
+        accounts = [a for a in self.accounts() if not accounts or a["id"] in accounts]
         known = {(a["id"], f): self.cache.uids(a["id"], f) for a in accounts for f in folders}
         self._partial_ids = set()
 
@@ -1176,7 +1083,7 @@ class MainWindow(ListMixin, AIMixin, Gtk.ApplicationWindow):
                 be = self.backend(a["id"])
                 for f in folders:
                     try:
-                        out.append((a["id"], f, be.sync(f, known[(a["id"], f)], on_batch=on_batch), None))
+                        out.append((a["id"], f, be.sync(f, known[(a["id"], f)], limit=self._fetch_limit.get((a["id"], f), 60), on_batch=on_batch), None))
                     except Exception as e:
                         out.append((a["id"], f, None, e))
             return out
@@ -1229,6 +1136,7 @@ class MainWindow(ListMixin, AIMixin, Gtk.ApplicationWindow):
         self.update_counts()
         self._notify(fresh)
         self.ai_triage(routed_inbox)
+        self.refresh_folder_counts()
 
     # ----------------------------------------------------- push (IMAP IDLE)
     def _start_push(self):
@@ -1410,6 +1318,14 @@ class MainWindow(ListMixin, AIMixin, Gtk.ApplicationWindow):
         ]
         for i, sv in enumerate(self.config["saved_searches"]):
             cmds.append(("Supprimer la recherche enregistrée : " + sv["name"], lambda i=i: self.delete_saved(i)))
+        multi = len(self.accounts()) > 1
+        for acc in self.accounts():
+            for e in self.tree_of(acc["id"]):
+                if e["selectable"]:
+                    nm = e["path"] + ((" — " + (acc.get("name") or acc["email"])) if multi else "")
+                    cmds.append(("Aller au dossier : " + nm, lambda a=acc["id"], e=e: self.goto_folder(a, e)))
+        if m:
+            cmds.insert(0, ("Déplacer vers un dossier…", lambda: self.choose_folder_dialog(self.selected_msgs() or [m])))
         for vid, label, _ in NAV:
             cmds.append(("Aller à : " + label, lambda v=vid: self._goto(v)))
         return cmds
