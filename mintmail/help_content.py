@@ -13,7 +13,7 @@ SHORTCUTS_HELP: List[Tuple[str, str]] = [
     ("!", "Signaler comme spam"), ("B", "Menu Bloquer (adresse / domaine)"), ("\\", "Basculer colonnes / liste seule"),
     ("X", "Mode sélection"), ("Ctrl+J", "Assistant IA"), ("F11", "Plein écran"),
     ("? … (recherche)", "Poser une question à l'IA"), ("Ctrl+,", "Ouvrir les paramètres"), ("Ctrl+R", "Actualiser"),
-    ("Échap", "Annuler la sélection / la recherche"), ("V", "Déplacer vers un dossier"),
+    ("Échap", "Annuler la sélection / la recherche"), ("V", "Déplacer vers un dossier"), ("T", "Aujourd'hui (agenda, priorités, tâches)"),
     ("Ctrl+N", "Nouveau message"), ("Ctrl+Maj+,", "Paramètres dans une fenêtre séparée"), ("F1", "Aide"),
 ]
 
@@ -113,6 +113,34 @@ SECTIONS: List[Dict] = [
          "Faites glisser une ligne à la souris, au pavé tactile ou au doigt. Par défaut : droite = archiver, droite longue = supprimer, "
          "gauche = reporter, gauche longue = lu/non lu. Personnalisable dans Paramètres → Gestes & disposition (archiver, supprimer, "
          "reporter, lu, favori, épingle, spam, bloquer, rien) et inversion du sens pour le pavé tactile."),
+    ]},
+    {"id": "today", "title": "Aujourd'hui, tâches et créneaux", "items": [
+        ("Page « Aujourd'hui » (touche T)",
+         "Touche T, menu ☰ → Aujourd'hui, ou palette. Une seule fenêtre pour démarrer la journée :\n"
+         "• 📅 Agenda du jour (Google Agenda, si activé : Paramètres → Agenda).\n"
+         "• ⚡ À traiter en priorité : vos messages NON LUS que le tri IA juge importants (clic = ouvre le message). Sans IA, le tri se limite à des indices simples.\n"
+         "• ☑ Tâches ouvertes, en retard d'abord (cochez pour terminer, ✉ pour ouvrir le message d'origine) et un champ pour en ajouter une.\n"
+         "• ⏳ En attente de réponse : vos relances programmées (« Me rappeler si pas de réponse »).\n"
+         "• ✨ Brouillons de réponse préparés par l'IA, à relire (voir plus bas)."),
+        ("Tâches et échéances",
+         "• Créer : clic droit sur un message → « ✔ Ajouter aux tâches… », ou « ✨ Ajouter les N tâche(s) détectée(s) » (celles trouvées par l'analyse IA du message), "
+         "ou palette → « Nouvelle tâche… », ou le champ de la page Aujourd'hui.\n"
+         "• L'échéance est lue dans le texte, en français : « demain », « après-demain », « avant vendredi », « ce vendredi », « le 15/11 », « avant le 20 novembre », "
+         "« dans 3 jours », « dans 2 semaines », « la semaine prochaine », « fin de semaine », « fin du mois », « le 20 ». Un nom de jour désigne sa prochaine occurrence "
+         "(aujourd'hui exclu, sauf « ce lundi »). Aucune date trouvée : la tâche n'a pas d'échéance. Les dates et heures anglaises ne sont pas lues.\n"
+         "• Une tâche déjà ajoutée pour le même message n'est jamais dupliquée. Les tâches se synchronisent entre vos machines (la modification la plus récente l'emporte)."),
+        ("Proposer des créneaux (d'après Google Agenda)",
+         "Clic droit sur un message → « 📅 Proposer des créneaux (agenda) » → 30 min / 1 h / 1 h 30. MintMail lit votre agenda, trouve 3 créneaux libres sur des jours "
+         "ouvrables DIFFÉRENTS et ouvre la réponse avec le texte « Je vous propose les créneaux suivants : … » à relire et envoyer.\n"
+         "Règles fixes : lundi–vendredi, de 9h00 à 17h30, à partir de dans 2 heures, sur les 15 prochains jours ; les événements « occupés » (y compris les journées entières) "
+         "bloquent, les événements marqués « disponible » non. Le texte est en français. Nécessite Google Agenda activé (Paramètres → Agenda) ; l'option n'apparaît pas sinon."),
+        ("Brouillons de réponse préparés par l'IA (optionnel)",
+         "Paramètres → IA → « Préparer des brouillons de réponse (messages importants) » (désactivé par défaut).\n"
+         "• Quand arrive un message que l'IA juge important, de type « personne », qui attend une réponse (moins de 3 jours), MintMail prépare un brouillon dans Brouillons "
+         "(3 par passage au maximum). Il n'est JAMAIS envoyé : vous l'ouvrez, le relisez, le corrigez, puis vous envoyez.\n"
+         "• Le brouillon imite votre style d'après quelques-uns de vos messages envoyés : ces extraits sont donc envoyés au fournisseur d'IA (jamais avec Ollama).\n"
+         "• L'IA a pour consigne de ne rien inventer : toute information manquante est marquée [À COMPLÉTER : …] — relisez avant d'envoyer, un modèle peut se tromper.\n"
+         "• Les brouillons préparés apparaissent aussi dans la page Aujourd'hui (touche T)."),
     ]},
     {"id": "context", "title": "Clic droit, palette et raccourcis", "items": [
         ("Menu clic droit sur un message",

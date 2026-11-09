@@ -47,7 +47,7 @@ SYNC_SETTINGS = {
     "ai_lang": _enum("fr", "en", "nl", "de", "es"), "ai_tone": _enum("neutral", "formal", "friendly"),
     "nvidia_api_base": lambda v: isinstance(v, str) and len(v) <= 200 and (v == "" or v.startswith("https://") or (
         v.startswith("http://") and is_local_endpoint(v))),
-    "ai_model": _str(100), "ai_has_key": _b, "ai_provider": _enum("nvidia", "ollama", "custom"), "threads": _b,
+    "ai_model": _str(100), "ai_has_key": _b, "ai_prepare_drafts": _b, "ai_provider": _enum("nvidia", "ollama", "custom"), "threads": _b,
     "oauth_clients": lambda v: isinstance(v, dict) and set(v) <= {"google", "microsoft"} and all(
         isinstance(c, dict) and set(c) <= {"client_id", "client_secret"} and all(isinstance(x, str) and len(x) <= 300 for x in c.values())
         for c in v.values()),
@@ -106,7 +106,7 @@ def valid_item(key: str, item: Any) -> bool:
     if not isinstance(item.get("ts"), (int, float)) or not _b(item.get("del", False)):
         return False
     if item.get("del"):
-        return kind_of(key) in ("acct", "set", "secret", "rule", "blocked", "spam", "search", "tpl", "ident", "contact")
+        return kind_of(key) in ("acct", "set", "secret", "rule", "blocked", "spam", "search", "tpl", "ident", "contact", "task")
     v, kind, rest = item.get("v"), kind_of(key), key.split(":", 1)[-1]
     if kind == "acct":
         a = clean_account(v)
@@ -120,6 +120,12 @@ def valid_item(key: str, item: Any) -> bool:
                 and isinstance(v.get("account"), str) and re.match(r"^[A-Za-z0-9_-]{4,40}$", v["account"]) is not None
                 and isinstance(v.get("email"), str) and len(v["email"]) <= 200 and EMAIL_RE.match(v["email"]) is not None
                 and _str(100)(v.get("name", "")) and _str(20000)(v.get("signature_html", "")))
+    if kind == "task":
+        return (isinstance(v, dict) and re.match(r"^[A-Za-z0-9_-]{4,40}$", rest) is not None and v.get("id") == rest
+                and isinstance(v.get("text"), str) and 0 < len(v["text"]) <= 300
+                and (v.get("due", "") == "" or (isinstance(v.get("due"), str) and re.match(r"^\d{4}-\d{2}-\d{2}$", v["due"]) is not None))
+                and _b(v.get("done", False)) and _str(200)(v.get("msg", "")) and _str(40)(v.get("account", ""))
+                and isinstance(v.get("created", 0), (int, float)) and not isinstance(v.get("created", 0), bool))
     if kind == "contact":
         return (isinstance(v, dict) and EMAIL_RE.match(rest) is not None and len(rest) <= 200 and set(v) <= {"name", "phone", "org", "notes"}
                 and all(isinstance(x, str) and len(x) <= 500 for x in v.values()))
@@ -158,6 +164,9 @@ def collect(config) -> Dict[str, Tuple[Any, Optional[str]]]:
             out["ident:" + i["id"]] = (i, None)
     for email, c in (config.get("contacts") or {}).items():
         out["contact:" + email] = (c, None)
+    for t in config.get("tasks", []):
+        if isinstance(t, dict) and t.get("id"):
+            out["task:" + t["id"]] = (t, None)
     for r in config.get("rules", []):
         out["rule:" + hash_value(r)] = (r, None)
     for v in config.get("blocked", []):
@@ -317,6 +326,9 @@ def _apply_list_item(config, kind, rest, v, deleted, cache=None):
     elif kind == "ident":
         lst = [i for i in config.get("identities", []) if i.get("id") != rest]
         config["identities"] = lst if deleted else lst + [v]
+    elif kind == "task":
+        lst = [t for t in config.get("tasks", []) if t.get("id") != rest]
+        config["tasks"] = lst if deleted else lst + [v]
     elif kind == "contact":
         contacts = dict(config.get("contacts") or {})
         if deleted:
@@ -333,5 +345,5 @@ def _apply_list_item(config, kind, rest, v, deleted, cache=None):
 
 def describe(res: dict) -> str:
     names = {"acct": "compte(s)", "set": "réglage(s)", "secret": "clé IA", "rule": "règle(s)", "blocked": "blocage(s)",
-             "spam": "expéditeur(s) en spam", "search": "recherche(s)", "tpl": "modèle(s)", "ident": "identité(s)", "contact": "contact(s)"}
+             "spam": "expéditeur(s) en spam", "search": "recherche(s)", "tpl": "modèle(s)", "ident": "identité(s)", "contact": "contact(s)", "task": "tâche(s)"}
     return ", ".join("%d %s" % (n, names.get(k, k)) for k, n in res.get("kinds", {}).items()) or "à jour"

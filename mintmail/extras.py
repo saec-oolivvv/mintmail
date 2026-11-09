@@ -8,10 +8,15 @@ gi.require_version("Gtk", "3.0")
 from gi.repository import Gio, GLib, Gtk
 
 import datetime
+import hashlib
+import re
+import time
+import uuid
 
-from . import caldav, gcal, ical, oauth, unsub
+from . import caldav, gcal, ical, oauth, slots, tasks as tk, unsub
 from .ai_engine import make_ics
-from .models import Outgoing
+from .models import Message, Outgoing
+from .util import normalize_subject, text_to_html
 from .reader import open_uri
 
 
@@ -431,3 +436,280 @@ class ExtrasMixin:
         dlg.show_all()
         dlg.run()
         dlg.destroy()
+
+    # ------------------------------------------------------------------------ tâches
+    def tasks_all(self):
+        return list(self.config.get("tasks") or [])
+
+    def task_add(self, text, msg=None, due=None):
+        """Ajoute une tâche (échéance lue dans le texte si non précisée). Retourne la tâche, ou None si elle existe déjà."""
+        text = re.sub(r"\s+", " ", text or "").strip()[:300]
+        if not text:
+            return None
+        mid = msg.id if msg is not None else ""
+        if any(t["text"] == text and t.get("msg", "") == mid and not t.get("done") for t in self.tasks_all()):
+            return None
+        d = tk.parse_due(text) if due is None else due
+        task = {"id": uuid.uuid4().hex[:12], "text": text, "due": d.isoformat() if d else "", "done": False, "msg": mid,
+                "account": (msg.account if msg is not None else "")[:40], "created": time.time()}
+        self.config["tasks"] = self.tasks_all() + [task]
+        self.config.save()
+        return task
+
+    def task_set_done(self, tid, done=True):
+        self.config["tasks"] = [dict(t, done=bool(done)) if t["id"] == tid else t for t in self.tasks_all()]
+        self.config.save()
+
+    def task_remove(self, tid):
+        self.config["tasks"] = [t for t in self.tasks_all() if t["id"] != tid]
+        self.config.save()
+
+    def tasks_from_message(self, msg):
+        """Ajoute les tâches détectées par l'analyse IA du message (une seule fois chacune)."""
+        ana = self.cache.ai_get(msg.id, "analysis") or {}
+        added = [t for t in (self.task_add(x, msg) for x in ana.get("tasks", [])) if t]
+        self.toast.popup("%d tâche(s) ajoutée(s)" % len(added) if added else "Ces tâches sont déjà dans votre liste.", timeout=4)
+        return added
+
+    def task_add_dialog(self, msg=None):
+        dlg = Gtk.Dialog(title="Ajouter une tâche", transient_for=self, modal=True)
+        dlg.add_buttons("Annuler", Gtk.ResponseType.CANCEL, "Ajouter", Gtk.ResponseType.OK)
+        grid = Gtk.Grid(column_spacing=8, row_spacing=6)
+        grid.set_border_width(14)
+        text, due = Gtk.Entry(), Gtk.Entry()
+        text.set_width_chars(46)
+        if msg is not None:
+            text.set_text(("Répondre à %s : %s" % (msg.display_sender, msg.subject))[:200])
+        due.set_placeholder_text("facultatif : vendredi, 15/11, dans 3 jours… (sinon lue dans le texte)")
+        for i, (lab, w) in enumerate((("Tâche", text), ("Échéance", due))):
+            grid.attach(Gtk.Label(label=lab, xalign=1), 0, i, 1, 1)
+            w.set_hexpand(True)
+            grid.attach(w, 1, i, 1, 1)
+        dlg.get_content_area().pack_start(grid, True, True, 0)
+        dlg.show_all()
+        ok = dlg.run() == Gtk.ResponseType.OK
+        t, d = text.get_text(), due.get_text().strip()
+        dlg.destroy()
+        if not ok or not t.strip():
+            return None
+        parsed = tk.parse_due(d) if d else None
+        if d and parsed is None:
+            self.toast.popup("Échéance non comprise : la tâche est ajoutée sans date.", timeout=5)
+        task = self.task_add(t, msg, due=parsed if d else None)
+        self.toast.popup("Tâche ajoutée%s" % ((" — échéance " + task["due"]) if task and task["due"] else "") if task else
+                         "Cette tâche existe déjà.", timeout=4)
+        return task
+
+    # ---------------------------------------------------------- page « Aujourd'hui »
+    def today_local(self, now=None):
+        """Ce qui compte aujourd'hui, côté local : messages importants non lus, relances, tâches ouvertes, brouillons préparés."""
+        now = now or datetime.datetime.now()
+        inbox = self.cache.query("inbox", "all", unread_only=True, limit=200)
+        meta = self.cache.ai_meta([m.id for m in inbox])
+        important = [m for m in inbox if meta.get(m.id, {}).get("priority") == 3 and not meta[m.id].get("spam")][:8]
+        follow = sorted(self.config.get("followups", []), key=lambda f: f["at"])
+        open_tasks = sorted([t for t in self.tasks_all() if not t.get("done")], key=tk.sort_key)
+        drafts = [m for m in self.cache.query("drafts", "all", limit=100) if m.id.startswith("draft-ai-")][:5]
+        return {"important": important, "followups": follow, "tasks": open_tasks, "drafts": drafts, "now": now}
+
+    def agenda_today(self):
+        start = datetime.datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
+        return gcal.list_events(self._gcal_token(), start, start + datetime.timedelta(days=1))
+
+    def show_today(self):
+        if self._gcal_cfg():
+            self.run_bg(self.agenda_today, lambda res, err: self._today_dialog(res if res else (False, str(err))))
+        else:
+            self._today_dialog(None)
+
+    def _today_dialog(self, agenda):
+        dlg = Gtk.Dialog(title="Aujourd'hui — %s" % datetime.date.today().strftime("%d/%m/%Y"), transient_for=self, modal=True)
+        dlg.add_button("Fermer", Gtk.ResponseType.CLOSE)
+        dlg.set_default_size(620, 640)
+        outer = dlg.get_content_area()
+        outer.set_border_width(14)
+        sw = Gtk.ScrolledWindow()
+        inner = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
+        sw.add(inner)
+        outer.pack_start(sw, True, True, 0)
+        chosen = []
+
+        def head(text):
+            h = Gtk.Label(xalign=0)
+            h.set_markup("<b>%s</b>" % GLib.markup_escape_text(text))
+            inner.pack_start(h, False, False, 8)
+
+        def line(text, dim=False):
+            l = Gtk.Label(label=text, xalign=0)
+            l.set_line_wrap(True)
+            l.set_selectable(True)
+            if dim:
+                l.get_style_context().add_class("dim")
+            inner.pack_start(l, False, False, 0)
+
+        def msg_button(m, prefix=""):
+            b = Gtk.Button(label="%s%s — %s" % (prefix, m.display_sender, m.subject)[:110], relief=Gtk.ReliefStyle.NONE)
+            b.get_child().set_xalign(0)
+            b.connect("clicked", lambda *_: (chosen.append(m), dlg.response(Gtk.ResponseType.CLOSE)))
+            inner.pack_start(b, False, False, 0)
+
+        def fill():
+            for ch in inner.get_children():
+                inner.remove(ch)
+            data = self.today_local()
+            head("📅 Agenda du jour")
+            if agenda is None:
+                line("Activez Google Agenda (Paramètres → Agenda) pour voir vos rendez-vous ici.", dim=True)
+            elif not agenda[0]:
+                line("Google Agenda : %s" % agenda[1], dim=True)
+            elif not agenda[1]:
+                line("Aucun rendez-vous aujourd'hui.", dim=True)
+            else:
+                for e in agenda[1]:
+                    when = "Journée entière" if e["all_day"] else "%s–%s" % (e["start"].strftime("%H:%M"), e["end"].strftime("%H:%M"))
+                    line("%s   %s%s" % (when, e["title"], ("   📍 " + e["location"]) if e["location"] else ""))
+            head("⚡ À traiter en priorité (non lus, jugés importants)")
+            if data["important"]:
+                for m in data["important"]:
+                    msg_button(m)
+            else:
+                line("Rien d'urgent détecté." + ("" if self.engine.enabled() else " (L'IA n'est pas activée : le tri se limite à des indices simples.)"), dim=True)
+            head("☑ Tâches")
+            if data["tasks"]:
+                for t in data["tasks"]:
+                    row = Gtk.Box(spacing=8)
+                    cb = Gtk.CheckButton(label=t["text"][:90])
+                    cb.connect("toggled", lambda w, tid=t["id"]: (self.task_set_done(tid, w.get_active()), fill()))
+                    row.pack_start(cb, True, True, 0)
+                    lab = tk.due_label(t)
+                    if lab:
+                        l = Gtk.Label(xalign=1)
+                        l.set_markup("<span foreground='%s'>%s</span>" % ("#dc2626" if tk.is_overdue(t) else "#888888", GLib.markup_escape_text(lab)))
+                        row.pack_end(l, False, False, 0)
+                    if t.get("msg"):
+                        ob = Gtk.Button(label="✉", relief=Gtk.ReliefStyle.NONE)
+                        ob.set_tooltip_text("Ouvrir le message d'origine")
+                        ob.connect("clicked", lambda _b, mid=t["msg"]: self.cache.get(mid) and (chosen.append(self.cache.get(mid)), dlg.response(Gtk.ResponseType.CLOSE)))
+                        row.pack_end(ob, False, False, 0)
+                    inner.pack_start(row, False, False, 0)
+            else:
+                line("Aucune tâche ouverte.", dim=True)
+            addrow = Gtk.Box(spacing=6)
+            entry = Gtk.Entry()
+            entry.set_placeholder_text("Nouvelle tâche (ex. « envoyer le devis avant vendredi »)")
+
+            def add(*_):
+                if entry.get_text().strip():
+                    self.task_add(entry.get_text())
+                    fill()
+            entry.connect("activate", add)
+            b = Gtk.Button(label="Ajouter")
+            b.connect("clicked", add)
+            addrow.pack_start(entry, True, True, 0)
+            addrow.pack_start(b, False, False, 0)
+            inner.pack_start(addrow, False, False, 4)
+            head("⏳ En attente de réponse")
+            now_ts = time.time()
+            if data["followups"]:
+                for f in data["followups"][:8]:
+                    n = (f["at"] - now_ts) / 86400
+                    line("« %s » — %s  (%s)" % (f["subject"][:60], f["to"][:40], "relance échue" if n <= 0 else "relance dans %d j" % int(n + 0.5)))
+            else:
+                line("Aucune relance programmée.", dim=True)
+            if data["drafts"]:
+                head("✨ Brouillons de réponse préparés (à relire avant envoi)")
+                for m in data["drafts"]:
+                    msg_button(m, "Re : ")
+            inner.show_all()
+        fill()
+        dlg.show_all()
+        dlg.run()
+        dlg.destroy()
+        if chosen:
+            m = chosen[0]
+            if m.folder == "drafts":
+                self.open_draft(m)
+            else:
+                self.open_message(self.cache.get(m.id) or m, force=True)
+
+    # ----------------------------------------------------------- créneaux d'après l'agenda
+    def propose_slots(self, msg, minutes=60):
+        """Ouvre une réponse contenant 3 créneaux libres (Google Agenda : jours ouvrables, 9h00-17h30, à partir de dans 2 h)."""
+        if not self._gcal_cfg():
+            self.toast.popup("Activez Google Agenda pour proposer des créneaux : Paramètres → Agenda.", timeout=5)
+            self.show_settings("calendar")
+            return
+        self.toast.popup("Recherche de créneaux libres…", timeout=3)
+
+        def work():
+            now = datetime.datetime.now()
+            ok, events = gcal.list_events(self._gcal_token(), now, now + datetime.timedelta(days=15))
+            if not ok:
+                raise oauth.OAuthError(events)
+            return slots.free_slots(events, now, duration=minutes)
+
+        def done(found, err):
+            if err:
+                self.toast.popup("Agenda : %s" % str(err)[:100], timeout=6)
+            elif not found:
+                self.toast.popup("Aucun créneau libre trouvé dans les 15 prochains jours.", timeout=5)
+            else:
+                self.reply(msg, ai_text=slots.proposal_text(found))
+        self.run_bg(work, done)
+
+    # ------------------------------------------------------ brouillons de réponse préparés
+    _preparing = False
+
+    def _maybe_prepare_drafts(self, msgs, res):
+        """Brouillons de réponse (optionnel, jamais envoyés) pour les messages que l'IA juge importants ET attendant une réponse."""
+        if self._preparing or not self.config.get("ai_prepare_drafts") or not self.engine.enabled():
+            return
+        cutoff = time.time() - 3 * 86400
+        todo = []
+        for m in msgs:
+            v = res.get(m.id, {})
+            if (m.folder == "inbox" and m.date > cutoff and v.get("reply_needed") and not v.get("local") and not v.get("spam")
+                    and v.get("priority", 0) >= 2 and v.get("category") in (None, "people") and not self.cache.ai_get(m.id, "prepared")):
+                todo.append(m)
+        todo = todo[:3]
+        if not todo:
+            return
+        self._preparing = True
+
+        def work():
+            out = []
+            for m in todo:
+                full = self.cache.get(m.id) or m
+                examples = []
+                for s in self.cache.query("sent", m.account, limit=6):
+                    body = (self.cache.get(s.id) or s).text or ""
+                    if body.strip():
+                        examples.append(re.sub(r"\n{3,}", "\n\n", body.strip())[:400])
+                try:
+                    text = self.engine.prepare_reply(full, examples).strip()
+                except Exception:
+                    continue
+                if text:
+                    out.append((full, text))
+            return out
+
+        def done(res2, err):
+            self._preparing = False
+            made = 0
+            for full, text in res2 or []:
+                acc = next((a for a in self.accounts() if a["id"] == full.account), {})
+                ident = self._addressed_identity(full)
+                sig = (ident or {}).get("signature_html") or acc.get("signature_html", "")
+                did = "draft-ai-" + hashlib.sha1(full.id.encode("utf-8")).hexdigest()[:12]
+                self.cache.upsert(Message(
+                    id=did, account=full.account, folder="drafts", uid=0, sender_name=acc.get("name", ""), sender_email=acc.get("email", ""),
+                    to=(full.reply_to or full.sender_email), subject="Re: " + normalize_subject(full.subject), date=time.time(),
+                    snippet=("✨ " + text)[:150], text=text, unread=False, message_id=full.message_id, references=full.references,
+                    html=text_to_html(text) + ("<br><br>-- <br>" + sig if sig.strip() else "")))
+                self.cache.ai_set(full.id, "prepared", {"draft": did})
+                made += 1
+            if made:
+                self.reload_list()
+                self.update_counts()
+                self.toast.popup("✨ %d brouillon(s) de réponse prêt(s) dans Brouillons — à relire avant envoi" % made, timeout=8)
+        self.run_bg(work, done)

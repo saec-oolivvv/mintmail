@@ -202,7 +202,11 @@ class ListMixin:
                  ("Mettre l'expéditeur en spam", lambda: self.spam_sender(m)),
                  ("Bloquer l'expéditeur", lambda: self.block_sender(m)),
                  ("Voir tous ses messages", lambda: self.show_from(m)),
-                 ("Ajouter aux contacts", lambda: self.contact_add(m))]
+                 ("Ajouter aux contacts", lambda: self.contact_add(m)),
+                 ("✔ Ajouter aux tâches…", lambda: self.task_add_dialog(m))]
+        if self._gcal_cfg():
+            items.append(("sous-menu", "📅 Proposer des créneaux (agenda)",
+                          [(lab, lambda mn=mn: self.propose_slots(m, mn)) for lab, mn in (("30 minutes", 30), ("1 heure", 60), ("1 h 30", 90))]))
         if getattr(m, "unsubscribe", ""):
             items.append(("Se désabonner de cet expéditeur", lambda: self.unsubscribe(m)))
         items += [None] + self.ai_menu_items(m)    # section IA : classement, réponses, résumé, traduction, agenda…

@@ -23,7 +23,7 @@ SHORTCUTS = [
     ("!", "Signaler comme spam"), ("B", "Menu Bloquer (adresse / domaine)"), ("\\", "Basculer colonnes / liste seule"), ("X", "Mode sélection"),
     ("Ctrl+J", "Assistant IA"), ("F11", "Plein écran"), ("? … (recherche)", "Poser une question à l'IA"),
     ("Ctrl+,", "Ouvrir les paramètres"), ("Ctrl+R", "Actualiser"), ("Échap", "Annuler la sélection / la recherche"),
-    ("V", "Déplacer vers un dossier"), ("Ctrl+N", "Nouveau message"), ("Ctrl+Maj+,", "Paramètres dans une fenêtre séparée"), ("F1", "Aide"),
+    ("V", "Déplacer vers un dossier"), ("T", "Aujourd'hui (agenda, priorités, tâches)"), ("Ctrl+N", "Nouveau message"), ("Ctrl+Maj+,", "Paramètres dans une fenêtre séparée"), ("F1", "Aide"),
 ]
 SIG_TEMPLATE = ('<p><b>Prénom Nom</b><br>Fonction — Société<br>'
                 '📞 +32 000 00 00 00 · ✉ vous@exemple.be<br>'
@@ -556,6 +556,7 @@ class SettingsPage(OAuthMixin, Gtk.Box):
         switch("Analyser chaque message à l'ouverture", "ai_auto", True)
         switch("Trier les nouveaux messages (priorité, spam)", "ai_triage", True)
         switch("Résumé « En bref » de la boîte", "ai_digest", True)
+        switch("Préparer des brouillons de réponse (messages importants)", "ai_prepare_drafts", False)
         combo("Confidentialité", "ai_privacy", (("full", "Texte complet (meilleurs résultats)"),
                                                 ("minimal", "Minimal : 500 premiers caractères")), "full")
         combo("Langue de l'IA", "ai_lang", (("fr", "Français"), ("en", "English"), ("nl", "Nederlands"),

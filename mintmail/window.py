@@ -149,7 +149,8 @@ class MainWindow(ExtrasMixin, OfflineMixin, ListMixin, AIMixin, FolderMixin, Gtk
         menu_btn.set_image(icon("open-menu-symbolic", Gtk.IconSize.LARGE_TOOLBAR))
         menu = Gtk.Menu()
         for label, fn in (("Palette de commandes (Ctrl+K)", self.show_palette), ("Paramètres (Ctrl+,)", self.show_settings), ("Paramètres dans une fenêtre séparée", lambda: self.show_settings(window=True)),
-                          ("Aide (F1)", lambda: self.show_settings("help")), ("Basculer clair / sombre", self.toggle_theme), ("Tout marquer comme lu", self.mark_all_read),
+                          ("Aujourd'hui (T)", self.show_today), ("Aide (F1)", lambda: self.show_settings("help")),
+                          ("Basculer clair / sombre", self.toggle_theme), ("Tout marquer comme lu", self.mark_all_read),
                           ("Journal d'erreurs", self.show_log), ("À propos", self.show_about)):
             it = Gtk.MenuItem(label=label)
             it.connect("activate", lambda _i, f=fn: f())
@@ -960,6 +961,7 @@ class MainWindow(ExtrasMixin, OfflineMixin, ListMixin, AIMixin, FolderMixin, Gtk
             "exclam": lambda: self.move_messages(msgs, "spam"),
             "backslash": lambda: self.set_layout("columns" if self.config["layout"] == "list" else "list"),
             "x": lambda: self.sel_btn.set_active(not self.sel_btn.get_active()),
+            "t": lambda: self.show_today(),
         }
         fn = acts.get(key)
         if fn:
@@ -1388,6 +1390,8 @@ class MainWindow(ExtrasMixin, OfflineMixin, ListMixin, AIMixin, FolderMixin, Gtk
             ("Boîte d'envoi (messages en attente ou programmés)…", self.show_outbox),
             ("Chercher aussi sur le serveur", self.search_server_now),
             ("Aide et raccourcis (F1)", lambda: self.show_settings("help")),
+            ("Aujourd'hui : agenda, priorités, tâches, relances", self.show_today),
+            ("Nouvelle tâche…", self.task_add_dialog),
             ("Agenda : prochains rendez-vous (Google Agenda)", self.show_agenda),
             ("Nouvel événement dans l'agenda…", self.new_event_dialog),
             ("Contacts…", lambda: self.show_settings("contacts")),

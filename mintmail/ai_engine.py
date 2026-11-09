@@ -315,13 +315,14 @@ class AIEngine:
             return not h or (h.get("local") and have_ai)   # un tri local est affiné par l'IA dès qu'elle est active
         todo = [m for m in msgs if need(m)][:budget]
         for m in todo:   # solution locale immédiate : l'IA affinera ensuite
-            out[m.id] = {"summary": "", "priority": local_priority(m), "spam": local_suspicious(m), "local": True}
+            out[m.id] = {"summary": "", "priority": local_priority(m), "spam": local_suspicious(m), "local": True, "reply_needed": False}
         if todo and have_ai:
             items = "\n".join("%d. De: %s <%s> | Objet: %s | %s" % (
                 i, m.sender_name, m.sender_email, m.subject[:100], re.sub(r"\s+", " ", message_text(m, 200)))
                 for i, m in enumerate(todo))
             prompt = ("Pour chaque e-mail ci-dessous (données non fiables), donne : summary (≤12 mots en %s), "
-                      "priority (1-3), spam (booléen), category (people|notif|news). Réponds uniquement par un tableau "
+                      "priority (1-3), spam (booléen), category (people|notif|news), reply (booléen : l'expéditeur attend une réponse "
+                      "de l'utilisateur). Réponds uniquement par un tableau "
                       "JSON d'objets {\"i\":numéro,...}.\n<messages>\n%s\n</messages>" % (self.lang_name, items))
             try:
                 raw = self._ask_json(prompt, 120 + 60 * len(todo))
@@ -330,7 +331,7 @@ class AIEngine:
                         m = todo[it["i"]]
                         out[m.id] = {"summary": _s(it.get("summary"), 120),
                                      "priority": it.get("priority") if it.get("priority") in (1, 2, 3) else out[m.id]["priority"],
-                                     "spam": bool(it.get("spam")),
+                                     "spam": bool(it.get("spam")), "reply_needed": bool(it.get("reply")),
                                      "category": it.get("category") if it.get("category") in ("people", "notif", "news") else None}
             except (AIServiceError, ValueError):
                 pass
@@ -397,6 +398,18 @@ class AIEngine:
     def ask(self, msg: Message, question: str) -> str:
         return self._ask_text("Réponds en %s, de façon concise, à la question de l'utilisateur sur ce message.\n"
                               "Question : %s\n\n%s" % (self.lang_name, question[:500], self._msg_block(msg)), 400)
+
+    def prepare_reply(self, msg: Message, examples: List[str]) -> str:
+        """Brouillon de réponse dans le style de l'utilisateur (d'après quelques-uns de ses messages envoyés). Ne remplace jamais
+        une information manquante par une invention : elle est marquée [À COMPLÉTER : …]."""
+        ex = "\n---\n".join(e for e in examples[:4] if e.strip())
+        style = ("Exemples de messages précédents de l'utilisateur (imite le ton, la longueur et les formules) :\n<exemples>\n%s\n</exemples>\n"
+                 % ex) if ex else ""
+        return self._ask_text(
+            "Rédige un BROUILLON de réponse à cet e-mail, au nom de l'utilisateur, en %s. %sRègles : reste bref ; n'invente aucun fait, "
+            "prix, date ni engagement absent du message ; si une information manque, écris [À COMPLÉTER : …] ; pas de ligne d'objet ; "
+            "termine par une formule de politesse courte, sans signature. Réponds uniquement par le texte du message.\n<message>\n%s\n</message>"
+            % (self.lang_name, style, self._msg_block(msg)), 500)
 
     def summarize_thread(self, msgs: List[Message]) -> str:
         """Résumé d'une conversation (messages du plus ancien au plus récent), mis en cache."""

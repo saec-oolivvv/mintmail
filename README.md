@@ -1,4 +1,4 @@
-# MintMail 1.9.2
+# MintMail 1.10.0
 
 Client mail moderne pour Linux Mint (Python / GTK3), inspiré de Spark Mail.
 
@@ -24,6 +24,12 @@ Dépendances (installées automatiquement via apt) : `python3-gi`, `gir1.2-gtk-3
 - Palette de commandes `Ctrl+K`, raccourcis clavier (voir Paramètres → Raccourcis), thème clair/sombre, couleur d'accent
 - Interface adaptative (panneau latéral escamotable, mode une colonne en fenêtre étroite), notifications de bureau, gestionnaire `mailto:`
 - Sans compte configuré : mode démonstration avec messages d'exemple
+
+## Nouveautés 1.10.0
+- **Page « Aujourd'hui » (touche T)** : agenda du jour (Google Agenda), messages non lus jugés importants, tâches (en retard d'abord), relances en attente, brouillons préparés.
+- **Tâches avec échéance lue en français** (« avant vendredi », « le 15/11 », « dans 3 jours », « fin du mois »…) : clic droit → « Ajouter aux tâches… » ou « Ajouter les N tâches détectées » ; synchronisées entre vos machines.
+- **Proposer des créneaux** (clic droit, nécessite Google Agenda) : 3 créneaux libres sur des jours différents, en jours ouvrables 9h00–17h30, insérés dans une réponse à relire.
+- **Brouillons de réponse préparés par l'IA** (optionnel, désactivé par défaut) pour les messages importants qui attendent une réponse : jamais envoyés, style appris sur vos envois, informations manquantes marquées [À COMPLÉTER : …].
 
 ## Nouveautés 1.9.2
 - **Correctif important — clic droit** : le menu (et donc toutes les actions ✨ IA, archiver, spam, ranger…) visait toujours le dernier message reçu au lieu du message cliqué. Il agit maintenant sur le message sous le clic, y compris en mode sélection et dans l'arborescence des dossiers.

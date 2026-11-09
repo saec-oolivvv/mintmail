@@ -347,6 +347,8 @@ class AIMixin:
                       lambda: self.ai_classify(self.cache.query("inbox", self.account, limit=60))))
         if sug:
             items.append(("✨ Toujours ranger %s dans « %s »" % (who, sug), lambda: self.ai_rule_move(msg, sug)))
+        if ana.get("tasks"):
+            items.append(("✨ Ajouter les %d tâche(s) détectée(s)" % len(ana["tasks"]), lambda: self.tasks_from_message(msg)))
         items.append(None)
         replies = [("Réponse adaptée", "Réponds de façon appropriée à ce message."), ("Accepter", "Accepte poliment la proposition."),
                    ("Refuser poliment", "Refuse poliment la demande."), ("Demander plus d'informations", "Demande des précisions."),
@@ -377,6 +379,7 @@ class AIMixin:
             for cat, ids in by.items():
                 self.cache.update_many(ids, category=cat)
             self._refresh_row_ai(list(res))
+            self._maybe_prepare_drafts(msgs, res)
             urgent = [m for m in msgs if res.get(m.id, {}).get("priority") == 3 and not res[m.id].get("local")]
             if urgent and self.config["notifications"]:
                 n = Gio.Notification.new("✨ %d message(s) important(s)" % len(urgent))

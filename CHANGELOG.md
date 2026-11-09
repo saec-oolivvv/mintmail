@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.10.0
+- Page Aujourd'hui (T), tâches avec échéances en français (synchronisées), proposition de créneaux d'après Google Agenda, brouillons de réponse préparés (optionnels)
+
 ## 1.9.2
 - Correctif : le clic droit visait toujours le premier message de la liste (coordonnées relatives à la carte) ; ligne retrouvée via le widget cliqué (liste, mode sélection, dossiers)
 

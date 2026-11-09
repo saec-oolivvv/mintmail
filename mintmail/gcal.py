@@ -106,7 +106,8 @@ def parse_item(item: Dict) -> Optional[Dict]:
             end = datetime.datetime.fromisoformat(e["date"])
             allday = True
         return {"title": item.get("summary") or "(sans titre)", "start": start, "end": end, "all_day": allday,
-                "location": item.get("location", ""), "status": item.get("status", "confirmed")}
+                "location": item.get("location", ""), "status": item.get("status", "confirmed"),
+                "busy": item.get("transparency", "opaque") != "transparent"}     # « disponible » : ne bloque pas un créneau
     except (KeyError, ValueError, TypeError):
         return None
 
