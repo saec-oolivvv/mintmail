@@ -49,11 +49,15 @@ def pkce_pair():
     return verifier, _b64url(hashlib.sha256(verifier.encode()).digest())
 
 
-def build_auth_url(provider: str, client_id: str, redirect_uri: str, state: str, challenge: str, login_hint: str = "") -> str:
+def build_auth_url(provider: str, client_id: str, redirect_uri: str, state: str, challenge: str, login_hint: str = "",
+                   extra_scopes=()) -> str:
     p = PROVIDERS[provider]
-    q = {"client_id": client_id, "redirect_uri": redirect_uri, "response_type": "code", "scope": p["scopes"],
+    q = {"client_id": client_id, "redirect_uri": redirect_uri, "response_type": "code",
+         "scope": " ".join([p["scopes"]] + list(extra_scopes)),
          "state": state, "code_challenge": challenge, "code_challenge_method": "S256"}
     q.update(p["extra"])
+    if extra_scopes:
+        q["include_granted_scopes"] = "true"       # on AJOUTE une autorisation (agenda) sans retirer celles déjà accordées
     if login_hint:
         q["login_hint"] = login_hint
     return p["auth_url"] + "?" + urllib.parse.urlencode(q)
@@ -125,7 +129,7 @@ _PAGE = ("<html><head><meta charset='utf-8'><title>MintMail</title></head><body 
 
 
 def run_loopback_flow(provider: str, client_id: str, client_secret: str, open_url: Callable[[str], None],
-                      login_hint: str = "", timeout: float = 180.0) -> Dict:
+                      login_hint: str = "", timeout: float = 180.0, extra_scopes=()) -> Dict:
     """Ouvre le navigateur, attend le retour sur http://127.0.0.1:<port>/ (état vérifié), échange le code. Retourne les jetons
     (+ « email » si disponible). Bloquant : à lancer dans un thread."""
     if not client_id:
@@ -157,7 +161,7 @@ def run_loopback_flow(provider: str, client_id: str, client_secret: str, open_ur
     redirect = "http://127.0.0.1:%d/" % srv.server_address[1]
     threading.Thread(target=srv.serve_forever, daemon=True).start()
     try:
-        open_url(build_auth_url(provider, client_id, redirect, state, challenge, login_hint))
+        open_url(build_auth_url(provider, client_id, redirect, state, challenge, login_hint, extra_scopes))
         if not done.wait(timeout):
             raise OAuthError("délai dépassé : connexion non terminée dans le navigateur")
     finally:

@@ -1388,6 +1388,8 @@ class MainWindow(ExtrasMixin, OfflineMixin, ListMixin, AIMixin, FolderMixin, Gtk
             ("Boîte d'envoi (messages en attente ou programmés)…", self.show_outbox),
             ("Chercher aussi sur le serveur", self.search_server_now),
             ("Aide et raccourcis (F1)", lambda: self.show_settings("help")),
+            ("Agenda : prochains rendez-vous (Google Agenda)", self.show_agenda),
+            ("Nouvel événement dans l'agenda…", self.new_event_dialog),
             ("Contacts…", lambda: self.show_settings("contacts")),
             ("Identités d'envoi (alias)…", lambda: self.show_settings("identities")),
             ("Gérer les expéditeurs bloqués et les règles", lambda: self.show_settings("filters")),

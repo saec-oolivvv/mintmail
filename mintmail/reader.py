@@ -580,11 +580,17 @@ class Reader(Gtk.Stack):
             text += "\n<i>Cet événement a été annulé par l'organisateur.</i>"
         elif method == "REPLY":
             text += "\n<i>Réponse à une invitation.</i>"
+        self._invite_base = text
         self.invite_lbl.set_markup(text)
         can_reply = method == "REQUEST" and bool(inv.get("organizer"))
         for act, b in self.invite_btns:
             b.set_visible(can_reply if act != "invite_add" else method in ("REQUEST", "PUBLISH"))
         self.invite_box.show()
+
+    def set_invite_note(self, note):
+        """Ligne ajoutée sous l'invitation (conflit d'agenda, créneau libre)."""
+        base = getattr(self, "_invite_base", "")
+        self.invite_lbl.set_markup(base + (("\n" + html.escape(note)) if note else ""))
 
     # ----------------------------------------------------------- pièces jointes
     def _att_chip(self, a):

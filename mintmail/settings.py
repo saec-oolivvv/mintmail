@@ -74,7 +74,7 @@ class SettingsPage(OAuthMixin, Gtk.Box):
         stack.add_titled(templates_page(win), "templates", "Modèles de réponse")
         stack.add_titled(contacts_page(win), "contacts", "Contacts")
         stack.add_titled(identities_page(win), "identities", "Identités d'envoi")
-        stack.add_titled(self._scr(calendar_page(win)), "calendar", "Agenda (CalDAV)")
+        stack.add_titled(self._scr(calendar_page(win)), "calendar", "Agenda (Google / CalDAV)")
         stack.add_titled(self._shortcuts_page(), "keys", "Raccourcis")
         stack.add_titled(help_page(), "help", "Aide & Crédits")
         side = Gtk.StackSidebar()

@@ -5,7 +5,9 @@ import gi
 gi.require_version("Gtk", "3.0")
 from gi.repository import Gio, GLib, Gtk
 
-from . import caldav, contacts as vcf, oauth
+import datetime
+
+from . import caldav, contacts as vcf, gcal, oauth
 from .backend import new_account_id
 
 
@@ -337,7 +339,7 @@ def identities_page(win):
 
 
 # ------------------------------------------------------------------------------ agenda
-def calendar_page(win):
+def _caldav_grid(win):
     cfg = win.config
     grid = _grid()
     cur = cfg.get("caldav") or {}
@@ -396,3 +398,122 @@ def calendar_page(win):
         status.set_text("CalDAV désactivé.")
     clear.connect("clicked", do_clear)
     return grid
+
+
+def _google_section(win):
+    cfg = win.config
+    grid = _grid()
+    head = Gtk.Label(xalign=0)
+    head.set_markup("<b>Google Agenda</b> — avec votre compte Gmail connecté en OAuth")
+    grid.attach(head, 0, 0, 2, 1)
+    accs = [a for a in cfg["accounts"] if a.get("auth") == "oauth2" and a.get("oauth_provider") == "google"]
+    combo = Gtk.ComboBoxText()
+    for a in accs:
+        combo.append(a["id"], a["email"])
+    cur = cfg.get("gcal") or {}
+    combo.set_active_id(cur.get("account") if any(a["id"] == cur.get("account") for a in accs) else (accs[0]["id"] if accs else None))
+    on = Gtk.Switch()
+    on.set_active(bool(cur.get("enabled")) and bool(accs))
+    on.set_halign(Gtk.Align.START)
+    _row(grid, 1, "Compte Gmail", combo)
+    _row(grid, 2, "Utiliser Google Agenda", on)
+    status = Gtk.Label(xalign=0)
+    status.set_line_wrap(True)
+    status.set_selectable(True)
+    btns = Gtk.Box(spacing=6)
+    auth, test = Gtk.Button(label="🔑 Autoriser Google Agenda"), Gtk.Button(label="Tester (7 prochains jours)")
+    auth.get_style_context().add_class("suggested-action")
+    btns.pack_start(auth, False, False, 0)
+    btns.pack_start(test, False, False, 0)
+    grid.attach(btns, 1, 3, 1, 1)
+    grid.attach(status, 1, 4, 1, 1)
+    grid.attach(_note(
+        "Ce que ça apporte : les invitations acceptées et les rendez-vous détectés par l'IA arrivent directement dans Google Agenda "
+        "(sans doublon) ; « Agenda » dans la palette affiche vos 14 prochains jours et permet de créer un événement ; à la réception d'une "
+        "invitation, MintMail prévient si le créneau est déjà pris.\n\n"
+        "Mise en place (une seule fois) :\n"
+        "1. Connectez d'abord votre compte Gmail avec le fournisseur « OAuth » (Paramètres → Comptes).\n"
+        "2. Console Google Cloud (le même projet que pour Gmail) → API et services → Bibliothèque → « Google Calendar API » → Activer.\n"
+        "3. Ici : « Autoriser Google Agenda » (une page Google s'ouvre ; l'autorisation « calendar.events » est AJOUTÉE à celle de Gmail).\n"
+        "Important : tant que l'écran de consentement est en mode « Test », Google fait expirer le jeton au bout de 7 jours (il faut alors "
+        "ré-autoriser). Pour un usage personnel durable, passez l'application en « En production » (écran « application non validée » à "
+        "accepter une fois ; jusqu'à 100 utilisateurs)."), 1, 5, 1, 1)
+
+    def say(text, error=False):
+        status.set_markup("<span foreground='%s'>%s</span>" % ("#dc2626" if error else "#16a34a", GLib.markup_escape_text(text)))
+
+    def save_cfg(*_):
+        cfg["gcal"] = {"account": combo.get_active_id(), "enabled": bool(on.get_active() and combo.get_active_id())}
+        cfg.save()
+    on.connect("notify::active", save_cfg)
+    combo.connect("changed", save_cfg)
+
+    def account():
+        return next((a for a in accs if a["id"] == combo.get_active_id()), None)
+
+    def do_auth(*_):
+        acc = account()
+        client = (cfg.get("oauth_clients") or {}).get("google", {})
+        if not acc:
+            say("Ajoutez d'abord un compte Gmail avec le fournisseur « OAuth » (Paramètres → Comptes).", True)
+            return
+        if not client.get("client_id"):
+            say("Identifiant client OAuth manquant : Paramètres → Comptes → Gmail (OAuth).", True)
+            return
+        say("Autorisation dans le navigateur… (3 minutes maximum)")
+        auth.set_sensitive(False)
+
+        def open_url(url):
+            GLib.idle_add(lambda: (Gio.AppInfo.launch_default_for_uri(url, None), False)[1])
+
+        def work():
+            try:
+                res = oauth.run_loopback_flow("google", client["client_id"], client.get("client_secret", ""), open_url,
+                                              login_hint=acc["email"], extra_scopes=[gcal.SCOPE])
+                err = "" if res.get("refresh_token") else "Google n'a pas renvoyé de jeton durable : réessayez."
+            except Exception as e:
+                res, err = None, str(e)
+
+            def done():
+                auth.set_sensitive(True)
+                if err:
+                    say("Autorisation : %s" % err, True)
+                    return False
+                cfg.set_password(acc["id"], res["refresh_token"])           # nouveau jeton : Gmail + Agenda
+                oauth.manager_for(cfg)._cache.pop(acc["id"], None)
+                on.set_active(True)
+                save_cfg()
+                say("Google Agenda autorisé ✔ — cliquez « Tester » pour vérifier.")
+                return False
+            GLib.idle_add(done)
+        threading.Thread(target=work, daemon=True).start()
+    auth.connect("clicked", do_auth)
+
+    def do_test(*_):
+        acc = account()
+        if not acc:
+            say("Aucun compte Gmail (OAuth).", True)
+            return
+        say("Test…")
+
+        def work():
+            try:
+                now = datetime.datetime.now()
+                ok, data = gcal.list_events(oauth.manager_for(cfg).access_token(acc), now, now + datetime.timedelta(days=7))
+            except Exception as e:
+                ok, data = False, str(e)
+            GLib.idle_add(lambda: (say(("✔ Connecté : %d événement(s) dans les 7 prochains jours." % len(data)) if ok else "✖ %s" % data, not ok), False)[1])
+        threading.Thread(target=work, daemon=True).start()
+    test.connect("clicked", do_test)
+    return grid
+
+
+def calendar_page(win):
+    box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
+    box.pack_start(_google_section(win), False, False, 0)
+    box.pack_start(Gtk.Separator(), False, False, 6)
+    alt = Gtk.Label(xalign=0)
+    alt.set_markup("   <b>Autre calendrier : CalDAV</b> (Nextcloud, Radicale, Fastmail, iCloud…) — utilisé si Google Agenda est désactivé")
+    box.pack_start(alt, False, False, 4)
+    box.pack_start(_caldav_grid(win), False, False, 0)
+    return box

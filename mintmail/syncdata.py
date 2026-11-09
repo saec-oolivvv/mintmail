@@ -51,6 +51,8 @@ SYNC_SETTINGS = {
     "oauth_clients": lambda v: isinstance(v, dict) and set(v) <= {"google", "microsoft"} and all(
         isinstance(c, dict) and set(c) <= {"client_id", "client_secret"} and all(isinstance(x, str) and len(x) <= 300 for x in c.values())
         for c in v.values()),
+    "gcal": lambda v: isinstance(v, dict) and set(v) <= {"account", "enabled"} and isinstance(v.get("enabled", False), bool)
+        and (v.get("account") is None or (isinstance(v["account"], str) and re.match(r"^[A-Za-z0-9_-]{4,40}$", v["account"]) is not None)),
     "caldav": lambda v: isinstance(v, dict) and set(v) <= {"url", "user"} and all(isinstance(x, str) and len(x) <= 300 for x in v.values())
         and (not v.get("url") or v["url"].startswith("https://") or (v["url"].startswith("http://") and is_local_endpoint(v["url"]))),
 }

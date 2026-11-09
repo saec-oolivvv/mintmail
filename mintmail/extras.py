@@ -7,7 +7,10 @@ import gi
 gi.require_version("Gtk", "3.0")
 from gi.repository import Gio, GLib, Gtk
 
-from . import caldav, ical, unsub
+import datetime
+
+from . import caldav, gcal, ical, oauth, unsub
+from .ai_engine import make_ics
 from .models import Outgoing
 from .reader import open_uri
 
@@ -37,9 +40,13 @@ class ExtrasMixin:
         tid = getattr(full, "thread_id", "") or getattr(msg, "thread_id", "")
         if not tid:
             self.reader.show_thread([], full.id)
+            if full.invite:
+                self._invite_conflicts(full)
             return
         members = self.cache.thread_members(full.account, tid)
         self.reader.show_thread(members, full.id)
+        if full.invite:
+            self._invite_conflicts(full)
         if self.threads_on() and getattr(msg, "thread_count", 1) > 1 and msg.folder != "drafts":
             unread = [x for x in members if x.unread and x.folder == msg.folder and x.id != msg.id]
             if unread:
@@ -145,27 +152,163 @@ class ExtrasMixin:
         else:
             self.toast.popup("Réponse envoyée à l'organisateur (%s)" % verb, timeout=4)
 
-    def invite_add(self, msg):
-        """Ajoute l'événement à l'agenda : CalDAV si configuré, sinon ouverture du fichier .ics dans l'agenda du système."""
-        inv = self._full(msg).invite or {}
-        raw = inv.get("raw")
-        if not raw:
+    # ------------------------------------------------------------------ agenda
+    def _gcal_cfg(self):
+        c = self.config.get("gcal") or {}
+        return c if c.get("enabled") and c.get("account") else None
+
+    def _gcal_token(self):
+        c = self._gcal_cfg()
+        acc = next((a for a in self.accounts() if a["id"] == c["account"] and a.get("auth") == "oauth2"), None) if c else None
+        if acc is None:
+            raise oauth.OAuthError("compte Gmail (OAuth) introuvable : Paramètres → Agenda")
+        return oauth.manager_for(self.config).access_token(acc)
+
+    def calendar_add_event(self, ev, uid="", raw_ics=None):
+        """Ajoute un événement à l'agenda choisi : Google Agenda, sinon CalDAV, sinon fichier .ics ouvert dans l'agenda du système."""
+        if self._gcal_cfg():
+            self.toast.popup("Ajout à Google Agenda…", timeout=3)
+
+            def work():
+                return gcal.insert_event(self._gcal_token(), ev, uid)
+            self.run_bg(work, lambda res, err: self.toast.popup(
+                ("Google Agenda : %s ✔" % res[1]) if res and res[0] else "Google Agenda : %s" % (res[1] if res else err), timeout=6))
             return
         cfg = self.config.get("caldav") or {}
+        ics = raw_ics or make_ics(ev)
         if cfg.get("url"):
             pw = self.config.password("caldav")
             self.toast.popup("Envoi à l'agenda CalDAV…", timeout=3)
-            self.run_bg(lambda: caldav.put_event(cfg["url"], cfg.get("user", ""), pw, raw.replace("METHOD:REQUEST", "METHOD:PUBLISH"), inv["uid"]),
+            self.run_bg(lambda: caldav.put_event(cfg["url"], cfg.get("user", ""), pw, ics.replace("METHOD:REQUEST", "METHOD:PUBLISH"),
+                                                 uid or ev.get("title", "evenement")),
                         lambda res, err: self.toast.popup("Ajouté à votre agenda ✔" if res and res[0] else
                                                           "Agenda CalDAV : %s" % (res[1] if res else err), timeout=5))
             return
         try:
             fd, path = tempfile.mkstemp(prefix="mintmail-", suffix=".ics")
             with os.fdopen(fd, "w", encoding="utf-8", newline="") as f:
-                f.write(raw)
+                f.write(ics)
             Gio.AppInfo.launch_default_for_uri("file://" + path, None)
+            self.toast.popup("Événement « %s » envoyé à votre agenda" % ev.get("title", "")[:40], timeout=4)
         except Exception as e:
             self.show_error("Impossible d'ouvrir l'agenda", e)
+
+    def invite_add(self, msg):
+        """Ajoute l'invitation à l'agenda (Google Agenda, CalDAV ou fichier .ics)."""
+        inv = self._full(msg).invite or {}
+        if not inv.get("raw"):
+            return
+        self.calendar_add_event({"title": inv.get("title", ""), "start": inv.get("start", ""), "end": inv.get("end", ""),
+                                 "location": inv.get("location", ""), "description": inv.get("description", "")},
+                                uid=inv["uid"], raw_ics=inv["raw"])
+
+    def agenda_events(self, days=14):
+        """(ok, événements | message) des prochains jours dans Google Agenda ; à appeler en arrière-plan."""
+        now = datetime.datetime.now()
+        return gcal.list_events(self._gcal_token(), now, now + datetime.timedelta(days=days))
+
+    def show_agenda(self):
+        if not self._gcal_cfg():
+            self.toast.popup("Activez Google Agenda : Paramètres → Agenda.", timeout=4)
+            self.show_settings("calendar")
+            return
+        self.toast.popup("Chargement de l'agenda…", timeout=2)
+        self.run_bg(self.agenda_events, self._agenda_dialog)
+
+    def _agenda_dialog(self, res, err):
+        ok, data = res if res else (False, str(err))
+        dlg = Gtk.Dialog(title="Agenda — 14 prochains jours", transient_for=self, modal=True)
+        dlg.add_buttons("Nouvel événement…", 1, "Fermer", Gtk.ResponseType.CLOSE)
+        dlg.set_default_size(520, 460)
+        box = dlg.get_content_area()
+        box.set_border_width(14)
+        sw = Gtk.ScrolledWindow()
+        inner = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
+        sw.add(inner)
+        box.pack_start(sw, True, True, 0)
+        if not ok:
+            inner.pack_start(Gtk.Label(label="Google Agenda : %s" % data, xalign=0), False, False, 0)
+        elif not data:
+            inner.pack_start(Gtk.Label(label="Rien de prévu dans les 14 prochains jours.", xalign=0), False, False, 0)
+        else:
+            day = None
+            for e in data:
+                d = e["start"].date()
+                if d != day:
+                    day = d
+                    h = Gtk.Label(xalign=0)
+                    h.set_markup("<b>%s</b>" % GLib.markup_escape_text(e["start"].strftime("%A %d %B")))
+                    inner.pack_start(h, False, False, 6)
+                when = "Journée entière" if e["all_day"] else "%s–%s" % (e["start"].strftime("%H:%M"), e["end"].strftime("%H:%M"))
+                l = Gtk.Label(xalign=0)
+                l.set_markup("%s   %s%s" % (when, GLib.markup_escape_text(e["title"]),
+                                            ("  <small>📍 %s</small>" % GLib.markup_escape_text(e["location"])) if e["location"] else ""))
+                l.set_line_wrap(True)
+                l.set_selectable(True)
+                inner.pack_start(l, False, False, 0)
+        dlg.show_all()
+        r = dlg.run()
+        dlg.destroy()
+        if r == 1:
+            self.new_event_dialog()
+
+    def new_event_dialog(self):
+        dlg = Gtk.Dialog(title="Nouvel événement", transient_for=self, modal=True)
+        dlg.add_buttons("Annuler", Gtk.ResponseType.CANCEL, "Ajouter", Gtk.ResponseType.OK)
+        grid = Gtk.Grid(column_spacing=8, row_spacing=6)
+        grid.set_border_width(14)
+        now = datetime.datetime.now() + datetime.timedelta(hours=1)
+        fields = {"title": Gtk.Entry(), "date": Gtk.Entry(), "time": Gtk.Entry(), "dur": Gtk.Entry(), "place": Gtk.Entry()}
+        fields["date"].set_text(now.strftime("%Y-%m-%d"))
+        fields["time"].set_text(now.strftime("%H:00"))
+        fields["dur"].set_text("60")
+        for i, (k, lab) in enumerate((("title", "Titre"), ("date", "Date (AAAA-MM-JJ)"), ("time", "Heure (HH:MM)"),
+                                      ("dur", "Durée (minutes)"), ("place", "Lieu"))):
+            grid.attach(Gtk.Label(label=lab, xalign=1), 0, i, 1, 1)
+            fields[k].set_hexpand(True)
+            grid.attach(fields[k], 1, i, 1, 1)
+        dlg.get_content_area().pack_start(grid, True, True, 0)
+        dlg.show_all()
+        ok = dlg.run() == Gtk.ResponseType.OK
+        vals = {k: w.get_text().strip() for k, w in fields.items()}
+        dlg.destroy()
+        if not ok:
+            return
+        try:
+            start = datetime.datetime.fromisoformat("%sT%s" % (vals["date"], vals["time"]))
+            end = start + datetime.timedelta(minutes=max(5, int(vals["dur"] or 60)))
+        except ValueError:
+            self.toast.popup("Date, heure ou durée invalide.", timeout=4)
+            return
+        self.calendar_add_event({"title": vals["title"] or "Rendez-vous", "start": start.strftime("%Y-%m-%dT%H:%M"),
+                                 "end": end.strftime("%Y-%m-%dT%H:%M"), "location": vals["place"]})
+
+    def _invite_conflicts(self, full):
+        """À l'ouverture d'une invitation : prévient si le créneau est déjà pris dans Google Agenda."""
+        inv = full.invite or {}
+        if not (inv.get("start") and self._gcal_cfg()):
+            return
+        try:
+            start = gcal._local_dt(inv["start"]).replace(tzinfo=None)
+            end = gcal._local_dt(inv["end"]).replace(tzinfo=None) if inv.get("end") else start + datetime.timedelta(hours=1)
+        except ValueError:
+            return
+
+        def work():
+            ok, events = gcal.list_events(self._gcal_token(), start - datetime.timedelta(minutes=1), end + datetime.timedelta(minutes=1))
+            return gcal.conflicts(events, start, end) if ok else None
+
+        def done(clash, err):
+            if err or clash is None or self.reader.msg is None or self.reader.msg.id != full.id:
+                return
+            if clash:
+                e = clash[0]
+                self.reader.set_invite_note("⚠ Conflit avec « %s » (%s–%s)%s" % (
+                    e["title"][:40], e["start"].strftime("%H:%M"), e["end"].strftime("%H:%M"),
+                    " et %d autre(s)" % (len(clash) - 1) if len(clash) > 1 else ""))
+            else:
+                self.reader.set_invite_note("✔ Vous êtes libre sur ce créneau (Google Agenda).")
+        self.run_bg(work, done)
 
     # -------------------------------------------------------- recherche sur le serveur
     def search_server_now(self):

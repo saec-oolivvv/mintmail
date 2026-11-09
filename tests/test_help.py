@@ -63,7 +63,8 @@ def test_all_features_of_the_current_release_are_findable():
               "vcard", "invitation", "caldav", "alias", "send-due", "rfc 8058", "glisser", "boite d'envoi", "f1", "classer", "creer un dossier",
               "clic droit", "assistant", "hameconnage", "pairs fixes", "diagnostic", "mot de passe d'application", "reporter", "signature",
               "modele", "regle", "bloquer", "domaine", "palette", "swipe", "idle", "trousseau", "tout enregistrer", "--reset", "--diagnose",
-              "icone", "mintmail-outbox", "identite", "contacts", "langue", "confidentialite", "journal"]
+              "icone", "mintmail-outbox", "identite", "contacts", "langue", "confidentialite", "journal",
+              "google agenda", "calendar.events", "google calendar api", "nouvel evenement", "libre sur ce creneau", "expirer", "7 jours"]
     for term in needed:
         assert H.search(term, CTX), "introuvable dans l'aide : %s" % term
 

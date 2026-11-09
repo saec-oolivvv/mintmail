@@ -1,4 +1,4 @@
-# MintMail 1.8.1
+# MintMail 1.9.0
 
 Client mail moderne pour Linux Mint (Python / GTK3), inspiré de Spark Mail.
 
@@ -24,6 +24,10 @@ Dépendances (installées automatiquement via apt) : `python3-gi`, `gir1.2-gtk-3
 - Palette de commandes `Ctrl+K`, raccourcis clavier (voir Paramètres → Raccourcis), thème clair/sombre, couleur d'accent
 - Interface adaptative (panneau latéral escamotable, mode une colonne en fenêtre étroite), notifications de bureau, gestionnaire `mailto:`
 - Sans compte configuré : mode démonstration avec messages d'exemple
+
+## Nouveautés 1.9.0
+- **Google Agenda** (compte Gmail connecté en OAuth) : les invitations acceptées et les rendez-vous détectés par l'IA sont ajoutés directement à votre agenda, **sans doublon** ; palette → « Agenda : prochains rendez-vous » (14 jours) et « Nouvel événement… » ; à l'ouverture d'une invitation, **alerte de conflit** ou « vous êtes libre sur ce créneau ». Mise en place : Paramètres → Agenda (Google / CalDAV) → « Autoriser Google Agenda » (activer aussi « Google Calendar API » dans la console Google Cloud). CalDAV reste disponible pour les autres agendas.
+- Attention : tant que l'écran de consentement Google est en mode « Test », le jeton expire après 7 jours ; passez l'application « En production » pour un usage durable (voir l'aide, F1).
 
 ## Nouveautés 1.8.1
 - **Aide intégrée complète** (touche **F1**, ☰ → Aide, ou Paramètres → Aide & Crédits) : 13 sections et plus de 60 rubriques — premiers pas, OAuth, lecture et dossiers, conversations, recherche, clic droit, palette, tous les raccourcis, rédaction, alias, envoi différé, IA (fournisseurs, assistant, classement, habitudes), spam / règles / désabonnement, pièces jointes, invitations, contacts, CalDAV, synchronisation, hors ligne, apparence, sécurité, ligne de commande, dépannage. **Recherche instantanée** (sans accents) dans toute l'aide.

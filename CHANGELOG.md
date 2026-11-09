@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.9.0
+- Google Agenda : ajout sans doublon des invitations et rendez-vous IA, agenda des 14 jours, nouvel événement, alerte de conflit ; autorisation « calendar.events » ajoutée séparément à celle de Gmail
+- Aide mise à jour (Google Agenda, expiration à 7 jours du jeton en mode Test)
+
 ## 1.8.1
 - Aide intégrée complète et consultable (F1, recherche instantanée) ; mintmail --help ; AIDE.txt installé ; tests d'alignement aide / code
 

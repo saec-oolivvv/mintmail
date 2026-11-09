@@ -50,7 +50,10 @@ SECTIONS: List[Dict] = [
          "de redirection http://localhost.\n"
          "• « Se connecter » ouvre la page du fournisseur dans votre navigateur ; MintMail ne voit jamais votre mot de passe. Il garde un jeton "
          "révocable à tout moment depuis votre compte Google ou Microsoft, stocké comme un mot de passe (trousseau) et synchronisé avec vos autres machines.\n"
-         "• « Reconnecter » renouvelle le jeton si le fournisseur l'a révoqué."),
+         "• « Reconnecter » renouvelle le jeton si le fournisseur l'a révoqué.\n"
+         "• Google, important : tant que l'écran de consentement est en mode « Test », Google fait EXPIRER le jeton au bout de 7 jours (il faut se "
+         "reconnecter). Pour un usage personnel durable, passez l'application en « En production » dans la console Google Cloud : un écran « application "
+         "non validée » s'affiche une fois, à accepter (jusqu'à 100 utilisateurs, aucune validation nécessaire)."),
         ("Mode démonstration",
          "Sans compte configuré, MintMail affiche des messages d'exemple pour essayer l'interface (dossiers, IA, rédaction). "
          "Ajouter un vrai compte remplace automatiquement la démo."),
@@ -121,7 +124,7 @@ SECTIONS: List[Dict] = [
          "débloquer, rappel de relance, etc.)."),
         ("Palette de commandes (Ctrl+K)",
          "Tapez quelques lettres pour retrouver une action : répondre, archiver, déplacer vers un dossier, spam / bloquer l'expéditeur ou son domaine, "
-         "se désabonner, résumer, traduire, ouvrir les contacts ou les identités, boîte d'envoi, chercher sur le serveur, changer de vue, de style, "
+         "se désabonner, résumer, traduire, ouvrir les contacts ou les identités, agenda et nouvel événement, boîte d'envoi, chercher sur le serveur, changer de vue, de style, "
          "de disposition, d'affichage… Entrée exécute, Échap ferme."),
         ("Tous les raccourcis clavier",
          "@SHORTCUTS@"),
@@ -237,15 +240,29 @@ SECTIONS: List[Dict] = [
          "Un message contenant une invitation (fichier .ics) affiche un encadré 📅 avec le titre, la date et le lieu :\n"
          "• Accepter / Peut-être / Refuser envoient la réponse iCalendar à l'organisateur (compris par Outlook, Google, Apple…), depuis l'adresse qui "
          "a reçu l'invitation.\n"
-         "• « Ajouter à l'agenda » : envoi à votre agenda CalDAV s'il est configuré, sinon ouverture du .ics dans l'agenda de votre système.\n"
+         "• « Ajouter à l'agenda » : envoi à Google Agenda s'il est activé (sans doublon si vous cliquez deux fois), sinon à votre agenda CalDAV, "
+         "sinon ouverture du .ics dans l'agenda de votre système.\n"
+         "• Avec Google Agenda activé, MintMail vérifie à l'ouverture si le créneau est libre : « ✔ Vous êtes libre » ou « ⚠ Conflit avec … (14:00–15:00) ».\n"
          "Une annulation d'événement est signalée."),
         ("Contacts",
          "Paramètres → Contacts : fiches (nom, e-mail, téléphone, société, notes), recherche, import et export vCard (.vcf). Les fiches manuelles "
          "se synchronisent entre vos machines ; les correspondants repérés automatiquement dans vos messages (« auto ») alimentent la complétion des adresses. "
          "Clic droit sur un message → Ajouter aux contacts."),
-        ("Agenda CalDAV (facultatif)",
-         "Paramètres → Agenda (CalDAV) : adresse du calendrier (Nextcloud, Radicale, Fastmail, iCloud…), identifiant, mot de passe, bouton « Tester ». "
-         "HTTPS obligatoire (HTTP seulement sur le réseau local). MintMail y ajoute les événements ; il ne lit pas votre calendrier."),
+        ("Google Agenda (Gmail)",
+         "Paramètres → Agenda (Google / CalDAV) → section Google Agenda. Mise en place, une seule fois :\n"
+         "1. Connectez votre compte Gmail avec le fournisseur « OAuth » (Paramètres → Comptes).\n"
+         "2. Console Google Cloud (même projet que pour Gmail) → API et services → Bibliothèque → « Google Calendar API » → Activer.\n"
+         "3. « Autoriser Google Agenda » : une page Google s'ouvre et l'autorisation « calendar.events » est AJOUTÉE à celle de Gmail ; activez ensuite l'interrupteur « Utiliser Google Agenda » et cliquez « Tester ».\n"
+         "Ce que ça apporte :\n"
+         "• Les invitations acceptées et les rendez-vous détectés par l'IA (« Ajouter à l'agenda ») arrivent directement dans Google Agenda, sans doublon.\n"
+         "• Palette (Ctrl+K) → « Agenda : prochains rendez-vous » : vos 14 prochains jours ; bouton « Nouvel événement… » pour en créer un (titre, date, heure, durée, lieu).\n"
+         "• À l'ouverture d'une invitation, alerte de conflit ou confirmation que vous êtes libre sur ce créneau.\n"
+         "Si « autorisation de l'agenda manquante » apparaît : refaites l'étape 3. Si « l'API Google Calendar n'est pas activée » : refaites l'étape 2. "
+         "Jeton expiré après 7 jours : voir la remarque sur le mode « Test » dans « Connexion Google / Microsoft ». Le réglage se synchronise entre vos machines."),
+        ("Agenda CalDAV (autre calendrier)",
+         "Paramètres → Agenda (Google / CalDAV), section CalDAV : adresse du calendrier (Nextcloud, Radicale, Fastmail, iCloud…), identifiant, mot de passe, "
+         "bouton « Tester ». HTTPS obligatoire (HTTP seulement sur le réseau local). Utilisé seulement si Google Agenda est désactivé ; "
+         "MintMail y ajoute les événements, il ne lit pas ce calendrier."),
     ]},
     {"id": "sync", "title": "Synchronisation entre vos machines", "items": [
         ("Principe",
@@ -294,7 +311,7 @@ SECTIONS: List[Dict] = [
          "• Paramètres → Raccourcis : liste des touches. « Réinitialiser l'apparence » remet les valeurs par défaut."),
         ("Pages de paramètres",
          "Comptes · Signatures · Apparence · ✨ Intelligence artificielle · Synchronisation P2P · Gestes & disposition · Filtres & blocage · "
-         "Modèles de réponse · Contacts · Identités d'envoi · Agenda (CalDAV) · Raccourcis · Aide & Crédits. Échap revient à la boîte de réception."),
+         "Modèles de réponse · Contacts · Identités d'envoi · Agenda (Google / CalDAV) · Raccourcis · Aide & Crédits. Échap revient à la boîte de réception."),
     ]},
     {"id": "security", "title": "Sécurité et vie privée", "items": [
         ("Où sont vos données",

@@ -19,7 +19,7 @@ DEFAULTS = {
     "density": "comfortable", "load_images": False, "notifications": True,
     "refresh_minutes": 5, "undo_seconds": 6, "width": 1280, "height": 800,
     "folders": {}, "collapsed_folders": [], "style": "aurora", "design_v2": False,
-    "threads": True, "ai_provider": "nvidia", "oauth_clients": {}, "caldav": {}, "identities": [], "contacts": {},
+    "threads": True, "gcal": {}, "ai_provider": "nvidia", "oauth_clients": {}, "caldav": {}, "identities": [], "contacts": {},
     "last_view": "inbox", "layout": "columns", "pos_cols": 420, "pos_bottom": 300,
     "side_width": 230, "zoom": 1.0,
     "swipe": {"right": "archive", "right_long": "trash", "left": "snooze", "left_long": "read"},

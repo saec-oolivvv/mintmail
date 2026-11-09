@@ -204,14 +204,7 @@ class AIMixin:
         if not ev:
             self.toast.popup("Aucun rendez-vous détecté dans ce message.", timeout=3)
             return
-        try:
-            fd, path = tempfile.mkstemp(prefix="mintmail-", suffix=".ics")
-            with os.fdopen(fd, "w", encoding="utf-8", newline="") as f:
-                f.write(make_ics(ev))
-            Gio.AppInfo.launch_default_for_uri("file://" + path, None)
-            self.toast.popup("Événement « %s » envoyé à votre agenda" % ev["title"][:40], timeout=4)
-        except Exception as e:
-            self.show_error("Impossible d'ouvrir l'agenda", e)
+        self.calendar_add_event(ev, uid="mintmail-" + msg.id)
 
     def ai_reply_with_ai(self, msg, idea="Réponds de façon appropriée à ce message."):
         """Rédige une réponse avec l'IA puis ouvre le composeur prérempli (à relire avant envoi)."""
