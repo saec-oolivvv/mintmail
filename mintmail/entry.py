@@ -175,6 +175,13 @@ def send_due() -> int:
 
 def main(argv=None) -> int:
     argv = list(argv if argv is not None else sys.argv)
+    if "--help" in argv or "-h" in argv:
+        from . import help_content as H
+        from .store import CONFIG_DIR, DATA_DIR
+        print("MintMail %s — options :\n" % __version__)
+        print(H.cli_text({"config": str(CONFIG_DIR), "data": str(DATA_DIR), "version": __version__}))
+        print("\nAide complète dans l'application : touche F1.")
+        return 0
     if "--version" in argv:
         print("%s %s" % (APP_NAME, __version__))
         return 0

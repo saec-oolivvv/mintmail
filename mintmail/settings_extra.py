@@ -550,42 +550,97 @@ def p2p_page(win):
 
 # ------------------------------------------------------------------ aide
 def help_page():
-    """Page d'aide et crédits."""
-    sw = Gtk.ScrolledWindow()
-    page = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=12)
-    page.set_border_width(14)
-    sw.add(page)
+    """Aide intégrée complète : sections à gauche, recherche instantanée, contenu sélectionnable (voir help_content.py)."""
+    from . import help_content as H
+    from .log import LOG
+    from .store import CONFIG_DIR, DATA_DIR
+    ctx = {"version": __version__, "config": str(CONFIG_DIR), "data": str(DATA_DIR), "log": str(LOG)}
+    secs = H.sections(ctx)
+    mono = ("Tous les raccourcis clavier", "Options de la commande mintmail")
 
-    # Titre
-    title = Gtk.Label(label=f"{APP_NAME} {__version__}", xalign=0)
+    root = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
+    top = Gtk.Box(spacing=12)
+    top.set_border_width(12)
+    title = Gtk.Label(label="Aide — %s %s" % (APP_NAME, __version__), xalign=0)
     title.get_style_context().add_class("list-title")
-    page.pack_start(title, False, False, 0)
+    search = Gtk.SearchEntry()
+    search.set_placeholder_text("Rechercher dans l'aide (ex. OAuth, spam, hors ligne, raccourcis)")
+    search.set_hexpand(True)
+    top.pack_start(title, False, False, 0)
+    top.pack_start(search, True, True, 0)
+    root.pack_start(top, False, False, 0)
 
-    # Description
-    desc = Gtk.Label(xalign=0, label="Le client mail dont l'IA est l'ADN : elle lit, trie, résume, rédige et agit avec vous.")
-    desc.get_style_context().add_class("dim")
-    desc.set_line_wrap(True)
-    page.pack_start(desc, False, False, 8)
+    body = Gtk.Box(spacing=0)
+    lb = Gtk.ListBox()
+    lb.set_selection_mode(Gtk.SelectionMode.SINGLE)
+    for s in secs:
+        row = Gtk.ListBoxRow()
+        row.sec = s
+        lab = Gtk.Label(label=s["title"], xalign=0)
+        lab.set_line_wrap(True)
+        row.set_border_width(8)
+        row.add(lab)
+        lb.add(row)
+    lsw = Gtk.ScrolledWindow()
+    lsw.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC)
+    lsw.set_size_request(230, -1)
+    lsw.add(lb)
+    body.pack_start(lsw, False, False, 0)
+    content = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=14)
+    content.set_border_width(18)
+    csw = Gtk.ScrolledWindow()
+    csw.add(content)
+    body.pack_start(csw, True, True, 0)
+    root.pack_start(body, True, True, 0)
 
-    # Fonctionnalités
-    feats = Gtk.Label(xalign=0, label="✨ Assistant IA (Ctrl+J) : demandez-lui d'archiver, bloquer, créer une règle, rédiger… chaque action est confirmée\n✨ Carte IA sur chaque message : résumé, points clés, priorité, alerte hameçonnage, réponses suggérées, agenda, traduction, questions\n✨ Classement par l'IA dans des dossiers (existants ou créés), avec validation ; clic droit : section IA\n✨ Tri automatique des nouveaux messages et résumé « En bref » de la boîte\n✨ Rédaction : écrire depuis une idée, améliorer, corriger, raccourcir, ton formel/amical, traduire, objet\n✨ Recherche en langage naturel : tapez « ? les mails non lus de Marie »\n✓ Tous vos dossiers : arborescence complète par compte, déplacer, créer, renommer, supprimer\n✓ Trois styles visuels : Aurora, Papier, Terminal (Paramètres → Apparence)\n✓ Actions instantanées (archiver, supprimer, spam, blocage), swipe, actions au survol\n✓ Réception en temps réel (IMAP IDLE), chargement progressif, connexions persistantes\n✓ Synchro automatique et chiffrée entre vos machines : comptes, signatures, IA, réponses rapides, règles, apparence")
-    feats.get_style_context().add_class("dim")
-    feats.set_line_wrap(True)
-    page.pack_start(feats, False, False, 8)
+    def render(entries, heading=None, show_section=False):
+        for ch in content.get_children():
+            content.remove(ch)
+        if heading:
+            h = Gtk.Label(xalign=0)
+            h.set_markup("<span size='x-large' weight='bold'>%s</span>" % GLib.markup_escape_text(heading))
+            h.set_line_wrap(True)
+            content.pack_start(h, False, False, 0)
+        for sec, t, text in entries:
+            box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4)
+            if show_section:
+                sl = Gtk.Label(label=sec.upper(), xalign=0)
+                sl.get_style_context().add_class("dim")
+                box.pack_start(sl, False, False, 0)
+            tl = Gtk.Label(xalign=0)
+            tl.set_markup("<b>%s</b>" % GLib.markup_escape_text(t))
+            tl.set_line_wrap(True)
+            tl.set_selectable(True)
+            box.pack_start(tl, False, False, 0)
+            bl = Gtk.Label(xalign=0)
+            esc = GLib.markup_escape_text(text)
+            bl.set_markup("<tt>%s</tt>" % esc if t in mono else esc)
+            bl.set_line_wrap(True)
+            bl.set_selectable(True)
+            bl.get_style_context().add_class("dim" if False else "help-body")
+            box.pack_start(bl, False, False, 0)
+            content.pack_start(box, False, False, 0)
+        if not entries:
+            content.pack_start(Gtk.Label(label="Aucun résultat : essayez un autre mot (sans accent, une partie de mot suffit).", xalign=0), False, False, 0)
+        content.show_all()
+        vadj = csw.get_vadjustment()
+        if vadj is not None:
+            vadj.set_value(0)
 
-    # Aide
-    help_label = Gtk.Label(xalign=0, label="Raccourcis clavier :\nCtrl+,: Ouvrir les paramètres\nCtrl+J Assistant IA\nCtrl+K Palette de commandes\nF11 Plein écran\nCtrl+R Actualiser\nCtrl+N Nouveau message\nCtrl+F Rechercher\nEsc Fermer/annuler")
-    help_label.get_style_context().add_class("dim")
-    help_label.set_line_wrap(True)
-    page.pack_start(help_label, False, False, 12)
+    def picked(_lb, row):
+        if row is not None and not search.get_text().strip():
+            render([(row.sec["title"], t, b) for t, b in row.sec["items"]], heading=row.sec["title"])
+    lb.connect("row-selected", picked)
 
-    # Crédits
-    sep = Gtk.Separator(orientation=Gtk.Orientation.HORIZONTAL)
-    page.pack_start(sep, False, False, 12)
-
-    credit_label = Gtk.Label(xalign=0, label="Développé par saec - https://saec.me\n\nMintMail est un projet open source.\nUtilisez MintMail librement selon vos besoins.")
-    credit_label.get_style_context().add_class("dim")
-    credit_label.set_line_wrap(True)
-    page.pack_start(credit_label, False, False, 0)
-
-    return sw
+    def changed(entry):
+        q = entry.get_text().strip()
+        if len(q) >= 2:
+            lb.unselect_all()
+            hits = H.search(q, ctx)
+            render(hits, heading="%d résultat%s pour « %s »" % (len(hits), "s" if len(hits) > 1 else "", q), show_section=True)
+        elif not q:
+            lb.select_row(lb.get_row_at_index(0))
+    search.connect("search-changed", changed)
+    lb.select_row(lb.get_row_at_index(0))
+    root.show_all()
+    return root

@@ -23,6 +23,7 @@ SHORTCUTS = [
     ("!", "Signaler comme spam"), ("B", "Menu Bloquer (adresse / domaine)"), ("\\", "Basculer colonnes / liste seule"), ("X", "Mode sélection"),
     ("Ctrl+J", "Assistant IA"), ("F11", "Plein écran"), ("? … (recherche)", "Poser une question à l'IA"),
     ("Ctrl+,", "Ouvrir les paramètres"), ("Ctrl+R", "Actualiser"), ("Échap", "Annuler la sélection / la recherche"),
+    ("V", "Déplacer vers un dossier"), ("Ctrl+N", "Nouveau message"), ("Ctrl+Maj+,", "Paramètres dans une fenêtre séparée"), ("F1", "Aide"),
 ]
 SIG_TEMPLATE = ('<p><b>Prénom Nom</b><br>Fonction — Société<br>'
                 '📞 +32 000 00 00 00 · ✉ vous@exemple.be<br>'
@@ -75,7 +76,7 @@ class SettingsPage(OAuthMixin, Gtk.Box):
         stack.add_titled(identities_page(win), "identities", "Identités d'envoi")
         stack.add_titled(self._scr(calendar_page(win)), "calendar", "Agenda (CalDAV)")
         stack.add_titled(self._shortcuts_page(), "keys", "Raccourcis")
-        stack.add_titled(self._scr(help_page()), "help", "Aide & Crédits")
+        stack.add_titled(help_page(), "help", "Aide & Crédits")
         side = Gtk.StackSidebar()
         side.set_stack(stack)
         box = Gtk.Box()

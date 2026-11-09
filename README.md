@@ -1,4 +1,4 @@
-# MintMail 1.8.0
+# MintMail 1.8.1
 
 Client mail moderne pour Linux Mint (Python / GTK3), inspiré de Spark Mail.
 
@@ -24,6 +24,11 @@ Dépendances (installées automatiquement via apt) : `python3-gi`, `gir1.2-gtk-3
 - Palette de commandes `Ctrl+K`, raccourcis clavier (voir Paramètres → Raccourcis), thème clair/sombre, couleur d'accent
 - Interface adaptative (panneau latéral escamotable, mode une colonne en fenêtre étroite), notifications de bureau, gestionnaire `mailto:`
 - Sans compte configuré : mode démonstration avec messages d'exemple
+
+## Nouveautés 1.8.1
+- **Aide intégrée complète** (touche **F1**, ☰ → Aide, ou Paramètres → Aide & Crédits) : 13 sections et plus de 60 rubriques — premiers pas, OAuth, lecture et dossiers, conversations, recherche, clic droit, palette, tous les raccourcis, rédaction, alias, envoi différé, IA (fournisseurs, assistant, classement, habitudes), spam / règles / désabonnement, pièces jointes, invitations, contacts, CalDAV, synchronisation, hors ligne, apparence, sécurité, ligne de commande, dépannage. **Recherche instantanée** (sans accents) dans toute l'aide.
+- `mintmail --help` liste les options ; le texte complet de l'aide est aussi installé dans `/usr/share/doc/mintmail/AIDE.txt`.
+- Des tests vérifient que l'aide reste alignée sur le code (raccourcis, options, pages de paramètres, fonctions).
 
 ## Nouveautés 1.8.0
 - **Barre d'actions au survol des cadres de messages : supprimée** (actions par clic droit, raccourcis, balayage).

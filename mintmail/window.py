@@ -149,7 +149,7 @@ class MainWindow(ExtrasMixin, OfflineMixin, ListMixin, AIMixin, FolderMixin, Gtk
         menu_btn.set_image(icon("open-menu-symbolic", Gtk.IconSize.LARGE_TOOLBAR))
         menu = Gtk.Menu()
         for label, fn in (("Palette de commandes (Ctrl+K)", self.show_palette), ("Paramètres (Ctrl+,)", self.show_settings), ("Paramètres dans une fenêtre séparée", lambda: self.show_settings(window=True)),
-                          ("Basculer clair / sombre", self.toggle_theme), ("Tout marquer comme lu", self.mark_all_read),
+                          ("Aide (F1)", lambda: self.show_settings("help")), ("Basculer clair / sombre", self.toggle_theme), ("Tout marquer comme lu", self.mark_all_read),
                           ("Journal d'erreurs", self.show_log), ("À propos", self.show_about)):
             it = Gtk.MenuItem(label=label)
             it.connect("activate", lambda _i, f=fn: f())
@@ -898,6 +898,9 @@ class MainWindow(ExtrasMixin, OfflineMixin, ListMixin, AIMixin, FolderMixin, Gtk
         key = Gdk.keyval_name(ev.keyval) or ""
         ctrl = bool(ev.state & Gdk.ModifierType.CONTROL_MASK)
         typing = isinstance(focus, (Gtk.Entry, Gtk.TextView, Gtk.SpinButton))
+        if key == "F1":
+            self.show_settings("help")
+            return True
         if ctrl and key in ("comma", "less"):
             self.show_settings(window=bool(ev.state & Gdk.ModifierType.SHIFT_MASK))
             return True
@@ -1384,6 +1387,7 @@ class MainWindow(ExtrasMixin, OfflineMixin, ListMixin, AIMixin, FolderMixin, Gtk
             ("Nouveau message", self.compose), ("Actualiser", lambda: self.sync(True)),
             ("Boîte d'envoi (messages en attente ou programmés)…", self.show_outbox),
             ("Chercher aussi sur le serveur", self.search_server_now),
+            ("Aide et raccourcis (F1)", lambda: self.show_settings("help")),
             ("Contacts…", lambda: self.show_settings("contacts")),
             ("Identités d'envoi (alias)…", lambda: self.show_settings("identities")),
             ("Gérer les expéditeurs bloqués et les règles", lambda: self.show_settings("filters")),

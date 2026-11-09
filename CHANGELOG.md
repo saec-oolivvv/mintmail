@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.8.1
+- Aide intégrée complète et consultable (F1, recherche instantanée) ; mintmail --help ; AIDE.txt installé ; tests d'alignement aide / code
+
 ## 1.8.0
 - Suppression de la barre d'actions au survol des messages
 - Conversations, recherche sur le serveur, OAuth Google/Microsoft, IA locale (Ollama), apprentissage des rangements
