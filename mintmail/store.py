@@ -9,6 +9,7 @@ from pathlib import Path
 from .models import Message, Outgoing
 
 APP = "mintmail"
+P2P_MIN_SECRET = 12   # code de jumelage : 12 caractères minimum (les identifiants circulent entre machines)
 CONFIG_DIR = Path(os.environ.get("XDG_CONFIG_HOME", str(Path.home() / ".config"))) / APP
 DATA_DIR = Path(os.environ.get("XDG_DATA_HOME", str(Path.home() / ".local" / "share"))) / APP
 
@@ -28,7 +29,7 @@ DEFAULTS = {
         {"name": "Relance aimable", "html": "<p>Bonjour,</p><p>Je me permets de revenir vers vous au sujet de mon précédent message. Avez-vous eu l'occasion d'y jeter un œil ?</p><p>Merci d'avance,</p>"},
     ],
     # Synchronisation P2P (désactivée par défaut ; exige un code de jumelage commun)
-    "p2p_enabled": False, "p2p_node_id": None, "p2p_secret": "", "p2p_port": 54322,
+    "p2p_enabled": False, "p2p_node_id": None, "p2p_secret": "", "p2p_port": 54322, "sync_meta": {},
     "p2p_disc_port": 54321, "p2p_static_peers": [],
     # Assistance IA (désactivée par défaut ; la clé est stockée dans le trousseau, pas dans ce fichier)
     "ai_enabled": False, "nvidia_api_base": "", "ai_model": "", "ai_auto": True, "ai_triage": True,
@@ -42,6 +43,8 @@ class Config:
         self.data = copy.deepcopy(DEFAULTS)
         self._pw = {}
         self._save_lock = threading.Lock()
+        self.sync_lock = threading.RLock()   # protège les métadonnées de synchro (moteur P2P / interface)
+        self._pw_miss = {}
         self.load()
 
     def load(self):
@@ -50,7 +53,7 @@ class Config:
                 self.data.update(json.load(f))
         except (OSError, ValueError):
             pass
-        if self.data.get("p2p_enabled") and len(str(self.data.get("p2p_secret") or "")) < 8:
+        if self.data.get("p2p_enabled") and len(str(self.data.get("p2p_secret") or "")) < P2P_MIN_SECRET:
             self.data["p2p_enabled"] = False   # jamais de synchro ouverte sans code de jumelage
         if not self.data.get("design_v2"):   # refonte 1.5 : nouvelle identité visuelle par défaut, une seule fois
             self.data.update(style="aurora", theme="dark", accent="#7c8cff", design_v2=True)
@@ -79,9 +82,13 @@ class Config:
     def password(self, account_id):
         if account_id in self._pw:
             return self._pw[account_id]
+        if time.time() - self._pw_miss.get(account_id, 0) < 30:   # échec récent : ne pas solliciter le trousseau en boucle
+            return self.data.get("passwords", {}).get(account_id, "")
         pw = _keyring("get_password", APP, account_id) or self.data.get("passwords", {}).get(account_id, "")
         if pw:
             self._pw[account_id] = pw
+        else:
+            self._pw_miss[account_id] = time.time()
         return pw or ""
 
     def preload_passwords(self):

@@ -19,6 +19,7 @@ from .listing import ListMixin, PAGE
 from .folders import FolderMixin, SMART_VIEWS, dest_of
 from .models import Message, Outgoing
 from .p2p import SyncEngine
+from .syncdata import apply_items, describe as describe_sync
 from .reader import Reader
 from .settings import SettingsPage
 from .log import LOG, log_exception, tail
@@ -322,6 +323,10 @@ class MainWindow(ListMixin, AIMixin, FolderMixin, Gtk.ApplicationWindow):
         self.status.get_style_context().add_class("dim")
         self.status.set_line_wrap(True)
         box.pack_start(self.status, False, False, 0)
+        self.p2p_lbl = Gtk.Label(xalign=0)
+        self.p2p_lbl.get_style_context().add_class("dim")
+        self.p2p_lbl.set_line_wrap(True)
+        box.pack_start(self.p2p_lbl, False, False, 0)
         b = self.settings_btn = Gtk.Button(label="Paramètres")
         b.set_image(icon("preferences-system-symbolic"))
         b.set_always_show_image(True)
@@ -634,6 +639,10 @@ class MainWindow(ListMixin, AIMixin, FolderMixin, Gtk.ApplicationWindow):
     def _tick(self):
         self._ticks += 1
         self.process_outbox()
+        if self._ticks % 3 == 0 and hasattr(self, "p2p_lbl"):
+            eng = self.sync_engine
+            self.p2p_lbl.set_text("⇄ " + eng.state_label().replace("Active — appareil ", "").replace(" — synchronisé à ", " · ")
+                                  if eng.is_enabled() else "")
         if self._ticks % 30 == 0:
             woken = self.cache.wake_snoozed()
             if woken:
@@ -699,29 +708,44 @@ class MainWindow(ListMixin, AIMixin, FolderMixin, Gtk.ApplicationWindow):
 
     # ------------------------------------------------------------ Synchronisation
     def _init_sync(self):
-        """(Re)démarre le moteur de synchronisation P2P selon les réglages. Le moteur existe toujours."""
+        """(Re)démarre la synchronisation automatique entre machines. Le moteur existe toujours."""
         old = getattr(self, "sync_engine", None)
         if old is not None:
             old.stop()
-        self.sync_engine = SyncEngine(self.config, cache=self.cache, on_update=self._on_p2p_update)
+        self.sync_engine = SyncEngine(self.config, cache=self.cache, apply_cb=self._p2p_apply)
         self.sync_engine.start()   # sans effet si désactivé ou sans code de jumelage
 
-    def _on_p2p_update(self, summary):
-        """Appelé depuis un thread de synchro : l'interface est mise à jour dans le thread principal."""
-        names = {"added_rules": "règles", "added_templates": "modèles", "added_blocked": "expéditeurs bloqués",
-                 "added_spam_senders": "expéditeurs en spam", "added_saved_searches": "recherches",
-                 "added_signatures": "signatures"}
-        parts = ["+%d %s" % (v, names[k]) for k, v in summary.items() if k in names and v]
+    def _p2p_apply(self, wins):
+        """Appelé par le moteur (thread de synchro) : applique les éléments reçus DANS le fil principal, puis attend."""
+        box, ev = {}, threading.Event()
 
-        def ui():
-            self._rebuild_saved()
-            self.reload_list()
-            self.toast.popup("Synchro : " + (", ".join(parts) or "à jour"), timeout=4)
+        def run():
+            try:
+                box["res"] = apply_items(self.config, wins, self.cache)
+                self._p2p_refresh(box["res"])
+            except Exception:
+                log_exception("p2p apply")
+            finally:
+                ev.set()
             return False
-        GLib.idle_add(ui)
+        GLib.idle_add(run)
+        ev.wait(15)
+        return box.get("res")
 
-
-
+    def _p2p_refresh(self, res):
+        """Met l'interface à jour selon ce que la synchro vient de changer (comptes, réglages, IA, listes)."""
+        if res["accounts"]:
+            self.accounts_changed()
+        if res["settings"]:
+            self.apply_settings()
+        if res["ai"]:
+            self.refresh_ai()
+        if res["lists"]:
+            self._rebuild_nav_dynamic()
+            self.reload_list()
+        names = res.get("new_accounts") or []
+        self.toast.popup(("Synchro : compte « %s » ajouté — " % names[0] if names else "Synchro : ") + describe_sync(res),
+                         timeout=6)
 
     def sync_from_store(self):
         """Déclenche un échange P2P immédiat avec les pairs."""

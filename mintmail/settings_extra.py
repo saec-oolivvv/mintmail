@@ -301,9 +301,11 @@ def p2p_page(win):
     title = label("Synchronisation entre machines", dim=False)
     title.get_style_context().add_class("list-title")
     grid.attach(title, 0, 0, 2, 1)
-    grid.attach(label("Partage automatiquement, entre vos machines MintMail du même réseau : règles, modèles, "
-                      "expéditeurs bloqués ou en spam, recherches enregistrées et signatures. Les mots de passe, "
-                      "clés API, comptes et courriers ne sont jamais échangés. Seuls les ajouts sont synchronisés."),
+    grid.attach(label("Tout est synchronisé automatiquement entre vos machines MintMail du même réseau dès qu'elles se voient : "
+                      "comptes (avec leurs mots de passe), signatures, IA (clé API), modèles de réponse rapide, règles, "
+                      "blocages, recherches enregistrées et apparence. Les suppressions sont propagées aussi. "
+                      "Les échanges sont authentifiés et chiffrés ; le courrier n'est pas échangé (chaque machine le "
+                      "télécharge depuis son serveur). Utilisez le même code de jumelage partout."),
                 0, 1, 2, 1)
 
     # --- code de jumelage
@@ -323,7 +325,7 @@ def p2p_page(win):
     grid.attach(srow, 1, 2, 1, 1)
 
     def on_generate(_b):
-        secret.set_text(secrets.token_urlsafe(9))
+        secret.set_text(secrets.token_urlsafe(12))
         show.set_active(True)
     gen.connect("clicked", on_generate)
 
@@ -379,14 +381,14 @@ def p2p_page(win):
 
             def done():
                 sync_btn.set_sensitive(True)
-                parts = ["%d %s" % (v, _SYNC_NOUNS.get(k[6:], k[6:])) for k, v in res.items()
-                         if k.startswith("added_") and v]
                 if not win.sync_engine.can_run():
                     msg = "Synchronisation inactive (code de jumelage requis)"
                 elif not res.get("peers_checked"):
                     msg = "Aucune autre machine détectée"
+                elif res.get("failed") and not res.get("applied"):
+                    msg = "Échange impossible : %s" % (win.sync_engine.last_error or "machine injoignable")
                 else:
-                    msg = " + ".join(parts) if parts else "À jour"
+                    msg = ("%d élément(s) reçu(s) — %s" % (res["applied"], win.sync_engine.last_summary)) if res["applied"] else "Tout est à jour"
                 win.toast.popup(msg, timeout=3)
                 refresh()
                 return False
@@ -489,7 +491,7 @@ def help_page():
     page.pack_start(desc, False, False, 8)
 
     # Fonctionnalités
-    feats = Gtk.Label(xalign=0, label="✨ Assistant IA (Ctrl+J) : demandez-lui d'archiver, bloquer, créer une règle, rédiger… chaque action est confirmée\n✨ Carte IA sur chaque message : résumé, points clés, priorité, alerte hameçonnage, réponses suggérées, agenda, traduction, questions\n✨ Tri automatique des nouveaux messages et résumé « En bref » de la boîte\n✨ Rédaction : écrire depuis une idée, améliorer, corriger, raccourcir, ton formel/amical, traduire, objet\n✨ Recherche en langage naturel : tapez « ? les mails non lus de Marie »\n✓ Tous vos dossiers : arborescence complète par compte, déplacer, créer, renommer, supprimer\n✓ Trois styles visuels : Aurora, Papier, Terminal (Paramètres → Apparence)\n✓ Actions instantanées (archiver, supprimer, spam, blocage), swipe, actions au survol\n✓ Réception en temps réel (IMAP IDLE), chargement progressif, connexions persistantes\n✓ Règles, modèles de réponse, recherches enregistrées, rappels sans réponse, sync entre machines")
+    feats = Gtk.Label(xalign=0, label="✨ Assistant IA (Ctrl+J) : demandez-lui d'archiver, bloquer, créer une règle, rédiger… chaque action est confirmée\n✨ Carte IA sur chaque message : résumé, points clés, priorité, alerte hameçonnage, réponses suggérées, agenda, traduction, questions\n✨ Tri automatique des nouveaux messages et résumé « En bref » de la boîte\n✨ Rédaction : écrire depuis une idée, améliorer, corriger, raccourcir, ton formel/amical, traduire, objet\n✨ Recherche en langage naturel : tapez « ? les mails non lus de Marie »\n✓ Tous vos dossiers : arborescence complète par compte, déplacer, créer, renommer, supprimer\n✓ Trois styles visuels : Aurora, Papier, Terminal (Paramètres → Apparence)\n✓ Actions instantanées (archiver, supprimer, spam, blocage), swipe, actions au survol\n✓ Réception en temps réel (IMAP IDLE), chargement progressif, connexions persistantes\n✓ Synchro automatique et chiffrée entre vos machines : comptes, signatures, IA, réponses rapides, règles, apparence")
     feats.get_style_context().add_class("dim")
     feats.set_line_wrap(True)
     page.pack_start(feats, False, False, 8)

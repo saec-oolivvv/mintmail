@@ -1,16 +1,18 @@
-"""Synchronisation des préférences entre deux machines MintMail du même réseau local.
+"""Synchronisation automatique entre vos machines MintMail du même réseau local.
 
-Ce qui est synchronisé (ajouts uniquement, jamais de suppression) : règles, modèles de réponse, expéditeurs
-bloqués / en spam, recherches enregistrées, signatures des comptes déjà présents des deux côtés.
+Tout ce qui configure MintMail est synchronisé (voir syncdata.py) : comptes avec mots de passe, signatures, IA (clé
+comprise), modèles de réponse rapide, règles, blocages, recherches, apparence. Les suppressions se propagent aussi.
+Le courrier n'est pas échangé (chaque machine le synchronise avec son serveur).
 
-Ce qui n'est JAMAIS échangé : mots de passe, clés API, comptes de messagerie, courrier.
-
-Sécurité : la fonction est désactivée par défaut. Elle exige un code de jumelage (8 caractères minimum),
-identique sur les deux machines. L'authentification est mutuelle par défi/réponse HMAC-SHA256 (le code ne
-circule jamais), avec nonces anti-rejeu. Les données échangées (préférences) ne sont pas chiffrées :
-n'utilisez cette fonction que sur un réseau de confiance.
+Sécurité — des identifiants circulant, le canal est authentifié ET chiffré :
+- code de jumelage commun (12 caractères minimum), jamais transmis : PBKDF2-HMAC-SHA256 (600 000 itérations) ;
+- authentification mutuelle par défi/réponse HMAC-SHA256 avec nonces (anti-rejeu) ;
+- clés de session dérivées des nonces ; chiffrement par flux HMAC-SHA256 en mode compteur + étiquette HMAC-SHA256
+  (chiffrer puis authentifier), numéro de séquence lié à chaque trame (rejet des trames altérées, rejouées ou
+  réordonnées). Uniquement la bibliothèque standard : aucune dépendance.
+Limites : pas de confidentialité persistante (un code compromis permet de déchiffrer un trafic enregistré) ; le code
+doit rester secret et fort — utilisez « Générer ». Réseau local de confiance recommandé.
 """
-import copy
 import hashlib
 import hmac
 import ipaddress
@@ -20,68 +22,19 @@ import secrets
 import socket
 import threading
 import time
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional
 
-PROTOCOL = 2
-MAX_LINE = 1_000_000
-MIN_SECRET = 8
-RULE_FIELDS = {"from", "subject", "to"}
-RULE_ACTIONS = {"archive", "trash", "spam", "read", "star", "pin"}
-LIST_KEYS = (("rules", "added_rules"), ("blocked", "added_blocked"),
-             ("spam_senders", "added_spam_senders"), ("saved_searches", "added_saved_searches"))
-COUNT_KEYS = ("added_rules", "added_templates", "added_blocked", "added_spam_senders",
-              "added_saved_searches", "added_signatures")
+from . import syncdata
+from .store import P2P_MIN_SECRET
+
+PROTOCOL = 3
+MAX_LINE = 4096
+MAX_FRAME = 8 * 1024 * 1024
+MIN_SECRET = P2P_MIN_SECRET
 
 
-def _key(x) -> str:
-    return json.dumps(x, sort_keys=True, ensure_ascii=False)
-
-
-def _short(s, n=300) -> bool:
-    return isinstance(s, str) and 0 < len(s) <= n
-
-
-def _valid(name: str, item) -> bool:
-    """Valide un élément reçu d'un pair : on ne fait jamais confiance au réseau."""
-    if name == "rules":
-        return (isinstance(item, dict) and item.get("field") in RULE_FIELDS
-                and item.get("action") in RULE_ACTIONS and _short(item.get("text"), 200))
-    if name in ("blocked", "spam_senders"):
-        return _short(item, 200) and re.match(r"^@?[^\s@]+(@[^\s@]+)?$", item) is not None
-    if name == "saved_searches":
-        return isinstance(item, dict) and _short(item.get("name"), 100) and _short(item.get("query"), 300)
-    if name == "templates":
-        return isinstance(item, dict) and _short(item.get("name"), 100) and _short(item.get("html"), 20000)
-    return False
-
-
-def merge_states(local: dict, remote: dict) -> Tuple[dict, dict]:
-    """Union additive de l'état distant dans une copie de l'état local. Fonction pure.
-
-    Retourne (état_fusionné, compteurs)."""
-    out = copy.deepcopy(local)
-    counts = {k: 0 for k in COUNT_KEYS}
-    for name, ckey in LIST_KEYS:
-        seen = {_key(x) for x in out.get(name, [])}
-        for item in remote.get(name, []) if isinstance(remote.get(name), list) else []:
-            if _valid(name, item) and _key(item) not in seen:
-                out.setdefault(name, []).append(item)
-                seen.add(_key(item))
-                counts[ckey] += 1
-    names = {t.get("name") for t in out.get("templates", [])}
-    for t in remote.get("templates", []) if isinstance(remote.get("templates"), list) else []:
-        if _valid("templates", t) and t["name"] not in names:
-            out.setdefault("templates", []).append({"name": t["name"], "html": t["html"]})
-            names.add(t["name"])
-            counts["added_templates"] += 1
-    sigs = dict(out.get("signatures", {}))
-    rsigs = remote.get("signatures", {})
-    for aid, sig in (rsigs.items() if isinstance(rsigs, dict) else []):
-        if isinstance(aid, str) and isinstance(sig, str) and 0 < len(sig) <= 20000 and not sigs.get(aid):
-            sigs[aid] = sig
-            counts["added_signatures"] += 1
-    out["signatures"] = sigs
-    return out, counts
+def derive_key(secret: str) -> bytes:
+    return hashlib.pbkdf2_hmac("sha256", secret.encode("utf-8"), b"mintmail-p2p-v3", 600_000)
 
 
 def local_ip() -> str:
@@ -104,20 +57,74 @@ def _private(host: str) -> bool:
         return False
 
 
-class SyncEngine:
-    """Moteur de synchronisation : découverte UDP, échange TCP authentifié, fusion additive."""
+def _xor(data: bytes, ks: bytes) -> bytes:
+    return (int.from_bytes(data, "big") ^ int.from_bytes(ks, "big")).to_bytes(len(data), "big") if data else b""
 
-    def __init__(self, config, cache=None, on_update=None):
-        self.config, self.cache, self.on_update = config, cache, on_update
+
+class SecureChannel:
+    """Trames chiffrées + authentifiées au-dessus d'un fichier binaire (chiffrer puis authentifier)."""
+
+    def __init__(self, f, key: bytes, nc: bytes, ns: bytes, initiator: bool):
+        def sub(label):
+            return hmac.new(key, label + b"|" + nc + b"|" + ns, hashlib.sha256).digest()
+        c_enc, c_mac, s_enc, s_mac = sub(b"c2s-enc"), sub(b"c2s-mac"), sub(b"s2c-enc"), sub(b"s2c-mac")
+        self.f = f
+        self.send_enc, self.send_mac, self.recv_enc, self.recv_mac = (
+            (c_enc, c_mac, s_enc, s_mac) if initiator else (s_enc, s_mac, c_enc, c_mac))
+        self.send_seq = self.recv_seq = 0
+
+    @staticmethod
+    def _stream(key: bytes, seq: int, n: int) -> bytes:
+        out, i = [], 0
+        while sum(map(len, out)) < n:
+            out.append(hmac.new(key, seq.to_bytes(8, "big") + i.to_bytes(4, "big"), hashlib.sha256).digest())
+            i += 1
+        return b"".join(out)[:n]
+
+    def _tag(self, key: bytes, seq: int, hdr: bytes, ct: bytes) -> bytes:
+        return hmac.new(key, seq.to_bytes(8, "big") + hdr + ct, hashlib.sha256).digest()
+
+    def send(self, obj: Any) -> None:
+        data = json.dumps(obj, ensure_ascii=False).encode("utf-8")
+        if len(data) > MAX_FRAME:
+            raise ValueError("trame trop grande")
+        ct = _xor(data, self._stream(self.send_enc, self.send_seq, len(data)))
+        hdr = len(ct).to_bytes(4, "big")
+        self.f.write(hdr + ct + self._tag(self.send_mac, self.send_seq, hdr, ct))
+        self.f.flush()
+        self.send_seq += 1
+
+    def _read(self, n: int) -> bytes:
+        b = self.f.read(n)
+        if b is None or len(b) != n:
+            raise ValueError("connexion interrompue")
+        return b
+
+    def recv(self) -> Any:
+        hdr = self._read(4)
+        n = int.from_bytes(hdr, "big")
+        if n > MAX_FRAME:
+            raise ValueError("trame trop grande")
+        ct, tag = self._read(n), self._read(32)
+        if not hmac.compare_digest(tag, self._tag(self.recv_mac, self.recv_seq, hdr, ct)):
+            raise ValueError("authentification de la trame échouée")
+        pt = _xor(ct, self._stream(self.recv_enc, self.recv_seq, n))
+        self.recv_seq += 1
+        return json.loads(pt.decode("utf-8"))
+
+
+class SyncEngine:
+    """Découverte UDP, échange chiffré TCP, fusion « dernière modification gagnante » entièrement automatique."""
+
+    def __init__(self, config, cache=None, on_update=None, apply_cb=None):
+        self.config, self.cache, self.on_update, self.apply_cb = config, cache, on_update, apply_cb
         self._node_id = config.get("p2p_node_id")
         if not self._node_id:
             self._node_id = secrets.token_hex(4).upper()
             config["p2p_node_id"] = self._node_id
             config.save()
         secret = str(config.get("p2p_secret") or "")
-        self._key: Optional[bytes] = (
-            hashlib.pbkdf2_hmac("sha256", secret.encode("utf-8"), b"mintmail-p2p-v2", 100_000)
-            if len(secret) >= MIN_SECRET else None)
+        self._key: Optional[bytes] = derive_key(secret) if len(secret) >= MIN_SECRET else None
         self._enabled = bool(config.get("p2p_enabled", False))
         self._tcp_port = int(config.get("p2p_port", 54322))
         self._disc_port = int(config.get("p2p_disc_port", 54321))
@@ -128,10 +135,10 @@ class SyncEngine:
         self._running = False
         self._udp: Optional[socket.socket] = None
         self._srv: Optional[socket.socket] = None
-        self._last_hash: Optional[str] = None
+        self._last_fp: Optional[str] = None
         self._sync_lock = threading.Lock()
         self._slots = threading.BoundedSemaphore(4)
-        self.last_error = ""
+        self.last_error, self.last_sync, self.last_summary = "", 0.0, ""
 
     # ------------------------------------------------------------ état public
     def is_enabled(self) -> bool:
@@ -153,21 +160,17 @@ class SyncEngine:
             return "Désactivée"
         if self._key is None:
             return "Code de jumelage requis (%d caractères minimum)" % MIN_SECRET
-        if self.last_error:
-            return "Active — %s" % self.last_error
         with self._lock:
             n = len(self._peers)
-        return "Active — appareil %s — %d pair(s)" % (self._node_id[:6], n)
+        base = "Active — appareil %s — %d pair(s)" % (self._node_id[:6], n)
+        if self.last_error:
+            return base + " — " + self.last_error
+        if self.last_sync:
+            return base + " — synchronisé à " + time.strftime("%H:%M:%S", time.localtime(self.last_sync))
+        return base
 
-    def local_state(self) -> dict:
-        c = self.config
-        return {
-            "rules": list(c.get("rules", [])), "templates": list(c.get("templates", [])),
-            "blocked": list(c.get("blocked", [])), "spam_senders": list(c.get("spam_senders", [])),
-            "saved_searches": list(c.get("saved_searches", [])),
-            "signatures": {a["id"]: a["signature_html"] for a in c.get("accounts", [])
-                           if a.get("id") and a.get("signature_html")},
-        }
+    def local_items(self):
+        return syncdata.local_items(self.config)
 
     # --------------------------------------------------------------- cycle de vie
     def start(self) -> bool:
@@ -195,14 +198,15 @@ class SyncEngine:
         except OSError as e:
             self._srv = None
             self.last_error = "port TCP %d indisponible (%s)" % (self._tcp_port, e.strerror)
-        for host_spec in self._static:
-            host, _, port = host_spec.partition(":")
+        for spec in self._static:
+            host, _, port = spec.partition(":")
             if host:
                 with self._lock:
                     self._peers["static:" + host] = {"host": host, "port": int(port) if port.isdigit() else self._tcp_port,
                                                      "last_seen": time.time()}
         for target in (self._discovery_loop, self._server_loop, self._periodic_loop):
             threading.Thread(target=target, daemon=True, name="mintmail-p2p").start()
+        threading.Timer(1.0, self._auto_sync).start()    # premier échange dès le démarrage
         return True
 
     def stop(self) -> None:
@@ -226,9 +230,10 @@ class SyncEngine:
             u = self._udp
             if u is None:
                 self._stop.wait(2)
+                self._check_local_changes()
                 continue
             now = time.time()
-            if now - last_announce > 10:
+            if now - last_announce > 5:
                 last_announce = now
                 try:
                     u.sendto(msg, ("255.255.255.255", self._disc_port))
@@ -252,25 +257,25 @@ class SyncEngine:
                 threading.Thread(target=self._auto_sync, daemon=True).start()
 
     def _periodic_loop(self):
-        while not self._stop.wait(60):
+        while not self._stop.wait(30):
             self._auto_sync()
 
     def _check_local_changes(self):
+        """Détecte toute modification locale (compte ajouté, signature, réglage…) et synchronise aussitôt."""
         try:
-            h = hashlib.sha256(_key(self.local_state()).encode()).hexdigest()
+            fp = syncdata.fingerprint(self.local_items())
         except Exception:
             return
-        if self._last_hash is not None and h != self._last_hash:
+        if self._last_fp is not None and fp != self._last_fp:
             threading.Thread(target=self._auto_sync, daemon=True).start()
-        self._last_hash = h
+        self._last_fp = fp
 
     # ------------------------------------------------------------------ protocole
     def _mac(self, tag: bytes, a: str, b: str, node: str) -> str:
-        return hmac.new(self._key, b"|".join([tag, a.encode(), b.encode(), node.encode()]),
-                        hashlib.sha256).hexdigest()
+        return hmac.new(self._key, b"|".join([tag, a.encode(), b.encode(), node.encode()]), hashlib.sha256).hexdigest()
 
     @staticmethod
-    def _read(f) -> dict:
+    def _read_line(f) -> dict:
         line = f.readline(MAX_LINE + 1)
         if not line or len(line) > MAX_LINE:
             raise ValueError("message vide ou trop long")
@@ -280,8 +285,8 @@ class SyncEngine:
         return obj
 
     @staticmethod
-    def _write(f, obj: dict):
-        f.write(json.dumps(obj, ensure_ascii=False).encode("utf-8") + b"\n")
+    def _write_line(f, obj: dict):
+        f.write(json.dumps(obj).encode("utf-8") + b"\n")
         f.flush()
 
     def _server_loop(self):
@@ -291,7 +296,7 @@ class SyncEngine:
                 self._stop.wait(2)
                 continue
             try:
-                conn, addr = s.accept()
+                conn, _addr = s.accept()
             except socket.timeout:
                 continue
             except OSError:
@@ -303,22 +308,24 @@ class SyncEngine:
 
     def _handle(self, conn):
         try:
-            conn.settimeout(6.0)
+            conn.settimeout(10.0)
             f = conn.makefile("rwb")
-            hello = self._read(f)
+            hello = self._read_line(f)
             nc, node_c = str(hello.get("nc", "")), str(hello.get("node", ""))
             if hello.get("t") != "hello" or hello.get("v") != PROTOCOL or not re.fullmatch(r"[0-9a-f]{32}", nc):
                 return
             ns = secrets.token_hex(16)
-            self._write(f, {"t": "challenge", "node": self._node_id, "ns": ns,
-                            "ps": self._mac(b"S", nc, ns, self._node_id)})
-            msg = self._read(f)
-            if msg.get("t") != "state" or not hmac.compare_digest(
-                    str(msg.get("pc", "")), self._mac(b"C", ns, nc, node_c)):
+            self._write_line(f, {"t": "challenge", "node": self._node_id, "ns": ns,
+                                 "ps": self._mac(b"S", nc, ns, self._node_id)})
+            auth = self._read_line(f)
+            if auth.get("t") != "auth" or not hmac.compare_digest(str(auth.get("pc", "")), self._mac(b"C", ns, nc, node_c)):
                 return   # code de jumelage différent : rejet silencieux
-            mine = self.local_state()
-            self._write(f, {"t": "state", "state": mine})
-            self._apply(mine, msg.get("state") if isinstance(msg.get("state"), dict) else {})
+            chan = SecureChannel(f, self._key, nc.encode(), ns.encode(), initiator=False)
+            msg = chan.recv()
+            mine = self.local_items()
+            chan.send({"t": "items", "items": syncdata.to_wire(mine)})
+            if msg.get("t") == "items":
+                self._merge(mine, msg.get("items"), node_c)
         except (OSError, ValueError):
             pass
         finally:
@@ -328,70 +335,65 @@ class SyncEngine:
             except OSError:
                 pass
 
-    def _exchange(self, peer: Dict[str, Any]) -> dict:
-        counts = {k: 0 for k in COUNT_KEYS}
+    def _exchange(self, peer: Dict[str, Any]) -> int:
         sock = None
         try:
             sock = socket.create_connection((peer["host"], int(peer["port"])), timeout=4.0)
-            sock.settimeout(6.0)
+            sock.settimeout(10.0)
             f = sock.makefile("rwb")
             nc = secrets.token_hex(16)
-            self._write(f, {"t": "hello", "v": PROTOCOL, "node": self._node_id, "nc": nc})
-            ch = self._read(f)
+            self._write_line(f, {"t": "hello", "v": PROTOCOL, "node": self._node_id, "nc": nc})
+            ch = self._read_line(f)
             ns, node_s = str(ch.get("ns", "")), str(ch.get("node", ""))
-            if ch.get("t") != "challenge" or not hmac.compare_digest(
-                    str(ch.get("ps", "")), self._mac(b"S", nc, ns, node_s)):
+            if ch.get("t") != "challenge" or not hmac.compare_digest(str(ch.get("ps", "")), self._mac(b"S", nc, ns, node_s)):
                 self.last_error = "code de jumelage différent sur « %s »" % node_s[:6]
-                return counts
-            mine = self.local_state()
-            self._write(f, {"t": "state", "pc": self._mac(b"C", ns, nc, self._node_id), "state": mine})
-            reply = self._read(f)
-            if reply.get("t") == "state" and isinstance(reply.get("state"), dict):
-                self.last_error = ""
-                return self._apply(mine, reply["state"])
+                return -1
+            self._write_line(f, {"t": "auth", "pc": self._mac(b"C", ns, nc, self._node_id)})
+            chan = SecureChannel(f, self._key, nc.encode(), ns.encode(), initiator=True)
+            mine = self.local_items()
+            chan.send({"t": "items", "items": syncdata.to_wire(mine)})
+            reply = chan.recv()
+            self.last_error = ""
+            self.last_sync = time.time()
+            if reply.get("t") == "items":
+                return self._merge(mine, reply.get("items"), node_s)
+            return 0
         except (OSError, ValueError):
-            pass
+            return -1
         finally:
             if sock:
                 sock.close()
-        return counts
 
-    def _apply(self, mine: dict, remote: dict) -> dict:
-        merged, counts = merge_states(mine, remote)
-        if not any(counts.values()):
-            return counts
-        with self._lock:
-            c = self.config
-            for name, _ in LIST_KEYS:
-                if len(merged.get(name, [])) != len(c.get(name, [])):
-                    c[name] = merged[name]
-            if len(merged.get("templates", [])) != len(c.get("templates", [])):
-                c["templates"] = merged["templates"]
-            for acc in c.get("accounts", []):
-                sig = merged.get("signatures", {}).get(acc.get("id"))
-                if sig and not acc.get("signature_html"):
-                    acc["signature_html"] = sig
-            c.save()
+    def _merge(self, mine: dict, remote_wire: Any, node: str) -> int:
+        """Fusion « dernière modification gagnante » : applique ce qui est plus récent côté pair."""
+        wins = syncdata.merge_items(mine, remote_wire)
+        if not wins:
+            return 0
+        res = self.apply_cb(wins) if self.apply_cb else syncdata.apply_items(self.config, wins, self.cache)
+        res = res or {"count": len(wins), "kinds": {}}
+        self.last_summary = syncdata.describe(res)
         if self.on_update:
             try:
-                self.on_update(dict(counts))
+                self.on_update(res)
             except Exception:
                 pass
-        return counts
+        return int(res.get("count", len(wins)))
 
     def sync_now(self) -> dict:
-        """Échange avec tous les pairs connus ; retourne les compteurs d'ajouts."""
-        total = {k: 0 for k in COUNT_KEYS}
+        """Échange avec tous les pairs connus. Retourne {applied, peers_checked, failed}."""
+        out = {"applied": 0, "peers_checked": 0, "failed": 0}
         if not self.can_run():
-            total["peers_checked"] = 0
-            return total
+            return out
         with self._lock:
             peers = list(self._peers.values())
         for p in peers:
-            for k, v in self._exchange(p).items():
-                total[k] += v
-        total["peers_checked"] = len(peers)
-        return total
+            n = self._exchange(p)
+            out["peers_checked"] += 1
+            if n < 0:
+                out["failed"] += 1
+            else:
+                out["applied"] += n
+        return out
 
     def _auto_sync(self):
         if not self._sync_lock.acquire(blocking=False):

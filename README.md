@@ -1,10 +1,10 @@
-# MintMail 1.5.0
+# MintMail 1.6.0
 
 Client mail moderne pour Linux Mint (Python / GTK3), inspiré de Spark Mail.
 
 ## Installation / mise à jour
 ```bash
-unzip mintmail-1.5.0.zip && cd mintmail-1.5.0
+unzip mintmail-1.6.0.zip && cd mintmail-1.6.0
 ./install.sh            # pour l'utilisateur courant (~/.local) — si « Permission denied » : bash install.sh
 ./install.sh --system   # pour tous les utilisateurs (/opt, sudo)
 ```
@@ -24,6 +24,14 @@ Dépendances (installées automatiquement via apt) : `python3-gi`, `gir1.2-gtk-3
 - Palette de commandes `Ctrl+K`, raccourcis clavier (voir Paramètres → Raccourcis), thème clair/sombre, couleur d'accent
 - Interface adaptative (panneau latéral escamotable, mode une colonne en fenêtre étroite), notifications de bureau, gestionnaire `mailto:`
 - Sans compte configuré : mode démonstration avec messages d'exemple
+
+## Nouveautés 1.6.0 — synchronisation automatique complète entre machines
+- **Tout se synchronise tout seul** dès que deux machines se voient (même code de jumelage) : **comptes de messagerie avec leurs mots de passe**, signatures, **IA** (activation, modèle, endpoint, **clé API**), **modèles de réponse rapide**, règles, blocages / spam, recherches enregistrées, apparence et gestes. Aucun clic nécessaire.
+- **Ajout, modification ET suppression** se propagent (dernière modification gagnante, avec « pierres tombales »). Un compte ajouté sur un poste apparaît sur les autres en quelques secondes et commence à se synchroniser.
+- Vérifications automatiques : à la détection d'un pair, à chaque modification locale (surveillée en continu), au démarrage et toutes les 30 s ; voyant « ⇄ » en bas de la barre latérale.
+- **Chiffré et authentifié** : puisque des identifiants circulent, canal chiffré (HMAC-SHA256 en mode compteur + étiquette), authentification mutuelle par code de jumelage (12 caractères minimum, bouton « Générer »), protection contre l'altération, le rejeu et le réordonnancement.
+- Ce qui reste propre à chaque machine : taille de fenêtre, disposition, zoom, dossiers repliés, courrier téléchargé.
+- Prérequis : horloges des machines à peu près à l'heure (NTP, par défaut sous Linux) ; pare-feu : UDP 54321 et TCP 54322 entre les machines (ou renseigner l'adresse IP de l'autre machine dans Paramètres → Synchronisation).
 
 ## Nouveautés 1.5.0 — tous vos dossiers, une identité visuelle à part
 - **Tous les dossiers de chaque boîte** dans la barre latérale : arborescence complète (sous-dossiers repliables, dossiers « parents » comme `[Gmail]`, accents décodés), compteurs de non lus par dossier, un compte = un groupe repliable
