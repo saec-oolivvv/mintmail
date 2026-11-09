@@ -1,4 +1,4 @@
-# MintMail 1.6.0
+# MintMail 1.6.1
 
 Client mail moderne pour Linux Mint (Python / GTK3), inspiré de Spark Mail.
 
@@ -24,6 +24,10 @@ Dépendances (installées automatiquement via apt) : `python3-gi`, `gir1.2-gtk-3
 - Palette de commandes `Ctrl+K`, raccourcis clavier (voir Paramètres → Raccourcis), thème clair/sombre, couleur d'accent
 - Interface adaptative (panneau latéral escamotable, mode une colonne en fenêtre étroite), notifications de bureau, gestionnaire `mailto:`
 - Sans compte configuré : mode démonstration avec messages d'exemple
+
+## Nouveautés 1.6.1
+- **Paquet `.deb`** : `sudo apt install ./mintmail_1.6.1_all.deb` (dépendances installées automatiquement, mise à jour = réinstaller le .deb). `mintmail --remove-local-install` supprime une ancienne installation par `install.sh`.
+- **Correctif** : la barre d'actions qui apparaît au survol d'un message clignotait et n'était pas cliquable (le pointeur quittait la carte dès que la barre apparaissait). Elle reste maintenant affichée tant que le pointeur est sur le message ou sur la barre, et ses boutons fonctionnent.
 
 ## Nouveautés 1.6.0 — synchronisation automatique complète entre machines
 - **Tout se synchronise tout seul** dès que deux machines se voient (même code de jumelage) : **comptes de messagerie avec leurs mots de passe**, signatures, **IA** (activation, modèle, endpoint, **clé API**), **modèles de réponse rapide**, règles, blocages / spam, recherches enregistrées, apparence et gestes. Aucun clic nécessaire.

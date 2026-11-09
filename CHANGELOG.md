@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.6.1
+- Correctif : la barre d'actions au survol d'un message clignotait et n'était pas utilisable (masquage différé, boutons surveillés)
+- Livraison sous forme de paquet .deb ; option --remove-local-install pour retirer l'ancienne installation locale
+
 ## 1.6.0
 - Synchro entre machines entièrement automatique : comptes + mots de passe, signatures, IA (clé comprise), modèles de réponse rapide, règles, blocages, recherches, apparence ; ajouts, modifications et suppressions
 - Canal chiffré + authentifié (code de jumelage ≥ 12 caractères), détection continue des modifications locales, échange toutes les 30 s et à chaque changement, voyant dans la barre latérale

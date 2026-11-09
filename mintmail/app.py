@@ -1,4 +1,6 @@
+import shutil
 import sys
+from pathlib import Path
 from urllib.parse import urlparse, parse_qs, unquote
 
 import gi
@@ -51,12 +53,39 @@ def main(argv=None):
         return 0
     if "--diagnose" in argv:
         return diagnose()
+    if "--remove-local-install" in argv:
+        return remove_local_install()
     log("Démarrage MintMail %s" % __version__)
     return MintMailApp().run([a for a in argv if a not in ("--settings", "--window")])
 
 
+def remove_local_install():
+    """Supprime l'ancienne installation par install.sh (~/.local) qui masquerait le paquet .deb. Garde vos réglages et vos mails."""
+    home = Path.home()
+    paths = [home / ".local/share/mintmail-app", home / ".local/bin/mintmail",
+             home / ".local/share/applications/mintmail.desktop",
+             home / ".local/share/icons/hicolor/scalable/apps/mintmail.svg"]
+    done = []
+    for p in paths:
+        try:
+            if p.is_dir():
+                shutil.rmtree(p)
+                done.append(str(p))
+            elif p.exists() or p.is_symlink():
+                p.unlink()
+                done.append(str(p))
+        except OSError as e:
+            print("Impossible de supprimer %s : %s" % (p, e))
+    print("Ancienne installation locale supprimée :" if done else "Aucune ancienne installation locale.")
+    for d in done:
+        print("  -", d)
+    print("Vos réglages (~/.config/mintmail) et votre courrier en cache sont conservés.")
+    return 0
+
+
 def diagnose():
     print("MintMail %s" % __version__)
+    print("Installé dans :", Path(__file__).resolve().parent)
     print("Config :", CONFIG_DIR / "config.json")
     print("Données :", DATA_DIR)
     print("Journal :", LOG)
