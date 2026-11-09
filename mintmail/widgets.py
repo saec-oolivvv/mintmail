@@ -426,3 +426,23 @@ class Toast(Gtk.Revealer):
         self._finish(expired=False)
         if cb:
             cb()
+
+
+def row_at_event(lb, ev):
+    """Ligne de liste sous un clic. Les coordonnées d'un évènement sont relatives à la FENÊTRE qui l'a reçu (ici la carte du
+    message, pas la liste) : get_row_at_y(ev.y) retombait presque toujours sur la première ligne (le dernier message reçu).
+    On remonte donc depuis le widget qui a réellement reçu le clic ; à défaut, on convertit les coordonnées dans le repère de la liste."""
+    w = Gtk.get_event_widget(ev)
+    node = w
+    while node is not None and node is not lb:
+        if isinstance(node, Gtk.ListBoxRow):
+            return node
+        node = node.get_parent()
+    if w is not None:
+        try:
+            res = w.translate_coordinates(lb, int(ev.x), int(ev.y))
+            if res:
+                return lb.get_row_at_y(int(res[-1]))
+        except Exception:
+            pass
+    return lb.get_row_at_y(int(ev.y))

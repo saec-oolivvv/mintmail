@@ -5,7 +5,7 @@ gi.require_version("Gdk", "3.0")
 from gi.repository import Gtk, Gdk, GLib
 
 from .backend import utf7_decode
-from .widgets import Avatar, icon
+from .widgets import Avatar, icon, row_at_event
 
 SMART_VIEWS = ("inbox", "unread", "starred", "pinned", "snoozed", "drafts")
 LOGICAL = ("inbox", "sent", "drafts", "archive", "trash", "spam")
@@ -501,7 +501,7 @@ class FolderMixin:
     def _nav_context(self, lb, ev):
         if ev.button != 3:
             return False
-        row = lb.get_row_at_y(int(ev.y))
+        row = row_at_event(lb, ev)
         if row is None:
             return False
         aid = getattr(row, "account", None)

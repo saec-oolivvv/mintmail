@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.9.2
+- Correctif : le clic droit visait toujours le premier message de la liste (coordonnées relatives à la carte) ; ligne retrouvée via le widget cliqué (liste, mode sélection, dossiers)
+
 ## 1.9.1
 - Assistant guidé de création de l'identifiant OAuth (liens exacts), identifiants préinstallables (/etc/mintmail/oauth-clients.json), aide mise à jour
 

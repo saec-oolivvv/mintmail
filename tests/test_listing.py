@@ -1,5 +1,5 @@
 """Test fidèle de la liste : un clic ouvre toujours le message, actions instantanées, sélection du suivant."""
-import sys, time, os
+import sys, time, os, types
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import gtkstub   # noqa: F401  (installe les doublures de gi)
 from mintmail.store import Config, Cache
@@ -177,3 +177,59 @@ def test_message_rows_have_no_hover_action_bar():
     w = make_window(10)
     w.reload_list(full=True)
     assert "hover_ev" not in w.listbox.get_row_at_index(0).__dict__
+
+
+def _click_env(w, index):
+    """Un clic reçu par un widget INTERNE de la carte du message n° index ; y est relatif à la carte (petit), comme dans GTK."""
+    rows = w.listbox._sorted()
+    target = rows[index]
+
+    class Child:
+        def get_parent(self_): return target
+    WD.Gtk.get_event_widget = lambda e: e.widget
+    FakeLB.get_row_at_y = lambda self, y: self._sorted()[int(y) // 72]          # ancien comportement : y relatif à la carte -> ligne 0
+    FakeLB.unselect_row = lambda self, row: setattr(self, "sel", None)
+    return rows, target, types.SimpleNamespace(button=3, x=40.0, y=12.0, widget=Child())
+
+
+def test_right_click_targets_the_clicked_message_not_the_latest_one():
+    """Régression : le menu clic droit (et donc toutes les actions IA) visait toujours le dernier message reçu."""
+    w = make_window(30)
+    w.reload_list(full=True)
+    rows, target, ev = _click_env(w, 9)
+    assert target is not rows[0]
+    seen = []
+    w.ai_menu_items = lambda m: (seen.append(m.id), [])[1]
+    w.build_snooze_menu = lambda cb=None: gtkstub.D()
+    w.build_move_menu = lambda msgs=None: gtkstub.D()
+    w._on_list_context(w.listbox, ev)
+    assert w.listbox.get_selected_row() is target and seen == [target.msg.id]          # le message cliqué, pas le premier
+    # clic sur un autre message : le menu suit
+    _rows, target2, ev2 = _click_env(w, 3)
+    seen.clear()
+    w._on_list_context(w.listbox, ev2)
+    assert seen == [target2.msg.id] and w.listbox.get_selected_row() is target2
+
+
+def test_selection_mode_click_toggles_the_clicked_row():
+    w = make_window(30)
+    w.reload_list(full=True)
+    rows, target, ev = _click_env(w, 5)
+    w.select_mode = True
+    target.is_selected = lambda: False
+    ev.button = 1
+    assert w._on_list_click(w.listbox, ev) is True and w.listbox.get_selected_row() is target
+
+
+def test_row_at_event_falls_back_to_coordinate_translation():
+    w = make_window(10)
+    w.reload_list(full=True)
+    rows = w.listbox._sorted()
+
+    class Orphan:                                    # widget sans ligne parente : conversion de coordonnées vers la liste
+        def get_parent(self_): return None
+        def translate_coordinates(self_, dest, x, y): return (x, y + 72 * 4)
+    WD.Gtk.get_event_widget = lambda e: e.widget
+    FakeLB.get_row_at_y = lambda self, y: self._sorted()[int(y) // 72]
+    ev = types.SimpleNamespace(button=3, x=5.0, y=10.0, widget=Orphan())
+    assert WD.row_at_event(w.listbox, ev) is rows[4]

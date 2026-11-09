@@ -9,7 +9,7 @@ gi.require_version("Gdk", "3.0")
 from gi.repository import Gtk, Gdk, GLib
 
 from .util import format_full
-from .widgets import MessageRow
+from .widgets import MessageRow, row_at_event
 
 PAGE = 100
 FOLDER_VERBS = {"archive": "archivé", "trash": "supprimé", "spam": "signalé comme spam", "inbox": "déplacé"}
@@ -168,7 +168,7 @@ class ListMixin:
 
     def _on_list_click(self, lb, ev):
         if self.select_mode and ev.button == 1:
-            row = lb.get_row_at_y(int(ev.y))
+            row = row_at_event(lb, ev)
             if row:
                 (lb.unselect_row if row.is_selected() else lb.select_row)(row)
                 return True
@@ -177,7 +177,7 @@ class ListMixin:
     def _on_list_context(self, lb, ev):
         if ev.button != 3:
             return False
-        row = lb.get_row_at_y(int(ev.y))
+        row = row_at_event(lb, ev)
         if not row:
             return False
         if not row.is_selected():

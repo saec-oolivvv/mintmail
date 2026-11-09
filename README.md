@@ -1,4 +1,4 @@
-# MintMail 1.9.1
+# MintMail 1.9.2
 
 Client mail moderne pour Linux Mint (Python / GTK3), inspiré de Spark Mail.
 
@@ -24,6 +24,9 @@ Dépendances (installées automatiquement via apt) : `python3-gi`, `gir1.2-gtk-3
 - Palette de commandes `Ctrl+K`, raccourcis clavier (voir Paramètres → Raccourcis), thème clair/sombre, couleur d'accent
 - Interface adaptative (panneau latéral escamotable, mode une colonne en fenêtre étroite), notifications de bureau, gestionnaire `mailto:`
 - Sans compte configuré : mode démonstration avec messages d'exemple
+
+## Nouveautés 1.9.2
+- **Correctif important — clic droit** : le menu (et donc toutes les actions ✨ IA, archiver, spam, ranger…) visait toujours le dernier message reçu au lieu du message cliqué. Il agit maintenant sur le message sous le clic, y compris en mode sélection et dans l'arborescence des dossiers.
 
 ## Nouveautés 1.9.1
 - **Assistant de configuration Google / Microsoft** : au premier « Se connecter », une fenêtre guide pas à pas avec un bouton « Ouvrir ↗ » par page de la console (projet, API Agenda, écran de consentement, identifiant). À faire **une seule fois** : l'identifiant se synchronise avec vos autres machines.
