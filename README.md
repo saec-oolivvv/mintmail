@@ -1,4 +1,4 @@
-# MintMail 1.6.4
+# MintMail 1.6.6
 
 Client mail moderne pour Linux Mint (Python / GTK3), inspiré de Spark Mail.
 
@@ -24,6 +24,13 @@ Dépendances (installées automatiquement via apt) : `python3-gi`, `gir1.2-gtk-3
 - Palette de commandes `Ctrl+K`, raccourcis clavier (voir Paramètres → Raccourcis), thème clair/sombre, couleur d'accent
 - Interface adaptative (panneau latéral escamotable, mode une colonne en fenêtre étroite), notifications de bureau, gestionnaire `mailto:`
 - Sans compte configuré : mode démonstration avec messages d'exemple
+
+## Nouveautés 1.6.6
+- **`/usr/bin/mintmail --remove-local-install` ne supprime plus rien** : il LISTE d'abord les installations hors paquet (avec la version de chacune, lue sans exécuter le lanceur) et signale les versions inconnues de ce paquet. Avec `--yes`, il **met de côté** (dans `~/mintmail-sauvegarde-<date>/`, restaurable) les éléments de votre dossier personnel. Les éléments système (`/usr/local`, `/opt`) ne sont jamais touchés : il affiche seulement la commande.
+- `mintmail --diagnose` affiche la version de chaque lanceur trouvé dans le PATH.
+
+## Nouveautés 1.6.5
+- **Ancienne installation locale** (faite avec `install.sh`) : elle masque le paquet .deb. Pour la retirer, utilisez **le chemin complet** : `/usr/bin/mintmail --remove-local-install` (l'ancien lanceur local ne connaît pas cette option), puis ouvrez un nouveau terminal. Seuls les fichiers venant de MintMail sont supprimés ; réglages et courrier en cache sont conservés.
 
 ## Nouveautés 1.6.4 — fiabilité d'une machine à l'autre
 - **Le lanceur utilise toujours `/usr/bin/python3`** : sur une machine où `python3` pointe vers un autre Python (conda, pyenv, venv, version installée à la main), MintMail ne trouvait pas GTK (`python3-gi`) et ne démarrait pas.

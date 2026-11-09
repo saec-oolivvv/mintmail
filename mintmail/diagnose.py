@@ -66,9 +66,15 @@ def build_report() -> str:
         if p and os.path.exists(p) and os.path.realpath(p) not in seen:   # /bin est un lien vers /usr/bin : même fichier
             seen.add(os.path.realpath(p))
             shadows.append(p)
-    add("Lanceurs    : %s" % (", ".join(shadows) or "aucun dans le PATH"))
+    from .entry import _launcher_version
+    detail = []
+    for sp in shadows:
+        v = _launcher_version(__import__("pathlib").Path(sp)) if os.path.realpath(sp) != os.path.realpath("/usr/bin/mintmail") else __version__
+        detail.append("%s [%s]" % (sp, v))
+    add("Lanceurs    : %s" % (", ".join(detail) or "aucun dans le PATH"))
     if shadows and os.path.realpath(shadows[0]) != os.path.realpath("/usr/bin/mintmail"):
-        add("               ^ ce lanceur passe avant /usr/bin/mintmail : « mintmail --remove-local-install » (ou /usr/bin/mintmail)")
+        add("               ^ ce lanceur passe avant /usr/bin/mintmail. Lancez « /usr/bin/mintmail --remove-local-install »")
+        add("                 (il LISTE d'abord, ne modifie rien sans --yes, et met de côté au lieu de supprimer)")
     add("Session     : %s  DISPLAY=%s  WAYLAND_DISPLAY=%s" % (os.environ.get("XDG_SESSION_TYPE", "?"),
                                                              os.environ.get("DISPLAY", "-"), os.environ.get("WAYLAND_DISPLAY", "-")))
     add("")

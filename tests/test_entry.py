@@ -52,10 +52,6 @@ def test_reset_sets_aside_without_deleting_and_remove_local_install():
     assert [f for f in os.listdir(tmp + "/data/mintmail") if f.startswith("cache.db.bak-")]
     r2, _ = run(["--reset"], home=tmp)
     assert "Rien à réinitialiser" in r2.stdout
-    os.makedirs(tmp + "/.local/bin"); os.makedirs(tmp + "/.local/share/mintmail-app/app")
-    open(tmp + "/.local/bin/mintmail", "w").write("#!/bin/sh")
-    r3, _ = run(["--remove-local-install"], home=tmp)
-    assert not os.path.exists(tmp + "/.local/bin/mintmail") and "conservés" in r3.stdout
 
 
 def test_diagnose_does_not_flag_usrmerge_symlinks_but_flags_real_shadowing():
@@ -69,3 +65,40 @@ def test_diagnose_does_not_flag_usrmerge_symlinks_but_flags_real_shadowing():
     assert line.count(tmp) == 1, line                                      # un seul lanceur compté
     r2, _ = run(["--diagnose"], env_extra={"PATH": "%s:%s:%s" % (c, a, os.environ["PATH"])})
     assert "passe avant" in r2.stdout                                      # un autre fichier devant : signalé
+
+
+def test_remove_local_install_lists_first_then_sets_aside_never_deletes():
+    tmp = tempfile.mkdtemp()
+    app = tmp + "/.local/share/mintmail-app"
+    os.makedirs(app + "/app"); os.makedirs(tmp + "/.local/bin"); os.makedirs(tmp + "/.config/mintmail")
+    open(app + "/VERSION", "w").write("3.0.1\n")                                          # une version que ce paquet ne connaît pas
+    launcher = tmp + "/.local/bin/mintmail"
+    open(launcher, "w").write('#!/bin/sh\nexec env PYTHONPATH="%s/app${PYTHONPATH:+:$PYTHONPATH}" python3 -m mintmail "$@"\n' % app)
+    open(tmp + "/.config/mintmail/config.json", "w").write("{}")
+    # 1) sans --yes : liste, signale la version inconnue, ne modifie RIEN
+    r, _ = run(["--remove-local-install"], home=tmp)
+    assert "3.0.1" in r.stdout and "INCONNUE" in r.stdout and "Rien n'a été modifié" in r.stdout
+    assert os.path.exists(launcher) and os.path.isdir(app)
+    # 2) avec --yes : mis de côté (pas supprimé), réglages intacts
+    r2, _ = run(["--remove-local-install", "--yes"], home=tmp)
+    backups = [d for d in os.listdir(tmp) if d.startswith("mintmail-sauvegarde-")]
+    assert len(backups) == 1 and not os.path.exists(launcher) and not os.path.exists(app)
+    assert len(os.listdir(tmp + "/" + backups[0])) == 2 and os.path.exists(tmp + "/.config/mintmail/config.json")
+    assert "hash -r" in r2.stdout
+    # 3) un fichier qui n'est pas de MintMail n'est jamais déplacé
+    open(launcher, "w").write("#!/bin/sh\necho script personnel\n")
+    r3, _ = run(["--remove-local-install", "--yes"], home=tmp)
+    assert os.path.exists(launcher) and "Conservé" in r3.stdout
+
+
+def test_diagnose_shows_launcher_versions_without_running_them():
+    tmp = tempfile.mkdtemp()
+    app = tmp + "/.local/share/mintmail-app"
+    os.makedirs(app + "/app"); os.makedirs(tmp + "/.local/bin")
+    open(app + "/VERSION", "w").write("3.0.1\n")
+    marker = tmp + "/EXECUTE"
+    open(tmp + "/.local/bin/mintmail", "w").write('#!/bin/sh\ntouch %s\nexec env PYTHONPATH="%s/app" python3 -m mintmail\n' % (marker, app))
+    os.chmod(tmp + "/.local/bin/mintmail", 0o755)
+    r, _ = run(["--diagnose"], home=tmp, env_extra={"PATH": tmp + "/.local/bin:" + os.environ["PATH"]})
+    assert "[3.0.1]" in r.stdout and "passe avant" in r.stdout and "met de côté au lieu de supprimer" in r.stdout
+    assert not os.path.exists(marker)                                                      # le lanceur inconnu n'est jamais exécuté

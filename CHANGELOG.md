@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.6.6
+- --remove-local-install : liste d'abord (versions comprises), met de côté avec --yes au lieu de supprimer, ne touche jamais /usr/local ni /opt
+- --diagnose : version de chaque lanceur du PATH, sans les exécuter
+
+## 1.6.5
+- Nettoyage de l'ancienne installation locale : commande à lancer avec le chemin complet (/usr/bin/mintmail --remove-local-install), suppression limitée aux fichiers de MintMail
+
 ## 1.6.4
 - Lanceur : /usr/bin/python3 explicite (Python de conda / pyenv / venv sans PyGObject)
 - --diagnose (rapport sans secrets), --reset (mise de côté des données), démarrage protégé avec boîte de dialogue, message clair sans GTK

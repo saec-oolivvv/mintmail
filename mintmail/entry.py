@@ -1,5 +1,6 @@
 """Point d'entrée sans GTK : options utilitaires et message clair si l'interface ne peut pas démarrer."""
 import os
+import re
 import shutil
 import sys
 import time
@@ -19,27 +20,97 @@ Pour un rapport complet : /usr/bin/mintmail --diagnose
 """
 
 
-def remove_local_install() -> int:
-    """Supprime l'ancienne installation par install.sh (~/.local) qui masquerait le paquet .deb. Garde réglages et mails."""
-    home = Path.home()
-    paths = [home / ".local/share/mintmail-app", home / ".local/bin/mintmail",
-             home / ".local/share/applications/mintmail.desktop",
-             home / ".local/share/icons/hicolor/scalable/apps/mintmail.svg"]
-    done = []
-    for p in paths:
+def _head(path: Path, n: int = 4096) -> str:
+    try:
+        return path.read_text(encoding="utf-8", errors="replace")[:n]
+    except OSError:
+        return ""
+
+
+def _launcher_version(path: Path) -> str:
+    """Version d'un lanceur d'une installation locale/système, SANS l'exécuter (lit le fichier VERSION à côté de l'appli)."""
+    m = re.search(r'PYTHONPATH="([^"$:]+)', _head(path))
+    if m:
+        v = Path(m.group(1)).parent / "VERSION"
         try:
-            if p.is_dir():
-                shutil.rmtree(p)
-                done.append(str(p))
-            elif p.exists() or p.is_symlink():
-                p.unlink()
-                done.append(str(p))
+            return v.read_text(encoding="utf-8").strip()
+        except OSError:
+            pass
+    return "?"
+
+
+def local_installs():
+    """Installations de MintMail hors paquet .deb : [(chemin, description, version)] — rien n'est modifié."""
+    home = Path.home()
+    found = []
+    app = home / ".local/share/mintmail-app"
+    if app.is_dir():
+        try:
+            ver = (app / "VERSION").read_text(encoding="utf-8").strip()
+        except OSError:
+            ver = "?"
+        found.append((app, "application locale", ver))
+    for p, what in ((home / ".local/bin/mintmail", "lanceur local"), (Path("/usr/local/bin/mintmail"), "lanceur système (/usr/local)")):
+        if p.exists() or p.is_symlink():
+            found.append((p, what, _launcher_version(p) if "mintmail" in _head(p) else "?"))
+    for p, what in ((home / ".local/share/applications/mintmail.desktop", "entrée de menu locale"),
+                    (home / ".local/share/icons/hicolor/scalable/apps/mintmail.svg", "icône locale")):
+        if p.exists():
+            found.append((p, what, ""))
+    opt = Path("/opt/mintmail")
+    if opt.is_dir():
+        try:
+            ver = (opt / "VERSION").read_text(encoding="utf-8").strip()
+        except OSError:
+            ver = "?"
+        found.append((opt, "application système (/opt)", ver))
+    return found
+
+
+def remove_local_install(argv=None) -> int:
+    """Sans --yes : LISTE seulement ce qui masque le paquet (aucune modification). Avec --yes : met de côté, sans rien
+    supprimer, les éléments de votre dossier personnel dans ~/mintmail-sauvegarde-<date>/ (réglages et courrier conservés)."""
+    argv = list(argv if argv is not None else sys.argv)
+    home = Path.home()
+    items = local_installs()
+    if not items:
+        print("Aucune installation de MintMail hors paquet .deb.")
+        return 0
+    print("Installations de MintMail hors paquet .deb (le paquet installé est la version %s) :" % __version__)
+    for p, what, ver in items:
+        flag = ""
+        if ver and ver != "?" and not ver.startswith("1."):
+            flag = "   <-- version INCONNUE de ce paquet : peut-être votre propre version, ne la retirez pas sans vérifier"
+        print("  - %-30s %s%s%s" % (what, p, ("  [version %s]" % ver) if ver else "", flag))
+    mine = [(p, w, v) for p, w, v in items if str(p).startswith(str(home))]
+    system = [(p, w, v) for p, w, v in items if not str(p).startswith(str(home))]
+    if system:
+        print("\nÉléments système (ce programme n'y touche jamais) : retirez-les vous-même si besoin, par ex.")
+        for p, _w, _v in system:
+            print("    sudo mv %s %s.sauvegarde" % (p, p))
+    if "--yes" not in argv:
+        print("\nRien n'a été modifié. Pour METTRE DE CÔTÉ (sans supprimer) les éléments de votre dossier personnel :")
+        print("    /usr/bin/mintmail --remove-local-install --yes")
+        return 0
+    dest = home / ("mintmail-sauvegarde-" + time.strftime("%Y%m%d-%H%M%S"))
+    moved = []
+    for p, what, ver in mine:
+        if p.is_file() and p.suffix != ".svg" and "mintmail" not in _head(p):
+            print("Conservé (ne semble pas venir de MintMail) : %s" % p)
+            continue
+        try:
+            dest.mkdir(exist_ok=True)
+            target = dest / str(p.relative_to(home)).replace("/", "__")
+            shutil.move(str(p), str(target))
+            moved.append((p, target))
         except OSError as e:
-            print("Impossible de supprimer %s : %s" % (p, e))
-    print("Ancienne installation locale supprimée :" if done else "Aucune ancienne installation locale.")
-    for d in done:
-        print("  -", d)
-    print("Vos réglages (~/.config/mintmail) et votre courrier en cache sont conservés.")
+            print("Impossible de déplacer %s : %s" % (p, e))
+    for p, t in moved:
+        print("Mis de côté : %s  ->  %s" % (p, t))
+    print("\nVos réglages (~/.config/mintmail) et votre courrier en cache n'ont pas été touchés.")
+    if moved:
+        print("Pour tout restaurer, remettez les éléments de %s à leur place d'origine." % dest)
+        print("Ouvrez un nouveau terminal (ou tapez : hash -r) puis lancez : mintmail")
     return 0
 
 
@@ -71,7 +142,7 @@ def main(argv=None) -> int:
         from .diagnose import print_report
         return print_report()
     if "--remove-local-install" in argv:
-        return remove_local_install()
+        return remove_local_install(argv)
     if "--reset" in argv:
         return reset_data()
     install_hook()
