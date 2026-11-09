@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.6.4
+- Lanceur : /usr/bin/python3 explicite (Python de conda / pyenv / venv sans PyGObject)
+- --diagnose (rapport sans secrets), --reset (mise de côté des données), démarrage protégé avec boîte de dialogue, message clair sans GTK
+
 ## 1.6.3
 - Paquet .deb avec epoch (1:1.6.3) : remplace toute version précédemment installée, même de numéro plus élevé
 

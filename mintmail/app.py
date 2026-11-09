@@ -1,6 +1,5 @@
-import shutil
+import os
 import sys
-from pathlib import Path
 from urllib.parse import urlparse, parse_qs, unquote
 
 import gi
@@ -8,8 +7,8 @@ gi.require_version("Gtk", "3.0")
 from gi.repository import Gtk, Gio, GLib
 
 from . import APP_ID, APP_NAME, __version__
-from .store import Config, Cache, CONFIG_DIR, DATA_DIR
-from .log import install_hook, LOG, log
+from .store import Config, Cache
+from .log import install_hook, LOG, log, log_exception
 
 
 class MintMailApp(Gtk.Application):
@@ -20,21 +19,45 @@ class MintMailApp(Gtk.Application):
 
     def _window(self):
         if not self.win:
-            from .window import MainWindow
-            Gtk.Window.set_default_icon_name("mintmail")
-            self.win = MainWindow(self, Config(), Cache())
+            try:
+                from .window import MainWindow
+                Gtk.Window.set_default_icon_name("mintmail")
+                self.win = MainWindow(self, Config(), Cache())
+            except Exception as e:
+                self._startup_failure(e)
+                return None
             install_hook(lambda e: GLib.idle_add(
                 lambda: (self.win.toast.popup("Erreur interne : %s (menu ☰ → Journal d'erreurs)" % str(e)[:70], timeout=8), False)[1]))
         return self.win
 
+    def _startup_failure(self, exc):
+        """Démarrage impossible : message clair, journal, et possibilité de repartir de données propres (sauvegardées)."""
+        log_exception("démarrage de la fenêtre")
+        d = Gtk.MessageDialog(message_type=Gtk.MessageType.ERROR, text="MintMail n'a pas pu démarrer",
+                              secondary_text="%s\n\nDétails : %s\nDiagnostic : /usr/bin/mintmail --diagnose\n\n"
+                                             "Si le problème vient de vos données, vous pouvez les mettre de côté "
+                                             "(rien n'est supprimé) et relancer." % (exc, LOG))
+        d.add_buttons("Quitter", Gtk.ResponseType.CLOSE, "Mettre de côté réglages et cache, puis relancer", Gtk.ResponseType.APPLY)
+        r = d.run()
+        d.destroy()
+        if r == Gtk.ResponseType.APPLY:
+            from .entry import reset_data
+            reset_data()
+            os.execv(sys.executable, [sys.executable, "-m", "mintmail"])
+
     def do_activate(self):
         win = self._window()
+        if win is None:
+            self.quit()
+            return
         win.present()
-        if "--settings" in sys.argv:
-            GLib.idle_add(lambda: (win.show_settings(window="--window" in sys.argv), False)[1])
+        if getattr(self, "open_settings", False):
+            GLib.idle_add(lambda: (win.show_settings(window=self.settings_window), False)[1])
 
     def do_open(self, files, n_files, hint):
         win = self._window()
+        if win is None:
+            return
         win.present()
         for f in files:
             uri = f.get_uri()
@@ -46,61 +69,8 @@ class MintMailApp(Gtk.Application):
                             body_html=" ".join(q.get("body", [])).replace("\n", "<br>"))
 
 
-def main(argv=None):
-    argv = argv if argv is not None else sys.argv
-    if "--version" in argv:
-        print("%s %s" % (APP_NAME, __version__))
-        return 0
-    if "--diagnose" in argv:
-        return diagnose()
-    if "--remove-local-install" in argv:
-        return remove_local_install()
-    log("Démarrage MintMail %s" % __version__)
-    return MintMailApp().run([a for a in argv if a not in ("--settings", "--window")])
-
-
-def remove_local_install():
-    """Supprime l'ancienne installation par install.sh (~/.local) qui masquerait le paquet .deb. Garde vos réglages et vos mails."""
-    home = Path.home()
-    paths = [home / ".local/share/mintmail-app", home / ".local/bin/mintmail",
-             home / ".local/share/applications/mintmail.desktop",
-             home / ".local/share/icons/hicolor/scalable/apps/mintmail.svg"]
-    done = []
-    for p in paths:
-        try:
-            if p.is_dir():
-                shutil.rmtree(p)
-                done.append(str(p))
-            elif p.exists() or p.is_symlink():
-                p.unlink()
-                done.append(str(p))
-        except OSError as e:
-            print("Impossible de supprimer %s : %s" % (p, e))
-    print("Ancienne installation locale supprimée :" if done else "Aucune ancienne installation locale.")
-    for d in done:
-        print("  -", d)
-    print("Vos réglages (~/.config/mintmail) et votre courrier en cache sont conservés.")
-    return 0
-
-
-def diagnose():
-    print("MintMail %s" % __version__)
-    print("Installé dans :", Path(__file__).resolve().parent)
-    print("Config :", CONFIG_DIR / "config.json")
-    print("Données :", DATA_DIR)
-    print("Journal :", LOG)
-    try:
-        print("GTK : %d.%d.%d" % (Gtk.get_major_version(), Gtk.get_minor_version(), Gtk.get_micro_version()))
-    except Exception as e:
-        print("GTK : erreur", e)
-    try:
-        from .reader import HAS_WEBKIT
-        print("WebKit :", "oui" if HAS_WEBKIT else "non (lecture en texte brut)")
-    except Exception as e:
-        print("WebKit : erreur", e)
-    try:
-        import keyring
-        print("Trousseau :", keyring.get_keyring())
-    except Exception as e:
-        print("Trousseau : indisponible (%s) — mots de passe stockés dans le fichier de config" % type(e).__name__)
-    return 0
+def run(argv, settings=False, window=False):
+    log("Interface GTK %d.%d" % (Gtk.get_major_version(), Gtk.get_minor_version()))
+    app = MintMailApp()
+    app.open_settings, app.settings_window = settings, window
+    return app.run(argv)

@@ -1,4 +1,4 @@
-# MintMail 1.6.3
+# MintMail 1.6.4
 
 Client mail moderne pour Linux Mint (Python / GTK3), inspiré de Spark Mail.
 
@@ -24,6 +24,12 @@ Dépendances (installées automatiquement via apt) : `python3-gi`, `gir1.2-gtk-3
 - Palette de commandes `Ctrl+K`, raccourcis clavier (voir Paramètres → Raccourcis), thème clair/sombre, couleur d'accent
 - Interface adaptative (panneau latéral escamotable, mode une colonne en fenêtre étroite), notifications de bureau, gestionnaire `mailto:`
 - Sans compte configuré : mode démonstration avec messages d'exemple
+
+## Nouveautés 1.6.4 — fiabilité d'une machine à l'autre
+- **Le lanceur utilise toujours `/usr/bin/python3`** : sur une machine où `python3` pointe vers un autre Python (conda, pyenv, venv, version installée à la main), MintMail ne trouvait pas GTK (`python3-gi`) et ne démarrait pas.
+- **`mintmail --diagnose`** : rapport complet (système, Python, GTK / WebKit, modules, données, trousseau, lanceurs qui se masquent, journal) **sans aucun secret**, enregistré dans `~/.local/share/mintmail/diagnostic.txt`.
+- **Démarrage protégé** : si la fenêtre ne peut pas s'ouvrir, un message clair s'affiche (au lieu de rien) avec le journal, et le choix de **mettre de côté réglages et cache** (rien n'est supprimé : `config.json.bak-…`) puis de relancer. Les comptes reviennent seuls avec la synchro. Aussi disponible : `mintmail --reset`.
+- Sans interface graphique disponible : message explicatif (au lieu d'une trace Python) avec la commande d'installation des composants manquants.
 
 ## Nouveautés 1.6.3
 - **Paquet .deb** : numéro de version avec « epoch » (`1:1.6.3`) pour que l'installateur n'affiche plus « une version plus récente est déjà installée » quand un ancien paquet `mintmail` portait un numéro plus élevé. Toutes les versions suivantes gardent ce préfixe `1:`.

@@ -1,3 +1,3 @@
 import sys
-from .app import main
+from .entry import main
 sys.exit(main(sys.argv))
