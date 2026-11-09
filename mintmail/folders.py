@@ -382,7 +382,7 @@ class FolderMixin:
         self.update_counts()
 
     # --------------------------------------------------------- liste & compteurs
-    def refresh_folders(self):
+    def refresh_folders(self, after=None):
         """Relit l'arborescence des dossiers de chaque compte (arrière-plan) puis met à jour l'arbre et les compteurs."""
         accts = list(self.accounts())
 
@@ -406,6 +406,8 @@ class FolderMixin:
                 self.config.save()
                 self._rebuild_nav_dynamic()
             self.refresh_folder_counts()
+            if after:
+                after()
         self.run_bg(work, done)
 
     def refresh_folder_counts(self):
@@ -551,6 +553,49 @@ class FolderMixin:
                 self.toast.popup(ok_text, timeout=3)
             self.refresh_folders()
         self.run_bg(lambda: fn(self.backend(aid)), done)
+
+    def _namespace_prefix(self, aid):
+        """Serveurs de type Dovecot : tous les dossiers vivent sous « INBOX. » : les nouveaux dossiers doivent en tenir compte."""
+        for e in self.tree_of(aid):
+            if e["delim"] and e["name"].upper().startswith("INBOX" + e["delim"]):
+                return "INBOX" + e["delim"]
+        return ""
+
+    def create_folder_named(self, aid, name, parent=None, then=None):
+        """Crée un dossier (au premier niveau ou sous « parent ») puis appelle then(entrée). Idempotent."""
+        from .ai_engine import sanitize_folder_name
+        name = sanitize_folder_name(name)
+        if not name:
+            return
+        delim = parent["delim"] if parent else "/"
+        decoded_parent = utf7_decode(parent["name"]) if parent else ""
+        path = (decoded_parent + delim + name) if parent else self._namespace_prefix(aid) + name
+        label = (parent["path"] + " › " + name) if parent else name
+        existing = self.find_folder(label, aid)
+        if existing and existing[1]["path"].lower() == label.lower():
+            if then:
+                then(existing[1])
+            return
+
+        def done(_r, err):
+            if err:
+                self.toast.popup("Création du dossier impossible : %s" % str(err)[:100], timeout=6)
+                return
+            self.refresh_folders(after=(lambda: then(self.find_folder(label, aid)[1]) if then and self.find_folder(label, aid) else None))
+        self.run_bg(lambda: self.backend(aid).create_folder(path), done)
+
+    def ensure_folder(self, aid, spec, cb):
+        """Retrouve le dossier désigné (chemin ou nom) ; le crée s'il n'existe pas ; puis cb(entrée)."""
+        found = self.find_folder(spec, aid)
+        if found:
+            cb(found[1])
+            return
+        parts = [p.strip() for p in str(spec).split("›") if p.strip()]
+        if len(parts) > 1:                       # « Clients › Alpha » : le parent doit exister
+            parent = self.find_folder(" › ".join(parts[:-1]), aid)
+            self.create_folder_named(aid, parts[-1], parent[1] if parent else None, cb)
+        else:
+            self.create_folder_named(aid, spec, None, cb)
 
     def folder_create(self, aid, parent):
         name = self._ask_text("Nouveau dossier", "Nom du dossier" + (" (dans « %s »)" % parent["label"] if parent else ""))

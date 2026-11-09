@@ -5,8 +5,9 @@ from gi.repository import Gtk, GLib, GObject
 
 from .widgets import icon, icon_button
 
-SUGGESTIONS = ["Résume ma boîte", "Quels messages sont urgents ?", "Archive les newsletters déjà lues",
-               "Mets en spam les mails promotionnels", "Rédige une relance polie", "Crée une règle pour les notifications"]
+SUGGESTIONS = ["Classe mes derniers emails dans des dossiers", "Résume ma boîte", "Quels messages sont urgents ?",
+               "Crée un dossier Factures et range mes factures dedans", "Archive les newsletters déjà lues",
+               "Mets en spam les mails promotionnels", "Crée une règle pour les notifications"]
 
 
 class AssistantPanel(Gtk.Box):

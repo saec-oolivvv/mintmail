@@ -20,6 +20,7 @@ from .folders import FolderMixin, SMART_VIEWS, dest_of
 from .models import Message, Outgoing
 from .p2p import SyncEngine
 from .syncdata import apply_items, describe as describe_sync
+from .store import P2P_MIN_SECRET
 from .reader import Reader
 from .settings import SettingsPage
 from .log import LOG, log_exception, tail
@@ -109,6 +110,10 @@ class MainWindow(ListMixin, AIMixin, FolderMixin, Gtk.ApplicationWindow):
         threading.Thread(target=self.cache.backfill_meta, daemon=True).start()
         GLib.idle_add(lambda: (self.sync(), False)[1])
         GLib.timeout_add(800, lambda: (self.refresh_folders(), False)[1])
+        if self.config.p2p_notice == "short_code":   # l'ancien code (moins de 12 caractères) a désactivé la synchro
+            GLib.timeout_add(2500, lambda: (self.toast.popup(
+                "Synchronisation désactivée : l'ancien code de jumelage est trop court (12 caractères minimum).",
+                "Corriger", lambda: self.show_settings("p2p"), timeout=15), False)[1])
         GLib.timeout_add_seconds(3, lambda: (self._start_push(), False)[1])
         GLib.timeout_add_seconds(1, self._tick)
 
@@ -641,8 +646,9 @@ class MainWindow(ListMixin, AIMixin, FolderMixin, Gtk.ApplicationWindow):
         self.process_outbox()
         if self._ticks % 3 == 0 and hasattr(self, "p2p_lbl"):
             eng = self.sync_engine
+            short = 0 < len(str(self.config.get("p2p_secret") or "")) < P2P_MIN_SECRET
             self.p2p_lbl.set_text("⇄ " + eng.state_label().replace("Active — appareil ", "").replace(" — synchronisé à ", " · ")
-                                  if eng.is_enabled() else "")
+                                  if eng.is_enabled() else ("⇄ désactivée : code < %d car." % P2P_MIN_SECRET if short else ""))
         if self._ticks % 30 == 0:
             woken = self.cache.wake_snoozed()
             if woken:
@@ -978,18 +984,23 @@ class MainWindow(ListMixin, AIMixin, FolderMixin, Gtk.ApplicationWindow):
         rules = cfg["rules"]
         if not msgs or not (blocked or spam_s or rules):
             return list(msgs)
-        moves, keep = {"trash": [], "spam": [], "archive": []}, []
+        moves, keep, folder_moves = {"trash": [], "spam": [], "archive": []}, [], {}
         for m in msgs:
             em = m.sender_email.lower()
             dom = "@" + em.split("@")[-1]
             dest = "trash" if (em in blocked or dom in blocked) else \
                    "spam" if (em in spam_s or dom in spam_s) else None
+            fdest = None
             if dest is None:
                 for r in rules:
                     if not self._rule_match(r, m):
                         continue
                     act = r.get("action")
-                    if act in moves and dest is None:
+                    if act == "move" and dest is None and fdest is None:
+                        found = self.find_folder(r.get("folder", ""), m.account)     # règle « ranger dans un dossier »
+                        if found:
+                            fdest = dest_of(found[1])
+                    elif act in moves and dest is None:
                         dest = act
                     elif act == "read":
                         self.set_unread([m], False, reload=False)
@@ -1000,8 +1011,11 @@ class MainWindow(ListMixin, AIMixin, FolderMixin, Gtk.ApplicationWindow):
                     elif act == "pin":
                         m.pinned = True
                         self.cache.update(m.id, pinned=True)
-            (moves[dest] if dest else keep).append(m)
-        for dest, lst in moves.items():
+            if fdest and not dest:
+                folder_moves.setdefault(fdest, []).append(m)
+            else:
+                (moves[dest] if dest else keep).append(m)
+        for dest, lst in list(moves.items()) + list(folder_moves.items()):
             if lst:
                 self._auto_move(lst, dest)
         return keep

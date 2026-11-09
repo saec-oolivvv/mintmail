@@ -1,4 +1,4 @@
-# MintMail 1.6.6
+# MintMail 1.7.0
 
 Client mail moderne pour Linux Mint (Python / GTK3), inspiré de Spark Mail.
 
@@ -25,12 +25,20 @@ Dépendances (installées automatiquement via apt) : `python3-gi`, `gir1.2-gtk-3
 - Interface adaptative (panneau latéral escamotable, mode une colonne en fenêtre étroite), notifications de bureau, gestionnaire `mailto:`
 - Sans compte configuré : mode démonstration avec messages d'exemple
 
+## Nouveautés 1.7.0
+- **Classement par l'IA, pour de vrai** : demandez à l'assistant (`Ctrl+J`) « classe mes derniers emails dans des dossiers » ou « crée un dossier Factures et range mes factures dedans ». L'IA propose un classement (dossiers existants d'abord, nouveaux dossiers seulement si besoin, 6 au maximum) ; **rien n'est créé ni déplacé avant votre validation**, ligne par ligne ou en bloc. Les dossiers manquants sont créés sur le serveur au moment de valider.
+- **Clic droit sur un message : section ✨ IA** — ranger dans le dossier suggéré (ou « Suggérer un dossier… »), classer tous les messages de l'expéditeur, classer la boîte, **toujours ranger cet expéditeur dans ce dossier** (règle automatique), répondre avec l'IA (adaptée / accepter / refuser / demander des précisions / autre créneau / formel / amical / très courte), résumer, traduire, ajouter à l'agenda, demander à l'assistant. Menu ⋯ de la barre au survol : mêmes raccourcis IA.
+- **Règles « Ranger dans le dossier… »** (Paramètres → Filtres), synchronisées entre machines.
+- **Résumé simplifié** : la barre d'options sous le résumé (réponses suggérées, boutons, champ de question) est supprimée ; le résumé affiche seulement la synthèse, les points clés, les tâches et l'alerte d'hameçonnage. (Correction au passage : le texte du résumé pouvait ne pas s'afficher.)
+- **Icône de l'application** : nouvelle icône (enveloppe + étincelle IA) en SVG et PNG de 16 à 512 px ; le lanceur est associé à la fenêtre (nom de programme / classe `mintmail`, identifiant `me.saec.mintmail`), ce qui supprime la roue dentelée générique dans la barre des tâches et le menu.
+- **Synchronisation entre machines plus robuste** : diffusion sur chaque interface réseau, réponse directe aux annonces, VPN / Tailscale acceptés, machines à identifiant identique tolérées, recherche active du réseau (bouton « Rechercher les machines »), diagnostic réseau lisible dans Paramètres → Synchronisation, avertissement si l'ancien code est trop court.
+
 ## Nouveautés 1.6.6
 - **`/usr/bin/mintmail --remove-local-install` ne supprime plus rien** : il LISTE d'abord les installations hors paquet (avec la version de chacune, lue sans exécuter le lanceur) et signale les versions inconnues de ce paquet. Avec `--yes`, il **met de côté** (dans `~/mintmail-sauvegarde-<date>/`, restaurable) les éléments de votre dossier personnel. Les éléments système (`/usr/local`, `/opt`) ne sont jamais touchés : il affiche seulement la commande.
 - `mintmail --diagnose` affiche la version de chaque lanceur trouvé dans le PATH.
 
 ## Nouveautés 1.6.5
-- **Ancienne installation locale** (faite avec `install.sh`) : elle masque le paquet .deb. Pour la retirer, utilisez **le chemin complet** : `/usr/bin/mintmail --remove-local-install` (l'ancien lanceur local ne connaît pas cette option), puis ouvrez un nouveau terminal. Seuls les fichiers venant de MintMail sont supprimés ; réglages et courrier en cache sont conservés.
+- **Ancienne installation locale** (faite avec `install.sh`) : elle masque le paquet .deb. Pour la retirer, utilisez **le chemin complet** : `/usr/bin/mintmail --remove-local-install` (l'ancien lanceur local ne connaît pas cette option), puis ouvrez un nouveau terminal. Réglages et courrier en cache sont conservés.
 
 ## Nouveautés 1.6.4 — fiabilité d'une machine à l'autre
 - **Le lanceur utilise toujours `/usr/bin/python3`** : sur une machine où `python3` pointe vers un autre Python (conda, pyenv, venv, version installée à la main), MintMail ne trouvait pas GTK (`python3-gi`) et ne démarrait pas.

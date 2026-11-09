@@ -45,6 +45,7 @@ class Config:
         self._save_lock = threading.Lock()
         self.sync_lock = threading.RLock()   # protège les métadonnées de synchro (moteur P2P / interface)
         self._pw_miss = {}
+        self.p2p_notice = ""
         self.load()
 
     def load(self):
@@ -55,6 +56,7 @@ class Config:
             pass
         if self.data.get("p2p_enabled") and len(str(self.data.get("p2p_secret") or "")) < P2P_MIN_SECRET:
             self.data["p2p_enabled"] = False   # jamais de synchro ouverte sans code de jumelage
+            self.p2p_notice = "short_code"
         if not self.data.get("design_v2"):   # refonte 1.5 : nouvelle identité visuelle par défaut, une seule fois
             self.data.update(style="aurora", theme="dark", accent="#7c8cff", design_v2=True)
         if self.data.get("accent") == "#3b82f6":   # ancien bleu par défaut

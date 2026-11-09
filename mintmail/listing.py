@@ -198,9 +198,20 @@ class ListMixin:
                  ("Mettre l'expéditeur en spam", lambda: self.spam_sender(m)),
                  ("Bloquer l'expéditeur", lambda: self.block_sender(m)),
                  ("Voir tous ses messages", lambda: self.show_from(m))]
+        items += [None] + self.ai_menu_items(m)    # section IA : classement, réponses, résumé, traduction, agenda…
         for it in items:
             if it is None:
                 menu.append(Gtk.SeparatorMenuItem())
+                continue
+            if it[0] == "sous-menu":
+                sub = Gtk.Menu()
+                for lab, fn in it[2]:
+                    si = Gtk.MenuItem(label=lab)
+                    si.connect("activate", lambda _i, f=fn: f())
+                    sub.append(si)
+                mi = Gtk.MenuItem(label=it[1])
+                mi.set_submenu(sub)
+                menu.append(mi)
                 continue
             mi = Gtk.MenuItem(label=it[0])
             mi.connect("activate", lambda _i, f=it[1]: f())
@@ -282,6 +293,8 @@ class ListMixin:
                 ("Désépingler" if msg.pinned else "Épingler", lambda: self.set_flag([msg], "pinned", not msg.pinned)),
                 ("Retirer des favoris" if msg.starred else "Ajouter aux favoris",
                  lambda: self.set_flag([msg], "starred", not msg.starred)),
+                ("✨ Ranger / suggérer un dossier", lambda: self.ai_suggest_folder(msg)),
+                ("✨ Classer ma boîte de réception", lambda: self.ai_classify(self.cache.query("inbox", self.account, limit=60))),
                 ("✨ Répondre avec l'IA", lambda: self.ai_reply_with_ai(msg)),
                 ("Voir tous les messages de %s" % who, lambda: self.show_from(msg)),
                 ("Copier l'adresse %s" % who, lambda: self.copy_text(who)),

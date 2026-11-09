@@ -121,7 +121,14 @@ class AIMixin:
             return False
         GLib.timeout_add(350, go)   # évite un appel par message quand on parcourt la liste rapidement
 
+    def _folder_names(self):
+        return [e["path"] for a in self.accounts() for e in self.tree_of(a["id"]) if e["selectable"] and not e["special"]]
+
+    def _prime_engine(self):
+        self.engine.folder_names = self._folder_names()
+
     def ai_fetch(self, msg, force=False):
+        self._prime_engine()
         self.reader.ai_loading()
 
         def done(res, err):
@@ -203,7 +210,7 @@ class AIMixin:
         except Exception as e:
             self.show_error("Impossible d'ouvrir l'agenda", e)
 
-    def ai_reply_with_ai(self, msg):
+    def ai_reply_with_ai(self, msg, idea="Réponds de façon appropriée à ce message."):
         """Rédige une réponse avec l'IA puis ouvre le composeur prérempli (à relire avant envoi)."""
         if not self.engine.enabled():
             self.toast.popup("IA non configurée : Paramètres → IA.", timeout=4)
@@ -213,7 +220,7 @@ class AIMixin:
         self.toast.popup("✨ Rédaction de la réponse…", timeout=3)
 
         def work():
-            return self.engine.write_from_prompt("Réponds de façon appropriée à ce message.",
+            return self.engine.write_from_prompt(idea,
                                                  "Re: " + normalize_subject(full.subject), full.sender_email,
                                                  context=self.engine._msg_block(full, 1500))
 
@@ -223,6 +230,131 @@ class AIMixin:
             else:
                 self.reply(full, ai_text=text)
         self.run_bg(work, done)
+
+    # ------------------------------------------------ classement et menu clic droit IA
+    def _apply_group(self, aid, folder, group):
+        self.ensure_folder(aid, folder, lambda e: self.move_messages(group, dest_of(e), label="rangé dans « %s »" % e["path"]))
+
+    def ai_file_message(self, msg, spec):
+        self.ensure_folder(msg.account, spec, lambda e: self.move_messages([msg], dest_of(e), label="rangé dans « %s »" % e["path"]))
+
+    def ai_classify(self, msgs):
+        """Classe des messages dans des dossiers (existants ou à créer). Propose, puis exécute seulement ce que vous validez."""
+        msgs = [m for m in msgs if m.folder in ("inbox", "archive")][:100]
+        if not self.engine.enabled():
+            self.toast.popup("IA non configurée : Paramètres → IA.", timeout=4)
+            self.show_settings("ai")
+            return
+        if not msgs:
+            self.toast.popup("Aucun message à classer ici.", timeout=3)
+            return
+        self._prime_engine()
+        p = self.assistant
+        self.toggle_assistant(True)
+        p.add_ai("Je classe %d message(s)… Rien n'est déplacé ni créé avant votre accord." % len(msgs))
+        p.set_busy(True)
+        groups = {}
+        for m in msgs:
+            groups.setdefault(m.account, []).append(m)
+
+        def work():
+            out = {}
+            for aid, lst in groups.items():
+                existing = [e["path"] for e in self.tree_of(aid) if e["selectable"] and not e["special"]]
+                out[aid] = self.engine.classify(lst, existing)
+            return out
+
+        def done(res, err):
+            p.set_busy(False)
+            if err:
+                p.add_ai("Désolé, le classement a échoué : %s" % str(err)[:160])
+                return
+            by_id, items, total, stay = {m.id: m for m in msgs}, [], 0, 0
+            for aid, r in res.items():
+                stay += r["stay"]
+                for folder, ids in r["moves"].items():
+                    grp = [by_id[i] for i in ids if i in by_id]
+                    total += len(grp)
+                    items.append(("%d message(s) → « %s »%s" % (len(grp), folder, " (nouveau dossier)" if folder in r["new"] else ""),
+                                  lambda aid=aid, f=folder, g=grp: self._apply_group(aid, f, g)))
+            if not items:
+                p.add_ai("Rien à ranger : ces messages restent dans la boîte de réception.")
+                return
+            p.add_ai("Voici ma proposition : %d message(s) rangés dans %d dossier(s)%s. Validez ligne par ligne ou tout d'un coup."
+                     % (total, len(items), (", %d restent dans la boîte" % stay) if stay else ""))
+            p.add_plan(items, lambda: [fn() for _d, fn in items])
+        self.run_bg(work, done)
+
+    def ai_suggest_folder(self, msg):
+        if not self.engine.enabled():
+            self.toast.popup("IA non configurée : Paramètres → IA.", timeout=4)
+            self.show_settings("ai")
+            return
+        self._prime_engine()
+        self.toast.popup("✨ Recherche du meilleur dossier…", timeout=3)
+        existing = [e["path"] for e in self.tree_of(msg.account) if e["selectable"] and not e["special"]]
+
+        def done(r, err):
+            if err:
+                self.toast.popup("Erreur IA : %s" % str(err)[:90], timeout=6)
+                return
+            if not r["moves"]:
+                self.toast.popup("✨ Cette conversation peut rester dans la boîte de réception.", timeout=5)
+                return
+            f = next(iter(r["moves"]))
+            self.toast.popup("✨ Suggestion : « %s »%s" % (f, " (nouveau dossier)" if f in r["new"] else ""), "Ranger",
+                             lambda: self.ai_file_message(msg, f), timeout=12)
+        self.run_bg(lambda: self.engine.classify([msg], existing), done)
+
+    def ai_rule_move(self, msg, folder):
+        rule = {"field": "from", "text": msg.sender_email.lower(), "action": "move", "folder": folder}
+        if rule not in self.config["rules"]:
+            self.config["rules"].append(rule)
+            self.config.save()
+        self.toast.popup("Règle créée : les messages de %s iront dans « %s »" % (msg.sender_email, folder),
+                         "Appliquer maintenant", self.apply_rules_now, timeout=8)
+
+    def _focus_message(self, msg):
+        if self.reader.msg is None or self.reader.msg.id != msg.id:
+            self.open_message(msg, force=True)
+
+    def assistant_about(self, msg):
+        self._focus_message(msg)
+        self.toggle_assistant(True)
+        self.assistant.entry.set_text("À propos de ce message : ")
+        self.assistant.entry.set_position(-1)
+        self.assistant.focus_entry()
+
+    def ai_menu_items(self, msg):
+        """Entrées IA du menu clic droit : (libellé, action) | (\"sous-menu\", libellé, [(libellé, action)…]) | None."""
+        if not self.engine.enabled():
+            return [("✨ Activer l'IA : classement, résumés, réponses…", lambda: self.show_settings("ai"))]
+        ana = self.cache.ai_get(msg.id, "analysis") or {}
+        sug, who = ana.get("folder") or "", msg.sender_email
+        key = who.lower()
+        items = []
+        if sug:
+            items.append(("✨ Ranger dans « %s » (suggéré)" % sug, lambda: self.ai_file_message(msg, sug)))
+        else:
+            items.append(("✨ Suggérer un dossier…", lambda: self.ai_suggest_folder(msg)))
+        items.append(("✨ Classer tous les messages de %s" % who,
+                      lambda: self.ai_classify(self.cache.by_sender(key, ("inbox", "archive")) or [msg])))
+        items.append(("✨ Classer ma boîte de réception (60 derniers)",
+                      lambda: self.ai_classify(self.cache.query("inbox", self.account, limit=60))))
+        if sug:
+            items.append(("✨ Toujours ranger %s dans « %s »" % (who, sug), lambda: self.ai_rule_move(msg, sug)))
+        items.append(None)
+        replies = [("Réponse adaptée", "Réponds de façon appropriée à ce message."), ("Accepter", "Accepte poliment la proposition."),
+                   ("Refuser poliment", "Refuse poliment la demande."), ("Demander plus d'informations", "Demande des précisions."),
+                   ("Proposer un autre créneau", "Propose un autre créneau."), ("Ton formel", "Réponds sur un ton formel."),
+                   ("Ton amical", "Réponds sur un ton amical."), ("Très courte", "Réponds en une ou deux phrases.")]
+        items.append(("sous-menu", "✨ Répondre avec l'IA", [(lab, lambda i=idea: self.ai_reply_with_ai(msg, i)) for lab, idea in replies]))
+        items.append(("✨ Résumer / analyser ce message", lambda: (self._focus_message(msg), self.ai_fetch(self._full(msg), force=True))))
+        items.append(("✨ Traduire ce message", lambda: (self._focus_message(msg), self._on_ai_action(self.reader, "translate", ""))))
+        if ana.get("event"):
+            items.append(("✨ Ajouter à l'agenda : %s" % ana["event"]["title"][:30], lambda: self._add_to_calendar(msg)))
+        items.append(("✨ Demander à l'assistant à propos de ce message…", lambda: self.assistant_about(msg)))
+        return items
 
     # ------------------------------------------------------------------ tri
     def ai_triage(self, msgs):
@@ -302,6 +434,7 @@ class AIMixin:
         return "\n".join(lines)
 
     def assistant_ask(self, text):
+        self._prime_engine()
         self.toggle_assistant(True)
         p = self.assistant
         p.add_user(text)
@@ -332,13 +465,16 @@ class AIMixin:
         q = a.get("query", "")
         if q:
             return self.cache.query("inbox", self.account, search=q, limit=500)
-        return self.selected_msgs()
+        sel = self.selected_msgs()
+        if a["type"] == "classify" and len(sel) < 2:
+            return self.cache.query("inbox", self.account, limit=60)    # « classe mes mails » : les 60 derniers de la boîte
+        return sel
 
     def _plan_items(self, plan):
         items = []
         for a in plan["actions"]:
             msgs = self._resolve(a) if a["type"] in ("archive", "trash", "spam", "mark_read", "mark_unread", "star",
-                                                     "pin", "snooze", "move") else None
+                                                     "pin", "snooze", "move", "classify") else None
             if msgs is not None and not msgs:
                 items.append(("%s — aucun message concerné" % describe_action(a), lambda: None))
                 continue
@@ -353,11 +489,17 @@ class AIMixin:
         elif t in ("archive", "trash", "spam"):
             self.move_messages(msgs, t)
         elif t == "move":
-            found = self.find_folder(a["folder"], msgs[0].account if msgs else self.account)
-            if not found:
-                self.toast.popup("Dossier « %s » introuvable" % a["folder"], timeout=4)
-            else:
-                self.move_messages(msgs, dest_of(found[1]), label="déplacé vers « %s »" % found[1]["path"])
+            aid = msgs[0].account if msgs else self._default_account()
+            self.ensure_folder(aid, a["folder"], lambda e: self.move_messages(msgs, dest_of(e), label="déplacé vers « %s »" % e["path"]))
+        elif t == "classify":
+            self.ai_classify(msgs)
+        elif t == "create_folder":
+            parent, aid = None, self._default_account()
+            if a.get("parent"):
+                f = self.find_folder(a["parent"], None if self.account == "all" else self.account)
+                if f:
+                    aid, parent = f[0], f[1]
+            self.create_folder_named(aid, a["name"], parent, lambda e: self.toast.popup("Dossier « %s » créé" % e["path"], timeout=4))
         elif t in ("mark_read", "mark_unread"):
             self.set_unread(msgs, t == "mark_unread")
         elif t in ("star", "pin"):
@@ -381,7 +523,7 @@ class AIMixin:
         elif t == "compose":
             self.compose(to=a.get("to", ""), subject=a.get("subject", ""), body_html=text_to_html(a.get("body", "")))
         elif t == "create_rule":
-            rule = {"field": a["field"], "text": a["text"], "action": a["action"]}
+            rule = {k: a[k] for k in ("field", "text", "action", "folder") if k in a}
             if rule not in self.config["rules"]:
                 self.config["rules"].append(rule)
                 self.config.save()

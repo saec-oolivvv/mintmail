@@ -1,11 +1,18 @@
 # Changelog
 
+## 1.7.0
+- IA : classement des emails avec validation, création de dossiers, actions « classer » et « créer un dossier » pour l'assistant, règles « ranger dans un dossier »
+- Clic droit : section ✨ IA (ranger, classer, répondre selon l'intention, résumer, traduire, agenda, assistant)
+- Résumé : barre d'options supprimée ; affichage du texte du résumé corrigé
+- Icône de l'application (SVG + PNG), association fenêtre / lanceur (me.saec.mintmail, classe mintmail)
+- Synchro : découverte réseau fiabilisée (toutes les interfaces, VPN, identifiants dupliqués, recherche active, diagnostic)
+
 ## 1.6.6
 - --remove-local-install : liste d'abord (versions comprises), met de côté avec --yes au lieu de supprimer, ne touche jamais /usr/local ni /opt
 - --diagnose : version de chaque lanceur du PATH, sans les exécuter
 
 ## 1.6.5
-- Nettoyage de l'ancienne installation locale : commande à lancer avec le chemin complet (/usr/bin/mintmail --remove-local-install), suppression limitée aux fichiers de MintMail
+- Nettoyage de l'ancienne installation locale : commande à lancer avec le chemin complet (/usr/bin/mintmail --remove-local-install)
 
 ## 1.6.4
 - Lanceur : /usr/bin/python3 explicite (Python de conda / pyenv / venv sans PyGObject)

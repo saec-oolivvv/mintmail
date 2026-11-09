@@ -24,7 +24,8 @@ import threading
 import time
 from typing import Any, Dict, List, Optional
 
-from . import syncdata
+from . import netutil, syncdata
+from .netutil import local_ip   # noqa: F401  (compatibilité : importé depuis ce module par les réglages)
 from .store import P2P_MIN_SECRET
 
 PROTOCOL = 3
@@ -37,22 +38,10 @@ def derive_key(secret: str) -> bytes:
     return hashlib.pbkdf2_hmac("sha256", secret.encode("utf-8"), b"mintmail-p2p-v3", 600_000)
 
 
-def local_ip() -> str:
-    """Adresse IP locale (sans émettre aucun paquet)."""
-    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+def reachable(host: str) -> bool:
+    """Adresse d'un réseau local ou privé (y compris VPN / Tailscale en 100.64/10) : jamais une adresse publique."""
     try:
-        s.connect(("10.255.255.255", 1))
-        return s.getsockname()[0]
-    except OSError:
-        return "127.0.0.1"
-    finally:
-        s.close()
-
-
-def _private(host: str) -> bool:
-    try:
-        ip = ipaddress.ip_address(host)
-        return ip.is_private or ip.is_loopback or ip.is_link_local
+        return not ipaddress.ip_address(host).is_global
     except ValueError:
         return False
 
@@ -139,6 +128,12 @@ class SyncEngine:
         self._sync_lock = threading.Lock()
         self._slots = threading.BoundedSemaphore(4)
         self.last_error, self.last_sync, self.last_summary = "", 0.0, ""
+        self._instance = secrets.token_hex(4)           # distingue NOS annonces des autres (même si deux machines partagent un identifiant)
+        self._own = netutil.own_addresses()
+        self._own_at = time.time()
+        self._started_at = 0.0
+        self._last_scan = 0.0
+        self.stats = {"sent": 0, "received": 0, "foreign": set(), "filtered": set(), "send_errors": 0, "scanned": 0}
 
     # ------------------------------------------------------------ état public
     def is_enabled(self) -> bool:
@@ -152,8 +147,8 @@ class SyncEngine:
 
     def peers(self) -> List[Dict[str, str]]:
         with self._lock:
-            return [{"node_id": n, "host": p["host"], "port": str(p["port"]), "last_seen": str(p["last_seen"])}
-                    for n, p in self._peers.items()]
+            return [{"node_id": p.get("node") or k, "host": p["host"], "port": str(p["port"]),
+                     "last_seen": str(p["last_seen"]), "via": p.get("via", "annonce")} for k, p in self._peers.items()]
 
     def state_label(self) -> str:
         if not self._enabled:
@@ -167,7 +162,21 @@ class SyncEngine:
             return base + " — " + self.last_error
         if self.last_sync:
             return base + " — synchronisé à " + time.strftime("%H:%M:%S", time.localtime(self.last_sync))
+        if n == 0 and self._started_at and time.time() - self._started_at > 30:
+            return base + " — aucune machine vue (voir Paramètres → Synchronisation)"
         return base
+
+    def diagnostics(self) -> Dict[str, Any]:
+        """Tout ce qu'il faut pour comprendre pourquoi deux machines ne se voient pas."""
+        secret = str(self.config.get("p2p_secret") or "")
+        return {
+            "enabled": self._enabled, "code_len": len(secret), "code_ok": self._key is not None,
+            "udp_bound": self._udp is not None, "tcp_bound": self._srv is not None,
+            "disc_port": self._disc_port, "tcp_port": self._tcp_port, "own_ips": sorted(self._own - {"127.0.0.1"}),
+            "broadcasts": netutil.broadcast_targets(), "sent": self.stats["sent"], "received": self.stats["received"],
+            "send_errors": self.stats["send_errors"], "foreign_versions": sorted(self.stats["foreign"]),
+            "filtered": sorted(self.stats["filtered"]), "scanned": self.stats["scanned"], "peers": self.peers(),
+        }
 
     def local_items(self):
         return syncdata.local_items(self.config)
@@ -178,6 +187,7 @@ class SyncEngine:
             return False
         self._stop.clear()
         self._running = True
+        self._started_at = time.time()
         try:
             u = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
             u.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
@@ -223,9 +233,55 @@ class SyncEngine:
             self._peers.clear()
 
     # ---------------------------------------------------------------- découverte
+    def _announce_bytes(self) -> bytes:
+        return ("MINTMAIL/%d %s %d %s" % (PROTOCOL, self._node_id, self._tcp_port, self._instance)).encode()
+
+    def _send_announces(self):
+        u = self._udp
+        if u is None:
+            return
+        for target in netutil.broadcast_targets():
+            try:
+                u.sendto(self._announce_bytes(), (target, self._disc_port))
+                self.stats["sent"] += 1
+            except OSError:
+                self.stats["send_errors"] += 1
+
+    def _handle_announce(self, data: bytes, addr) -> Optional[str]:
+        """Traite une annonce reçue ; retourne la clé du pair ajouté (ou None). Répond en unicast à un pair nouveau."""
+        parts = data.decode("utf-8", "replace").split()
+        if not parts or not parts[0].startswith("MINTMAIL/"):
+            return None
+        self.stats["received"] += 1
+        host = addr[0]
+        if parts[0] != "MINTMAIL/%d" % PROTOCOL:
+            self.stats["foreign"].add(parts[0].split("/", 1)[1] if "/" in parts[0] else "?")   # machine d'une autre version
+            return None
+        if len(parts) < 3 or not parts[2].isdigit():
+            return None
+        instance = parts[3] if len(parts) > 3 else None
+        if time.time() - self._own_at > 30:
+            self._own, self._own_at = netutil.own_addresses(), time.time()
+        if instance == self._instance or (instance is None and host in self._own):
+            return None   # notre propre annonce (ou diffusion bouclée)
+        if not reachable(host):
+            self.stats["filtered"].add(host)
+            return None
+        key = "%s:%s" % (host, parts[2])
+        with self._lock:
+            first = key not in self._peers
+            self._peers[key] = {"host": host, "port": int(parts[2]), "last_seen": time.time(), "node": parts[1], "via": "annonce"}
+        if first:
+            try:
+                if self._udp is not None:   # réponse directe : le pair nous voit même si nos diffusions ne lui parviennent pas
+                    self._udp.sendto(self._announce_bytes(), (host, self._disc_port))
+            except OSError:
+                pass
+            threading.Thread(target=self._auto_sync, daemon=True).start()
+        return key
+
     def _discovery_loop(self):
         last_announce = 0.0
-        msg = ("MINTMAIL/%d %s %d" % (PROTOCOL, self._node_id, self._tcp_port)).encode()
         while not self._stop.is_set():
             u = self._udp
             if u is None:
@@ -233,12 +289,11 @@ class SyncEngine:
                 self._check_local_changes()
                 continue
             now = time.time()
-            if now - last_announce > 5:
+            with self._lock:
+                alone = not self._peers
+            if now - last_announce > (3 if alone else 15):
                 last_announce = now
-                try:
-                    u.sendto(msg, ("255.255.255.255", self._disc_port))
-                except OSError:
-                    pass
+                self._send_announces()
             self._check_local_changes()
             try:
                 data, addr = u.recvfrom(256)
@@ -246,19 +301,51 @@ class SyncEngine:
                 continue
             except OSError:
                 break
-            parts = data.decode("utf-8", "replace").split()
-            if (len(parts) != 3 or parts[0] != "MINTMAIL/%d" % PROTOCOL or parts[1] == self._node_id
-                    or not parts[2].isdigit() or not _private(addr[0])):
-                continue
-            with self._lock:
-                first = parts[1] not in self._peers
-                self._peers[parts[1]] = {"host": addr[0], "port": int(parts[2]), "last_seen": now}
-            if first:
-                threading.Thread(target=self._auto_sync, daemon=True).start()
+            self._handle_announce(data, addr)
 
     def _periodic_loop(self):
-        while not self._stop.wait(30):
-            self._auto_sync()
+        ticks = 0
+        while not self._stop.wait(10):
+            ticks += 1
+            with self._lock:
+                alone = not self._peers
+            if alone and time.time() - self._started_at > 20 and time.time() - self._last_scan > 180:
+                self.scan_now()          # personne vu : sonde le réseau local (la diffusion peut être filtrée)
+            if ticks % 3 == 0:
+                self._auto_sync()
+
+    def scan_now(self) -> int:
+        """Recherche active : sonde le port de synchro sur les réseaux locaux et vérifie l'authentification (code commun)."""
+        if not self.can_run():
+            return 0
+        self._last_scan = time.time()
+        hosts = netutil.scan_candidates()
+        found, lock = [], threading.Lock()
+        queue = list(hosts)
+
+        def worker():
+            while True:
+                with lock:
+                    if not queue or self._stop.is_set():
+                        return
+                    host = queue.pop()
+                try:
+                    socket.create_connection((host, self._tcp_port), timeout=0.3).close()
+                except OSError:
+                    continue
+                peer = {"host": host, "port": self._tcp_port, "last_seen": time.time(), "via": "recherche"}
+                if self._exchange(peer) >= 0:      # n'est retenu que si la machine connaît notre code de jumelage
+                    with self._lock:
+                        self._peers["%s:%d" % (host, self._tcp_port)] = peer
+                    with lock:
+                        found.append(host)
+        threads = [threading.Thread(target=worker, daemon=True) for _ in range(48)]
+        for t in threads:
+            t.start()
+        for t in threads:
+            t.join(60)
+        self.stats["scanned"] = len(hosts)
+        return len(found)
 
     def _check_local_changes(self):
         """Détecte toute modification locale (compte ajouté, signature, réglage…) et synchronise aussitôt."""

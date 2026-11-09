@@ -1,14 +1,35 @@
 import os
 import sys
+from pathlib import Path
 from urllib.parse import urlparse, parse_qs, unquote
 
 import gi
 gi.require_version("Gtk", "3.0")
-from gi.repository import Gtk, Gio, GLib
+gi.require_version("Gdk", "3.0")
+from gi.repository import Gtk, Gdk, Gio, GLib
+
+try:
+    gi.require_version("GdkPixbuf", "2.0")
+    from gi.repository import GdkPixbuf
+except (ValueError, ImportError):
+    GdkPixbuf = None
 
 from . import APP_ID, APP_NAME, __version__
 from .store import Config, Cache
 from .log import install_hook, LOG, log, log_exception
+
+
+def set_window_icon():
+    """Icône des fenêtres : thème d'icônes si l'icône est installée, sinon fichiers PNG fournis avec le programme."""
+    try:
+        if Gtk.IconTheme.get_default().has_icon("mintmail"):
+            Gtk.Window.set_default_icon_name("mintmail")
+            return
+        base = Path(__file__).resolve().parent / "icons"
+        if GdkPixbuf is not None:
+            Gtk.Window.set_default_icon_list([GdkPixbuf.Pixbuf.new_from_file(str(f)) for f in sorted(base.glob("mintmail-*.png"))])
+    except Exception:
+        log_exception("icône de l'application")
 
 
 class MintMailApp(Gtk.Application):
@@ -21,7 +42,7 @@ class MintMailApp(Gtk.Application):
         if not self.win:
             try:
                 from .window import MainWindow
-                Gtk.Window.set_default_icon_name("mintmail")
+                set_window_icon()
                 self.win = MainWindow(self, Config(), Cache())
             except Exception as e:
                 self._startup_failure(e)
@@ -71,6 +92,8 @@ class MintMailApp(Gtk.Application):
 
 def run(argv, settings=False, window=False):
     log("Interface GTK %d.%d" % (Gtk.get_major_version(), Gtk.get_minor_version()))
+    GLib.set_prgname("mintmail")              # nom de programme = StartupWMClass du lanceur : le bon icône dans la barre des tâches
+    Gdk.set_program_class("mintmail")
     app = MintMailApp()
     app.open_settings, app.settings_window = settings, window
     return app.run(argv)

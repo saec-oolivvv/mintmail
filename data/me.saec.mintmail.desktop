@@ -1,8 +1,10 @@
 [Desktop Entry]
 Type=Application
+Version=1.0
 Name=MintMail
 GenericName=Client de messagerie
-Comment=Client mail moderne : boîte intelligente, reports, envoi annulable
+Comment=Client mail moderne avec IA intégrée : dossiers, classement, résumés, réponses
+Comment[en]=Modern mail client with built-in AI
 Exec=@EXEC@ %U
 Icon=mintmail
 Terminal=false
@@ -10,3 +12,4 @@ Categories=Network;Email;
 MimeType=x-scheme-handler/mailto;
 StartupNotify=true
 StartupWMClass=mintmail
+Keywords=mail;email;courriel;messagerie;imap;smtp;ia;

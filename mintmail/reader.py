@@ -323,29 +323,16 @@ class Reader(Gtk.Stack):
             for b in self.secondary:
                 b.set_visible(wide)
 
-    # -- carte « Assistant IA »
+    # -- carte « Résumé » : lecture seule, sans barre d'options (les actions IA sont dans le clic droit et la palette)
     def _build_ai_card(self):
-        card = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
+        card = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
         card.get_style_context().add_class("ai-card")
         head = Gtk.Box(spacing=8)
-        self.ai_title = Gtk.Label(xalign=0, label="✨ ASSISTANT")
+        self.ai_title = Gtk.Label(xalign=0, label="✨ RÉSUMÉ")
         self.ai_title.get_style_context().add_class("ai-title")
         self.ai_spinner = Gtk.Spinner()
         head.pack_start(self.ai_title, False, False, 0)
         head.pack_start(self.ai_spinner, False, False, 0)
-        hide = Gtk.Button(label="✕")
-        hide.get_style_context().add_class("flat-btn")
-        hide.set_tooltip_text("Masquer l'assistant pour ce message")
-        hide.connect("clicked", self._ai_hide)
-        regen = Gtk.Button(label="↻")
-        regen.get_style_context().add_class("flat-btn")
-        regen.set_tooltip_text("Relancer l'analyse")
-        regen.connect("clicked", lambda *_: self.emit("ai-action", "regen", ""))
-        tr = Gtk.Button(label="Traduire")
-        tr.get_style_context().add_class("pill")
-        tr.connect("clicked", lambda *_: self.emit("ai-action", "translate", ""))
-        for w in (hide, regen, tr):
-            head.pack_end(w, False, False, 0)
         card.pack_start(head, False, False, 0)
         self.ai_summary = Gtk.Label(xalign=0)
         self.ai_summary.set_line_wrap(True)
@@ -357,84 +344,44 @@ class Reader(Gtk.Stack):
         self.ai_warn = Gtk.Label(xalign=0)
         self.ai_warn.set_line_wrap(True)
         self.ai_warn.get_style_context().add_class("ai-warn")
-        self.ai_warn.set_no_show_all(True)
         card.pack_start(self.ai_warn, False, False, 0)
-        self.ai_chips = Gtk.FlowBox()
-        self.ai_chips.set_selection_mode(Gtk.SelectionMode.NONE)
-        self.ai_chips.set_max_children_per_line(6)
-        self.ai_chips.set_row_spacing(6)
-        self.ai_chips.set_column_spacing(6)
-        card.pack_start(self.ai_chips, False, False, 0)
         self.ai_answer = Gtk.Label(xalign=0)
         self.ai_answer.set_line_wrap(True)
         self.ai_answer.set_selectable(True)
         self.ai_answer.get_style_context().add_class("ai-text")
-        self.ai_answer.set_no_show_all(True)
         card.pack_start(self.ai_answer, False, False, 0)
-        ask = Gtk.Box(spacing=6)
-        self.ai_ask = Gtk.Entry()
-        self.ai_ask.set_placeholder_text("Poser une question sur ce message…")
-        self.ai_ask.connect("activate", self._ai_ask)
-        ask_btn = Gtk.Button(label="Demander")
-        ask_btn.get_style_context().add_class("ai-btn")
-        ask_btn.connect("clicked", self._ai_ask)
-        ask.pack_start(self.ai_ask, True, True, 0)
-        ask.pack_start(ask_btn, False, False, 0)
-        self.ai_ask_row = ask
-        card.pack_start(ask, False, False, 0)
-        card.set_no_show_all(True)
+        card.show_all()                 # tous les enfants sont visibles ; seul le conteneur est affiché / masqué
+        self.ai_warn.hide()
+        self.ai_answer.hide()
+        card.hide()
         self.ai_card = card
         return card
 
-    def _ai_hide(self, *_):
-        self._ai_hidden = True
-        self.ai_card.hide()
-
-    def _ai_ask(self, *_):
-        q = self.ai_ask.get_text().strip()
-        if q:
-            self.ai_ask.set_text("")
-            self.emit("ai-action", "ask", q)
-
     def _ai_reset(self):
-        for box in (self.ai_points,):
-            for ch in box.get_children():
-                box.remove(ch)
-        for ch in self.ai_chips.get_children():
-            self.ai_chips.remove(ch)
+        for ch in self.ai_points.get_children():
+            self.ai_points.remove(ch)
+        self.ai_warn.set_text("")
         self.ai_warn.hide()
+        self.ai_answer.set_text("")
         self.ai_answer.hide()
-        self.ai_title.set_text("✨ ASSISTANT")
+        self.ai_title.set_text("✨ RÉSUMÉ")
 
     def _ai_show_card(self):
-        if not self._ai_hidden:
-            self.ai_card.show()
-            self.ai_card.show_all()
-            self.ai_warn.set_visible(bool(self.ai_warn.get_text()))
-            self.ai_answer.set_visible(bool(self.ai_answer.get_text()))
-        self.ai_ask_row.set_visible(self.ai_enabled)
-
-    def _chip(self, label, cb, ai=True):
-        b = Gtk.Button(label=label)
-        b.get_style_context().add_class("ai-chip" if ai else "pill")
-        b.connect("clicked", lambda *_: cb())
-        b.show()
-        self.ai_chips.add(b)
+        self.ai_warn.set_visible(bool(self.ai_warn.get_text()))
+        self.ai_answer.set_visible(bool(self.ai_answer.get_text()))
+        self.ai_card.show()
 
     def ai_loading(self):
         self._ai_reset()
         self.ai_summary.set_text("Lecture du message…")
         self.ai_spinner.start()
-        self.ai_warn.set_text("")
         self._ai_show_card()
 
     def ai_idle(self):
+        """Analyse automatique désactivée : pas de carte (le menu clic droit propose « Résumer / analyser »)."""
         self._ai_reset()
         self.ai_spinner.stop()
-        self.ai_summary.set_text("L'assistant peut résumer ce message et proposer des réponses.")
-        self.ai_warn.set_text("")
-        self._chip("✨ Analyser ce message", lambda: self.emit("ai-action", "analyze", ""))
-        self._ai_show_card()
+        self.ai_card.hide()
 
     def ai_working(self, text):
         self.ai_spinner.start()
@@ -444,49 +391,24 @@ class Reader(Gtk.Stack):
     def ai_text(self, title, text):
         self.ai_spinner.stop()
         self.ai_answer.set_markup("<b>%s</b>\n%s" % (GLib.markup_escape_text(title), GLib.markup_escape_text(text)))
-        self.ai_answer.show()
         self._ai_show_card()
 
     def ai_show(self, res, cta=False, error=""):
-        """Affiche une analyse (IA ou locale) : résumé, points, alerte, réponses, actions."""
+        """Résumé (IA ou local) : phrase de synthèse, points clés, tâches, alerte d'hameçonnage. Rien d'autre."""
         self._ai_reset()
         self.ai_spinner.stop()
-        local = res.get("local")
-        prio = {3: " · Urgent", 1: " · Peu important"}.get(res.get("priority"), "")
-        self.ai_title.set_text("✨ ASSISTANT%s%s" % (" (local)" if local else "", prio))
+        prio = {3: " · URGENT", 1: " · peu important"}.get(res.get("priority"), "")
+        self.ai_title.set_text("✨ RÉSUMÉ%s%s" % (" (local)" if res.get("local") else "", prio))
         self.ai_summary.set_text(res.get("summary") or "")
-        for t in res.get("points", []):
-            l = Gtk.Label(xalign=0, label="•  " + t)
-            l.set_line_wrap(True)
-            l.show()
-            self.ai_points.pack_start(l, False, False, 0)
-        for t in res.get("tasks", []):
-            l = Gtk.Label(xalign=0, label="☐  " + t)
-            l.set_line_wrap(True)
-            l.show()
-            self.ai_points.pack_start(l, False, False, 0)
+        for mark, items in (("•  ", res.get("points", [])), ("☐  ", res.get("tasks", []))):
+            for t in items:
+                l = Gtk.Label(xalign=0, label=mark + t)
+                l.set_line_wrap(True)
+                l.show()
+                self.ai_points.pack_start(l, False, False, 0)
         if res.get("suspicious"):
             self.ai_warn.set_text("⚠ Message suspect (hameçonnage possible)%s. Ne cliquez sur aucun lien." % (
                 " : " + res["why"] if res.get("why") else ""))
-        else:
-            self.ai_warn.set_text("")
-        for r in res.get("replies", []):
-            self._chip(r, lambda t=r: (self.quick.set_text(t), self.quick.grab_focus(), self.quick.set_position(-1)))
-        if self.ai_enabled:
-            self._chip("✨ Rédiger une réponse", lambda: self.emit("ai-action", "reply_ai", ""), ai=False)
-        if res.get("event"):
-            self._chip("📅 Ajouter à l'agenda", lambda: self.emit("ai-action", "event", ""), ai=False)
-        sug = res.get("suggested", [])
-        if "snooze" in sug:
-            self._chip("⏰ Reporter", lambda: self.emit("ai-action", "snooze", ""), ai=False)
-        if "archive" in sug:
-            self._chip("📥 Archiver", lambda: self.emit("ai-action", "archive", ""), ai=False)
-        if "unsubscribe" in sug and self.msg is not None and self.msg.unsubscribe:
-            self._chip("✉ Se désabonner", self._unsub, ai=False)
-        if "block" in sug or res.get("suspicious"):
-            self._chip("🚫 Bloquer l'expéditeur", lambda: self.emit("ai-action", "block", ""), ai=False)
-        if cta:
-            self._chip("✨ Activer l'IA pour des résumés complets", lambda: self.emit("ai-action", "enable_ai", ""))
         if error:
             self.ai_answer.set_text("IA indisponible : %s" % error)
         self._ai_show_card()

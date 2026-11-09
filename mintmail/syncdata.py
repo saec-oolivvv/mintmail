@@ -20,7 +20,7 @@ ACCOUNT_FIELDS = ("id", "name", "email", "username", "imap_host", "imap_port", "
                   "signature_html", "has_password")
 SWIPE_ACTIONS = {"archive", "trash", "snooze", "read", "star", "pin", "spam", "block", "none"}
 RULE_FIELDS = {"from", "subject", "to"}
-RULE_ACTIONS = {"archive", "trash", "spam", "read", "star", "pin"}
+RULE_ACTIONS = {"archive", "trash", "spam", "read", "star", "pin", "move"}
 HOST_RE = re.compile(r"^[A-Za-z0-9]([A-Za-z0-9.-]{0,251}[A-Za-z0-9])?$")
 EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 
@@ -106,7 +106,8 @@ def valid_item(key: str, item: Any) -> bool:
         return rest == "ai" and isinstance(v, str) and 0 < len(v) <= 500
     if kind == "rule":
         return (isinstance(v, dict) and v.get("field") in RULE_FIELDS and v.get("action") in RULE_ACTIONS
-                and _str(200)(v.get("text")) and bool(v.get("text")))
+                and _str(200)(v.get("text")) and bool(v.get("text"))
+                and (v.get("action") != "move" or (isinstance(v.get("folder"), str) and 0 < len(v["folder"]) <= 120)))
     if kind in ("blocked", "spam"):
         return isinstance(v, str) and 0 < len(v) <= 200 and re.match(r"^@?[^\s@]+(@[^\s@]+)?$", v) is not None and v == rest
     if kind == "search":

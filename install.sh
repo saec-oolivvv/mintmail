@@ -87,11 +87,14 @@ $SUDO install -m 755 "$LAUNCHER" "$BIN/mintmail"; rm -f "$LAUNCHER"
 
 # --- entrée de menu
 DESKTOP="$(mktemp)"
-sed "s|@EXEC@|$BIN/mintmail|" "$HERE/data/mintmail.desktop" > "$DESKTOP"
-$SUDO install -m 644 "$DESKTOP" "$APPS/mintmail.desktop"; rm -f "$DESKTOP"
+sed "s|@EXEC@|$BIN/mintmail|" "$HERE/data/me.saec.mintmail.desktop" > "$DESKTOP"
+$SUDO rm -f "$APPS/mintmail.desktop"
+$SUDO install -m 644 "$DESKTOP" "$APPS/me.saec.mintmail.desktop"; rm -f "$DESKTOP"
+ICONROOT="$(dirname "$(dirname "$ICONS")")"
+for f in "$HERE"/mintmail/icons/mintmail-*.png; do s="$(basename "$f" .png)"; s="${s#mintmail-}"; $SUDO mkdir -p "$ICONROOT/${s}x${s}/apps"; $SUDO install -m 644 "$f" "$ICONROOT/${s}x${s}/apps/mintmail.png"; done
 command -v update-desktop-database >/dev/null 2>&1 && $SUDO update-desktop-database "$APPS" >/dev/null 2>&1 || true
 command -v gtk-update-icon-cache >/dev/null 2>&1 && $SUDO gtk-update-icon-cache -q -t "$(dirname "$(dirname "$(dirname "$ICONS")")")" >/dev/null 2>&1 || true
-command -v xdg-mime >/dev/null 2>&1 && xdg-mime default mintmail.desktop x-scheme-handler/mailto >/dev/null 2>&1 || true
+command -v xdg-mime >/dev/null 2>&1 && xdg-mime default me.saec.mintmail.desktop x-scheme-handler/mailto >/dev/null 2>&1 || true
 
 echo "==> Terminé. Lancez « mintmail » ou cherchez MintMail dans le menu."
 case ":$PATH:" in *":$BIN:"*) ;; *) echo "    Astuce : ajoutez $BIN à votre PATH (ou redémarrez la session).";; esac

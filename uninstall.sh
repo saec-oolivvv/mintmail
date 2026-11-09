@@ -3,7 +3,7 @@
 set -u
 PURGE=0; [ "${1:-}" = "--purge" ] && PURGE=1
 rm -rf "$HOME/.local/share/mintmail-app" "$HOME/.local/bin/mintmail" \
-  "$HOME/.local/share/applications/mintmail.desktop" "$HOME/.local/share/icons/hicolor/scalable/apps/mintmail.svg"
+  "$HOME/.local/share/applications/me.saec.mintmail.desktop" "$HOME/.local/share/applications/mintmail.desktop" "$HOME/.local/share/icons/hicolor/scalable/apps/mintmail.svg"
 if [ -d /opt/mintmail ]; then
   sudo rm -rf /opt/mintmail /usr/local/bin/mintmail /usr/share/applications/mintmail.desktop \
     /usr/share/icons/hicolor/scalable/apps/mintmail.svg

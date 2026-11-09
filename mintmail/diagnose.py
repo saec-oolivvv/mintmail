@@ -113,6 +113,33 @@ def build_report() -> str:
             add("KO  %s : %s: %s" % (name, type(e).__name__, str(e)[:160]))
     add("%s%d module(s) chargés sur %d" % (ok(not bad), len(MODULES) - bad, len(MODULES)))
     add("")
+    add("--- Synchronisation entre machines ---")
+    try:
+        from . import netutil
+        cfgd = json.loads((CONFIG_DIR / "config.json").read_text(encoding="utf-8")) if (CONFIG_DIR / "config.json").exists() else {}
+        code = str(cfgd.get("p2p_secret") or "")
+        from .store import P2P_MIN_SECRET
+        add("%ssynchro activée : %s ; code : %d caractère(s) (%d minimum)%s" % (
+            ok(bool(cfgd.get("p2p_enabled")) and len(code) >= P2P_MIN_SECRET), bool(cfgd.get("p2p_enabled")), len(code), P2P_MIN_SECRET,
+            "" if len(code) >= P2P_MIN_SECRET or not code else "   <-- trop court : synchro désactivée, générer un nouveau code"))
+        ifs = netutil.interfaces()
+        add("Interfaces  : %s" % ("; ".join("%s %s/%d" % (i["if"], i["ip"], i["prefix"]) for i in ifs) or "aucune (réseau déconnecté ?)"))
+        add("Diffusions  : %s" % ", ".join(netutil.broadcast_targets()))
+        import socket as _s
+        for kind, port, typ in (("UDP", cfgd.get("p2p_disc_port", 54321), _s.SOCK_DGRAM), ("TCP", cfgd.get("p2p_port", 54322), _s.SOCK_STREAM)):
+            sk = _s.socket(_s.AF_INET, typ)
+            sk.setsockopt(_s.SOL_SOCKET, _s.SO_REUSEADDR, 1)
+            try:
+                sk.bind(("", int(port)))
+                add("%sport %s %s libre en local" % (ok(True), kind, port))
+            except OSError as e:
+                add("%sport %s %s : %s (MintMail déjà ouvert ? autre programme ?)" % (ok(False), kind, port, e.strerror))
+            finally:
+                sk.close()
+        add("Pairs fixes : %s" % (cfgd.get("p2p_static_peers") or "aucun"))
+    except Exception as e:
+        add("KO  synchro : %s" % e)
+    add("")
     add("--- Données ---")
     cfg = CONFIG_DIR / "config.json"
     try:

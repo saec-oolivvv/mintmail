@@ -54,6 +54,7 @@ def local_installs():
         if p.exists() or p.is_symlink():
             found.append((p, what, _launcher_version(p) if "mintmail" in _head(p) else "?"))
     for p, what in ((home / ".local/share/applications/mintmail.desktop", "entrée de menu locale"),
+                    (home / ".local/share/applications/me.saec.mintmail.desktop", "entrée de menu locale"),
                     (home / ".local/share/icons/hicolor/scalable/apps/mintmail.svg", "icône locale")):
         if p.exists():
             found.append((p, what, ""))

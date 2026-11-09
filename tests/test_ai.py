@@ -147,6 +147,35 @@ def test_move_action_is_validated():
     assert "Clients/Alpha" in E.describe_action(plan["actions"][0], 3) and "3 messages" in E.describe_action(plan["actions"][0], 3)
 
 
+def test_every_action_type_can_be_described():
+    """describe_action construit tous les libellés d'un coup : aucune action ne doit faire échouer l'affichage du plan."""
+    for a in ({"type": "archive", "query": "x"}, {"type": "classify", "query": ""}, {"type": "create_folder", "name": "F", "parent": ""},
+              {"type": "create_rule", "field": "from", "text": "t", "action": "move", "folder": "F"},
+              {"type": "move", "query": "", "folder": "F"}, {"type": "digest"}, {"type": "open_settings", "page": "ai"},
+              {"type": "compose", "to": "a@b.be", "subject": "", "body": ""}, {"type": "block_sender", "email": "", "target": "selected"}):
+        assert E.describe_action(a, 2)
+
+
+def test_classify_maps_existing_caps_new_and_sanitizes():
+    calls = []
+
+    def resp(m):
+        calls.append(m)
+        return json.dumps([{"i": 0, "folder": "FACTURES"}, {"i": 1, "folder": "Nouveau A"}, {"i": 2, "folder": "Nouveau B"},
+                           {"i": 3, "folder": "Nouveau C"}, {"i": 4, "folder": "../../etc/passwd"}, {"i": 5, "folder": ""},
+                           {"i": 99, "folder": "Hors limite"}, {"i": "x", "folder": "Bizarre"}, "pas un dict"])
+    eng, _ = engine(resp)
+    ms = [msg(str(i), "Sujet %d" % i) for i in range(6)]
+    r = eng.classify(ms, ["Factures", "Clients › Alpha"], max_new=2)
+    assert r["moves"]["Factures"] == ["0"] and r["new"] == ["Nouveau A", "Nouveau B"]          # existant (casse) ; 2 nouveaux maximum
+    assert "Nouveau C" not in r["moves"] and "etc passwd" in r["moves"] or "Nouveau C" not in r["moves"]
+    assert r["stay"] >= 2 and len(calls) == 1                                                  # le reste demeure dans la boîte
+    assert all("/" not in k and ".." not in k for k in r["moves"])                              # noms de dossiers sûrs
+    ms2 = [msg(str(i), "S%d" % i) for i in range(60)]
+    eng.classify(ms2, [], chunk=25)
+    assert len(calls) == 1 + 3                                                                  # lots de 25 : 25 + 25 + 10
+
+
 def _isolated(fn):
     def run():
         try:

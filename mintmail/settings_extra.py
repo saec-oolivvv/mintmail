@@ -10,7 +10,8 @@ from .widgets import SWIPE_ACTIONS, icon
 LAYOUTS = [("columns", "Colonnes : liste | lecture"), ("bottom", "Lecture en bas"), ("list", "Liste seule (lecture plein écran)")]
 RULE_FIELDS = [("from", "L'expéditeur contient"), ("subject", "L'objet contient"), ("to", "Les destinataires contiennent")]
 RULE_ACTIONS = [("archive", "Archiver"), ("trash", "Supprimer"), ("spam", "Mettre en spam"),
-                ("read", "Marquer comme lu"), ("star", "Ajouter aux favoris"), ("pin", "Épingler")]
+                ("read", "Marquer comme lu"), ("star", "Ajouter aux favoris"), ("pin", "Épingler"),
+                ("move", "Ranger dans le dossier →")]
 
 
 def _combo(options, active):
@@ -146,8 +147,11 @@ def filters_page(win):
     f_text.set_placeholder_text("texte…")
     f_text.set_hexpand(True)
     f_act = _combo(RULE_ACTIONS, "archive")
+    f_folder = Gtk.Entry()
+    f_folder.set_placeholder_text("dossier (pour « Ranger »)")
+    f_folder.set_width_chars(16)
     add = Gtk.Button(label="Ajouter la règle")
-    for w in (f_field, f_text, f_act, add):
+    for w in (f_field, f_text, f_act, f_folder, add):
         form.pack_start(w, w is f_text, True, 0)
     page.pack_start(form, False, False, 0)
     apply_btn = Gtk.Button(label="Appliquer maintenant à la boîte de réception")
@@ -164,7 +168,7 @@ def filters_page(win):
             row = Gtk.Box(spacing=8)
             row.set_border_width(4)
             row.pack_start(Gtk.Label(xalign=0, label="%s « %s » → %s" % (
-                names.get(r["field"], r["field"]), r["text"], anames.get(r["action"], r["action"]))), True, True, 0)
+                names.get(r["field"], r["field"]), r["text"], anames.get(r["action"], r["action"]) + ((" « %s »" % r["folder"]) if r.get("folder") else ""))), True, True, 0)
             rm = Gtk.Button()
             rm.set_image(icon("list-remove-symbolic"))
             rm.set_relief(Gtk.ReliefStyle.NONE)
@@ -176,9 +180,17 @@ def filters_page(win):
     def add_rule(*_):
         t = f_text.get_text().strip()
         if t:
-            cfg["rules"].append({"field": f_field.get_active_id(), "text": t, "action": f_act.get_active_id()})
+            rule = {"field": f_field.get_active_id(), "text": t, "action": f_act.get_active_id()}
+            if rule["action"] == "move":
+                from .ai_engine import sanitize_folder_name
+                rule["folder"] = sanitize_folder_name(f_folder.get_text())
+                if not rule["folder"]:
+                    win.toast.popup("Indiquez le dossier de destination", timeout=3)
+                    return
+            cfg["rules"].append(rule)
             cfg.save()
             f_text.set_text("")
+            f_folder.set_text("")
             refresh()
     add.connect("clicked", add_rule)
     f_text.connect("activate", add_rule)
@@ -395,7 +407,29 @@ def p2p_page(win):
             GLib.idle_add(done)
         threading.Thread(target=work, daemon=True).start()
     sync_btn.connect("clicked", do_sync)
-    grid.attach(sync_btn, 1, 7, 1, 1)
+    scan_btn = Gtk.Button(label="🔍 Rechercher les machines")
+    scan_btn.set_tooltip_text("Sonde le réseau local (utile si la détection automatique est bloquée par la box ou un VPN)")
+
+    def do_scan(_b):
+        scan_btn.set_sensitive(False)
+        win.toast.popup("Recherche des machines sur le réseau local…", timeout=3)
+
+        def work():
+            n = win.sync_engine.scan_now()
+
+            def done():
+                scan_btn.set_sensitive(True)
+                win.toast.popup("%d machine(s) trouvée(s)" % n if win.sync_engine.can_run()
+                                else "Synchronisation inactive (code de jumelage requis)", timeout=4)
+                refresh()
+                return False
+            GLib.idle_add(done)
+        threading.Thread(target=work, daemon=True).start()
+    scan_btn.connect("clicked", do_scan)
+    brow = Gtk.Box(spacing=8)
+    brow.pack_start(sync_btn, False, False, 0)
+    brow.pack_start(scan_btn, False, False, 0)
+    grid.attach(brow, 1, 7, 1, 1)
 
     # --- pairs statiques (secours si la découverte automatique est bloquée)
     grid.attach(label("Secours si la découverte automatique est bloquée (isolation Wi-Fi de certaines box) : "
@@ -450,14 +484,46 @@ def p2p_page(win):
     grid.attach(prow, 0, 9, 2, 1)
     grid.attach(label("Pare-feu : autoriser UDP 54321 et TCP 54322 entre les machines "
                       "(ex. sudo ufw allow from 192.168.1.0/24 to any port 54322 proto tcp). "
-                      "Les données échangées ne sont pas chiffrées : réseau de confiance uniquement."), 0, 10, 2, 1)
+                      "Les échanges sont chiffrés et authentifiés par le code de jumelage."), 0, 10, 2, 1)
+    diag_lbl = label("")
+    diag_lbl.set_selectable(True)
+    grid.attach(Gtk.Label(label="Diagnostic réseau", xalign=1, yalign=0), 0, 11, 1, 1)
+    grid.attach(diag_lbl, 1, 11, 1, 1)
+
+    def diag_text():
+        d = win.sync_engine.diagnostics()
+        out = []
+        if not d["enabled"]:
+            out.append("⚠ Synchronisation désactivée sur CETTE machine (elle ne se voit pas elle-même ni les autres).")
+        if d["code_len"] and d["code_len"] < MIN_SECRET:
+            out.append("⚠ Code trop court : %d caractères (%d minimum). Cliquez « Générer », « Appliquer », puis "
+                       "saisissez EXACTEMENT le même code sur chaque machine." % (d["code_len"], MIN_SECRET))
+        if d["enabled"] and not d["code_ok"]:
+            out.append("⚠ Aucun code valide : la synchronisation ne démarre pas.")
+        out.append("• Adresses de cette machine : %s" % (", ".join(d["own_ips"]) or "aucune détectée (réseau déconnecté ?)"))
+        if d["enabled"]:
+            out.append("• Écoute : UDP %d %s — TCP %d %s" % (d["disc_port"], "OK" if d["udp_bound"] else "✗ port occupé",
+                                                           d["tcp_port"], "OK" if d["tcp_bound"] else "✗ port occupé"))
+            out.append("• Annonces envoyées : %d (échecs : %d) — reçues d'autres machines : %d" % (
+                d["sent"], d["send_errors"], d["received"]))
+            if d["foreign_versions"]:
+                out.append("⚠ Une machine d'une AUTRE version (protocole %s) annonce sa présence : mettez MintMail à jour "
+                           "partout (même version)." % ", ".join(d["foreign_versions"]))
+            if d["filtered"]:
+                out.append("• Annonces ignorées (adresse publique) : %s" % ", ".join(d["filtered"][:4]))
+            if d["scanned"]:
+                out.append("• Dernière recherche active : %d adresses sondées" % d["scanned"])
+            if not d["received"] and d["sent"]:
+                out.append("→ Aucune annonce reçue : box ou pare-feu qui bloque UDP %d ? Essayez « Rechercher les machines »." % d["disc_port"])
+        return "\n".join(out)
 
     def refresh(*_):
         eng = win.sync_engine
         state_lbl.set_text(eng.state_label())
         id_lbl.set_markup("<b>%s</b>" % GLib.markup_escape_text(eng.node_id() or "—"))
-        peers_lbl.set_text("\n".join("%s @ %s:%s" % (p["node_id"], p["host"], p["port"]) for p in eng.peers())
+        peers_lbl.set_text("\n".join("%s @ %s:%s (%s)" % (p["node_id"], p["host"], p["port"], p["via"]) for p in eng.peers())
                            or "Aucune autre machine détectée pour l'instant.")
+        diag_lbl.set_text(diag_text())
 
     sw = _scrolled(grid)
     sw.connect("destroy", lambda *_: alive.update(v=False))
@@ -491,7 +557,7 @@ def help_page():
     page.pack_start(desc, False, False, 8)
 
     # Fonctionnalités
-    feats = Gtk.Label(xalign=0, label="✨ Assistant IA (Ctrl+J) : demandez-lui d'archiver, bloquer, créer une règle, rédiger… chaque action est confirmée\n✨ Carte IA sur chaque message : résumé, points clés, priorité, alerte hameçonnage, réponses suggérées, agenda, traduction, questions\n✨ Tri automatique des nouveaux messages et résumé « En bref » de la boîte\n✨ Rédaction : écrire depuis une idée, améliorer, corriger, raccourcir, ton formel/amical, traduire, objet\n✨ Recherche en langage naturel : tapez « ? les mails non lus de Marie »\n✓ Tous vos dossiers : arborescence complète par compte, déplacer, créer, renommer, supprimer\n✓ Trois styles visuels : Aurora, Papier, Terminal (Paramètres → Apparence)\n✓ Actions instantanées (archiver, supprimer, spam, blocage), swipe, actions au survol\n✓ Réception en temps réel (IMAP IDLE), chargement progressif, connexions persistantes\n✓ Synchro automatique et chiffrée entre vos machines : comptes, signatures, IA, réponses rapides, règles, apparence")
+    feats = Gtk.Label(xalign=0, label="✨ Assistant IA (Ctrl+J) : demandez-lui d'archiver, bloquer, créer une règle, rédiger… chaque action est confirmée\n✨ Carte IA sur chaque message : résumé, points clés, priorité, alerte hameçonnage, réponses suggérées, agenda, traduction, questions\n✨ Classement par l'IA dans des dossiers (existants ou créés), avec validation ; clic droit : section IA\n✨ Tri automatique des nouveaux messages et résumé « En bref » de la boîte\n✨ Rédaction : écrire depuis une idée, améliorer, corriger, raccourcir, ton formel/amical, traduire, objet\n✨ Recherche en langage naturel : tapez « ? les mails non lus de Marie »\n✓ Tous vos dossiers : arborescence complète par compte, déplacer, créer, renommer, supprimer\n✓ Trois styles visuels : Aurora, Papier, Terminal (Paramètres → Apparence)\n✓ Actions instantanées (archiver, supprimer, spam, blocage), swipe, actions au survol\n✓ Réception en temps réel (IMAP IDLE), chargement progressif, connexions persistantes\n✓ Synchro automatique et chiffrée entre vos machines : comptes, signatures, IA, réponses rapides, règles, apparence")
     feats.get_style_context().add_class("dim")
     feats.set_line_wrap(True)
     page.pack_start(feats, False, False, 8)
