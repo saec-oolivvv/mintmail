@@ -309,7 +309,7 @@ def p2p_page(win):
     import secrets
     import socket
     import threading
-    from .p2p import MIN_SECRET, local_ip
+    from .p2p import MIN_SECRET, local_ip, code_is_acceptable, code_strength, generate_code
     cfg = win.config
     grid = Gtk.Grid(column_spacing=14, row_spacing=10)
     grid.set_border_width(18)
@@ -348,7 +348,7 @@ def p2p_page(win):
     grid.attach(srow, 1, 2, 1, 1)
 
     def on_generate(_b):
-        secret.set_text(secrets.token_urlsafe(12))
+        secret.set_text(generate_code())
         show.set_active(True)
     gen.connect("clicked", on_generate)
 
@@ -361,6 +361,13 @@ def p2p_page(win):
     def apply_settings(*_):
         code = secret.get_text().strip()
         want = enabled.get_active()
+        if want and code != (cfg.get("p2p_secret") or "") and len(code) >= MIN_SECRET and not code_is_acceptable(code):
+            win.toast.popup("Code trop faible (≈ %d bits) : il protège vos mots de passe sur le réseau. Cliquez « Générer » ou utilisez au moins "
+                            "16 caractères variés (lettres, chiffres, symboles), sans mot courant." % code_strength(code), timeout=9)
+            guard["busy"] = True
+            enabled.set_active(False)
+            guard["busy"] = False
+            return
         if want and len(code) < MIN_SECRET:
             win.toast.popup("Définissez d'abord un code de jumelage (%d caractères minimum)" % MIN_SECRET, timeout=4)
             guard["busy"] = True
@@ -509,6 +516,9 @@ def p2p_page(win):
         if d["code_len"] and d["code_len"] < MIN_SECRET:
             out.append("⚠ Code trop court : %d caractères (%d minimum). Cliquez « Générer », « Appliquer », puis "
                        "saisissez EXACTEMENT le même code sur chaque machine." % (d["code_len"], MIN_SECRET))
+        if d["code_len"] >= MIN_SECRET and d.get("code_bits", 99) < 64:
+            out.append("⚠ Code de jumelage faible (≈ %d bits) : un attaquant du réseau pourrait le deviner hors ligne. Générez-en un nouveau "
+                       "(bouton « Générer ») puis saisissez-le sur chaque machine." % d["code_bits"])
         if d["enabled"] and not d["code_ok"]:
             out.append("⚠ Aucun code valide : la synchronisation ne démarre pas.")
         out.append("• Adresses de cette machine : %s" % (", ".join(d["own_ips"]) or "aucune détectée (réseau déconnecté ?)"))

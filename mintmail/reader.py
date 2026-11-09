@@ -17,7 +17,7 @@ for _v in ("4.1", "4.0"):
         WebKit2 = None
 HAS_WEBKIT = WebKit2 is not None
 
-from .util import (attachment_kind, save_attachments, format_full, human_size, has_remote_content, block_remote_content,
+from .util import (attachment_kind, attachment_risk, save_attachments, format_full, human_size, has_remote_content, block_remote_content,
                    text_to_html, split_addresses)
 from .widgets import Avatar, icon, icon_button
 
@@ -25,13 +25,66 @@ QUICK_REPLIES = ["Merci !", "OK, bien reçu 👍", "Je regarde ça et je reviens
 
 
 def open_uri(widget, uri):
+    """Ouvre un lien : http, https et mailto SEULEMENT (voir htmlsafe.safe_to_open). Retourne False si refusé."""
+    from .htmlsafe import safe_to_open
+    from .log import log
+    clean = safe_to_open(uri)
+    if clean is None:
+        log("Lien refusé (schéma non autorisé) : %s" % (uri or "")[:120])
+        return False
     try:
-        Gtk.show_uri_on_window(widget.get_toplevel() if widget else None, uri, Gdk.CURRENT_TIME)
+        Gtk.show_uri_on_window(widget.get_toplevel() if widget else None, clean, Gdk.CURRENT_TIME)
     except Exception:
         try:
-            Gio.AppInfo.launch_default_for_uri(uri, None)
+            Gio.AppInfo.launch_default_for_uri(clean, None)
         except Exception:
-            pass
+            return False
+    return True
+
+
+def harden_settings(s, javascript):
+    """Réglages WebKit minimaux : pas de plugins, stockage, médias, fenêtres, audit de liens (ping), WebGL, inspecteur…"""
+    s.set_enable_javascript(javascript)
+    for name in ("set_enable_hyperlink_auditing", "set_enable_plugins", "set_enable_java", "set_enable_webgl", "set_enable_media_stream",
+                 "set_enable_mediasource", "set_enable_webaudio", "set_enable_html5_local_storage", "set_enable_html5_database",
+                 "set_enable_offline_web_application_cache", "set_enable_page_cache", "set_javascript_can_open_windows_automatically",
+                 "set_allow_modal_dialogs", "set_enable_dns_prefetching", "set_allow_file_access_from_file_urls",
+                 "set_allow_universal_access_from_file_urls", "set_enable_site_specific_quirks", "set_enable_developer_extras",
+                 "set_enable_write_console_messages_to_stdout"):
+        fn = getattr(s, name, None)
+        if fn:
+            try:
+                fn(False)
+            except Exception:
+                pass
+
+
+def new_webview(javascript):
+    """Vue WebKit durcie, avec un contexte éphémère (aucun cookie ni cache conservé)."""
+    s = WebKit2.Settings()
+    harden_settings(s, javascript)
+    try:
+        return WebKit2.WebView(web_context=WebKit2.WebContext.new_ephemeral(), settings=s)
+    except Exception:
+        return WebKit2.WebView.new_with_settings(s)
+
+
+def navigation_policy(owner, decision, dtype):
+    """Seul notre propre chargement (about:blank) est autorisé ; un clic ouvre le lien dans le navigateur (si autorisé) ; tout
+    le reste (redirection, formulaire, cadre, nouvelle fenêtre) est refusé."""
+    if dtype == WebKit2.PolicyDecisionType.NAVIGATION_ACTION:
+        nav = decision.get_navigation_action()
+        uri = nav.get_request().get_uri() or ""
+        if uri == "about:blank" or uri.startswith("about:blank#"):
+            return False
+        if nav.get_navigation_type() == WebKit2.NavigationType.LINK_CLICKED:
+            open_uri(owner, uri)
+        decision.ignore()
+        return True
+    if dtype == WebKit2.PolicyDecisionType.NEW_WINDOW_ACTION:
+        decision.ignore()
+        return True
+    return False
 
 
 PLAIN_FONT = {"aurora": "system-ui,sans-serif", "papier": "Georgia,'DejaVu Serif',serif", "terminal": "'DejaVu Sans Mono',monospace"}
@@ -40,9 +93,10 @@ PLAIN_FONT = {"aurora": "system-ui,sans-serif", "papier": "Georgia,'DejaVu Serif
 def wrap_html(msg, load_images, dark, style="aurora"):
     body = msg.html
     if body:
-        if not load_images:
-            body = block_remote_content(body)
-        return ('<html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width">'
+        from .htmlsafe import reader_csp, sanitize
+        body = sanitize(body, keep_style=True, allow_remote_images=load_images)    # liste blanche + CSP : voir htmlsafe.py
+        return ('<html><head><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="' + reader_csp(load_images) + '">'
+                '<meta name="viewport" content="width=device-width">'
                 '<style>html{background:#fff;color:#111}body{margin:0;padding:18px 22px;'
                 'font-family:system-ui,Arial,sans-serif;font-size:14px;word-wrap:break-word}'
                 'img{max-width:100%%;height:auto}table{max-width:100%%;}pre{white-space:pre-wrap}'
@@ -61,9 +115,7 @@ class BodyView(Gtk.Box):
         super().__init__()
         self.web = None
         if HAS_WEBKIT:
-            s = WebKit2.Settings()
-            s.set_enable_javascript(False)
-            self.web = WebKit2.WebView.new_with_settings(s)
+            self.web = new_webview(False)          # JavaScript désactivé pour le courrier reçu
             self.web.connect("decide-policy", self._policy)
             self.pack_start(self.web, True, True, 0)
         else:
@@ -78,13 +130,7 @@ class BodyView(Gtk.Box):
             self.pack_start(sw, True, True, 0)
 
     def _policy(self, web, decision, dtype):
-        if dtype == WebKit2.PolicyDecisionType.NAVIGATION_ACTION:
-            nav = decision.get_navigation_action()
-            if nav.get_navigation_type() == WebKit2.NavigationType.LINK_CLICKED:
-                open_uri(self, nav.get_request().get_uri())
-                decision.ignore()
-                return True
-        return False
+        return navigation_policy(self, decision, dtype)
 
     def show_message(self, msg, load_images, dark, style="aurora"):
         if self.web:
@@ -637,11 +683,34 @@ class Reader(Gtk.Stack):
         return True
 
     def _open_att(self, a, preview=True):
+        """Aperçu intégré (images, texte) ou ouverture avec l'application par défaut — sauf fichiers exécutables / scripts
+        (enregistrement seulement) et fichiers à risque (confirmation)."""
+        risk = attachment_risk(a)
+        if risk == "block":
+            self._warn_dialog("Fichier potentiellement dangereux", "« %s » est un programme ou un script : MintMail ne l'ouvre pas. "
+                              "Si vous êtes certain de sa provenance, enregistrez-le (clic droit → Enregistrer sous…) et vérifiez-le avant "
+                              "de l'exécuter." % a["filename"], ok_label=None)
+            return
+        if risk == "warn" and not self._warn_dialog("Ouvrir ce fichier ?", "« %s » peut contenir des macros ou du code actif. "
+                                                    "Ouvrez-le seulement si vous attendiez ce fichier." % a["filename"], ok_label="Ouvrir quand même"):
+            return
         kind = attachment_kind(a)
-        if preview and kind in ("image", "text"):
+        if preview and kind in ("image", "text") and a.get("size", 0) <= 15_000_000:
             self._preview(a, kind)
         else:
-            open_uri(self, Gio.File.new_for_path(a["path"]).get_uri())
+            try:
+                Gio.AppInfo.launch_default_for_uri(Gio.File.new_for_path(a["path"]).get_uri(), None)
+            except Exception:
+                pass
+
+    def _warn_dialog(self, title, text, ok_label=None):
+        d = Gtk.MessageDialog(transient_for=self.get_toplevel(), modal=True, message_type=Gtk.MessageType.WARNING, text=title, secondary_text=text)
+        d.add_button("Annuler" if ok_label else "Fermer", Gtk.ResponseType.CANCEL)
+        if ok_label:
+            d.add_button(ok_label, Gtk.ResponseType.OK)
+        ok = d.run() == Gtk.ResponseType.OK
+        d.destroy()
+        return ok
 
     def _preview(self, a, kind):
         dlg = Gtk.Dialog(title=a["filename"], transient_for=self.get_toplevel(), modal=False)

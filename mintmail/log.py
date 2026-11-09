@@ -1,19 +1,21 @@
 """Journal d'erreurs : rien n'échoue en silence."""
+import os
 import sys
 import time
 import traceback
 
-from .store import DATA_DIR
+from .store import DATA_DIR, private_dir
 
 LOG = DATA_DIR / "mintmail.log"
 
 
 def log(msg):
     try:
-        DATA_DIR.mkdir(parents=True, exist_ok=True)
+        private_dir(DATA_DIR)
         if LOG.exists() and LOG.stat().st_size > 500_000:
             LOG.replace(DATA_DIR / "mintmail.log.old")
-        with open(LOG, "a", encoding="utf-8") as f:
+        fd = os.open(str(LOG), os.O_WRONLY | os.O_APPEND | os.O_CREAT, 0o600)
+        with os.fdopen(fd, "a", encoding="utf-8") as f:
             f.write("[%s] %s\n" % (time.strftime("%Y-%m-%d %H:%M:%S"), msg))
     except OSError:
         pass

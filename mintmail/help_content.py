@@ -355,9 +355,18 @@ SECTIONS: List[Dict] = [
          "• Le courrier reste sur votre serveur ; le cache local est une copie. Supprimer un compte efface son cache, pas vos mails."),
         ("Ce qui protège",
          "• Connexions IMAP/SMTP chiffrées (TLS) avec vérification des certificats ; OAuth sans mot de passe pour Gmail et Outlook.\n"
-         "• Images distantes bloquées, HTML nettoyé, liens suspects signalés.\n"
-         "• Synchronisation chiffrée et authentifiée ; désabonnement et CalDAV en HTTPS uniquement.\n"
-         "• IA : envoi de texte seulement si vous l'activez, jamais avec Ollama, aucune action sans validation."),
+         "• Courrier reçu : le HTML est reconstruit par liste blanche (scripts, formulaires, cadres, redirections, styles dangereux supprimés) et "
+         "affiché sous une politique de sécurité de contenu ; images distantes bloquées par défaut ; JavaScript désactivé ; aucun cookie ni cache conservé.\n"
+         "• Liens : seuls http, https et mailto s'ouvrent (jamais file:, javascript:, smb:, ssh:…). Pièces jointes : programmes et scripts (.exe, .sh, .desktop, "
+         ".AppImage…) jamais ouverts depuis MintMail (enregistrement seulement) ; fichiers à risque (HTML, SVG, macros Office…) demandent une confirmation.\n"
+         "• Vos données : dossiers de MintMail en 0700 et fichiers en 0600 (courrier, pièces jointes, réglages, journal : illisibles par les autres comptes de la machine).\n"
+         "• Synchronisation chiffrée et authentifiée, limitée au réseau local ; codes faibles refusés ; désabonnement et CalDAV en HTTPS, sans requête vers votre réseau interne.\n"
+         "• IA : envoi de texte seulement si vous l'activez, jamais avec Ollama, aucune action sans validation ; un message piégé peut cependant tromper un modèle "
+         "(résumé ou classement faussé) : vérifiez avant de valider.\n"
+         "• Limites connues et rapport d'audit : fichier SECURITY.md (dépôt du projet et /usr/share/doc/mintmail/)."),
+        ("Signaler une faille de sécurité",
+         "Écrivez à contact@saec.me en décrivant le problème et comment le reproduire. Merci de ne pas le publier avant correction. Une version corrigée sera "
+         "publiée dans les meilleurs délais ; seule la dernière version est maintenue."),
         ("Journal d'erreurs",
          "☰ → Journal d'erreurs affiche les derniers incidents. En cas de problème au démarrage, MintMail affiche un message clair et propose de mettre de côté "
          "réglages et cache (rien n'est supprimé)."),

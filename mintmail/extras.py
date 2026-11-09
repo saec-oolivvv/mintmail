@@ -107,6 +107,9 @@ class ExtrasMixin:
             self.run_bg(lambda: unsub.one_click_post(url), done)
         elif links["mailto"]:
             to, subject, body = unsub.mailto_fields(links["mailto"][0])
+            if not to:
+                self.toast.popup("Adresse de désabonnement invalide ou multiple : refusée par sécurité.", timeout=6)
+                return
             if not self._confirm("Se désabonner de %s ?" % who, "Un e-mail de désabonnement sera envoyé à %s." % to):
                 return
             self.queue_send(Outgoing(account=msg.account, to=to, subject=subject, html="<p>%s</p>" % body, text=body), delay=2)

@@ -14,6 +14,46 @@ P2P_MIN_SECRET = 12   # code de jumelage : 12 caractères minimum (les identifia
 CONFIG_DIR = Path(os.environ.get("XDG_CONFIG_HOME", str(Path.home() / ".config"))) / APP
 DATA_DIR = Path(os.environ.get("XDG_DATA_HOME", str(Path.home() / ".local" / "share"))) / APP
 
+
+def private_dir(p):
+    """Dossier réservé à l'utilisateur (0700) : le courrier et les identifiants ne doivent pas être lisibles par les autres comptes."""
+    p = Path(p)
+    p.mkdir(parents=True, exist_ok=True, mode=0o700)
+    try:
+        if (p.stat().st_mode & 0o077):
+            os.chmod(p, 0o700)
+    except OSError:
+        pass
+    return p
+
+
+def write_private(path, data):
+    """Écrit un fichier créé directement en 0600 (aucun instant où il serait lisible par d'autres)."""
+    fd = os.open(str(path), os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+    with os.fdopen(fd, "wb") as f:
+        f.write(data if isinstance(data, bytes) else data.encode("utf-8"))
+    os.chmod(path, 0o600)
+
+
+def harden_permissions():
+    """Au démarrage : dossiers 0700 et fichiers 0600 pour tout ce que MintMail stocke (anciennes installations comprises)."""
+    changed = 0
+    for root in (CONFIG_DIR, DATA_DIR):
+        if not root.exists():
+            continue
+        for dirpath, dirs, files in os.walk(root):
+            for name, mode in [(d, 0o700) for d in dirs] + [(f, 0o600) for f in files] + [(".", 0o700)]:
+                p = os.path.join(dirpath, name)
+                try:
+                    if os.path.islink(p):
+                        continue
+                    if os.stat(p).st_mode & 0o077:
+                        os.chmod(p, mode)
+                        changed += 1
+                except OSError:
+                    pass
+    return changed
+
 DEFAULTS = {
     "accounts": [], "passwords": {}, "theme": "system", "accent": "#1a73ff",
     "density": "comfortable", "load_images": False, "notifications": True,
@@ -66,11 +106,9 @@ class Config:
 
     def save(self):
         with self._save_lock:   # plusieurs threads (UI, synchro P2P) peuvent enregistrer
-            self.path.parent.mkdir(parents=True, exist_ok=True)
+            private_dir(self.path.parent)
             tmp = str(self.path) + ".tmp"
-            with open(tmp, "w", encoding="utf-8") as f:
-                json.dump(self.data, f, indent=2, ensure_ascii=False)
-            os.chmod(tmp, 0o600)
+            write_private(tmp, json.dumps(self.data, indent=2, ensure_ascii=False))      # 0600 dès la création (mots de passe en repli)
             os.replace(tmp, self.path)
 
     def __getitem__(self, k):
@@ -167,8 +205,15 @@ class Cache:
             "snoozed_until": "snoozed", "category": "category"}
 
     def __init__(self, path=None):
-        DATA_DIR.mkdir(parents=True, exist_ok=True)
-        if not Path(str(path or DATA_DIR / "cache.db")).exists():
+        private_dir(DATA_DIR)
+        db_file = Path(str(path or DATA_DIR / "cache.db"))
+        if not db_file.exists():
+            try:
+                fd = os.open(str(db_file), os.O_WRONLY | os.O_CREAT, 0o600)      # base créée en 0600 (tout votre courrier y est)
+                os.close(fd)
+            except OSError:
+                pass
+        if not db_file.exists():
             try:
                 (DATA_DIR / "demo_seeded").unlink()
             except OSError:

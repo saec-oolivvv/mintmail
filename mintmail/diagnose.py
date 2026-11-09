@@ -102,6 +102,16 @@ def build_report() -> str:
         add(ok(False) + "PyGObject (module gi) absent pour cet interpréteur : %s" % e)
         add("               -> sudo apt install python3-gi gir1.2-gtk-3.0 gir1.2-webkit2-4.1")
     add("Trousseau   : %s" % _keyring_name())
+    try:
+        _cfgd = json.loads((CONFIG_DIR / "config.json").read_text(encoding="utf-8")) if (CONFIG_DIR / "config.json").exists() else {}
+        n_clear = len(_cfgd.get("passwords") or {}) + (1 if _cfgd.get("nvidia_api_key") else 0)
+        add("%sSecrets     : %s" % ("KO  " if n_clear else "OK  ", "%d mot(s) de passe / clé(s) en CLAIR dans config.json (0600) faute de trousseau : installez "
+            "python3-keyring + un trousseau (gnome-keyring) puis réenregistrez vos comptes" % n_clear if n_clear else "aucun secret en clair dans config.json"))
+        from .store import DATA_DIR as _D
+        wide = [p for p in (CONFIG_DIR, _D, CONFIG_DIR / "config.json", _D / "cache.db") if p.exists() and p.stat().st_mode & 0o077]
+        add("%sPermissions : %s" % ("KO  " if wide else "OK  ", ("lisibles par d'autres comptes : %s (corrigé au prochain démarrage)" % ", ".join(map(str, wide))) if wide else "réglages et courrier en cache réservés à votre compte"))
+    except Exception as e:
+        add("Secrets / permissions : vérification impossible (%s)" % type(e).__name__)
     add("")
     add("--- Modules MintMail ---")
     bad = 0
@@ -178,9 +188,10 @@ def print_report() -> int:
     text = build_report()
     print(text)
     try:
-        DATA_DIR.mkdir(parents=True, exist_ok=True)
+        from .store import private_dir, write_private
+        private_dir(DATA_DIR)
         path = DATA_DIR / "diagnostic.txt"
-        path.write_text(text, encoding="utf-8")
+        write_private(path, text)
         print("Rapport enregistré dans %s — copiez-le dans votre message si le problème persiste." % path)
     except OSError:
         pass

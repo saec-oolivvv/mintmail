@@ -31,7 +31,18 @@ from .store import P2P_MIN_SECRET
 PROTOCOL = 3
 MAX_LINE = 4096
 MAX_FRAME = 8 * 1024 * 1024
+CONN_DEADLINE = 30.0      # durée TOTALE maximale d'un échange (un pair qui goutte à goutte ne monopolise pas un emplacement)
+MAX_PEERS = 64
 MIN_SECRET = P2P_MIN_SECRET
+
+
+def _cut(sock) -> None:
+    """Coupe une connexion depuis un autre thread : shutdown() réveille la lecture bloquée (close() seul ne le fait pas)."""
+    for op in (lambda: sock.shutdown(socket.SHUT_RDWR), sock.close):
+        try:
+            op()
+        except OSError:
+            pass
 
 
 def derive_key(secret: str) -> bytes:
@@ -170,7 +181,7 @@ class SyncEngine:
         """Tout ce qu'il faut pour comprendre pourquoi deux machines ne se voient pas."""
         secret = str(self.config.get("p2p_secret") or "")
         return {
-            "enabled": self._enabled, "code_len": len(secret), "code_ok": self._key is not None,
+            "enabled": self._enabled, "code_len": len(secret), "code_bits": code_strength(secret), "code_ok": self._key is not None,
             "udp_bound": self._udp is not None, "tcp_bound": self._srv is not None,
             "disc_port": self._disc_port, "tcp_port": self._tcp_port, "own_ips": sorted(self._own - {"127.0.0.1"}),
             "broadcasts": netutil.broadcast_targets(), "sent": self.stats["sent"], "received": self.stats["received"],
@@ -255,19 +266,24 @@ class SyncEngine:
         self.stats["received"] += 1
         host = addr[0]
         if parts[0] != "MINTMAIL/%d" % PROTOCOL:
-            self.stats["foreign"].add(parts[0].split("/", 1)[1] if "/" in parts[0] else "?")   # machine d'une autre version
+            if len(self.stats["foreign"]) < 20:
+                self.stats["foreign"].add(parts[0].split("/", 1)[1][:8] if "/" in parts[0] else "?")   # machine d'une autre version
             return None
-        if len(parts) < 3 or not parts[2].isdigit():
-            return None
+        if len(parts) < 3 or not parts[2].isdigit() or not 1024 <= int(parts[2]) <= 65535:
+            return None                        # port hors plage (une annonce falsifiée ne peut pas viser un port système)
         instance = parts[3] if len(parts) > 3 else None
         if time.time() - self._own_at > 30:
             self._own, self._own_at = netutil.own_addresses(), time.time()
         if instance == self._instance or (instance is None and host in self._own):
             return None   # notre propre annonce (ou diffusion bouclée)
         if not reachable(host):
-            self.stats["filtered"].add(host)
+            if len(self.stats["filtered"]) < 50:
+                self.stats["filtered"].add(host)
             return None
         key = "%s:%s" % (host, parts[2])
+        with self._lock:
+            if key not in self._peers and len(self._peers) >= MAX_PEERS:
+                return None                    # table bornée : une inondation d'annonces ne consomme pas la mémoire
         with self._lock:
             first = key not in self._peers
             self._peers[key] = {"host": host, "port": int(parts[2]), "last_seen": time.time(), "node": parts[1], "via": "annonce"}
@@ -388,12 +404,23 @@ class SyncEngine:
                 continue
             except OSError:
                 break
+            if not self.accepts(_addr):
+                conn.close()                  # jamais d'inconnu d'Internet : réseau local, VPN ou bouclage uniquement
+                continue
             if not self._slots.acquire(blocking=False):
                 conn.close()
                 continue
             threading.Thread(target=self._handle, args=(conn,), daemon=True).start()
 
+    @staticmethod
+    def accepts(addr) -> bool:
+        """Adresse d'origine autorisée à ouvrir une connexion de synchronisation."""
+        return reachable(addr[0])
+
     def _handle(self, conn):
+        deadline = threading.Timer(CONN_DEADLINE, lambda: _cut(conn))
+        deadline.daemon = True
+        deadline.start()
         try:
             conn.settimeout(10.0)
             f = conn.makefile("rwb")
@@ -416,6 +443,7 @@ class SyncEngine:
         except (OSError, ValueError):
             pass
         finally:
+            deadline.cancel()
             self._slots.release()
             try:
                 conn.close()
@@ -424,8 +452,12 @@ class SyncEngine:
 
     def _exchange(self, peer: Dict[str, Any]) -> int:
         sock = None
+        deadline = None
         try:
             sock = socket.create_connection((peer["host"], int(peer["port"])), timeout=4.0)
+            deadline = threading.Timer(CONN_DEADLINE, lambda: _cut(sock))
+            deadline.daemon = True
+            deadline.start()
             sock.settimeout(10.0)
             f = sock.makefile("rwb")
             nc = secrets.token_hex(16)
@@ -448,6 +480,8 @@ class SyncEngine:
         except (OSError, ValueError):
             return -1
         finally:
+            if deadline:
+                deadline.cancel()
             if sock:
                 sock.close()
 
@@ -489,3 +523,46 @@ class SyncEngine:
             self.sync_now()
         finally:
             self._sync_lock.release()
+
+
+_COMMON = ("password", "motdepasse", "azerty", "qwerty", "123456", "abcdef", "mintmail", "saec", "linux", "admin", "bonjour", "soleil", "welcome")
+
+
+def code_strength(code: str) -> int:
+    """Estimation prudente (bits) de la robustesse d'un code de jumelage : taille de l'alphabet utilisé × caractères distincts,
+    avec pénalités pour les mots courants, les suites, les répétitions et les codes composés de lettres seules (mots de dictionnaire).
+    Heuristique : le bouton « Générer » produit ~96 bits."""
+    import math
+    code = code or ""
+    if not code:
+        return 0
+    pool = 0
+    for rx, n in ((r"[a-z]", 26), (r"[A-Z]", 26), (r"[0-9]", 10), (r"[^A-Za-z0-9]", 32)):
+        if re.search(rx, code):
+            pool += n
+    bits = len(set(code)) * math.log2(max(pool, 2))
+    low = code.lower()
+    if any(w in low for w in _COMMON):
+        bits -= 25
+    if re.search(r"(.)\1{2,}", code) or re.search(r"(0123|1234|2345|3456|4567|5678|6789|abcd|bcde|cdef)", low):
+        bits -= 20
+    if code.isalpha() and (code[1:] == code[1:].lower()):      # lettres seules en minuscules (ou Majuscule initiale) : mot de dictionnaire probable
+        bits -= 20
+    return max(0, int(bits))
+
+
+def generate_code() -> str:
+    """Code de jumelage aléatoire (~120 bits), qui satisfait toujours code_is_acceptable : majuscules, minuscules, chiffres, symboles."""
+    alphabet = {"l": "abcdefghjkmnpqrstuvwxyz", "u": "ABCDEFGHJKLMNPQRSTUVWXYZ", "d": "23456789", "s": "-_!#$%&*+=?"}
+    while True:
+        chars = [secrets.choice(alphabet[k]) for k in "luds" * 2]
+        allchars = "".join(alphabet.values())
+        chars += [secrets.choice(allchars) for _ in range(12)]
+        secrets.SystemRandom().shuffle(chars)
+        code = "".join(chars)
+        if code_is_acceptable(code):
+            return code
+
+
+def code_is_acceptable(code: str) -> bool:
+    return len(code or "") >= MIN_SECRET and code_strength(code) >= 64

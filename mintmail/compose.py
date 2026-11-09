@@ -11,11 +11,12 @@ gi.require_version("Gtk", "3.0")
 from gi.repository import Gdk, Gio, Gtk, GLib
 
 from .models import Message, Outgoing
-from .reader import WebKit2, HAS_WEBKIT, open_uri
+from .htmlsafe import clean_url, editor_csp
+from .reader import WebKit2, HAS_WEBKIT, navigation_policy, new_webview, open_uri
 from .util import html_to_text, sanitize_html, text_to_html, split_addresses, normalize_subject, format_full, human_size
 from .widgets import icon, icon_button
 
-EDITOR_TPL = """<html><head><meta charset="utf-8"><style>
+EDITOR_TPL = """<html><head><meta charset="utf-8">@@CSPMETA@@<style>
 html{background:#fff;color:#111}body{margin:0;font-family:system-ui,Arial,sans-serif;font-size:14px}
 #ed{outline:none;padding:16px 20px;min-height:80vh;line-height:1.5}
 blockquote{border-left:3px solid #ccc;margin:8px 0;padding-left:12px;color:#555}
@@ -24,6 +25,12 @@ blockquote{border-left:3px solid #ccc;margin:8px 0;padding-left:12px;color:#555}
 r.setStart(e,0);r.collapse(true);var s=window.getSelection();s.removeAllRanges();s.addRange(r);</script>
 </body></html>"""
 
+# Politique de sécurité de contenu : l'éditeur n'exécute QUE son propre script (empreinte SHA-256), aucun réseau, aucun formulaire.
+# Secours en cas de problème d'affichage : lancer « MINTMAIL_EDITOR_CSP=0 mintmail » et nous le signaler.
+_ED_SCRIPT = re.search(r"<script>(.*?)</script>", EDITOR_TPL, re.S).group(1)
+EDITOR_TPL = EDITOR_TPL.replace("@@CSPMETA@@", "" if os.environ.get("MINTMAIL_EDITOR_CSP") == "0" else
+                                '<meta http-equiv="Content-Security-Policy" content="%s">' % editor_csp(_ED_SCRIPT))
+
 
 class Editor(Gtk.Box):
     """Éditeur riche (WebKit contenteditable) avec repli texte brut."""
@@ -31,9 +38,7 @@ class Editor(Gtk.Box):
         super().__init__()
         self.web = self.tv = None
         if HAS_WEBKIT:
-            s = WebKit2.Settings()
-            s.set_enable_javascript(True)
-            self.web = WebKit2.WebView.new_with_settings(s)
+            self.web = new_webview(True)           # JavaScript nécessaire à l'édition, borné par la CSP ci-dessus
             self.web.connect("decide-policy", self._policy)
             self.pack_start(self.web, True, True, 0)
         else:
@@ -44,13 +49,7 @@ class Editor(Gtk.Box):
             self.pack_start(sw, True, True, 0)
 
     def _policy(self, web, decision, dtype):
-        if dtype == WebKit2.PolicyDecisionType.NAVIGATION_ACTION:
-            nav = decision.get_navigation_action()
-            if nav.get_navigation_type() == WebKit2.NavigationType.LINK_CLICKED:
-                open_uri(self, nav.get_request().get_uri())
-                decision.ignore()
-                return True
-        return False
+        return navigation_policy(self, decision, dtype)
 
     def set_html(self, content):
         if self.web:
@@ -511,8 +510,12 @@ class ComposeWindow(Gtk.Window):
         dlg.get_content_area().pack_start(e, True, True, 12)
         dlg.set_default_response(Gtk.ResponseType.OK)
         dlg.show_all()
-        if dlg.run() == Gtk.ResponseType.OK and e.get_text().strip():
-            self.editor.exec("createLink", e.get_text().strip())
+        url = e.get_text().strip()
+        if dlg.run() == Gtk.ResponseType.OK and url:
+            if clean_url(url, "link", False):
+                self.editor.exec("createLink", url)
+            else:
+                self.win.toast.popup("Lien refusé : seuls http, https, mailto et tel sont acceptés.", timeout=5)
         dlg.destroy()
 
     # -- envoi

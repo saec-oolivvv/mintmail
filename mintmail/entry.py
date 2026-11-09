@@ -139,7 +139,8 @@ def send_due() -> int:
     Appelé chaque minute par la minuterie systemd de l'utilisateur ; une réservation atomique évite tout double envoi
     si la fenêtre MintMail est ouverte en même temps."""
     from .backend import make_backend, is_retryable
-    from .store import Cache, Config
+    from .store import Cache, Config, harden_permissions
+    harden_permissions()
     cache = Cache()
     due = cache.outbox_due()
     if not due:
@@ -194,6 +195,8 @@ def main(argv=None) -> int:
         return reset_data()
     if "--send-due" in argv:
         return send_due()
+    from .store import harden_permissions
+    harden_permissions()                    # dossiers 0700 / fichiers 0600, même pour les anciennes installations
     install_hook()
     log("Démarrage MintMail %s (%s)" % (__version__, sys.executable))
     try:

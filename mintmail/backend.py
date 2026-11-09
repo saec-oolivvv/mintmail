@@ -17,7 +17,7 @@ from email.message import EmailMessage
 from email.utils import formataddr, make_msgid, parsedate_to_datetime, parseaddr, formatdate
 
 from .models import Message
-from .store import DATA_DIR
+from .store import DATA_DIR, private_dir, write_private
 from . import ical, oauth
 from .util import html_to_text, split_addresses, text_to_html, thread_key
 
@@ -107,6 +107,8 @@ TOP_RANK = {"inbox": 0, "drafts": 1, "sent": 2, "archive": 3, "spam": 4, "trash"
 
 
 def _q(name):
+    if re.search(r"[\x00-\x1f\x7f]", name or ""):                 # CR / LF / NUL : injection de commande IMAP
+        raise BackendError("Nom de dossier invalide (caractères de contrôle)")
     return '"' + name.replace("\\", "\\\\").replace('"', '\\"') + '"'
 
 
@@ -167,11 +169,12 @@ def parse_message(raw, account, logical, real_folder, uid, flags):
             continue
         if fname or part.get_content_disposition() == "attachment":
             d = DATA_DIR / "attachments" / re.sub(r"\W", "_", mid)
-            d.mkdir(parents=True, exist_ok=True)
+            private_dir(DATA_DIR / "attachments")
+            private_dir(d)
             fname = _safe(fname or "pièce jointe" + (mimetypes.guess_extension(part.get_content_type()) or ""))
             path = d / fname
             try:
-                path.write_bytes(data)
+                write_private(path, data)                                    # 0600 : lisible par vous seul
                 atts.append({"filename": fname, "path": str(path), "size": len(data),
                              "mime": part.get_content_type()})
             except OSError:

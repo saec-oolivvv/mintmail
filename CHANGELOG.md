@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.10.2
+- Audit de sécurité (voir SECURITY.md) : nettoyeur HTML à liste blanche + politique de sécurité de contenu (lecteur et rédaction), navigation et liens filtrés (http / https / mailto), WebKit durci, pièces jointes dangereuses bloquées ou confirmées
+- Données au repos : dossiers 0700 et fichiers 0600 dès la création (courrier, pièces jointes, journal, réglages)
+- Lanceur en mode isolé (-I) : plus de détournement par le dossier courant
+- Synchronisation : connexions limitées au réseau local, délai total, ports et tables bornés, code de jumelage faible refusé, nouveau générateur de code
+- Désabonnement : plus de requête vers le réseau interne, une seule adresse mailto valide ; noms de dossiers IMAP sans caractères de contrôle
+
 ## 1.10.1
 - Licence MIT (logiciel libre) ; mention dans « À propos » et dans l'aide
 

@@ -133,13 +133,9 @@ def normalize_subject(s):
 
 
 def sanitize_html(h):
-    """Nettoyage minimal avant d'injecter du HTML reçu dans l'éditeur (JS actif)."""
-    h = re.sub(r"(?is)<(script|style|iframe|object|embed|head|title)\b.*?</\1\s*>", "", h or "")
-    h = re.sub(r"(?is)<(script|iframe|object|embed|link|meta|base)\b[^>]*>", "", h)
-    h = re.sub(r"(?is)\son\w+\s*=\s*(\"[^\"]*\"|'[^']*'|[^\s>]+)", "", h)
-    h = re.sub(r"(?is)(href|src)\s*=\s*([\"']?)\s*javascript:[^\"'>\s]*\2", "", h)
-    h = re.sub(r"(?is)</?(html|body)[^>]*>", "", h)
-    return block_remote_content(h)
+    """HTML reçu -> HTML sûr pour l'éditeur : liste blanche (voir htmlsafe.py), sans <style>, sans ressource distante."""
+    from .htmlsafe import sanitize
+    return sanitize(h, keep_style=False, allow_remote_images=False)
 
 
 # ------------------------------------------------------------ conversations
@@ -156,7 +152,7 @@ def thread_key(message_id: str, references: str, subject: str, nsubj_hint: str =
 
 # -------------------------------------------------------------- pièces jointes
 TEXT_PREVIEW_EXT = (".txt", ".md", ".csv", ".log", ".json", ".xml", ".ini", ".conf", ".yml", ".yaml", ".ics", ".vcf")
-IMAGE_EXT = (".png", ".jpg", ".jpeg", ".gif", ".bmp", ".webp", ".svg")
+IMAGE_EXT = (".png", ".jpg", ".jpeg", ".gif", ".bmp", ".webp")   # .svg exclu : format actif (pas d'aperçu intégré)
 
 
 def attachment_kind(att) -> str:
@@ -198,3 +194,29 @@ def save_attachments(atts, directory: str):
         except OSError:
             continue
     return out
+
+
+# ------------------------------------------------- pièces jointes : risque à l'ouverture
+BLOCK_EXT = {".desktop", ".sh", ".bash", ".zsh", ".csh", ".ksh", ".run", ".bin", ".appimage", ".deb", ".rpm", ".snap", ".flatpakref",
+             ".jar", ".exe", ".msi", ".bat", ".cmd", ".com", ".scr", ".pif", ".vbs", ".vbe", ".js", ".jse", ".wsf", ".wsh", ".ps1",
+             ".psm1", ".lnk", ".hta", ".cpl", ".reg", ".dll", ".so", ".py", ".pl", ".rb", ".php", ".command", ".app", ".workflow",
+             ".action", ".scpt", ".applescript", ".gadget", ".msp", ".inf"}
+WARN_EXT = {".html", ".htm", ".xhtml", ".shtml", ".svg", ".svgz", ".mht", ".mhtml", ".docm", ".xlsm", ".pptm", ".dotm", ".xltm", ".ppam",
+            ".doc", ".xls", ".ppt", ".rtf", ".chm", ".iso", ".img", ".dmg", ".xps", ".swf", ".url", ".webloc", ".xul", ".jnlp", ".ics"}
+_BIDI = re.compile("[\u202a-\u202e\u2066-\u2069\u200b-\u200f]")
+
+
+def attachment_risk(att) -> str:
+    """'block' (exécutable / script : jamais ouvert depuis MintMail, enregistrement seulement), 'warn' (peut exécuter du code ou
+    contenir des macros : confirmation) ou 'ok'. Gère les astuces : double extension, point final, caractères bidirectionnels."""
+    import os
+    raw = att.get("filename") or ""
+    if _BIDI.search(raw):
+        return "block"                     # « facture‮fdp.exe » : l'extension est dissimulée à l'affichage
+    name = re.sub(r"[\x00-\x1f\x7f]", "", raw).strip().rstrip(". ").lower()
+    ext = os.path.splitext(name)[1]
+    if ext in BLOCK_EXT or not ext and (att.get("mime") or "") in ("application/x-sh", "application/x-executable", "application/x-msdownload"):
+        return "block"
+    if ext in WARN_EXT or (att.get("mime") or "") in ("text/html", "application/xhtml+xml", "image/svg+xml"):
+        return "warn"
+    return "ok"

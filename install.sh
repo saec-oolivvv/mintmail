@@ -81,7 +81,8 @@ $SUDO install -m 644 "$HERE/data/mintmail.svg" "$ICONS/mintmail.svg"
 LAUNCHER="$(mktemp)"
 cat > "$LAUNCHER" <<LAUNCH
 #!/usr/bin/env bash
-exec env PYTHONPATH="$PREFIX/app\${PYTHONPATH:+:\$PYTHONPATH}" python3 -m mintmail "\$@"
+# -I : ni dossier courant, ni PYTHONPATH, ni site utilisateur dans le chemin d'import (un « mintmail/ » posé dans le dossier courant ne peut pas détourner le programme)
+exec /usr/bin/python3 -I -c 'import sys, runpy; sys.path.insert(0, "$PREFIX/app"); runpy.run_module("mintmail", run_name="__main__", alter_sys=True)' "\$@"
 LAUNCH
 $SUDO install -m 755 "$LAUNCHER" "$BIN/mintmail"; rm -f "$LAUNCHER"
 
