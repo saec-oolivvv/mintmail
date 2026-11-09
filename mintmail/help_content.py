@@ -389,7 +389,7 @@ SECTIONS: List[Dict] = [
     {"id": "about", "title": "À propos et crédits", "items": [
         ("MintMail {version}",
          "Le client mail pour Linux Mint dont l'IA est l'ADN : il lit, trie, résume, classe, rédige et agit avec vous — toujours avec votre accord.\n"
-         "Développé par SAEC — https://saec.me · Application GTK3 / Python, sans service cloud imposé : vos mails, vos clés et vos réglages restent chez vous."),
+         "Développé par SAEC — https://saec.me · Logiciel libre sous licence MIT (© 2026 SAEC) : vous pouvez l'utiliser, le modifier et le redistribuer. Application GTK3 / Python, sans service cloud imposé : vos mails, vos clés et vos réglages restent chez vous."),
     ]},
 ]
 

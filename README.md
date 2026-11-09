@@ -1,4 +1,4 @@
-# MintMail 1.10.0
+# MintMail 1.10.1
 
 Client mail moderne pour Linux Mint (Python / GTK3), inspiré de Spark Mail.
 
@@ -24,6 +24,9 @@ Dépendances (installées automatiquement via apt) : `python3-gi`, `gir1.2-gtk-3
 - Palette de commandes `Ctrl+K`, raccourcis clavier (voir Paramètres → Raccourcis), thème clair/sombre, couleur d'accent
 - Interface adaptative (panneau latéral escamotable, mode une colonne en fenêtre étroite), notifications de bureau, gestionnaire `mailto:`
 - Sans compte configuré : mode démonstration avec messages d'exemple
+
+## Nouveautés 1.10.1
+- **Logiciel libre sous licence MIT** (© 2026 SAEC).
 
 ## Nouveautés 1.10.0
 - **Page « Aujourd'hui » (touche T)** : agenda du jour (Google Agenda), messages non lus jugés importants, tâches (en retard d'abord), relances en attente, brouillons préparés.

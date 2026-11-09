@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.10.1
+- Licence MIT (logiciel libre) ; mention dans « À propos » et dans l'aide
+
 ## 1.10.0
 - Page Aujourd'hui (T), tâches avec échéances en français (synchronisées), proposition de créneaux d'après Google Agenda, brouillons de réponse préparés (optionnels)
 

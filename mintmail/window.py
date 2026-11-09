@@ -497,6 +497,8 @@ class MainWindow(ExtrasMixin, OfflineMixin, ListMixin, AIMixin, FolderMixin, Gtk
         d.set_version(__version__)
         d.set_comments("Client mail moderne pour Linux Mint.\nBoîte intelligente, reports, envoi annulable, signatures HTML.")
         d.set_website("https://saec.me")
+        d.set_copyright("© 2026 SAEC")
+        d.set_license_type(Gtk.License.MIT_X11)          # logiciel libre : licence MIT
         d.set_logo_icon_name("mintmail")
         d.run()
         d.destroy()
