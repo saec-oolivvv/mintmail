@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.6.3
+- Paquet .deb avec epoch (1:1.6.3) : remplace toute version précédemment installée, même de numéro plus élevé
+
 ## 1.6.2
 - Barre d'actions des messages et barre du lecteur : boutons directs Spam ▾ / Bloquer ▾ (message, adresse ou domaine entier, débloquer) et menu ⋯ ; touche B
 

@@ -1,4 +1,4 @@
-# MintMail 1.6.2
+# MintMail 1.6.3
 
 Client mail moderne pour Linux Mint (Python / GTK3), inspiré de Spark Mail.
 
@@ -24,6 +24,9 @@ Dépendances (installées automatiquement via apt) : `python3-gi`, `gir1.2-gtk-3
 - Palette de commandes `Ctrl+K`, raccourcis clavier (voir Paramètres → Raccourcis), thème clair/sombre, couleur d'accent
 - Interface adaptative (panneau latéral escamotable, mode une colonne en fenêtre étroite), notifications de bureau, gestionnaire `mailto:`
 - Sans compte configuré : mode démonstration avec messages d'exemple
+
+## Nouveautés 1.6.3
+- **Paquet .deb** : numéro de version avec « epoch » (`1:1.6.3`) pour que l'installateur n'affiche plus « une version plus récente est déjà installée » quand un ancien paquet `mintmail` portait un numéro plus élevé. Toutes les versions suivantes gardent ce préfixe `1:`.
 
 ## Nouveautés 1.6.2
 - **Spam et blocage en accès direct** : la barre d'actions de chaque message (au survol) et la barre du lecteur ont maintenant des boutons **Spam ▾** et **Bloquer ▾**. Chaque menu propose le message, l'**adresse** ou **tout le domaine** — avec l'adresse et le domaine réels écrits dans le libellé — et « Débloquer » quand l'expéditeur l'est déjà. Un bouton **⋯** donne le reste : lu/non lu, épingler, favori, répondre avec l'IA, déplacer vers un dossier, reporter, tous les messages de l'expéditeur, copier l'adresse, rappel sans réponse. Touche `B` : menu Bloquer.
