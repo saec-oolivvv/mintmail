@@ -1,13 +1,14 @@
 """Panneau « Assistant » : conversation avec l'IA, propositions d'actions à confirmer."""
 import gi
+from .i18n import tr
 gi.require_version("Gtk", "3.0")
 from gi.repository import Gtk, GLib, GObject
 
 from .widgets import icon, icon_button
 
-SUGGESTIONS = ["Classe mes derniers emails dans des dossiers", "Résume ma boîte", "Quels messages sont urgents ?",
-               "Crée un dossier Factures et range mes factures dedans", "Archive les newsletters déjà lues",
-               "Mets en spam les mails promotionnels", "Crée une règle pour les notifications"]
+SUGGESTIONS = [tr("Classe mes derniers emails dans des dossiers"), tr("Résume ma boîte"), tr("Quels messages sont urgents ?"),
+               tr("Crée un dossier Factures et range mes factures dedans"), tr("Archive les newsletters déjà lues"),
+               tr("Mets en spam les mails promotionnels"), tr("Crée une règle pour les notifications")]
 
 
 class AssistantPanel(Gtk.Box):
@@ -21,11 +22,11 @@ class AssistantPanel(Gtk.Box):
         head = Gtk.Box(spacing=8)
         head.get_style_context().add_class("assistant-head")
         title = Gtk.Label(xalign=0)
-        title.set_markup("<b>✨ Assistant</b>")
+        title.set_markup(tr("<b>✨ Assistant</b>"))
         head.pack_start(title, True, True, 0)
-        clear = icon_button("edit-clear-all-symbolic", "Nouvelle conversation", relief=False)
+        clear = icon_button("edit-clear-all-symbolic", tr("Nouvelle conversation"), relief=False)
         clear.connect("clicked", lambda *_: self.clear())
-        close = icon_button("window-close-symbolic", "Fermer (Ctrl+J)", relief=False)
+        close = icon_button("window-close-symbolic", tr("Fermer (Ctrl+J)"), relief=False)
         close.connect("clicked", lambda *_: self.emit("close"))
         head.pack_end(close, False, False, 0)
         head.pack_end(clear, False, False, 0)
@@ -52,7 +53,7 @@ class AssistantPanel(Gtk.Box):
         row = Gtk.Box(spacing=6)
         row.set_border_width(10)
         self.entry = Gtk.Entry()
-        self.entry.set_placeholder_text("Demandez n'importe quoi à votre boîte mail…")
+        self.entry.set_placeholder_text(tr("Demandez n'importe quoi à votre boîte mail…"))
         self.entry.connect("activate", self._send)
         send = Gtk.Button()
         send.add(icon("mail-send-symbolic"))
@@ -115,19 +116,19 @@ class AssistantPanel(Gtk.Box):
             lab = Gtk.Label(label=desc, xalign=0)
             lab.set_line_wrap(True)
             lab.set_max_width_chars(28)
-            btn = Gtk.Button(label="Exécuter")
+            btn = Gtk.Button(label=tr("Exécuter"))
             btn.get_style_context().add_class("pill")
 
             def go(b, f=fn, l=lab):
                 b.set_sensitive(False)
-                b.set_label("✓ Fait")
+                b.set_label(tr("✓ Fait"))
                 f()
             btn.connect("clicked", go)
             row.pack_start(lab, True, True, 0)
             row.pack_end(btn, False, False, 0)
             self._add(row)
         if len(items) > 1:
-            allb = Gtk.Button(label="Tout exécuter")
+            allb = Gtk.Button(label=tr("Tout exécuter"))
             allb.get_style_context().add_class("ai-btn")
             allb.set_halign(Gtk.Align.END)
             allb.set_margin_end(10)

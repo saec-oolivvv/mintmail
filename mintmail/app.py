@@ -4,6 +4,7 @@ from pathlib import Path
 from urllib.parse import urlparse, parse_qs, unquote
 
 import gi
+from .i18n import tr
 gi.require_version("Gtk", "3.0")
 gi.require_version("Gdk", "3.0")
 from gi.repository import Gtk, Gdk, Gio, GLib
@@ -48,17 +49,17 @@ class MintMailApp(Gtk.Application):
                 self._startup_failure(e)
                 return None
             install_hook(lambda e: GLib.idle_add(
-                lambda: (self.win.toast.popup("Erreur interne : %s (menu ☰ → Journal d'erreurs)" % str(e)[:70], timeout=8), False)[1]))
+                lambda: (self.win.toast.popup(tr("Erreur interne : %s (menu ☰ → Journal d'erreurs)") % str(e)[:70], timeout=8), False)[1]))
         return self.win
 
     def _startup_failure(self, exc):
         """Démarrage impossible : message clair, journal, et possibilité de repartir de données propres (sauvegardées)."""
         log_exception("démarrage de la fenêtre")
-        d = Gtk.MessageDialog(message_type=Gtk.MessageType.ERROR, text="MintMail n'a pas pu démarrer",
-                              secondary_text="%s\n\nDétails : %s\nDiagnostic : /usr/bin/mintmail --diagnose\n\n"
+        d = Gtk.MessageDialog(message_type=Gtk.MessageType.ERROR, text=tr("MintMail n'a pas pu démarrer"),
+                              secondary_text=tr("%s\n\nDétails : %s\nDiagnostic : /usr/bin/mintmail --diagnose\n\n"
                                              "Si le problème vient de vos données, vous pouvez les mettre de côté "
-                                             "(rien n'est supprimé) et relancer." % (exc, LOG))
-        d.add_buttons("Quitter", Gtk.ResponseType.CLOSE, "Mettre de côté réglages et cache, puis relancer", Gtk.ResponseType.APPLY)
+                                             "(rien n'est supprimé) et relancer.") % (exc, LOG))
+        d.add_buttons(tr("Quitter"), Gtk.ResponseType.CLOSE, tr("Mettre de côté réglages et cache, puis relancer"), Gtk.ResponseType.APPLY)
         r = d.run()
         d.destroy()
         if r == Gtk.ResponseType.APPLY:

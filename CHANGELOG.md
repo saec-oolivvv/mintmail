@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.11.0
+- Mises à jour automatiques depuis GitHub (Paramètres → Mises à jour) : recherche une fois par jour (désactivable), annonce, installation en un clic ; chaque paquet doit porter une signature RSA vérifiée avec une clé publique intégrée au programme, retour en arrière refusé, mot de passe administrateur demandé (polkit)
+- Dépôt versionné : numéro de version unique contrôlé, tools/bump-version.sh, tools/make-signing-key.sh, tools/release.sh (publie une Release signée), docs/UPDATES.md et docs/RELEASING.md
+- Traduction : l'interface (≈ 1 000 textes), l'aide intégrée (F1) et la ligne de commande existent en français et en ANGLAIS ; choix dans Paramètres → Apparence → « Langue de l'interface » (Automatique = langue du système ; redémarrage nécessaire)
+- Moteur de traduction à catalogues JSON (mintmail/locale/) : le français reste la langue source, sans aucun changement de comportement
+- Outils : tools/i18n_wrap.py (enveloppe les nouveaux textes), tools/translate_catalog.py (pré-traduction d'autres langues par un service d'IA, avec validation automatique), tests de couverture exacte
+- Détection du mode hors ligne indépendante de la langue des messages ; libellé de synchronisation compact sans découpage de texte traduit
+
 ## 1.10.2
 - Audit de sécurité (voir SECURITY.md) : nettoyeur HTML à liste blanche + politique de sécurité de contenu (lecteur et rédaction), navigation et liens filtrés (http / https / mailto), WebKit durci, pièces jointes dangereuses bloquées ou confirmées
 - Données au repos : dossiers 0700 et fichiers 0600 dès la création (courrier, pièces jointes, journal, réglages)

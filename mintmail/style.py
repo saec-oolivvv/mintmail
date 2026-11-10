@@ -1,3 +1,4 @@
+from .i18n import tr
 """Identités visuelles de MintMail.
 
 Trois styles, chacun en clair et en sombre :
@@ -12,7 +13,7 @@ NAV_TINTS = {"inbox": "#4f8cff", "unread": "#a78bfa", "starred": "#fbbf24", "pin
 
 STYLES = {
     "aurora": {
-        "label": "Aurora — verre et lueurs", "accent": "#7c8cff", "r": 16, "rs": 10, "rp": 999, "ra": 999,
+        "label": tr("Aurora — verre et lueurs"), "accent": "#7c8cff", "r": 16, "rs": 10, "rp": 999, "ra": 999,
         "font": '"Inter", "Cantarell", "Ubuntu", "Segoe UI", sans-serif',
         "head": '"Inter", "Cantarell", "Ubuntu", sans-serif', "hw": 800,
         "dark": dict(bg="#0a0e1a", side="rgba(255,255,255,0.035)", card="rgba(255,255,255,0.055)",
@@ -27,7 +28,7 @@ STYLES = {
                       canvas="linear-gradient(to bottom right, #eaf0ff, #f6efff 50%, #e6f6ff)"),
     },
     "papier": {
-        "label": "Papier — éditorial", "accent": "#b4472f", "r": 4, "rs": 3, "rp": 4, "ra": 999,
+        "label": tr("Papier — éditorial"), "accent": "#b4472f", "r": 4, "rs": 3, "rp": 4, "ra": 999,
         "font": '"Source Sans 3", "Source Sans Pro", "Cantarell", "Ubuntu", sans-serif',
         "head": '"Source Serif 4", "Source Serif Pro", "Georgia", "DejaVu Serif", serif', "hw": 700,
         "dark": dict(bg="#1b1814", side="#15120f", card="#241f1a", panel="#201c17", hover="#2e2822",
@@ -38,7 +39,7 @@ STYLES = {
                       ai2="#b4472f", on="#ffffff", canvas="#f4efe6"),
     },
     "terminal": {
-        "label": "Terminal — phosphore", "accent": "#3dff8a", "r": 2, "rs": 2, "rp": 2, "ra": 2,
+        "label": tr("Terminal — phosphore"), "accent": "#3dff8a", "r": 2, "rs": 2, "rp": 2, "ra": 2,
         "font": '"JetBrains Mono", "Fira Code", "DejaVu Sans Mono", "Ubuntu Mono", monospace',
         "head": '"JetBrains Mono", "Fira Code", "DejaVu Sans Mono", "Ubuntu Mono", monospace', "hw": 700,
         "dark": dict(bg="#050d08", side="#07140c", card="#0a1a10", panel="#08150d", hover="#0f2617",
@@ -51,8 +52,8 @@ STYLES = {
 }
 DEFAULT_STYLE = "aurora"
 DEFAULT_ACCENT = STYLES[DEFAULT_STYLE]["accent"]
-ACCENTS = [("Indigo", "#7c8cff"), ("Cyan", "#22b8f0"), ("Menthe", "#2fd6a1"), ("Vert", "#16a34a"),
-           ("Orange", "#f97316"), ("Rose", "#ec4899"), ("Terracotta", "#b4472f"), ("Phosphore", "#3dff8a")]
+ACCENTS = [(tr("Indigo"), "#7c8cff"), (tr("Cyan"), "#22b8f0"), (tr("Menthe"), "#2fd6a1"), (tr("Vert"), "#16a34a"),
+           (tr("Orange"), "#f97316"), (tr("Rose"), "#ec4899"), (tr("Terracotta"), "#b4472f"), (tr("Phosphore"), "#3dff8a")]
 
 BASE = """
 @define-color accent %(accent)s;

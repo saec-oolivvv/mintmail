@@ -4,9 +4,10 @@ import re
 import time
 import datetime
 from html.parser import HTMLParser
+from .i18n import tr
 
-MONTHS = ["janv.", "févr.", "mars", "avr.", "mai", "juin",
-          "juil.", "août", "sept.", "oct.", "nov.", "déc."]
+MONTHS = [tr("janv."), tr("févr."), tr("mars"), tr("avr."), tr("mai"), tr("juin"),
+          tr("juil."), tr("août"), tr("sept."), tr("oct."), tr("nov."), tr("déc.")]
 
 
 class _Strip(HTMLParser):
@@ -56,7 +57,7 @@ def format_time(ts):
     if d.date() == today:
         return d.strftime("%H:%M")
     if d.date() == today - datetime.timedelta(days=1):
-        return "Hier"
+        return tr("Hier")
     if d.year == today.year:
         return "%d %s" % (d.day, MONTHS[d.month - 1])
     return d.strftime("%d/%m/%Y")
@@ -71,14 +72,14 @@ def date_group(ts):
     d = datetime.datetime.fromtimestamp(ts).date()
     delta = (datetime.date.today() - d).days
     if delta <= 0:
-        return "Aujourd'hui"
+        return tr("Aujourd'hui")
     if delta == 1:
-        return "Hier"
+        return tr("Hier")
     if delta < 7:
-        return "Cette semaine"
+        return tr("Cette semaine")
     if delta < 31:
-        return "Ce mois-ci"
-    return "Plus ancien"
+        return tr("Ce mois-ci")
+    return tr("Plus ancien")
 
 
 def color_index(key, n=8):
@@ -98,7 +99,7 @@ def initials(name):
 
 
 def human_size(n):
-    for unit in ("o", "Ko", "Mo", "Go"):
+    for unit in ("o", tr("Ko"), tr("Mo"), tr("Go")):
         if n < 1024 or unit == "Go":
             return ("%d %s" % (n, unit)) if unit == "o" else ("%.1f %s" % (n, unit))
         n /= 1024.0

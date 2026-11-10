@@ -4,6 +4,7 @@ import datetime
 import re
 import unicodedata
 from typing import Dict, List, Optional
+from .i18n import tr
 
 DAYS = {"lundi": 0, "mardi": 1, "mercredi": 2, "jeudi": 3, "vendredi": 4, "samedi": 5, "dimanche": 6}
 MONTHS = {"janvier": 1, "janv": 1, "fevrier": 2, "fevr": 2, "fev": 2, "mars": 3, "avril": 4, "avr": 4, "mai": 5, "juin": 6,
@@ -101,5 +102,5 @@ def due_label(task: Dict, today: Optional[datetime.date] = None) -> str:
     d = datetime.date.fromisoformat(task["due"])
     n = (d - today).days
     if n < 0:
-        return "en retard de %d j" % -n
-    return {0: "aujourd'hui", 1: "demain"}.get(n, "dans %d j (%s)" % (n, d.strftime("%d/%m")))
+        return tr("en retard de %d j") % -n
+    return {0: tr("aujourd'hui"), 1: tr("demain")}.get(n, tr("dans %d j (%s)") % (n, d.strftime("%d/%m")))

@@ -4,6 +4,7 @@ import tempfile
 import threading
 
 import gi
+from .i18n import tr
 gi.require_version("Gtk", "3.0")
 from gi.repository import Gio, GLib, Gtk
 
@@ -64,22 +65,22 @@ class ExtrasMixin:
 
     def ai_summarize_thread(self, msg):
         if not self.engine.enabled():
-            self.toast.popup("IA non configurée : Paramètres → IA.", timeout=4)
+            self.toast.popup(tr("IA non configurée : Paramètres → IA."), timeout=4)
             self.show_settings("ai")
             return
         self._focus_message(msg)
         members = self.cache.thread_members(msg.account, msg.thread_id)
-        self.reader.ai_working("Résumé de la conversation (%d messages)…" % len(members))
+        self.reader.ai_working(tr("Résumé de la conversation (%d messages)…") % len(members))
 
         def work():
             return self.engine.summarize_thread([self.cache.get(m.id) or m for m in members])
-        self.run_bg(work, lambda t, e: self.reader.ai_text("Conversation", ("Erreur IA : %s" % str(e)[:100]) if e else t)
+        self.run_bg(work, lambda t, e: self.reader.ai_text(tr("Conversation"), (tr("Erreur IA : %s") % str(e)[:100]) if e else t)
                     if self.reader.msg is not None and self.reader.msg.id == msg.id else None)
 
     # --------------------------------------------------------------- désabonnement
     def _confirm(self, text, secondary=""):
         d = Gtk.MessageDialog(transient_for=self, modal=True, message_type=Gtk.MessageType.QUESTION, text=text, secondary_text=secondary)
-        d.add_buttons("Annuler", Gtk.ResponseType.CANCEL, "Continuer", Gtk.ResponseType.OK)
+        d.add_buttons(tr("Annuler"), Gtk.ResponseType.CANCEL, tr("Continuer"), Gtk.ResponseType.OK)
         ok = d.run() == Gtk.ResponseType.OK
         d.destroy()
         return ok
@@ -90,34 +91,34 @@ class ExtrasMixin:
         links = unsub.parse_list_unsubscribe(msg.unsubscribe)
         who = msg.display_sender
         if msg.unsub_post and links["https"]:
-            if not self._confirm("Se désabonner de %s ?" % who,
-                                 "MintMail envoie la demande de désabonnement directement au service (requête sécurisée, sans ouvrir de page)."):
+            if not self._confirm(tr("Se désabonner de %s ?") % who,
+                                 tr("MintMail envoie la demande de désabonnement directement au service (requête sécurisée, sans ouvrir de page).")):
                 return
-            self.toast.popup("Désabonnement en cours…", timeout=3)
+            self.toast.popup(tr("Désabonnement en cours…"), timeout=3)
             url = links["https"][0]
 
             def done(res, err):
                 ok, detail = res if res else (False, str(err))
                 if ok:
-                    self.toast.popup("Désabonné de %s ✔ (si des messages arrivent encore, mettez l'expéditeur en spam)" % who[:30],
-                                     "Mettre en spam", lambda: self.spam_sender(msg), timeout=10)
+                    self.toast.popup(tr("Désabonné de %s ✔ (si des messages arrivent encore, mettez l'expéditeur en spam)") % who[:30],
+                                     tr("Mettre en spam"), lambda: self.spam_sender(msg), timeout=10)
                 else:
-                    self.toast.popup("Le service a refusé la demande (%s). Ouverture de la page de désabonnement…" % detail[:40], timeout=6)
+                    self.toast.popup(tr("Le service a refusé la demande (%s). Ouverture de la page de désabonnement…") % detail[:40], timeout=6)
                     open_uri(self, url)
             self.run_bg(lambda: unsub.one_click_post(url), done)
         elif links["mailto"]:
             to, subject, body = unsub.mailto_fields(links["mailto"][0])
             if not to:
-                self.toast.popup("Adresse de désabonnement invalide ou multiple : refusée par sécurité.", timeout=6)
+                self.toast.popup(tr("Adresse de désabonnement invalide ou multiple : refusée par sécurité."), timeout=6)
                 return
-            if not self._confirm("Se désabonner de %s ?" % who, "Un e-mail de désabonnement sera envoyé à %s." % to):
+            if not self._confirm(tr("Se désabonner de %s ?") % who, tr("Un e-mail de désabonnement sera envoyé à %s.") % to):
                 return
             self.queue_send(Outgoing(account=msg.account, to=to, subject=subject, html="<p>%s</p>" % body, text=body), delay=2)
-            self.toast.popup("Demande de désabonnement envoyée à %s" % to, "Mettre en spam", lambda: self.spam_sender(msg), timeout=10)
+            self.toast.popup(tr("Demande de désabonnement envoyée à %s") % to, tr("Mettre en spam"), lambda: self.spam_sender(msg), timeout=10)
         elif links["https"]:
             open_uri(self, links["https"][0])
         else:
-            self.toast.popup("Ce message ne propose pas de lien de désabonnement.", timeout=4)
+            self.toast.popup(tr("Ce message ne propose pas de lien de désabonnement."), timeout=4)
 
     # ---------------------------------------------------------------------- identités
     def _addressed_identity(self, msg):
@@ -146,19 +147,19 @@ class ExtrasMixin:
         msg = self._full(msg)
         inv = msg.invite or {}
         if not inv.get("organizer"):
-            self.toast.popup("Pas d'organisateur à qui répondre.", timeout=3)
+            self.toast.popup(tr("Pas d'organisateur à qui répondre."), timeout=3)
             return
         email, name, from_email = self._my_address(msg)
-        verb = {"accept": "accepté", "tentative": "accepté sous réserve", "decline": "décliné"}[action]
+        verb = {"accept": tr("accepté"), "tentative": tr("accepté sous réserve"), "decline": tr("décliné")}[action]
         out = Outgoing(account=msg.account, to=inv["organizer"], subject=ical.reply_subject(inv, action),
-                       html="<p>J'ai %s l'invitation « %s ».</p>" % (verb, inv.get("title", "")), text="J'ai %s l'invitation." % verb,
+                       html="<p>J'ai %s l'invitation « %s ».</p>" % (verb, inv.get("title", "")), text=tr("J'ai %s l'invitation.") % verb,
                        ics=ical.build_reply(inv, email, name, action), ics_method="REPLY",
                        from_email=from_email, from_name=name if from_email else "")
         self.queue_send(out, delay=2)
         if action == "accept":
-            self.toast.popup("Invitation acceptée — réponse envoyée à l'organisateur", "Ajouter à l'agenda", lambda: self.invite_add(msg), timeout=8)
+            self.toast.popup(tr("Invitation acceptée — réponse envoyée à l'organisateur"), tr("Ajouter à l'agenda"), lambda: self.invite_add(msg), timeout=8)
         else:
-            self.toast.popup("Réponse envoyée à l'organisateur (%s)" % verb, timeout=4)
+            self.toast.popup(tr("Réponse envoyée à l'organisateur (%s)") % verb, timeout=4)
 
     # ------------------------------------------------------------------ agenda
     def _gcal_cfg(self):
@@ -169,37 +170,37 @@ class ExtrasMixin:
         c = self._gcal_cfg()
         acc = next((a for a in self.accounts() if a["id"] == c["account"] and a.get("auth") == "oauth2"), None) if c else None
         if acc is None:
-            raise oauth.OAuthError("compte Gmail (OAuth) introuvable : Paramètres → Agenda")
+            raise oauth.OAuthError(tr("compte Gmail (OAuth) introuvable : Paramètres → Agenda"))
         return oauth.manager_for(self.config).access_token(acc)
 
     def calendar_add_event(self, ev, uid="", raw_ics=None):
         """Ajoute un événement à l'agenda choisi : Google Agenda, sinon CalDAV, sinon fichier .ics ouvert dans l'agenda du système."""
         if self._gcal_cfg():
-            self.toast.popup("Ajout à Google Agenda…", timeout=3)
+            self.toast.popup(tr("Ajout à Google Agenda…"), timeout=3)
 
             def work():
                 return gcal.insert_event(self._gcal_token(), ev, uid)
             self.run_bg(work, lambda res, err: self.toast.popup(
-                ("Google Agenda : %s ✔" % res[1]) if res and res[0] else "Google Agenda : %s" % (res[1] if res else err), timeout=6))
+                (tr("Google Agenda : %s ✔") % res[1]) if res and res[0] else tr("Google Agenda : %s") % (res[1] if res else err), timeout=6))
             return
         cfg = self.config.get("caldav") or {}
         ics = raw_ics or make_ics(ev)
         if cfg.get("url"):
             pw = self.config.password("caldav")
-            self.toast.popup("Envoi à l'agenda CalDAV…", timeout=3)
+            self.toast.popup(tr("Envoi à l'agenda CalDAV…"), timeout=3)
             self.run_bg(lambda: caldav.put_event(cfg["url"], cfg.get("user", ""), pw, ics.replace("METHOD:REQUEST", "METHOD:PUBLISH"),
                                                  uid or ev.get("title", "evenement")),
-                        lambda res, err: self.toast.popup("Ajouté à votre agenda ✔" if res and res[0] else
-                                                          "Agenda CalDAV : %s" % (res[1] if res else err), timeout=5))
+                        lambda res, err: self.toast.popup(tr("Ajouté à votre agenda ✔") if res and res[0] else
+                                                          tr("Agenda CalDAV : %s") % (res[1] if res else err), timeout=5))
             return
         try:
             fd, path = tempfile.mkstemp(prefix="mintmail-", suffix=".ics")
             with os.fdopen(fd, "w", encoding="utf-8", newline="") as f:
                 f.write(ics)
             Gio.AppInfo.launch_default_for_uri("file://" + path, None)
-            self.toast.popup("Événement « %s » envoyé à votre agenda" % ev.get("title", "")[:40], timeout=4)
+            self.toast.popup(tr("Événement « %s » envoyé à votre agenda") % ev.get("title", "")[:40], timeout=4)
         except Exception as e:
-            self.show_error("Impossible d'ouvrir l'agenda", e)
+            self.show_error(tr("Impossible d'ouvrir l'agenda"), e)
 
     def invite_add(self, msg):
         """Ajoute l'invitation à l'agenda (Google Agenda, CalDAV ou fichier .ics)."""
@@ -217,16 +218,16 @@ class ExtrasMixin:
 
     def show_agenda(self):
         if not self._gcal_cfg():
-            self.toast.popup("Activez Google Agenda : Paramètres → Agenda.", timeout=4)
+            self.toast.popup(tr("Activez Google Agenda : Paramètres → Agenda."), timeout=4)
             self.show_settings("calendar")
             return
-        self.toast.popup("Chargement de l'agenda…", timeout=2)
+        self.toast.popup(tr("Chargement de l'agenda…"), timeout=2)
         self.run_bg(self.agenda_events, self._agenda_dialog)
 
     def _agenda_dialog(self, res, err):
         ok, data = res if res else (False, str(err))
-        dlg = Gtk.Dialog(title="Agenda — 14 prochains jours", transient_for=self, modal=True)
-        dlg.add_buttons("Nouvel événement…", 1, "Fermer", Gtk.ResponseType.CLOSE)
+        dlg = Gtk.Dialog(title=tr("Agenda — 14 prochains jours"), transient_for=self, modal=True)
+        dlg.add_buttons(tr("Nouvel événement…"), 1, tr("Fermer"), Gtk.ResponseType.CLOSE)
         dlg.set_default_size(520, 460)
         box = dlg.get_content_area()
         box.set_border_width(14)
@@ -235,9 +236,9 @@ class ExtrasMixin:
         sw.add(inner)
         box.pack_start(sw, True, True, 0)
         if not ok:
-            inner.pack_start(Gtk.Label(label="Google Agenda : %s" % data, xalign=0), False, False, 0)
+            inner.pack_start(Gtk.Label(label=tr("Google Agenda : %s") % data, xalign=0), False, False, 0)
         elif not data:
-            inner.pack_start(Gtk.Label(label="Rien de prévu dans les 14 prochains jours.", xalign=0), False, False, 0)
+            inner.pack_start(Gtk.Label(label=tr("Rien de prévu dans les 14 prochains jours."), xalign=0), False, False, 0)
         else:
             day = None
             for e in data:
@@ -247,7 +248,7 @@ class ExtrasMixin:
                     h = Gtk.Label(xalign=0)
                     h.set_markup("<b>%s</b>" % GLib.markup_escape_text(e["start"].strftime("%A %d %B")))
                     inner.pack_start(h, False, False, 6)
-                when = "Journée entière" if e["all_day"] else "%s–%s" % (e["start"].strftime("%H:%M"), e["end"].strftime("%H:%M"))
+                when = tr("Journée entière") if e["all_day"] else "%s–%s" % (e["start"].strftime("%H:%M"), e["end"].strftime("%H:%M"))
                 l = Gtk.Label(xalign=0)
                 l.set_markup("%s   %s%s" % (when, GLib.markup_escape_text(e["title"]),
                                             ("  <small>📍 %s</small>" % GLib.markup_escape_text(e["location"])) if e["location"] else ""))
@@ -261,8 +262,8 @@ class ExtrasMixin:
             self.new_event_dialog()
 
     def new_event_dialog(self):
-        dlg = Gtk.Dialog(title="Nouvel événement", transient_for=self, modal=True)
-        dlg.add_buttons("Annuler", Gtk.ResponseType.CANCEL, "Ajouter", Gtk.ResponseType.OK)
+        dlg = Gtk.Dialog(title=tr("Nouvel événement"), transient_for=self, modal=True)
+        dlg.add_buttons(tr("Annuler"), Gtk.ResponseType.CANCEL, tr("Ajouter"), Gtk.ResponseType.OK)
         grid = Gtk.Grid(column_spacing=8, row_spacing=6)
         grid.set_border_width(14)
         now = datetime.datetime.now() + datetime.timedelta(hours=1)
@@ -270,8 +271,8 @@ class ExtrasMixin:
         fields["date"].set_text(now.strftime("%Y-%m-%d"))
         fields["time"].set_text(now.strftime("%H:00"))
         fields["dur"].set_text("60")
-        for i, (k, lab) in enumerate((("title", "Titre"), ("date", "Date (AAAA-MM-JJ)"), ("time", "Heure (HH:MM)"),
-                                      ("dur", "Durée (minutes)"), ("place", "Lieu"))):
+        for i, (k, lab) in enumerate((("title", tr("Titre")), ("date", tr("Date (AAAA-MM-JJ)")), ("time", tr("Heure (HH:MM)")),
+                                      ("dur", tr("Durée (minutes)")), ("place", tr("Lieu")))):
             grid.attach(Gtk.Label(label=lab, xalign=1), 0, i, 1, 1)
             fields[k].set_hexpand(True)
             grid.attach(fields[k], 1, i, 1, 1)
@@ -286,9 +287,9 @@ class ExtrasMixin:
             start = datetime.datetime.fromisoformat("%sT%s" % (vals["date"], vals["time"]))
             end = start + datetime.timedelta(minutes=max(5, int(vals["dur"] or 60)))
         except ValueError:
-            self.toast.popup("Date, heure ou durée invalide.", timeout=4)
+            self.toast.popup(tr("Date, heure ou durée invalide."), timeout=4)
             return
-        self.calendar_add_event({"title": vals["title"] or "Rendez-vous", "start": start.strftime("%Y-%m-%dT%H:%M"),
+        self.calendar_add_event({"title": vals["title"] or tr("Rendez-vous"), "start": start.strftime("%Y-%m-%dT%H:%M"),
                                  "end": end.strftime("%Y-%m-%dT%H:%M"), "location": vals["place"]})
 
     def _invite_conflicts(self, full):
@@ -311,11 +312,11 @@ class ExtrasMixin:
                 return
             if clash:
                 e = clash[0]
-                self.reader.set_invite_note("⚠ Conflit avec « %s » (%s–%s)%s" % (
+                self.reader.set_invite_note(tr("⚠ Conflit avec « %s » (%s–%s)%s") % (
                     e["title"][:40], e["start"].strftime("%H:%M"), e["end"].strftime("%H:%M"),
-                    " et %d autre(s)" % (len(clash) - 1) if len(clash) > 1 else ""))
+                    tr(" et %d autre(s)") % (len(clash) - 1) if len(clash) > 1 else ""))
             else:
-                self.reader.set_invite_note("✔ Vous êtes libre sur ce créneau (Google Agenda).")
+                self.reader.set_invite_note(tr("✔ Vous êtes libre sur ce créneau (Google Agenda)."))
         self.run_bg(work, done)
 
     # -------------------------------------------------------- recherche sur le serveur
@@ -323,10 +324,10 @@ class ExtrasMixin:
         text = self._effective_search()
         real = [a for a in self.accounts() if not a.get("demo")]
         if not text or not real:
-            self.toast.popup("Saisissez d'abord une recherche (compte réel requis).", timeout=3)
+            self.toast.popup(tr("Saisissez d'abord une recherche (compte réel requis)."), timeout=3)
             return
         self.srv_btn.set_sensitive(False)
-        self.toast.popup("Recherche sur le serveur…", timeout=3)
+        self.toast.popup(tr("Recherche sur le serveur…"), timeout=3)
         logicals = ["inbox", "sent", "archive"]
         if self.view.startswith("f:"):
             logicals.append(self.view)
@@ -344,9 +345,9 @@ class ExtrasMixin:
         def done(n, err):
             self.srv_btn.set_sensitive(True)
             if err:
-                self.toast.popup("Recherche serveur : %s" % str(err)[:90], timeout=6)
+                self.toast.popup(tr("Recherche serveur : %s") % str(err)[:90], timeout=6)
                 return
-            self.toast.popup("%d message(s) supplémentaire(s) trouvé(s) sur le serveur" % n if n else "Rien de plus sur le serveur.", timeout=4)
+            self.toast.popup(tr("%d message(s) supplémentaire(s) trouvé(s) sur le serveur") % n if n else tr("Rien de plus sur le serveur."), timeout=4)
             self.reload_list(full=True)
         self.run_bg(work, done)
 
@@ -361,7 +362,7 @@ class ExtrasMixin:
             if n == 3 and not proposed and not any(r.get("action") == "move" and r.get("text", "").lower() == m.sender_email.lower()
                                                    for r in self.config["rules"]):
                 proposed = True
-                self.toast.popup("Vous rangez souvent %s dans « %s »." % (m.sender_email, path), "Créer la règle",
+                self.toast.popup(tr("Vous rangez souvent %s dans « %s ».") % (m.sender_email, path), tr("Créer la règle"),
                                  lambda m=m, p=path: self.ai_rule_move(m, p), timeout=10)
 
     # ---------------------------------------------------------------- carnet d'adresses
@@ -394,30 +395,30 @@ class ExtrasMixin:
 
     def contact_add(self, msg):
         if self.contact_save(msg.sender_email, msg.sender_name):
-            self.toast.popup("%s ajouté aux contacts" % (msg.sender_name or msg.sender_email), timeout=3)
+            self.toast.popup(tr("%s ajouté aux contacts") % (msg.sender_name or msg.sender_email), timeout=3)
 
     # ---------------------------------------------------------------- boîte d'envoi
     def show_outbox(self):
         """Messages programmés ou en attente de réseau : envoyer maintenant ou annuler."""
         import time as _t
         items = self.cache.outbox_list()
-        dlg = Gtk.Dialog(title="Boîte d'envoi", transient_for=self, modal=True)
-        dlg.add_button("Fermer", Gtk.ResponseType.CLOSE)
+        dlg = Gtk.Dialog(title=tr("Boîte d'envoi"), transient_for=self, modal=True)
+        dlg.add_button(tr("Fermer"), Gtk.ResponseType.CLOSE)
         dlg.set_default_size(560, 360)
         box = dlg.get_content_area()
         box.set_border_width(14)
         box.set_spacing(8)
         if not items:
-            box.pack_start(Gtk.Label(label="Aucun message en attente."), True, True, 0)
+            box.pack_start(Gtk.Label(label=tr("Aucun message en attente.")), True, True, 0)
         for oid, at, out, tries in items:
             row = Gtk.Box(spacing=8)
-            when = "dès que possible" if at <= _t.time() else _t.strftime("%d/%m %H:%M", _t.localtime(at))
+            when = tr("dès que possible") if at <= _t.time() else _t.strftime("%d/%m %H:%M", _t.localtime(at))
             lab = Gtk.Label(xalign=0)
-            lab.set_markup("<b>%s</b>\nÀ : %s · prévu %s%s" % (
+            lab.set_markup(tr("<b>%s</b>\nÀ : %s · prévu %s%s") % (
                 GLib.markup_escape_text(out.subject[:60]), GLib.markup_escape_text(out.to[:60]), when,
-                (" · %d tentative(s)" % tries) if tries else ""))
+                (tr(" · %d tentative(s)") % tries) if tries else ""))
             lab.set_ellipsize(3)
-            now_b, del_b = Gtk.Button(label="Envoyer maintenant"), Gtk.Button(label="Annuler l'envoi")
+            now_b, del_b = Gtk.Button(label=tr("Envoyer maintenant")), Gtk.Button(label=tr("Annuler l'envoi"))
 
             def send_now(_b, oid=oid):
                 self.cache.outbox_reschedule(oid, _t.time() - 1)
@@ -434,7 +435,7 @@ class ExtrasMixin:
             row.pack_start(now_b, False, False, 0)
             row.pack_start(del_b, False, False, 0)
             box.pack_start(row, False, False, 0)
-        box.pack_end(Gtk.Label(label="Les messages programmés partent aussi fenêtre fermée (minuterie utilisateur « mintmail-outbox »).",
+        box.pack_end(Gtk.Label(label=tr("Les messages programmés partent aussi fenêtre fermée (minuterie utilisateur « mintmail-outbox »)."),
                                xalign=0), False, False, 0)
         dlg.show_all()
         dlg.run()
@@ -471,20 +472,20 @@ class ExtrasMixin:
         """Ajoute les tâches détectées par l'analyse IA du message (une seule fois chacune)."""
         ana = self.cache.ai_get(msg.id, "analysis") or {}
         added = [t for t in (self.task_add(x, msg) for x in ana.get("tasks", [])) if t]
-        self.toast.popup("%d tâche(s) ajoutée(s)" % len(added) if added else "Ces tâches sont déjà dans votre liste.", timeout=4)
+        self.toast.popup(tr("%d tâche(s) ajoutée(s)") % len(added) if added else tr("Ces tâches sont déjà dans votre liste."), timeout=4)
         return added
 
     def task_add_dialog(self, msg=None):
-        dlg = Gtk.Dialog(title="Ajouter une tâche", transient_for=self, modal=True)
-        dlg.add_buttons("Annuler", Gtk.ResponseType.CANCEL, "Ajouter", Gtk.ResponseType.OK)
+        dlg = Gtk.Dialog(title=tr("Ajouter une tâche"), transient_for=self, modal=True)
+        dlg.add_buttons(tr("Annuler"), Gtk.ResponseType.CANCEL, tr("Ajouter"), Gtk.ResponseType.OK)
         grid = Gtk.Grid(column_spacing=8, row_spacing=6)
         grid.set_border_width(14)
         text, due = Gtk.Entry(), Gtk.Entry()
         text.set_width_chars(46)
         if msg is not None:
-            text.set_text(("Répondre à %s : %s" % (msg.display_sender, msg.subject))[:200])
-        due.set_placeholder_text("facultatif : vendredi, 15/11, dans 3 jours… (sinon lue dans le texte)")
-        for i, (lab, w) in enumerate((("Tâche", text), ("Échéance", due))):
+            text.set_text((tr("Répondre à %s : %s") % (msg.display_sender, msg.subject))[:200])
+        due.set_placeholder_text(tr("facultatif : vendredi, 15/11, dans 3 jours… (sinon lue dans le texte)"))
+        for i, (lab, w) in enumerate(((tr("Tâche"), text), (tr("Échéance"), due))):
             grid.attach(Gtk.Label(label=lab, xalign=1), 0, i, 1, 1)
             w.set_hexpand(True)
             grid.attach(w, 1, i, 1, 1)
@@ -497,10 +498,10 @@ class ExtrasMixin:
             return None
         parsed = tk.parse_due(d) if d else None
         if d and parsed is None:
-            self.toast.popup("Échéance non comprise : la tâche est ajoutée sans date.", timeout=5)
+            self.toast.popup(tr("Échéance non comprise : la tâche est ajoutée sans date."), timeout=5)
         task = self.task_add(t, msg, due=parsed if d else None)
-        self.toast.popup("Tâche ajoutée%s" % ((" — échéance " + task["due"]) if task and task["due"] else "") if task else
-                         "Cette tâche existe déjà.", timeout=4)
+        self.toast.popup(tr("Tâche ajoutée%s") % ((tr(" — échéance ") + task["due"]) if task and task["due"] else "") if task else
+                         tr("Cette tâche existe déjà."), timeout=4)
         return task
 
     # ---------------------------------------------------------- page « Aujourd'hui »
@@ -526,8 +527,8 @@ class ExtrasMixin:
             self._today_dialog(None)
 
     def _today_dialog(self, agenda):
-        dlg = Gtk.Dialog(title="Aujourd'hui — %s" % datetime.date.today().strftime("%d/%m/%Y"), transient_for=self, modal=True)
-        dlg.add_button("Fermer", Gtk.ResponseType.CLOSE)
+        dlg = Gtk.Dialog(title=tr("Aujourd'hui — %s") % datetime.date.today().strftime("%d/%m/%Y"), transient_for=self, modal=True)
+        dlg.add_button(tr("Fermer"), Gtk.ResponseType.CLOSE)
         dlg.set_default_size(620, 640)
         outer = dlg.get_content_area()
         outer.set_border_width(14)
@@ -560,24 +561,24 @@ class ExtrasMixin:
             for ch in inner.get_children():
                 inner.remove(ch)
             data = self.today_local()
-            head("📅 Agenda du jour")
+            head(tr("📅 Agenda du jour"))
             if agenda is None:
-                line("Activez Google Agenda (Paramètres → Agenda) pour voir vos rendez-vous ici.", dim=True)
+                line(tr("Activez Google Agenda (Paramètres → Agenda) pour voir vos rendez-vous ici."), dim=True)
             elif not agenda[0]:
-                line("Google Agenda : %s" % agenda[1], dim=True)
+                line(tr("Google Agenda : %s") % agenda[1], dim=True)
             elif not agenda[1]:
-                line("Aucun rendez-vous aujourd'hui.", dim=True)
+                line(tr("Aucun rendez-vous aujourd'hui."), dim=True)
             else:
                 for e in agenda[1]:
-                    when = "Journée entière" if e["all_day"] else "%s–%s" % (e["start"].strftime("%H:%M"), e["end"].strftime("%H:%M"))
+                    when = tr("Journée entière") if e["all_day"] else "%s–%s" % (e["start"].strftime("%H:%M"), e["end"].strftime("%H:%M"))
                     line("%s   %s%s" % (when, e["title"], ("   📍 " + e["location"]) if e["location"] else ""))
-            head("⚡ À traiter en priorité (non lus, jugés importants)")
+            head(tr("⚡ À traiter en priorité (non lus, jugés importants)"))
             if data["important"]:
                 for m in data["important"]:
                     msg_button(m)
             else:
-                line("Rien d'urgent détecté." + ("" if self.engine.enabled() else " (L'IA n'est pas activée : le tri se limite à des indices simples.)"), dim=True)
-            head("☑ Tâches")
+                line(tr("Rien d'urgent détecté.") + ("" if self.engine.enabled() else tr(" (L'IA n'est pas activée : le tri se limite à des indices simples.)")), dim=True)
+            head(tr("☑ Tâches"))
             if data["tasks"]:
                 for t in data["tasks"]:
                     row = Gtk.Box(spacing=8)
@@ -591,36 +592,36 @@ class ExtrasMixin:
                         row.pack_end(l, False, False, 0)
                     if t.get("msg"):
                         ob = Gtk.Button(label="✉", relief=Gtk.ReliefStyle.NONE)
-                        ob.set_tooltip_text("Ouvrir le message d'origine")
+                        ob.set_tooltip_text(tr("Ouvrir le message d'origine"))
                         ob.connect("clicked", lambda _b, mid=t["msg"]: self.cache.get(mid) and (chosen.append(self.cache.get(mid)), dlg.response(Gtk.ResponseType.CLOSE)))
                         row.pack_end(ob, False, False, 0)
                     inner.pack_start(row, False, False, 0)
             else:
-                line("Aucune tâche ouverte.", dim=True)
+                line(tr("Aucune tâche ouverte."), dim=True)
             addrow = Gtk.Box(spacing=6)
             entry = Gtk.Entry()
-            entry.set_placeholder_text("Nouvelle tâche (ex. « envoyer le devis avant vendredi »)")
+            entry.set_placeholder_text(tr("Nouvelle tâche (ex. « envoyer le devis avant vendredi »)"))
 
             def add(*_):
                 if entry.get_text().strip():
                     self.task_add(entry.get_text())
                     fill()
             entry.connect("activate", add)
-            b = Gtk.Button(label="Ajouter")
+            b = Gtk.Button(label=tr("Ajouter"))
             b.connect("clicked", add)
             addrow.pack_start(entry, True, True, 0)
             addrow.pack_start(b, False, False, 0)
             inner.pack_start(addrow, False, False, 4)
-            head("⏳ En attente de réponse")
+            head(tr("⏳ En attente de réponse"))
             now_ts = time.time()
             if data["followups"]:
                 for f in data["followups"][:8]:
                     n = (f["at"] - now_ts) / 86400
-                    line("« %s » — %s  (%s)" % (f["subject"][:60], f["to"][:40], "relance échue" if n <= 0 else "relance dans %d j" % int(n + 0.5)))
+                    line("« %s » — %s  (%s)" % (f["subject"][:60], f["to"][:40], tr("relance échue") if n <= 0 else tr("relance dans %d j") % int(n + 0.5)))
             else:
-                line("Aucune relance programmée.", dim=True)
+                line(tr("Aucune relance programmée."), dim=True)
             if data["drafts"]:
-                head("✨ Brouillons de réponse préparés (à relire avant envoi)")
+                head(tr("✨ Brouillons de réponse préparés (à relire avant envoi)"))
                 for m in data["drafts"]:
                     msg_button(m, "Re : ")
             inner.show_all()
@@ -639,10 +640,10 @@ class ExtrasMixin:
     def propose_slots(self, msg, minutes=60):
         """Ouvre une réponse contenant 3 créneaux libres (Google Agenda : jours ouvrables, 9h00-17h30, à partir de dans 2 h)."""
         if not self._gcal_cfg():
-            self.toast.popup("Activez Google Agenda pour proposer des créneaux : Paramètres → Agenda.", timeout=5)
+            self.toast.popup(tr("Activez Google Agenda pour proposer des créneaux : Paramètres → Agenda."), timeout=5)
             self.show_settings("calendar")
             return
-        self.toast.popup("Recherche de créneaux libres…", timeout=3)
+        self.toast.popup(tr("Recherche de créneaux libres…"), timeout=3)
 
         def work():
             now = datetime.datetime.now()
@@ -653,9 +654,9 @@ class ExtrasMixin:
 
         def done(found, err):
             if err:
-                self.toast.popup("Agenda : %s" % str(err)[:100], timeout=6)
+                self.toast.popup(tr("Agenda : %s") % str(err)[:100], timeout=6)
             elif not found:
-                self.toast.popup("Aucun créneau libre trouvé dans les 15 prochains jours.", timeout=5)
+                self.toast.popup(tr("Aucun créneau libre trouvé dans les 15 prochains jours."), timeout=5)
             else:
                 self.reply(msg, ai_text=slots.proposal_text(found))
         self.run_bg(work, done)
@@ -714,5 +715,5 @@ class ExtrasMixin:
             if made:
                 self.reload_list()
                 self.update_counts()
-                self.toast.popup("✨ %d brouillon(s) de réponse prêt(s) dans Brouillons — à relire avant envoi" % made, timeout=8)
+                self.toast.popup(tr("✨ %d brouillon(s) de réponse prêt(s) dans Brouillons — à relire avant envoi") % made, timeout=8)
         self.run_bg(work, done)

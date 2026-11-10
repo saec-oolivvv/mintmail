@@ -184,7 +184,8 @@ def test_wrong_code_and_short_code_are_refused():
     try:
         assert b.start() and a.start()
         res = a.sync_now()
-        assert res["failed"] == 1 and res["applied"] == 0 and cb["accounts"] == [] and "code" in a.last_error
+        assert wait_for(lambda: "code" in a.last_error), "message d'erreur attendu ; obtenu : %r (résultat %r)" % (a.last_error, res)   # une synchro de fond peut chevaucher
+        assert res["failed"] == 1 and res["applied"] == 0 and cb["accounts"] == [], res
     finally:
         a.stop(); b.stop()
     path = os.path.join(tmp, "short.json")

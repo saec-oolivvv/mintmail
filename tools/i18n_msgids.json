@@ -1,0 +1,3262 @@
+{
+ "\n<i>Cet événement a été annulé par l'organisateur.</i>": [
+  "reader.py"
+ ],
+ "\n<i>Réponse à une invitation.</i>": [
+  "reader.py"
+ ],
+ "\nAide complète dans l'application : touche F1.": [
+  "entry.py"
+ ],
+ "\nDites-moi celui qui vous convient.": [
+  "slots.py"
+ ],
+ "\nRien n'a été modifié. Pour METTRE DE CÔTÉ (sans supprimer) les éléments de votre dossier personnel :": [
+  "entry.py"
+ ],
+ "\nVos réglages (~/.config/mintmail) et votre courrier en cache n'ont pas été touchés.": [
+  "entry.py"
+ ],
+ "\nÉléments système (ce programme n'y touche jamais) : retirez-les vous-même si besoin, par ex.": [
+  "entry.py"
+ ],
+ "   <-- version INCONNUE de ce paquet : peut-être votre propre version, ne la retirez pas sans vérifier": [
+  "entry.py"
+ ],
+ "   <b>Autre calendrier : CalDAV</b> (Nextcloud, Radicale, Fastmail, iCloud…) — utilisé si Google Agenda est désactivé": [
+  "settings_more.py"
+ ],
+ "  (IA : %s)": [
+  "ai_features.py"
+ ],
+ " (%d message%s)": [
+  "ai_engine.py"
+ ],
+ " (L'IA n'est pas activée : le tri se limite à des indices simples.)": [
+  "extras.py"
+ ],
+ " (dans « %s »)": [
+  "folders.py"
+ ],
+ " (nouveau dossier)": [
+  "ai_features.py"
+ ],
+ " dans « %s »": [
+  "ai_engine.py"
+ ],
+ " et %d autre(s)": [
+  "extras.py"
+ ],
+ " · %d tentative(s)": [
+  "extras.py"
+ ],
+ " · peu important": [
+  "reader.py"
+ ],
+ " — Ollama est-il lancé (ollama serve) et un modèle installé (ollama pull llama3.2) ?": [
+  "settings.py"
+ ],
+ " — attention : la plupart des serveurs refusent plus de 20-25 Mo": [
+  "compose.py"
+ ],
+ " — aucune machine vue (voir Paramètres → Synchronisation)": [
+  "p2p.py"
+ ],
+ " — synchronisé à ": [
+  "p2p.py"
+ ],
+ " — échéance ": [
+  "extras.py"
+ ],
+ "# / Suppr": [
+  "settings.py"
+ ],
+ "%d action(s) en attente d'envoi": [
+  "offline.py"
+ ],
+ "%d caractères minimum, identique sur les deux machines": [
+  "settings_extra.py"
+ ],
+ "%d contact(s) importé(s).": [
+  "settings_more.py"
+ ],
+ "%d fichier(s) enregistré(s) dans %s": [
+  "reader.py"
+ ],
+ "%d machine(s) trouvée(s)": [
+  "settings_extra.py"
+ ],
+ "%d message%s %s%s": [
+  "listing.py"
+ ],
+ "%d message%s · %d non lu%s": [
+  "listing.py"
+ ],
+ "%d message(s) supplémentaire(s) trouvé(s) sur le serveur": [
+  "extras.py"
+ ],
+ "%d message(s) → « %s »%s": [
+  "ai_features.py"
+ ],
+ "%d messages dans cette conversation": [
+  "widgets.py"
+ ],
+ "%d messages sélectionnés": [
+  "reader.py"
+ ],
+ "%d modèle(s) trouvé(s) : choisissez-en un.": [
+  "settings.py"
+ ],
+ "%d non lu(s) — %d à traiter en priorité, %d newsletter(s). Activez l'IA pour un vrai résumé.": [
+  "ai_engine.py"
+ ],
+ "%d nouveaux messages": [
+  "window.py"
+ ],
+ "%d pair(s)": [
+  "p2p.py"
+ ],
+ "%d pair(s) statique(s) enregistré(s)": [
+  "settings_extra.py"
+ ],
+ "%d résultat%s pour « %s »": [
+  "settings_extra.py"
+ ],
+ "%d sélectionné%s": [
+  "listing.py"
+ ],
+ "%d tâche(s) ajoutée(s)": [
+  "extras.py"
+ ],
+ "%d élément(s) reçu(s) — %s": [
+  "settings_extra.py"
+ ],
+ "%s\n\nDétails : %s\nDiagnostic : /usr/bin/mintmail --diagnose\n\nSi le problème vient de vos données, vous pouvez les mettre de côté (rien n'est supprimé) et relancer.": [
+  "app.py"
+ ],
+ "%s\n\nDétails dans le journal : %s": [
+  "window.py"
+ ],
+ "%s %d %s, de %dh%02d à %dh%02d": [
+  "slots.py"
+ ],
+ "%s ajouté aux contacts": [
+  "extras.py"
+ ],
+ "%s débloqué": [
+  "window.py"
+ ],
+ "%s — aucun message concerné": [
+  "ai_features.py"
+ ],
+ "(sans titre)": [
+  "gcal.py"
+ ],
+ ", %d restent dans la boîte": [
+  "ai_features.py"
+ ],
+ "/  ou  Ctrl+F": [
+  "settings.py"
+ ],
+ "1 heure": [
+  "listing.py"
+ ],
+ "192.168.1.42 ou 192.168.1.42:54322": [
+  "settings_extra.py"
+ ],
+ "30 minutes": [
+  "listing.py"
+ ],
+ "<b>%s</b>\nÀ : %s · prévu %s%s": [
+  "extras.py"
+ ],
+ "<b>Boîte intelligente</b>": [
+  "window.py"
+ ],
+ "<b>Google Agenda</b> — avec votre compte Gmail connecté en OAuth": [
+  "settings_more.py"
+ ],
+ "<b>Règles automatiques</b>": [
+  "settings_extra.py"
+ ],
+ "<b>Résultats</b>": [
+  "window.py"
+ ],
+ "<b>✨ Assistant</b>": [
+  "assistant.py"
+ ],
+ "<b>✨ En bref</b>": [
+  "ai_features.py"
+ ],
+ "<br>---------- Message transféré ----------<br>De : %s &lt;%s&gt;<br>Date : %s<br>Objet : %s<br>À : %s<br>": [
+  "window.py"
+ ],
+ "<div id=\"qt\"><br><div>Le %s, %s a écrit :</div><blockquote>%s</blockquote></div>": [
+  "window.py"
+ ],
+ "<html><head><meta charset='utf-8'><title>MintMail</title></head><body style='font-family:sans-serif;text-align:center;padding-top:15vh'><h2>%s</h2><p>Vous pouvez fermer cet onglet et revenir à MintMail.</p></body></html>": [
+  "oauth.py"
+ ],
+ "<p><b>Prénom Nom</b><br>Fonction — Société<br>📞 +32 000 00 00 00 · ✉ vous@exemple.be<br><a href=\"https://exemple.be\">exemple.be</a></p>": [
+  "settings.py"
+ ],
+ "<p>Bonjour,</p>": [
+  "settings_extra.py"
+ ],
+ "? … (recherche)": [
+  "settings.py"
+ ],
+ "Accepte poliment la proposition.": [
+  "ai_features.py"
+ ],
+ "Accepter": [
+  "ai_features.py",
+  "reader.py"
+ ],
+ "Accepté": [
+  "ical.py"
+ ],
+ "Active — appareil %s — %d pair(s)": [
+  "p2p.py"
+ ],
+ "Activer « Google Calendar API » (pour l'agenda ; facultatif pour le courrier seul)": [
+  "oauth.py"
+ ],
+ "Activez Google Agenda (Paramètres → Agenda) pour voir vos rendez-vous ici.": [
+  "extras.py"
+ ],
+ "Activez Google Agenda : Paramètres → Agenda.": [
+  "extras.py"
+ ],
+ "Activez Google Agenda pour proposer des créneaux : Paramètres → Agenda.": [
+  "extras.py"
+ ],
+ "Actualiser": [
+  "ai_features.py",
+  "settings.py",
+  "window.py"
+ ],
+ "Actualiser (Ctrl+R)": [
+  "window.py"
+ ],
+ "Actualiser ce dossier": [
+  "folders.py"
+ ],
+ "Actualiser la liste des dossiers": [
+  "folders.py"
+ ],
+ "Actualiser toutes les (min)": [
+  "settings.py"
+ ],
+ "Adresse (alias)": [
+  "settings_more.py"
+ ],
+ "Adresse de destinataire manquante ou invalide.": [
+  "compose.py"
+ ],
+ "Adresse de désabonnement invalide ou multiple : refusée par sécurité.": [
+  "extras.py"
+ ],
+ "Adresse de téléchargement refusée (hôte non autorisé).": [
+  "updates_ui.py"
+ ],
+ "Adresse du calendrier": [
+  "settings_more.py"
+ ],
+ "Adresse du service IA manquante.": [
+  "ai_service.py"
+ ],
+ "Adresse e-mail": [
+  "settings.py",
+  "settings_more.py"
+ ],
+ "Adresse e-mail invalide.": [
+  "settings.py",
+  "settings_more.py"
+ ],
+ "Adresse et compte d'envoi requis.": [
+  "settings_more.py"
+ ],
+ "Afficher": [
+  "reader.py",
+  "settings_extra.py"
+ ],
+ "Afficher / masquer le panneau latéral": [
+  "window.py"
+ ],
+ "Afficher les images distantes": [
+  "reader.py"
+ ],
+ "Agenda (Google / CalDAV)": [
+  "settings.py"
+ ],
+ "Agenda : %s": [
+  "extras.py"
+ ],
+ "Agenda : prochains rendez-vous (Google Agenda)": [
+  "window.py"
+ ],
+ "Agenda CalDAV : %s": [
+  "extras.py"
+ ],
+ "Agenda — 14 prochains jours": [
+  "extras.py"
+ ],
+ "Aide": [
+  "settings.py"
+ ],
+ "Aide & Crédits": [
+  "settings.py"
+ ],
+ "Aide (F1)": [
+  "window.py"
+ ],
+ "Aide et raccourcis (F1)": [
+  "window.py"
+ ],
+ "Aide — %s %s": [
+  "settings_extra.py"
+ ],
+ "Ajout à Google Agenda…": [
+  "extras.py"
+ ],
+ "Ajouter": [
+  "extras.py",
+  "settings_extra.py"
+ ],
+ "Ajouter aux contacts": [
+  "listing.py"
+ ],
+ "Ajouter aux favoris": [
+  "ai_engine.py",
+  "listing.py",
+  "settings_extra.py"
+ ],
+ "Ajouter la règle": [
+  "settings_extra.py"
+ ],
+ "Ajouter mon compte": [
+  "window.py"
+ ],
+ "Ajouter une tâche": [
+  "extras.py"
+ ],
+ "Ajouter à l'agenda": [
+  "extras.py",
+  "reader.py"
+ ],
+ "Ajoutez d'abord un compte Gmail avec le fournisseur « OAuth » (Paramètres → Comptes).": [
+  "settings_more.py"
+ ],
+ "Ajouté à votre agenda ✔": [
+  "extras.py"
+ ],
+ "Aller au dossier : ": [
+  "window.py"
+ ],
+ "Aller à : ": [
+  "window.py"
+ ],
+ "Amical": [
+  "settings.py"
+ ],
+ "Améliorer le texte": [
+  "compose.py"
+ ],
+ "Analyser chaque message à l'ouverture": [
+  "settings.py"
+ ],
+ "Annuler": [
+  "compose.py",
+  "extras.py",
+  "folders.py",
+  "listing.py",
+  "reader.py",
+  "settings.py",
+  "settings_more.py",
+  "window.py"
+ ],
+ "Annuler l'envoi": [
+  "extras.py"
+ ],
+ "Annuler la sélection / la recherche": [
+  "settings.py"
+ ],
+ "Aperçu": [
+  "reader.py"
+ ],
+ "Aperçu :": [
+  "settings.py"
+ ],
+ "Aperçu impossible : ouvrez le fichier avec « Ouvrir ».": [
+  "reader.py"
+ ],
+ "Apparence": [
+  "settings.py"
+ ],
+ "Appel invalide du programme d'installation.": [
+  "updates_ui.py"
+ ],
+ "Appliquer": [
+  "settings_extra.py"
+ ],
+ "Appliquer les règles à la boîte de réception": [
+  "window.py"
+ ],
+ "Appliquer maintenant": [
+  "ai_features.py"
+ ],
+ "Appliquer maintenant à la boîte de réception": [
+  "settings_extra.py"
+ ],
+ "Appliquées à chaque nouveau message de la boîte de réception.": [
+  "settings_extra.py"
+ ],
+ "Archive les newsletters déjà lues": [
+  "assistant.py"
+ ],
+ "Archiver": [
+  "ai_engine.py",
+  "listing.py",
+  "settings.py",
+  "settings_extra.py",
+  "widgets.py",
+  "window.py"
+ ],
+ "Archiver (E)": [
+  "reader.py"
+ ],
+ "Archives": [
+  "folders.py",
+  "window.py"
+ ],
+ "Assistant IA": [
+  "folders.py",
+  "settings.py"
+ ],
+ "Assistant IA (Ctrl+J)": [
+  "ai_features.py",
+  "window.py"
+ ],
+ "Assistant IA — non configuré (Ctrl+J)": [
+  "ai_features.py"
+ ],
+ "Aucun compte Gmail (OAuth).": [
+  "settings_more.py"
+ ],
+ "Aucun créneau libre trouvé dans les 15 prochains jours.": [
+  "extras.py"
+ ],
+ "Aucun destinataire valide.": [
+  "backend.py"
+ ],
+ "Aucun message": [
+  "window.py"
+ ],
+ "Aucun message en attente.": [
+  "extras.py"
+ ],
+ "Aucun message ici — profitez-en 🎉": [
+  "listing.py"
+ ],
+ "Aucun message à classer ici.": [
+  "ai_features.py"
+ ],
+ "Aucun modèle (voir Paramètres)": [
+  "compose.py"
+ ],
+ "Aucun modèle trouvé : %s": [
+  "ai_service.py"
+ ],
+ "Aucun rendez-vous aujourd'hui.": [
+  "extras.py"
+ ],
+ "Aucun rendez-vous détecté dans ce message.": [
+  "ai_features.py"
+ ],
+ "Aucun résultat": [
+  "listing.py"
+ ],
+ "Aucun résultat : essayez un autre mot (sans accent, une partie de mot suffit).": [
+  "settings_extra.py"
+ ],
+ "Aucune action": [
+  "widgets.py"
+ ],
+ "Aucune autre machine détectée": [
+  "settings_extra.py"
+ ],
+ "Aucune autre machine détectée pour l'instant.": [
+  "settings_extra.py"
+ ],
+ "Aucune installation de MintMail hors paquet .deb.": [
+  "entry.py"
+ ],
+ "Aucune mise à jour connue (dernière vérification : %s).": [
+  "updates_ui.py"
+ ],
+ "Aucune relance programmée.": [
+  "extras.py"
+ ],
+ "Aucune tâche ouverte.": [
+  "extras.py"
+ ],
+ "Aucune version publiée dans ce dépôt.": [
+  "updates_ui.py"
+ ],
+ "Aujourd'hui": [
+  "util.py"
+ ],
+ "Aujourd'hui (T)": [
+  "window.py"
+ ],
+ "Aujourd'hui (agenda, priorités, tâches)": [
+  "settings.py"
+ ],
+ "Aujourd'hui : agenda, priorités, tâches, relances": [
+  "window.py"
+ ],
+ "Aujourd'hui — %s": [
+  "extras.py"
+ ],
+ "Aurora — verre et lueurs": [
+  "style.py"
+ ],
+ "Authentification annulée : rien n'a été installé.": [
+  "updates_ui.py"
+ ],
+ "Automatique (langue du système)": [
+  "settings.py"
+ ],
+ "Autorisation : %s": [
+  "settings_more.py"
+ ],
+ "Autorisation dans le navigateur… (3 minutes maximum)": [
+  "settings_more.py"
+ ],
+ "Autorisations d'API → Exchange Online : IMAP.AccessAsUser.All et SMTP.Send (+ offline_access), puis copier l'ID d'application (client)": [
+  "oauth.py"
+ ],
+ "Autre (manuel)": [
+  "settings.py"
+ ],
+ "Autre service compatible OpenAI": [
+  "ai_service.py"
+ ],
+ "Aérée": [
+  "settings.py"
+ ],
+ "Barre latérale : réduire / étendre": [
+  "window.py"
+ ],
+ "Barre latérale réduite / étendue": [
+  "window.py"
+ ],
+ "Barré": [
+  "compose.py"
+ ],
+ "Basculer clair / sombre": [
+  "window.py"
+ ],
+ "Basculer colonnes / liste seule": [
+  "settings.py"
+ ],
+ "Basculer thème clair / sombre": [
+  "window.py"
+ ],
+ "Bloquer %s": [
+  "listing.py"
+ ],
+ "Bloquer l'adresse ou tout le domaine": [
+  "reader.py"
+ ],
+ "Bloquer l'expéditeur": [
+  "listing.py",
+  "reader.py",
+  "widgets.py"
+ ],
+ "Bloquer l'expéditeur — ": [
+  "window.py"
+ ],
+ "Bloquer le domaine — ": [
+  "window.py"
+ ],
+ "Bloquer son domaine": [
+  "reader.py"
+ ],
+ "Bloquer tout le domaine %s": [
+  "listing.py"
+ ],
+ "Bloquer ▾": [
+  "reader.py"
+ ],
+ "Bloqué : ": [
+  "listing.py"
+ ],
+ "Boîte d'envoi": [
+  "extras.py"
+ ],
+ "Boîte d'envoi (messages en attente ou programmés)…": [
+  "window.py"
+ ],
+ "Boîte de réception": [
+  "folders.py"
+ ],
+ "Boîte intelligente": [
+  "window.py"
+ ],
+ "Boîte à jour : aucun message non lu 🎉": [
+  "ai_features.py"
+ ],
+ "Boîtes intelligentes": [
+  "folders.py"
+ ],
+ "Brouillons": [
+  "folders.py",
+  "window.py"
+ ],
+ "Cache vidé, resynchronisation…": [
+  "settings.py"
+ ],
+ "CalDAV désactivé.": [
+  "settings_more.py"
+ ],
+ "Cc / Cci": [
+  "compose.py"
+ ],
+ "Cci": [
+  "compose.py"
+ ],
+ "Ce compte existe déjà.": [
+  "settings.py"
+ ],
+ "Ce fichier n'est pas un paquet MintMail valide : refusé.": [
+  "updates_ui.py"
+ ],
+ "Ce message ne propose pas de lien de désabonnement.": [
+  "extras.py"
+ ],
+ "Ce mois-ci": [
+  "util.py"
+ ],
+ "Ce que ça apporte : les invitations acceptées et les rendez-vous détectés par l'IA arrivent directement dans Google Agenda (sans doublon) ; « Agenda » dans la palette affiche vos 14 prochains jours et permet de créer un événement ; à la réception d'une invitation, MintMail prévient si le créneau est déjà pris.\n\nMise en place (une seule fois) :\n1. Connectez d'abord votre compte Gmail avec le fournisseur « OAuth » (Paramètres → Comptes).\n2. Console Google Cloud (le même projet que pour Gmail) → API et services → Bibliothèque → « Google Calendar API » → Activer.\n3. Ici : « Autoriser Google Agenda » (une page Google s'ouvre ; l'autorisation « calendar.events » est AJOUTÉE à celle de Gmail).\nImportant : tant que l'écran de consentement est en mode « Test », Google fait expirer le jeton au bout de 7 jours (il faut alors ré-autoriser). Pour un usage personnel durable, passez l'application en « En production » (écran « application non validée » à accepter une fois ; jusqu'à 100 utilisateurs).": [
+  "settings_more.py"
+ ],
+ "Ce week-end (samedi 9 h)": [
+  "window.py"
+ ],
+ "Ces tâches sont déjà dans votre liste.": [
+  "extras.py"
+ ],
+ "Cet appareil": [
+  "settings_extra.py"
+ ],
+ "Cette semaine": [
+  "util.py"
+ ],
+ "Cette tâche existe déjà.": [
+  "extras.py"
+ ],
+ "Cette version n'est pas plus récente que celle installée : refusée.": [
+  "updates_ui.py"
+ ],
+ "Chaque version est signée par SAEC. MintMail refuse tout paquet dont la signature ne correspond pas à la clé de vérification installée avec le programme (GitHub ne sert que de transport), refuse de revenir à une ancienne version, et demande votre mot de passe administrateur pour installer. Seule une requête anonyme est envoyée à GitHub ; désactivez la recherche automatique si vous préférez ne rien envoyer.": [
+  "updates_ui.py"
+ ],
+ "Chargement de l'agenda…": [
+  "extras.py"
+ ],
+ "Charger les images distantes": [
+  "settings.py"
+ ],
+ "Cherche dans tous les messages du serveur, même ceux qui ne sont pas encore téléchargés": [
+  "window.py"
+ ],
+ "Chercher aussi sur le serveur": [
+  "window.py"
+ ],
+ "Choisir une date…": [
+  "compose.py",
+  "window.py"
+ ],
+ "Citation": [
+  "compose.py"
+ ],
+ "Clair": [
+  "settings.py"
+ ],
+ "Classe mes derniers emails dans des dossiers": [
+  "assistant.py"
+ ],
+ "Classer les messages avec l'IA (proposition à valider)": [
+  "ai_engine.py"
+ ],
+ "Client mail moderne pour Linux Mint.\nBoîte intelligente, reports, envoi annulable, signatures HTML.": [
+  "window.py"
+ ],
+ "Cliquer pour ouvrir · clic droit : enregistrer, copier le chemin · glisser vers un dossier": [
+  "reader.py"
+ ],
+ "Clé API": [
+  "settings.py"
+ ],
+ "Clé API NVIDIA (nvapi-…)": [
+  "settings.py"
+ ],
+ "Clé API manquante.": [
+  "ai_service.py"
+ ],
+ "Clé de vérification absente : installation automatique désactivée.": [
+  "updates_ui.py"
+ ],
+ "Clé enregistrée dans le trousseau.": [
+  "settings.py"
+ ],
+ "Clé enregistrée — saisir pour la remplacer": [
+  "settings.py"
+ ],
+ "Code de jumelage": [
+  "settings_extra.py"
+ ],
+ "Code de jumelage requis (%d caractères minimum)": [
+  "p2p.py"
+ ],
+ "Code trop faible (≈ %d bits) : il protège vos mots de passe sur le réseau. Cliquez « Générer » ou utilisez au moins 16 caractères variés (lettres, chiffres, symboles), sans mot courant.": [
+  "settings_extra.py"
+ ],
+ "Colonnes : liste | lecture": [
+  "settings_extra.py",
+  "window.py"
+ ],
+ "Compacte": [
+  "settings.py"
+ ],
+ "Compte :": [
+  "settings.py"
+ ],
+ "Compte Gmail": [
+  "settings_more.py"
+ ],
+ "Compte ajouté. Réglages : icône ⚙ en haut à droite ou Ctrl+,": [
+  "settings.py"
+ ],
+ "Compte d'envoi": [
+  "settings_more.py"
+ ],
+ "Compte enregistré. Synchronisation en cours…": [
+  "settings.py"
+ ],
+ "Compte introuvable": [
+  "window.py"
+ ],
+ "Comptes": [
+  "settings.py"
+ ],
+ "Confidentialité": [
+  "settings.py"
+ ],
+ "Configurer %s — une seule fois": [
+  "settings_more.py"
+ ],
+ "Confortable": [
+  "settings.py"
+ ],
+ "Connectez-vous d'abord avec le bouton « Se connecter ».": [
+  "settings.py"
+ ],
+ "Connecté ✔ — aucun mot de passe n'est stocké : MintMail garde un jeton révocable depuis votre compte.\n": [
+  "settings_more.py"
+ ],
+ "Connecté ✔ — cliquez sur « Enregistrer ».": [
+  "settings_more.py"
+ ],
+ "Connexion IMAP impossible : %s": [
+  "backend.py"
+ ],
+ "Connexion IMAP perdue : %s": [
+  "backend.py"
+ ],
+ "Connexion OAuth : %s": [
+  "backend.py",
+  "settings_more.py"
+ ],
+ "Connexion OAuth : pas de mot de passe": [
+  "settings_more.py"
+ ],
+ "Connexion TCP vers %s:%d : OK": [
+  "settings_extra.py"
+ ],
+ "Connexion dans le navigateur… (3 minutes maximum)": [
+  "settings_more.py"
+ ],
+ "Connexion impossible : %s": [
+  "ai_service.py"
+ ],
+ "Connexion refusée": [
+  "oauth.py"
+ ],
+ "Connexion réussie (IMAP + SMTP).": [
+  "settings.py"
+ ],
+ "Connexion réussie ✔": [
+  "oauth.py"
+ ],
+ "Connexion réussie.": [
+  "settings.py"
+ ],
+ "Conservé (ne semble pas venir de MintMail) : %s": [
+  "entry.py"
+ ],
+ "Contacts": [
+  "settings.py"
+ ],
+ "Contacts exportés.": [
+  "settings_more.py"
+ ],
+ "Contacts…": [
+  "window.py"
+ ],
+ "Contenu HTML. Insertion depuis le bouton « Modèles » de la fenêtre de rédaction.": [
+  "settings_extra.py"
+ ],
+ "Continuer": [
+  "extras.py"
+ ],
+ "Continuer l'écriture": [
+  "compose.py"
+ ],
+ "Conversation": [
+  "extras.py",
+  "reader.py"
+ ],
+ "Conversation · %d autre%s message%s": [
+  "reader.py"
+ ],
+ "Copier l'adresse ": [
+  "window.py"
+ ],
+ "Copier l'adresse %s": [
+  "listing.py"
+ ],
+ "Copier le chemin": [
+  "reader.py"
+ ],
+ "Copier son adresse": [
+  "reader.py"
+ ],
+ "Copié : ": [
+  "window.py"
+ ],
+ "Corbeille": [
+  "folders.py",
+  "window.py"
+ ],
+ "Corriger": [
+  "window.py"
+ ],
+ "Corriger l'orthographe": [
+  "compose.py"
+ ],
+ "Couleur d'accent": [
+  "settings.py"
+ ],
+ "Couleurs prédéfinies": [
+  "settings.py"
+ ],
+ "Création du dossier impossible : %s": [
+  "folders.py"
+ ],
+ "Création impossible : %s": [
+  "backend.py"
+ ],
+ "Crée un dossier Factures et range mes factures dedans": [
+  "assistant.py"
+ ],
+ "Crée une règle pour les notifications": [
+  "assistant.py"
+ ],
+ "Créer l'identifiant : type « Application de bureau », nom « MintMail », puis copier l'ID client et le secret": [
+  "oauth.py"
+ ],
+ "Créer la règle": [
+  "extras.py"
+ ],
+ "Créer la règle : %s contient « %s » → %s": [
+  "ai_engine.py"
+ ],
+ "Créer le dossier « %s »%s": [
+  "ai_engine.py"
+ ],
+ "Créer un projet nommé « MintMail »": [
+  "oauth.py"
+ ],
+ "Créer une règle pour ": [
+  "window.py"
+ ],
+ "Ctrl+Maj+,": [
+  "settings.py"
+ ],
+ "Cyan": [
+  "style.py"
+ ],
+ "D'accord, je regarde ça.": [
+  "ai_engine.py"
+ ],
+ "Dans 1 heure": [
+  "compose.py"
+ ],
+ "Date (AAAA-MM-JJ)": [
+  "extras.py"
+ ],
+ "Date, heure ou durée invalide.": [
+  "extras.py"
+ ],
+ "De": [
+  "compose.py"
+ ],
+ "Demain 8 h": [
+  "window.py"
+ ],
+ "Demain à 8 h": [
+  "compose.py"
+ ],
+ "Demande de désabonnement envoyée à %s": [
+  "extras.py"
+ ],
+ "Demande des précisions.": [
+  "ai_features.py"
+ ],
+ "Demander plus d'informations": [
+  "ai_features.py"
+ ],
+ "Demandez n'importe quoi à votre boîte mail…": [
+  "assistant.py"
+ ],
+ "Densité de la liste": [
+  "settings.py"
+ ],
+ "Derniers non lus (données non fiables) :": [
+  "ai_features.py"
+ ],
+ "Diagnostic réseau": [
+  "settings_extra.py"
+ ],
+ "Disposition": [
+  "settings_extra.py",
+  "window.py"
+ ],
+ "Disposition : colonnes": [
+  "window.py"
+ ],
+ "Disposition : lecture en bas": [
+  "window.py"
+ ],
+ "Disposition : liste seule": [
+  "window.py"
+ ],
+ "Dossier : %s": [
+  "folders.py"
+ ],
+ "Dossier introuvable : %s": [
+  "backend.py"
+ ],
+ "Dossier renommé en « %s »": [
+  "folders.py"
+ ],
+ "Dossier supprimé": [
+  "folders.py"
+ ],
+ "Dossier « %s » créé": [
+  "ai_features.py",
+  "folders.py"
+ ],
+ "Dossier « %s » introuvable sur le serveur.": [
+  "backend.py"
+ ],
+ "Dossiers": [
+  "folders.py"
+ ],
+ "Dossiers existants : ": [
+  "ai_features.py"
+ ],
+ "Droits administrateur requis.": [
+  "updates_ui.py"
+ ],
+ "Durée (minutes)": [
+  "extras.py"
+ ],
+ "Débloquer ": [
+  "window.py"
+ ],
+ "Débloquer %s": [
+  "listing.py"
+ ],
+ "Débloquer l'expéditeur": [
+  "reader.py"
+ ],
+ "Définissez d'abord un code de jumelage (%d caractères minimum)": [
+  "settings_extra.py"
+ ],
+ "Délai d'annulation d'envoi (s)": [
+  "settings.py"
+ ],
+ "Délai dépassé : le service IA ne répond pas.": [
+  "ai_service.py"
+ ],
+ "Déplacer vers un dossier": [
+  "listing.py",
+  "settings.py"
+ ],
+ "Déplacer vers un dossier (V)": [
+  "reader.py"
+ ],
+ "Déplacer vers un dossier…": [
+  "window.py"
+ ],
+ "Déplacer vers « %s »%s": [
+  "ai_engine.py"
+ ],
+ "Déplacer vers…": [
+  "folders.py"
+ ],
+ "Dépôt GitHub": [
+  "updates_ui.py"
+ ],
+ "Dépôt GitHub des versions, au format propriétaire/nom": [
+  "updates_ui.py"
+ ],
+ "Dépôt invalide : écrivez « propriétaire/nom ».": [
+  "updates_ui.py"
+ ],
+ "Désabonnement en cours…": [
+  "extras.py"
+ ],
+ "Désabonner": [
+  "reader.py"
+ ],
+ "Désabonné de %s ✔ (si des messages arrivent encore, mettez l'expéditeur en spam)": [
+  "extras.py"
+ ],
+ "Désactiver": [
+  "settings_more.py"
+ ],
+ "Désactivée": [
+  "p2p.py"
+ ],
+ "Désolé, l'IA a rencontré une erreur : %s": [
+  "ai_features.py"
+ ],
+ "Désolé, le classement a échoué : %s": [
+  "ai_features.py"
+ ],
+ "Désépingler": [
+  "listing.py"
+ ],
+ "Développer": [
+  "compose.py"
+ ],
+ "Développer ce texte en réponse complète avec l'IA": [
+  "reader.py"
+ ],
+ "Efface ce que MintMail a retenu de vos rangements (expéditeur → dossier)": [
+  "settings.py"
+ ],
+ "Effacer la mise en forme": [
+  "compose.py"
+ ],
+ "En spam : ": [
+  "listing.py"
+ ],
+ "Endpoint API": [
+  "settings.py"
+ ],
+ "Enregistrer": [
+  "compose.py",
+  "reader.py",
+  "settings.py",
+  "settings_extra.py",
+  "settings_more.py",
+  "window.py"
+ ],
+ "Enregistrer ce message comme brouillon ?": [
+  "compose.py"
+ ],
+ "Enregistrer ici": [
+  "reader.py"
+ ],
+ "Enregistrer la clé": [
+  "settings.py"
+ ],
+ "Enregistrer la pièce jointe": [
+  "reader.py"
+ ],
+ "Enregistrer la recherche": [
+  "window.py"
+ ],
+ "Enregistrer la recherche actuelle": [
+  "window.py"
+ ],
+ "Enregistrer la signature": [
+  "settings.py"
+ ],
+ "Enregistrer sous…": [
+  "reader.py"
+ ],
+ "Enregistrer toutes les pièces jointes dans…": [
+  "reader.py"
+ ],
+ "Enregistré — laisser vide pour le conserver": [
+  "settings.py",
+  "settings_more.py"
+ ],
+ "Enregistré ✔": [
+  "settings_more.py"
+ ],
+ "Envoi du message…": [
+  "window.py"
+ ],
+ "Envoi impossible : %s": [
+  "backend.py"
+ ],
+ "Envoi programmé pour le %s": [
+  "window.py"
+ ],
+ "Envoi à l'agenda CalDAV…": [
+  "extras.py"
+ ],
+ "Envois différés : %d envoyé(s), %d abandonné(s).": [
+  "entry.py"
+ ],
+ "Envoyer": [
+  "compose.py"
+ ],
+ "Envoyer ce message sans objet ?": [
+  "compose.py"
+ ],
+ "Envoyer la réponse": [
+  "reader.py"
+ ],
+ "Envoyer maintenant": [
+  "extras.py"
+ ],
+ "Envoyer plus tard": [
+  "compose.py"
+ ],
+ "Envoyés": [
+  "folders.py",
+  "window.py"
+ ],
+ "Erreur HTTP %d (%s). %s": [
+  "ai_service.py"
+ ],
+ "Erreur IA : %s": [
+  "ai_features.py",
+  "compose.py",
+  "extras.py"
+ ],
+ "Erreur de mise à jour (%s).": [
+  "updates_ui.py"
+ ],
+ "Erreur du serveur de téléchargement.": [
+  "updates_ui.py"
+ ],
+ "Erreur interne : %s (menu ☰ → Journal d'erreurs)": [
+  "app.py"
+ ],
+ "Erreur interne pendant la mise à jour.": [
+  "updates_ui.py"
+ ],
+ "Español": [
+  "settings.py"
+ ],
+ "Exporter": [
+  "settings_more.py"
+ ],
+ "Exporter .vcf": [
+  "settings_more.py"
+ ],
+ "Exporter les contacts": [
+  "settings_more.py"
+ ],
+ "Expéditeurs bloqués": [
+  "settings_extra.py"
+ ],
+ "Expéditeurs envoyés en spam": [
+  "settings_extra.py"
+ ],
+ "Exécuter": [
+  "assistant.py"
+ ],
+ "Facultatif (service local : aucune clé nécessaire)": [
+  "settings.py"
+ ],
+ "Faites glisser un message vers la droite ou la gauche (souris, pavé tactile à deux doigts, écran tactile). Un glissement court déclenche l'action principale, un glissement long l'action secondaire.": [
+  "settings_extra.py"
+ ],
+ "Favori": [
+  "reader.py",
+  "settings.py",
+  "widgets.py"
+ ],
+ "Favori (S)": [
+  "reader.py"
+ ],
+ "Favoris": [
+  "window.py"
+ ],
+ "Fermer": [
+  "extras.py",
+  "reader.py",
+  "window.py"
+ ],
+ "Fermer (Ctrl+J)": [
+  "assistant.py"
+ ],
+ "Fichier de mise à jour invalide : refusé.": [
+  "updates_ui.py"
+ ],
+ "Fichier potentiellement dangereux": [
+  "reader.py"
+ ],
+ "Fichier trop volumineux : refusé.": [
+  "updates_ui.py"
+ ],
+ "Filtres & blocage": [
+  "settings.py"
+ ],
+ "Formel": [
+  "settings.py"
+ ],
+ "Fournisseur": [
+  "settings.py"
+ ],
+ "Français": [
+  "settings.py"
+ ],
+ "Gestes & disposition": [
+  "settings.py"
+ ],
+ "Gestes de swipe (réglages)": [
+  "window.py"
+ ],
+ "GitHub limite les requêtes : réessayez plus tard.": [
+  "updates_ui.py"
+ ],
+ "Glisser vers la droite": [
+  "settings_extra.py"
+ ],
+ "Glisser vers la gauche": [
+  "settings_extra.py"
+ ],
+ "Gmail (mot de passe d'application)": [
+  "settings.py"
+ ],
+ "Gmail / Yahoo / iCloud : créez un « mot de passe d'application » dans les paramètres de sécurité du compte.": [
+  "settings.py"
+ ],
+ "Gmail — connexion Google (OAuth, sans mot de passe)": [
+  "settings.py"
+ ],
+ "Go": [
+  "util.py"
+ ],
+ "Google Agenda : %s": [
+  "extras.py"
+ ],
+ "Google Agenda : %s ✔": [
+  "extras.py"
+ ],
+ "Google Agenda autorisé ✔ — cliquez « Tester » pour vérifier.": [
+  "settings_more.py"
+ ],
+ "Google n'a pas renvoyé de jeton durable : réessayez.": [
+  "settings_more.py"
+ ],
+ "Gras": [
+  "compose.py"
+ ],
+ "Générer": [
+  "settings_extra.py"
+ ],
+ "Gérer les expéditeurs bloqués et les règles": [
+  "window.py"
+ ],
+ "HTTPS obligatoire": [
+  "gcal.py"
+ ],
+ "HTTPS obligatoire (HTTP seulement sur le réseau local)": [
+  "caldav.py"
+ ],
+ "Habitudes de rangement effacées.": [
+  "settings.py"
+ ],
+ "Heure (HH:MM)": [
+  "extras.py"
+ ],
+ "Heure :": [
+  "compose.py"
+ ],
+ "Hier": [
+  "util.py"
+ ],
+ "Hors ligne : le déplacement est conservé et sera envoyé dès le retour du réseau.": [
+  "window.py"
+ ],
+ "Hors ligne : message conservé, nouvel essai automatique.": [
+  "window.py"
+ ],
+ "IA activée": [
+  "settings.py"
+ ],
+ "IA indisponible : %s": [
+  "reader.py"
+ ],
+ "IA non configurée : Paramètres → IA.": [
+  "ai_features.py",
+  "compose.py",
+  "extras.py"
+ ],
+ "IA non configurée.": [
+  "ai_engine.py"
+ ],
+ "ID client": [
+  "settings_more.py"
+ ],
+ "IDLE non pris en charge": [
+  "backend.py"
+ ],
+ "IDLE sans réponse": [
+  "backend.py"
+ ],
+ "IMAP en SSL/TLS direct (port 993)": [
+  "settings.py"
+ ],
+ "Identifiant": [
+  "settings.py",
+  "settings_more.py"
+ ],
+ "Identifiant client OAuth manquant : Paramètres → Comptes → Gmail (OAuth).": [
+  "settings_more.py"
+ ],
+ "Identité enregistrée ✔": [
+  "settings_more.py"
+ ],
+ "Identités d'envoi": [
+  "settings.py"
+ ],
+ "Identités d'envoi (alias)…": [
+  "window.py"
+ ],
+ "Images distantes bloquées (vie privée).": [
+  "reader.py"
+ ],
+ "Important": [
+  "widgets.py"
+ ],
+ "Importer": [
+  "settings_more.py"
+ ],
+ "Importer .vcf": [
+  "settings_more.py"
+ ],
+ "Importer des contacts (vCard)": [
+  "settings_more.py"
+ ],
+ "Impossible d'ouvrir l'agenda": [
+  "extras.py"
+ ],
+ "Impossible d'ouvrir les paramètres": [
+  "window.py"
+ ],
+ "Impossible de déplacer %s : %s": [
+  "entry.py"
+ ],
+ "Impossible de joindre %s:%d (%s)": [
+  "settings_extra.py"
+ ],
+ "Impossible de joindre GitHub (réseau).": [
+  "updates_ui.py"
+ ],
+ "Indigo": [
+  "style.py"
+ ],
+ "Indiquez le dossier de destination": [
+  "settings_extra.py"
+ ],
+ "Installation automatique : prête (clé de vérification présente).": [
+  "updates_ui.py"
+ ],
+ "Installation automatique désactivée : %s Vous serez seulement informé des nouvelles versions.": [
+  "updates_ui.py"
+ ],
+ "Installation automatique indisponible sur cette machine (pkexec ou programme d'installation absent).": [
+  "updates_ui.py"
+ ],
+ "Installations de MintMail hors paquet .deb (le paquet installé est la version %s) :": [
+  "entry.py"
+ ],
+ "Installer MintMail %s ?": [
+  "updates_ui.py"
+ ],
+ "Installer la mise à jour": [
+  "updates_ui.py"
+ ],
+ "Insérer": [
+  "compose.py"
+ ],
+ "Insérer un lien": [
+  "compose.py"
+ ],
+ "Insérer un modèle": [
+  "settings.py"
+ ],
+ "Inverser le sens au pavé tactile": [
+  "settings_extra.py"
+ ],
+ "Invitation": [
+  "ical.py"
+ ],
+ "Invitation acceptée — réponse envoyée à l'organisateur": [
+  "extras.py"
+ ],
+ "Italique": [
+  "compose.py"
+ ],
+ "J'ai %s l'invitation.": [
+  "extras.py"
+ ],
+ "Je classe %d message(s)… Rien n'est déplacé ni créé avant votre accord.": [
+  "ai_features.py"
+ ],
+ "Je n'ai pas compris cette recherche.": [
+  "ai_engine.py"
+ ],
+ "Je n'ai pas compris, pouvez-vous reformuler ?": [
+  "ai_features.py"
+ ],
+ "Je regarde ça et je reviens vers vous.": [
+  "reader.py"
+ ],
+ "Je vous propose les créneaux suivants :\n": [
+  "slots.py"
+ ],
+ "Joindre": [
+  "compose.py"
+ ],
+ "Joindre des fichiers": [
+  "compose.py"
+ ],
+ "Joindre un fichier": [
+  "compose.py"
+ ],
+ "Journal d'erreurs": [
+  "window.py"
+ ],
+ "Journée entière": [
+  "extras.py"
+ ],
+ "Ko": [
+  "util.py"
+ ],
+ "L'IA n'a rien renvoyé.": [
+  "compose.py"
+ ],
+ "L'IA n'est pas encore configurée. Ajoutez votre clé API NVIDIA pour que je puisse vous aider.": [
+  "ai_features.py"
+ ],
+ "L'adresse doit commencer par https://": [
+  "settings_more.py"
+ ],
+ "L'endpoint doit commencer par https:// (http:// seulement sur cette machine ou le réseau local).": [
+  "settings.py"
+ ],
+ "L'endpoint doit utiliser HTTPS (HTTP seulement sur cette machine ou le réseau local).": [
+  "ai_service.py"
+ ],
+ "L'expéditeur contient": [
+  "settings_extra.py"
+ ],
+ "L'installation a échoué (le détail est dans le journal).": [
+  "updates_ui.py"
+ ],
+ "L'objet contient": [
+  "settings_extra.py"
+ ],
+ "La clé de vérification installée n'est pas protégée : refusé.": [
+  "updates_ui.py"
+ ],
+ "La version publiée ne contient pas le paquet attendu.": [
+  "updates_ui.py"
+ ],
+ "Langue de l'IA": [
+  "settings.py"
+ ],
+ "Langue de l'interface": [
+  "settings.py"
+ ],
+ "Langue enregistrée : redémarrez MintMail pour l'appliquer.": [
+  "settings.py"
+ ],
+ "Le fournisseur n'a pas renvoyé de jeton durable (réessayez ; Google : consentement requis).": [
+  "settings_more.py"
+ ],
+ "Le nom ne peut pas contenir « %s »": [
+  "folders.py"
+ ],
+ "Le paquet est téléchargé depuis GitHub, sa signature est vérifiée avec la clé de SAEC intégrée à MintMail, puis votre mot de passe administrateur est demandé pour l'installer. Fermez et relancez MintMail ensuite.": [
+  "updates_ui.py"
+ ],
+ "Le service a refusé la demande (%s). Ouverture de la page de désabonnement…": [
+  "extras.py"
+ ],
+ "Lecture du message…": [
+  "reader.py"
+ ],
+ "Lecture en bas": [
+  "settings_extra.py",
+  "window.py"
+ ],
+ "Lecture impossible : %s": [
+  "settings_more.py"
+ ],
+ "Les destinataires contiennent": [
+  "settings_extra.py"
+ ],
+ "Les fiches enregistrées ici se synchronisent entre vos machines. Les autres correspondants (marqués auto) sont repérés dans vos messages et servent à l'auto-complétion.": [
+  "settings_more.py"
+ ],
+ "Les messages en cache seront effacés. Vos mails restent sur le serveur.": [
+  "settings.py"
+ ],
+ "Les messages programmés partent aussi fenêtre fermée (minuterie utilisateur « mintmail-outbox »).": [
+  "extras.py"
+ ],
+ "Les messages qu'il contient seront supprimés du serveur.": [
+  "folders.py"
+ ],
+ "Les ports doivent être des nombres.": [
+  "settings.py"
+ ],
+ "Leurs messages vont directement dans le dossier Spam.": [
+  "settings_extra.py"
+ ],
+ "Leurs messages vont directement à la corbeille (marqués comme lus).": [
+  "settings_extra.py"
+ ],
+ "Lien refusé : seuls http, https, mailto et tel sont acceptés.": [
+  "compose.py"
+ ],
+ "Lieu": [
+  "extras.py"
+ ],
+ "Liste numérotée": [
+  "compose.py"
+ ],
+ "Liste seule (lecture plein écran)": [
+  "settings_extra.py",
+  "window.py"
+ ],
+ "Liste à puces": [
+  "compose.py"
+ ],
+ "Lu": [
+  "window.py"
+ ],
+ "Lu / non lu": [
+  "widgets.py"
+ ],
+ "Lundi prochain à 8 h": [
+  "compose.py"
+ ],
+ "Marquer comme %s": [
+  "listing.py"
+ ],
+ "Marquer comme lu": [
+  "ai_engine.py",
+  "settings_extra.py"
+ ],
+ "Marquer comme non lu": [
+  "ai_engine.py"
+ ],
+ "Marquer comme non lu (U)": [
+  "reader.py"
+ ],
+ "Marquer lu / non lu": [
+  "settings.py"
+ ],
+ "Me rappeler si pas de réponse (3 jours)": [
+  "listing.py",
+  "window.py"
+ ],
+ "Me rappeler si pas de réponse (7 jours)": [
+  "window.py"
+ ],
+ "Me rappeler si pas de réponse — 3 jours": [
+  "reader.py"
+ ],
+ "Me rappeler si pas de réponse — 7 jours": [
+  "reader.py"
+ ],
+ "Menthe": [
+  "style.py"
+ ],
+ "Menu Bloquer (adresse / domaine)": [
+  "settings.py"
+ ],
+ "Merci !": [
+  "reader.py"
+ ],
+ "Merci, bien reçu !": [
+  "ai_engine.py"
+ ],
+ "Message envoyé ✔": [
+  "window.py"
+ ],
+ "Message ouvert : de %s <%s>, objet « %s » — %s": [
+  "ai_features.py"
+ ],
+ "Message suivant / précédent": [
+  "settings.py"
+ ],
+ "Messages non lus (boîte de réception) : %d": [
+  "ai_features.py"
+ ],
+ "Mets en spam les mails promotionnels": [
+  "assistant.py"
+ ],
+ "Mettre %s en spam": [
+  "listing.py"
+ ],
+ "Mettre de côté réglages et cache, puis relancer": [
+  "app.py"
+ ],
+ "Mettre en spam": [
+  "extras.py",
+  "settings_extra.py"
+ ],
+ "Mettre l'expéditeur en spam": [
+  "listing.py",
+  "reader.py"
+ ],
+ "Mettre l'expéditeur en spam — ": [
+  "window.py"
+ ],
+ "Mettre le domaine en spam — ": [
+  "window.py"
+ ],
+ "Mettre son domaine en spam": [
+  "reader.py"
+ ],
+ "Mettre tout le domaine %s en spam": [
+  "listing.py"
+ ],
+ "Minimal : 500 premiers caractères": [
+  "settings.py"
+ ],
+ "MintMail %s — options :\n": [
+  "entry.py"
+ ],
+ "MintMail : envoi impossible": [
+  "entry.py"
+ ],
+ "MintMail envoie la demande de désabonnement directement au service (requête sécurisée, sans ouvrir de page).": [
+  "extras.py"
+ ],
+ "MintMail est à jour (version %s).": [
+  "updates_ui.py"
+ ],
+ "MintMail n'a pas pu démarrer": [
+  "app.py"
+ ],
+ "MintMail ne peut pas créer cet identifiant à votre place (Google exige que ce soit vous, connecté à votre compte). Suivez les étapes ci-dessous : chaque bouton ouvre la bonne page. Ensuite, collez l'ID client et le secret. C'est à faire UNE FOIS : le réglage se synchronise avec vos autres machines (ou voir l'aide F1 pour le déployer sur plusieurs postes).": [
+  "settings_more.py"
+ ],
+ "MintMail ne peut pas démarrer : %s\n\nCauses habituelles :\n  - le Python utilisé n'est pas celui du système (conda, pyenv, venv…) : lancez /usr/bin/mintmail ;\n  - il manque un composant : sudo apt install python3-gi gir1.2-gtk-3.0 gir1.2-webkit2-4.1\n  - pas de session graphique (DISPLAY / WAYLAND_DISPLAY).\nPour un rapport complet : /usr/bin/mintmail --diagnose\n": [
+  "entry.py"
+ ],
+ "Mis de côté : %s  ->  %s": [
+  "entry.py"
+ ],
+ "Mis de côté : %s -> %s": [
+  "entry.py"
+ ],
+ "Mises à jour": [
+  "settings.py",
+  "updates_ui.py",
+  "window.py"
+ ],
+ "Mo": [
+  "util.py"
+ ],
+ "Mode": [
+  "settings.py"
+ ],
+ "Mode démonstration": [
+  "window.py"
+ ],
+ "Mode sélection": [
+  "settings.py"
+ ],
+ "Mode sélection multiple": [
+  "window.py"
+ ],
+ "Modèle": [
+  "settings.py"
+ ],
+ "Modèle enregistré": [
+  "settings_extra.py"
+ ],
+ "Modèles": [
+  "compose.py"
+ ],
+ "Modèles de réponse": [
+  "settings.py"
+ ],
+ "Mot de passe": [
+  "settings.py",
+  "settings_more.py"
+ ],
+ "Mot de passe (ou mot de passe d'application)": [
+  "settings_more.py"
+ ],
+ "Mot de passe requis.": [
+  "settings.py"
+ ],
+ "Neutre et poli": [
+  "settings.py"
+ ],
+ "Newsletters": [
+  "window.py"
+ ],
+ "Nom": [
+  "settings_more.py"
+ ],
+ "Nom affiché": [
+  "settings.py",
+  "settings_more.py"
+ ],
+ "Nom de dossier invalide (caractères de contrôle)": [
+  "backend.py"
+ ],
+ "Nom du dossier": [
+  "folders.py"
+ ],
+ "Nom du modèle": [
+  "settings_extra.py"
+ ],
+ "Non lu": [
+  "window.py"
+ ],
+ "Non lus": [
+  "window.py"
+ ],
+ "Notes": [
+  "settings_more.py"
+ ],
+ "Notifications": [
+  "window.py"
+ ],
+ "Notifications de bureau": [
+  "settings.py"
+ ],
+ "Nouveau": [
+  "settings_more.py"
+ ],
+ "Nouveau dossier": [
+  "folders.py"
+ ],
+ "Nouveau dossier…": [
+  "folders.py"
+ ],
+ "Nouveau message": [
+  "compose.py",
+  "folders.py",
+  "settings.py",
+  "window.py"
+ ],
+ "Nouveau message (C)": [
+  "window.py"
+ ],
+ "Nouveau modèle": [
+  "settings_extra.py"
+ ],
+ "Nouveau nom": [
+  "folders.py"
+ ],
+ "Nouveau sous-dossier…": [
+  "folders.py"
+ ],
+ "Nouvel événement": [
+  "extras.py"
+ ],
+ "Nouvel événement dans l'agenda…": [
+  "window.py"
+ ],
+ "Nouvel événement…": [
+  "extras.py"
+ ],
+ "Nouvelle conversation": [
+  "assistant.py"
+ ],
+ "Nouvelle inscription : nom « MintMail », comptes de tous annuaires + comptes Microsoft personnels, URI de redirection de type « Client public » : http://localhost": [
+  "oauth.py"
+ ],
+ "Nouvelle tâche (ex. « envoyer le devis avant vendredi »)": [
+  "extras.py"
+ ],
+ "Nouvelle tâche…": [
+  "window.py"
+ ],
+ "Numéro de version illisible.": [
+  "updates_ui.py"
+ ],
+ "OK, bien reçu 👍": [
+  "reader.py"
+ ],
+ "Objet": [
+  "compose.py"
+ ],
+ "Ollama (local — rien ne quitte votre machine)": [
+  "ai_service.py"
+ ],
+ "Optionnel : les invitations acceptées et les rendez-vous détectés par l'IA sont ajoutés directement à ce calendrier CalDAV (Nextcloud, Radicale, Fastmail, iCloud…). Sans CalDAV, MintMail ouvre le fichier .ics dans l'agenda de votre système (Thunderbird, GNOME Agenda…). Les réponses aux invitations (accepter / refuser) sont toujours envoyées par e-mail.": [
+  "settings_more.py"
+ ],
+ "Options de la commande mintmail": [
+  "settings_extra.py"
+ ],
+ "Opération en cours…": [
+  "updates_ui.py"
+ ],
+ "Orange": [
+  "style.py"
+ ],
+ "Oublier mes habitudes de rangement": [
+  "settings.py"
+ ],
+ "Outlook / Microsoft 365 — connexion Microsoft (OAuth)": [
+  "settings.py"
+ ],
+ "Ouvrez un nouveau terminal (ou tapez : hash -r) puis lancez : mintmail": [
+  "entry.py"
+ ],
+ "Ouvrir": [
+  "reader.py"
+ ],
+ "Ouvrir avec…": [
+  "reader.py"
+ ],
+ "Ouvrir ce fichier ?": [
+  "reader.py"
+ ],
+ "Ouvrir la page": [
+  "updates_ui.py"
+ ],
+ "Ouvrir le message d'origine": [
+  "extras.py"
+ ],
+ "Ouvrir les paramètres": [
+  "settings.py"
+ ],
+ "Ouvrir les paramètres (%s)": [
+  "ai_engine.py"
+ ],
+ "Ouvrir les réglages de l'IA": [
+  "ai_features.py"
+ ],
+ "Ouvrir quand même": [
+  "reader.py"
+ ],
+ "Ouvrir ↗": [
+  "settings_more.py"
+ ],
+ "Pairs détectés": [
+  "settings_extra.py"
+ ],
+ "Palette de commandes": [
+  "settings.py"
+ ],
+ "Palette de commandes (Ctrl+K)": [
+  "window.py"
+ ],
+ "Papier — éditorial": [
+  "style.py"
+ ],
+ "Paramètres": [
+  "settings.py",
+  "window.py"
+ ],
+ "Paramètres (Ctrl+,)": [
+  "window.py"
+ ],
+ "Paramètres dans une fenêtre séparée": [
+  "settings.py",
+  "window.py"
+ ],
+ "Paramètres de MintMail": [
+  "window.py"
+ ],
+ "Pare-feu : autoriser UDP 54321 et TCP 54322 entre les machines (ex. sudo ufw allow from 192.168.1.0/24 to any port 54322 proto tcp). Les échanges sont chiffrés et authentifiés par le code de jumelage.": [
+  "settings_extra.py"
+ ],
+ "Parfait, à bientôt.": [
+  "reader.py"
+ ],
+ "Pas d'organisateur à qui répondre.": [
+  "extras.py"
+ ],
+ "Pas de réponse à « %s »": [
+  "window.py"
+ ],
+ "Personnes": [
+  "window.py"
+ ],
+ "Peut-être": [
+  "ical.py",
+  "reader.py"
+ ],
+ "Phosphore": [
+  "style.py"
+ ],
+ "Pièces jointes": [
+  "window.py"
+ ],
+ "Planifier": [
+  "compose.py"
+ ],
+ "Plein écran": [
+  "settings.py"
+ ],
+ "Plein écran (F11)": [
+  "window.py"
+ ],
+ "Plus ancien": [
+  "util.py"
+ ],
+ "Plus tard aujourd'hui (+3 h)": [
+  "window.py"
+ ],
+ "Port IMAP": [
+  "settings.py"
+ ],
+ "Port SMTP": [
+  "settings.py"
+ ],
+ "Port invalide (1 à 65535).": [
+  "settings.py"
+ ],
+ "Poser une question à l'IA": [
+  "settings.py"
+ ],
+ "Pour tout restaurer, remettez les éléments de %s à leur place d'origine.": [
+  "entry.py"
+ ],
+ "Pouvez-vous m'en dire plus ?": [
+  "ai_engine.py"
+ ],
+ "Propose un autre créneau.": [
+  "ai_features.py"
+ ],
+ "Proposer un autre créneau": [
+  "ai_features.py"
+ ],
+ "Préparer des brouillons de réponse (messages importants)": [
+  "settings.py"
+ ],
+ "Que voulez-vous dire ? (quelques mots suffisent)": [
+  "compose.py"
+ ],
+ "Quels messages sont urgents ?": [
+  "assistant.py"
+ ],
+ "Quitter": [
+  "app.py"
+ ],
+ "Raccourcir": [
+  "compose.py"
+ ],
+ "Raccourcis": [
+  "settings.py"
+ ],
+ "Ranger": [
+  "ai_features.py"
+ ],
+ "Ranger dans le dossier →": [
+  "settings_extra.py"
+ ],
+ "Rappel dans %d jours si aucune réponse": [
+  "window.py"
+ ],
+ "Recherche": [
+  "folders.py"
+ ],
+ "Recherche : %s": [
+  "ai_features.py"
+ ],
+ "Recherche de créneaux libres…": [
+  "extras.py"
+ ],
+ "Recherche des machines sur le réseau local…": [
+  "settings_extra.py"
+ ],
+ "Recherche des modèles…": [
+  "settings.py"
+ ],
+ "Recherche serveur : %s": [
+  "extras.py"
+ ],
+ "Recherche sur le serveur…": [
+  "extras.py"
+ ],
+ "Rechercher": [
+  "settings.py",
+  "window.py"
+ ],
+ "Rechercher automatiquement (une fois par jour)": [
+  "updates_ui.py"
+ ],
+ "Rechercher dans l'aide (ex. OAuth, spam, hors ligne, raccourcis)": [
+  "settings_extra.py"
+ ],
+ "Rechercher les mises à jour": [
+  "window.py"
+ ],
+ "Rechercher un contact": [
+  "settings_more.py"
+ ],
+ "Rechercher « %s »": [
+  "ai_engine.py"
+ ],
+ "Rechercher — ou « ? » + une question pour l'IA": [
+  "window.py"
+ ],
+ "Recherches": [
+  "folders.py"
+ ],
+ "Refuse poliment la demande.": [
+  "ai_features.py"
+ ],
+ "Refuser": [
+  "reader.py"
+ ],
+ "Refuser poliment": [
+  "ai_features.py"
+ ],
+ "Refusé": [
+  "ical.py"
+ ],
+ "Regrouper en conversations": [
+  "settings_extra.py"
+ ],
+ "Rendez-vous": [
+  "ai_engine.py",
+  "extras.py",
+  "gcal.py",
+  "ical.py"
+ ],
+ "Renommage impossible : %s": [
+  "backend.py"
+ ],
+ "Renommer le dossier": [
+  "folders.py"
+ ],
+ "Renommer…": [
+  "folders.py"
+ ],
+ "Reporter": [
+  "listing.py",
+  "reader.py",
+  "window.py"
+ ],
+ "Reporter (%s)%s": [
+  "ai_engine.py"
+ ],
+ "Reporter jusqu'au…": [
+  "window.py"
+ ],
+ "Reporter à demain": [
+  "widgets.py"
+ ],
+ "Reporter à demain 8 h": [
+  "settings.py",
+  "window.py"
+ ],
+ "Reporté au %s": [
+  "listing.py"
+ ],
+ "Reportés": [
+  "window.py"
+ ],
+ "Retirer": [
+  "settings_extra.py"
+ ],
+ "Retirer des favoris": [
+  "listing.py"
+ ],
+ "Retour": [
+  "settings.py"
+ ],
+ "Retour à la liste": [
+  "reader.py"
+ ],
+ "Rien d'urgent détecté.": [
+  "extras.py"
+ ],
+ "Rien de plus sur le serveur.": [
+  "extras.py"
+ ],
+ "Rien de prévu dans les 14 prochains jours.": [
+  "extras.py"
+ ],
+ "Rien à ranger : ces messages restent dans la boîte de réception.": [
+  "ai_features.py"
+ ],
+ "Rien à réinitialiser.": [
+  "entry.py"
+ ],
+ "Rose": [
+  "style.py"
+ ],
+ "Rouvrir": [
+  "window.py"
+ ],
+ "Règle créée : les messages de %s iront dans « %s »": [
+  "ai_features.py"
+ ],
+ "Règle créée — appliquée aux prochains messages": [
+  "ai_features.py"
+ ],
+ "Règles appliquées (%d message(s) restent dans la boîte)": [
+  "window.py"
+ ],
+ "Rédaction de votre réponse…": [
+  "ai_features.py"
+ ],
+ "Rédiger": [
+  "compose.py"
+ ],
+ "Rédiger un message à %s": [
+  "ai_engine.py"
+ ],
+ "Rédiger une réponse avec l'IA": [
+  "reader.py"
+ ],
+ "Rédiger à partir d'une idée…": [
+  "compose.py"
+ ],
+ "Réduire / étendre la barre latérale": [
+  "window.py"
+ ],
+ "Réflexion…": [
+  "ai_features.py"
+ ],
+ "Réglages de l'IA": [
+  "window.py"
+ ],
+ "Réglages et cache réinitialisés.": [
+  "entry.py"
+ ],
+ "Répondre": [
+  "listing.py",
+  "settings.py",
+  "window.py"
+ ],
+ "Répondre (R)": [
+  "reader.py"
+ ],
+ "Répondre à %s : %s": [
+  "extras.py"
+ ],
+ "Répondre à tous": [
+  "listing.py",
+  "reader.py",
+  "settings.py",
+  "window.py"
+ ],
+ "Répondre à tous (A)": [
+  "reader.py"
+ ],
+ "Réponds de façon appropriée à ce message.": [
+  "ai_features.py"
+ ],
+ "Réponds en une ou deux phrases.": [
+  "ai_features.py"
+ ],
+ "Réponds sur un ton amical.": [
+  "ai_features.py"
+ ],
+ "Réponds sur un ton formel.": [
+  "ai_features.py"
+ ],
+ "Réponse adaptée": [
+  "ai_features.py"
+ ],
+ "Réponse envoyée à l'organisateur (%s)": [
+  "extras.py"
+ ],
+ "Réponse illisible de GitHub.": [
+  "updates_ui.py"
+ ],
+ "Réponse illisible du service IA.": [
+  "ai_service.py"
+ ],
+ "Réponse inattendue du service IA.": [
+  "ai_service.py"
+ ],
+ "Réponse rapide…": [
+  "reader.py"
+ ],
+ "Réseau rétabli : %d action(s) envoyée(s) au serveur": [
+  "offline.py"
+ ],
+ "Résume ma boîte": [
+  "assistant.py"
+ ],
+ "Résumer ma boîte": [
+  "ai_engine.py"
+ ],
+ "Résumé de la conversation (%d messages)…": [
+  "extras.py"
+ ],
+ "Résumé « En bref » de la boîte": [
+  "settings.py"
+ ],
+ "Résumés, réponses suggérées, tri par priorité, détection d'hameçonnage, rédaction, traduction, assistant conversationnel capable d'agir sur votre boîte. Désactivée par défaut : une fois activée, le texte des messages traités est envoyé au fournisseur choisi (voir « Confidentialité »). Avec Ollama, tout reste sur votre machine. Aucune action n'est exécutée sans votre accord.": [
+  "settings.py"
+ ],
+ "Rétablir": [
+  "settings.py"
+ ],
+ "Rétablir l'apparence et la disposition par défaut": [
+  "settings.py"
+ ],
+ "Rétablir l'apparence, la disposition et les gestes par défaut ?": [
+  "settings.py"
+ ],
+ "SIGNATURE INVALIDE : paquet refusé (il ne vient pas de SAEC ou a été modifié).": [
+  "updates_ui.py"
+ ],
+ "Saisissez d'abord une recherche (compte réel requis).": [
+  "extras.py"
+ ],
+ "Saisissez le mot de passe (ou mot de passe d'application).": [
+  "settings.py"
+ ],
+ "Sans titre": [
+  "settings_extra.py"
+ ],
+ "Se désabonner de %s ?": [
+  "extras.py"
+ ],
+ "Se désabonner de cet expéditeur": [
+  "listing.py",
+  "window.py"
+ ],
+ "Secours si la découverte automatique est bloquée (isolation Wi-Fi de certaines box) : adresse IP de l'autre machine. Votre adresse : %s": [
+  "settings_extra.py"
+ ],
+ "Secret client (facultatif selon le fournisseur)": [
+  "settings_more.py"
+ ],
+ "Semaine prochaine (lundi 8 h)": [
+  "window.py"
+ ],
+ "Serveur IMAP": [
+  "settings.py"
+ ],
+ "Serveur SMTP": [
+  "settings.py"
+ ],
+ "Serveurs IMAP et SMTP requis (choisissez un fournisseur).": [
+  "settings.py"
+ ],
+ "Signaler ce message comme spam": [
+  "listing.py"
+ ],
+ "Signaler comme spam": [
+  "ai_engine.py",
+  "listing.py",
+  "settings.py"
+ ],
+ "Signaler comme spam (!)": [
+  "reader.py"
+ ],
+ "Signaler comme spam (ce message)": [
+  "window.py"
+ ],
+ "Signature (HTML)": [
+  "settings_more.py"
+ ],
+ "Signature HTML (balises <b>, <a>, <img>… autorisées) :": [
+  "settings.py"
+ ],
+ "Signature enregistrée": [
+  "settings.py"
+ ],
+ "Signatures": [
+  "settings.py"
+ ],
+ "Société": [
+  "settings_more.py"
+ ],
+ "Sombre": [
+  "settings.py"
+ ],
+ "Somme de contrôle incorrecte : téléchargement corrompu, refusé.": [
+  "updates_ui.py"
+ ],
+ "Sonde le réseau local (utile si la détection automatique est bloquée par la box ou un VPN)": [
+  "settings_extra.py"
+ ],
+ "Souligné": [
+  "compose.py"
+ ],
+ "Spam : ce message, l'expéditeur ou tout le domaine": [
+  "reader.py"
+ ],
+ "Spam ▾": [
+  "reader.py"
+ ],
+ "Style visuel": [
+  "settings.py"
+ ],
+ "Suggérer un objet": [
+  "compose.py"
+ ],
+ "Suppression impossible : %s": [
+  "backend.py"
+ ],
+ "Supprimer": [
+  "ai_engine.py",
+  "compose.py",
+  "folders.py",
+  "listing.py",
+  "settings.py",
+  "settings_extra.py",
+  "settings_more.py",
+  "widgets.py",
+  "window.py"
+ ],
+ "Supprimer (#)": [
+  "reader.py"
+ ],
+ "Supprimer ce compte": [
+  "settings.py"
+ ],
+ "Supprimer ce compte de MintMail ?": [
+  "settings.py"
+ ],
+ "Supprimer définitivement %d message(s) ?": [
+  "listing.py"
+ ],
+ "Supprimer la recherche enregistrée : ": [
+  "window.py"
+ ],
+ "Supprimer le brouillon": [
+  "compose.py"
+ ],
+ "Supprimer le dossier « %s » ?": [
+  "folders.py"
+ ],
+ "Supprimer…": [
+  "folders.py"
+ ],
+ "Suspect": [
+  "widgets.py"
+ ],
+ "Synchro : ": [
+  "window.py"
+ ],
+ "Synchro : compte « %s » ajouté — ": [
+  "window.py"
+ ],
+ "Synchronisation P2P": [
+  "settings.py"
+ ],
+ "Synchronisation activée": [
+  "settings_extra.py"
+ ],
+ "Synchronisation déjà en cours…": [
+  "window.py"
+ ],
+ "Synchronisation désactivée : l'ancien code de jumelage est trop court (12 caractères minimum).": [
+  "window.py"
+ ],
+ "Synchronisation entre machines": [
+  "settings_extra.py"
+ ],
+ "Synchronisation inactive (code de jumelage requis)": [
+  "settings_extra.py"
+ ],
+ "Synchronisation…": [
+  "window.py"
+ ],
+ "Synchronisé à ": [
+  "window.py"
+ ],
+ "Système": [
+  "settings.py"
+ ],
+ "Sélectionnez un message pour le lire": [
+  "reader.py"
+ ],
+ "Taille normale": [
+  "reader.py"
+ ],
+ "Tapez d'abord une recherche, puis enregistrez-la": [
+  "window.py"
+ ],
+ "Tapez une commande — ou demandez n'importe quoi à l'IA…": [
+  "window.py"
+ ],
+ "Terminal — phosphore": [
+  "style.py"
+ ],
+ "Terracotta": [
+  "style.py"
+ ],
+ "Test de connexion en cours…": [
+  "settings.py"
+ ],
+ "Test en cours…": [
+  "settings.py"
+ ],
+ "Tester": [
+  "settings_extra.py",
+  "settings_more.py"
+ ],
+ "Tester (7 prochains jours)": [
+  "settings_more.py"
+ ],
+ "Tester la connexion": [
+  "settings.py"
+ ],
+ "Test…": [
+  "settings_more.py"
+ ],
+ "Texte complet (meilleurs résultats)": [
+  "settings.py"
+ ],
+ "Texte plus grand": [
+  "reader.py"
+ ],
+ "Texte plus petit": [
+  "reader.py"
+ ],
+ "Titre": [
+  "extras.py"
+ ],
+ "Ton amical": [
+  "ai_features.py"
+ ],
+ "Ton des rédactions": [
+  "settings.py"
+ ],
+ "Ton formel": [
+  "ai_features.py"
+ ],
+ "Ton plus amical": [
+  "compose.py"
+ ],
+ "Ton plus formel": [
+  "compose.py"
+ ],
+ "Tous les comptes": [
+  "folders.py"
+ ],
+ "Tous les raccourcis clavier": [
+  "settings_extra.py"
+ ],
+ "Tout": [
+  "window.py"
+ ],
+ "Tout est synchronisé automatiquement entre vos machines MintMail du même réseau dès qu'elles se voient : comptes (avec leurs mots de passe), signatures, IA (clé API), modèles de réponse rapide, règles, blocages, recherches enregistrées et apparence. Les suppressions sont propagées aussi. Les échanges sont authentifiés et chiffrés ; le courrier n'est pas échangé (chaque machine le télécharge depuis son serveur). Utilisez le même code de jumelage partout.": [
+  "settings_extra.py"
+ ],
+ "Tout est à jour": [
+  "settings_extra.py"
+ ],
+ "Tout exécuter": [
+  "assistant.py"
+ ],
+ "Tout marquer comme lu": [
+  "window.py"
+ ],
+ "Tout sélectionner": [
+  "settings.py",
+  "window.py"
+ ],
+ "Traduction": [
+  "ai_features.py"
+ ],
+ "Traduction…": [
+  "ai_features.py"
+ ],
+ "Traduire en allemand": [
+  "compose.py"
+ ],
+ "Traduire en anglais": [
+  "compose.py"
+ ],
+ "Traduire en espagnol": [
+  "compose.py"
+ ],
+ "Traduire en français": [
+  "compose.py"
+ ],
+ "Traduire en néerlandais": [
+  "compose.py"
+ ],
+ "Transférer": [
+  "listing.py",
+  "reader.py",
+  "settings.py",
+  "window.py"
+ ],
+ "Transférer (F)": [
+  "reader.py"
+ ],
+ "Trier les nouveaux messages (priorité, spam)": [
+  "settings.py"
+ ],
+ "Très courte": [
+  "ai_features.py"
+ ],
+ "Tâche": [
+  "extras.py"
+ ],
+ "Tâche ajoutée%s": [
+  "extras.py"
+ ],
+ "Téléchargement de MintMail %s…": [
+  "updates_ui.py"
+ ],
+ "Téléchargement incomplet.": [
+  "updates_ui.py"
+ ],
+ "Téléphone": [
+  "settings_more.py"
+ ],
+ "Un e-mail de désabonnement sera envoyé à %s.": [
+  "extras.py"
+ ],
+ "Une action en attente a été refusée par le serveur : %s": [
+  "offline.py"
+ ],
+ "Une identité est une adresse supplémentaire (alias) depuis laquelle vous pouvez écrire, avec sa propre signature. Le serveur du compte doit autoriser cet alias. Quand un message reçu était adressé à un alias, la réponse part automatiquement de cet alias. Choix possible dans le champ « De » de la rédaction.": [
+  "settings_more.py"
+ ],
+ "Une page de connexion s'ouvre dans votre navigateur (identifiant client OAuth à saisir une seule fois).": [
+  "settings_more.py"
+ ],
+ "Utiliser Google Agenda": [
+  "settings_more.py"
+ ],
+ "Utilisez la barre d'actions pour archiver, supprimer ou marquer ces messages.": [
+  "reader.py"
+ ],
+ "Version installée : %s": [
+  "updates_ui.py"
+ ],
+ "Version non signée : refusée par sécurité.": [
+  "updates_ui.py"
+ ],
+ "Vert": [
+  "style.py"
+ ],
+ "Vider le cache IA (%d éléments)": [
+  "settings.py"
+ ],
+ "Vider le cache IA (0 élément)": [
+  "settings.py"
+ ],
+ "Vider le cache des messages": [
+  "settings.py"
+ ],
+ "Voici ma proposition : %d message(s) rangés dans %d dossier(s)%s. Validez ligne par ligne ou tout d'un coup.": [
+  "ai_features.py"
+ ],
+ "Voir": [
+  "updates_ui.py"
+ ],
+ "Voir tous les messages de ": [
+  "window.py"
+ ],
+ "Voir tous les messages de %s": [
+  "listing.py"
+ ],
+ "Voir tous ses messages": [
+  "listing.py",
+  "reader.py"
+ ],
+ "Vous rangez souvent %s dans « %s ».": [
+  "extras.py"
+ ],
+ "Vue actuelle : %s": [
+  "ai_features.py"
+ ],
+ "Vérifier maintenant": [
+  "updates_ui.py"
+ ],
+ "accepté": [
+  "extras.py"
+ ],
+ "accepté sous réserve": [
+  "extras.py"
+ ],
+ "accès refusé": [
+  "ai_service.py",
+  "caldav.py"
+ ],
+ "actualisation refusée": [
+  "oauth.py"
+ ],
+ "adresse interne ou non publique refusée": [
+  "unsub.py"
+ ],
+ "adresse non sécurisée": [
+  "unsub.py"
+ ],
+ "adresse@exemple.com ou @domaine.com": [
+  "settings_extra.py"
+ ],
+ "agenda introuvable": [
+  "gcal.py"
+ ],
+ "ajouté": [
+  "gcal.py"
+ ],
+ "août": [
+  "slots.py",
+  "util.py"
+ ],
+ "application locale": [
+  "entry.py"
+ ],
+ "application système (/opt)": [
+  "entry.py"
+ ],
+ "archivé": [
+  "listing.py"
+ ],
+ "aucune détectée (réseau déconnecté ?)": [
+  "settings_extra.py"
+ ],
+ "aucune machine vue": [
+  "p2p.py"
+ ],
+ "aujourd'hui": [
+  "tasks.py"
+ ],
+ "autorisation de l'agenda manquante : Paramètres → Agenda → « Autoriser Google Agenda »": [
+  "gcal.py"
+ ],
+ "avr.": [
+  "util.py"
+ ],
+ "avril": [
+  "slots.py"
+ ],
+ "blocage(s)": [
+  "syncdata.py"
+ ],
+ "calendrier introuvable (vérifiez l'adresse)": [
+  "caldav.py"
+ ],
+ "clé API refusée": [
+  "ai_service.py"
+ ],
+ "clé IA": [
+  "syncdata.py"
+ ],
+ "code de jumelage différent sur « %s »": [
+  "p2p.py"
+ ],
+ "code de jumelage requis": [
+  "p2p.py"
+ ],
+ "compte Gmail (OAuth) introuvable : Paramètres → Agenda": [
+  "extras.py"
+ ],
+ "compte(s)": [
+  "syncdata.py"
+ ],
+ "connecté": [
+  "caldav.py"
+ ],
+ "connexion OAuth incomplète : reconnectez le compte (Paramètres → Comptes)": [
+  "oauth.py"
+ ],
+ "connexion fermée": [
+  "backend.py"
+ ],
+ "connexion impossible": [
+  "gcal.py"
+ ],
+ "connexion impossible : %s": [
+  "oauth.py"
+ ],
+ "console.cloud.google.com → API et services → Identifiants → ID client OAuth (type « Application de bureau »)": [
+  "oauth.py"
+ ],
+ "contact(s)": [
+  "syncdata.py"
+ ],
+ "dans %d j (%s)": [
+  "tasks.py"
+ ],
+ "demain": [
+  "tasks.py"
+ ],
+ "dimanche": [
+  "slots.py"
+ ],
+ "dossier (pour « Ranger »)": [
+  "settings_extra.py"
+ ],
+ "dès que possible": [
+  "extras.py"
+ ],
+ "déc.": [
+  "util.py"
+ ],
+ "décembre": [
+  "slots.py"
+ ],
+ "décliné": [
+  "extras.py"
+ ],
+ "découverte automatique indisponible (%s)": [
+  "p2p.py"
+ ],
+ "déjà dans votre agenda": [
+  "gcal.py"
+ ],
+ "délai dépassé : connexion non terminée dans le navigateur": [
+  "oauth.py"
+ ],
+ "déplacé": [
+  "listing.py"
+ ],
+ "déplacé vers « %s »": [
+  "ai_features.py",
+  "folders.py"
+ ],
+ "en retard de %d j": [
+  "tasks.py"
+ ],
+ "endpoint ou modèle introuvable": [
+  "ai_service.py"
+ ],
+ "entrée de menu locale": [
+  "entry.py"
+ ],
+ "erreur %d": [
+  "oauth.py"
+ ],
+ "erreur HTTP %d": [
+  "oauth.py"
+ ],
+ "expéditeur(s) en spam": [
+  "syncdata.py"
+ ],
+ "expéditeurs bloqués": [
+  "settings_extra.py"
+ ],
+ "expéditeurs en spam": [
+  "settings_extra.py"
+ ],
+ "facultatif : vendredi, 15/11, dans 3 jours… (sinon lue dans le texte)": [
+  "extras.py"
+ ],
+ "févr.": [
+  "util.py"
+ ],
+ "février": [
+  "slots.py"
+ ],
+ "icône locale": [
+  "entry.py"
+ ],
+ "identifiant client OAuth manquant (Paramètres → Comptes)": [
+  "oauth.py"
+ ],
+ "identifiants refusés": [
+  "caldav.py"
+ ],
+ "identité(s)": [
+  "syncdata.py"
+ ],
+ "jamais": [
+  "updates_ui.py"
+ ],
+ "janv.": [
+  "util.py"
+ ],
+ "janvier": [
+  "slots.py"
+ ],
+ "jeton refusé : reconnectez le compte (Paramètres → Comptes)": [
+  "gcal.py"
+ ],
+ "jeudi": [
+  "slots.py"
+ ],
+ "juil.": [
+  "util.py"
+ ],
+ "juillet": [
+  "slots.py"
+ ],
+ "juin": [
+  "slots.py",
+  "util.py"
+ ],
+ "l'API Google Calendar n'est pas activée dans votre projet Google Cloud (API et services → Bibliothèque → Google Calendar API → Activer)": [
+  "gcal.py"
+ ],
+ "l'expéditeur sélectionné": [
+  "ai_engine.py"
+ ],
+ "lanceur local": [
+  "entry.py"
+ ],
+ "lanceur système (/usr/local)": [
+  "entry.py"
+ ],
+ "le serveur d'authentification doit utiliser HTTPS": [
+  "oauth.py"
+ ],
+ "lundi": [
+  "slots.py"
+ ],
+ "machine injoignable": [
+  "settings_extra.py"
+ ],
+ "mai": [
+  "slots.py",
+  "util.py"
+ ],
+ "mardi": [
+  "slots.py"
+ ],
+ "mars": [
+  "slots.py",
+  "util.py"
+ ],
+ "mercredi": [
+  "slots.py"
+ ],
+ "modèle(s)": [
+  "syncdata.py"
+ ],
+ "modèles": [
+  "settings_extra.py"
+ ],
+ "nom du modèle": [
+  "settings.py"
+ ],
+ "non lu": [
+  "listing.py"
+ ],
+ "nov.": [
+  "util.py"
+ ],
+ "novembre": [
+  "slots.py"
+ ],
+ "oct.": [
+  "util.py"
+ ],
+ "octobre": [
+  "slots.py"
+ ],
+ "pièce jointe": [
+  "backend.py"
+ ],
+ "port TCP %d indisponible (%s)": [
+  "p2p.py"
+ ],
+ "portal.azure.com → Inscriptions d'applications → Nouvelle (client public, URI de redirection « http://localhost »)": [
+  "oauth.py"
+ ],
+ "quota ou débit dépassé": [
+  "ai_service.py"
+ ],
+ "rangé dans « %s »": [
+  "ai_features.py"
+ ],
+ "recherche(s)": [
+  "syncdata.py"
+ ],
+ "redirection non sécurisée refusée": [
+  "unsub.py"
+ ],
+ "refusé : %s": [
+  "oauth.py"
+ ],
+ "relance dans %d j": [
+  "extras.py"
+ ],
+ "relance échue": [
+  "extras.py"
+ ],
+ "règle(s)": [
+  "syncdata.py"
+ ],
+ "règles": [
+  "settings_extra.py"
+ ],
+ "réglage(s)": [
+  "syncdata.py"
+ ],
+ "réponse invalide (état différent) : connexion annulée par sécurité": [
+  "oauth.py"
+ ],
+ "réponse sans jeton d'accès": [
+  "oauth.py"
+ ],
+ "samedi": [
+  "slots.py"
+ ],
+ "sept.": [
+  "util.py"
+ ],
+ "septembre": [
+  "slots.py"
+ ],
+ "service injoignable": [
+  "ai_service.py"
+ ],
+ "signalé comme spam": [
+  "listing.py"
+ ],
+ "supprimé": [
+  "listing.py"
+ ],
+ "texte…": [
+  "settings_extra.py"
+ ],
+ "tâche(s)": [
+  "syncdata.py"
+ ],
+ "vendredi": [
+  "slots.py"
+ ],
+ "« %s » est un programme ou un script : MintMail ne l'ouvre pas. Si vous êtes certain de sa provenance, enregistrez-le (clic droit → Enregistrer sous…) et vérifiez-le avant de l'exécuter.": [
+  "reader.py"
+ ],
+ "« %s » peut contenir des macros ou du code actif. Ouvrez-le seulement si vous attendiez ce fichier.": [
+  "reader.py"
+ ],
+ "À propos": [
+  "window.py"
+ ],
+ "À propos de ce message : ": [
+  "ai_features.py"
+ ],
+ "Échange impossible : %s": [
+  "settings_extra.py"
+ ],
+ "Échap": [
+  "settings.py"
+ ],
+ "Échap pour revenir · Ctrl+, pour rouvrir": [
+  "settings.py"
+ ],
+ "Échec de l'envoi : %s": [
+  "window.py"
+ ],
+ "Échec du déplacement : %s": [
+  "window.py"
+ ],
+ "Échéance": [
+  "extras.py"
+ ],
+ "Échéance non comprise : la tâche est ajoutée sans date.": [
+  "extras.py"
+ ],
+ "Écran de consentement : type « Externe », nom « MintMail », votre e-mail ; ajoutez les portées https://mail.google.com/ et .../auth/calendar.events ; ajoutez-vous comme utilisateur test ; puis « Publier l'application » (sinon le jeton expire après 7 jours)": [
+  "oauth.py"
+ ],
+ "Écriture impossible : %s": [
+  "settings_more.py"
+ ],
+ "Écrivez d'abord un peu de texte.": [
+  "compose.py"
+ ],
+ "Épingler": [
+  "ai_engine.py",
+  "listing.py",
+  "reader.py",
+  "settings.py",
+  "settings_extra.py",
+  "widgets.py"
+ ],
+ "Épingler (P)": [
+  "reader.py"
+ ],
+ "Épinglés": [
+  "widgets.py",
+  "window.py"
+ ],
+ "État": [
+  "settings_extra.py"
+ ],
+ "Événement": [
+  "reader.py"
+ ],
+ "Événement « %s » envoyé à votre agenda": [
+  "extras.py"
+ ],
+ "à jour": [
+  "syncdata.py"
+ ],
+ "• Adresses de cette machine : %s": [
+  "settings_extra.py"
+ ],
+ "• Annonces envoyées : %d (échecs : %d) — reçues d'autres machines : %d": [
+  "settings_extra.py"
+ ],
+ "• Annonces ignorées (adresse publique) : %s": [
+  "settings_extra.py"
+ ],
+ "• Dernière recherche active : %d adresses sondées": [
+  "settings_extra.py"
+ ],
+ "• Écoute : UDP %d %s — TCP %d %s": [
+  "settings_extra.py"
+ ],
+ "… jusqu'au bout (droite)": [
+  "settings_extra.py"
+ ],
+ "… jusqu'au bout (gauche)": [
+  "settings_extra.py"
+ ],
+ "→ Aucune annonce reçue : box ou pare-feu qui bloque UDP %d ? Essayez « Rechercher les machines ».": [
+  "settings_extra.py"
+ ],
+ "↔ Synchroniser maintenant": [
+  "settings_extra.py"
+ ],
+ "⇄ désactivée : code < %d car.": [
+  "window.py"
+ ],
+ "⏳ En attente de réponse": [
+  "extras.py"
+ ],
+ "☑ Tâches": [
+  "extras.py"
+ ],
+ "⚠ Aucun code valide : la synchronisation ne démarre pas.": [
+  "settings_extra.py"
+ ],
+ "⚠ Code de jumelage faible (≈ %d bits) : un attaquant du réseau pourrait le deviner hors ligne. Générez-en un nouveau (bouton « Générer ») puis saisissez-le sur chaque machine.": [
+  "settings_extra.py"
+ ],
+ "⚠ Code trop court : %d caractères (%d minimum). Cliquez « Générer », « Appliquer », puis saisissez EXACTEMENT le même code sur chaque machine.": [
+  "settings_extra.py"
+ ],
+ "⚠ Conflit avec « %s » (%s–%s)%s": [
+  "extras.py"
+ ],
+ "⚠ Hors ligne — %d action(s) en attente, rejouées automatiquement": [
+  "offline.py"
+ ],
+ "⚠ Message suspect (hameçonnage possible)%s. Ne cliquez sur aucun lien.": [
+  "reader.py"
+ ],
+ "⚠ Synchronisation désactivée sur CETTE machine (elle ne se voit pas elle-même ni les autres).": [
+  "settings_extra.py"
+ ],
+ "⚠ Une machine d'une AUTRE version (protocole %s) annonce sa présence : mettez MintMail à jour partout (même version).": [
+  "settings_extra.py"
+ ],
+ "⚡ À traiter en priorité (non lus, jugés importants)": [
+  "extras.py"
+ ],
+ "✉ Écrire": [
+  "settings_more.py"
+ ],
+ "✓ Fait": [
+  "assistant.py"
+ ],
+ "✔ Ajouter aux tâches…": [
+  "listing.py"
+ ],
+ "✔ Connecté : %d événement(s) dans les 7 prochains jours.": [
+  "settings_more.py"
+ ],
+ "✔ MintMail %s est installé : fermez puis relancez MintMail.": [
+  "updates_ui.py"
+ ],
+ "✔ Vous êtes libre sur ce créneau (Google Agenda).": [
+  "extras.py"
+ ],
+ "✗ port occupé": [
+  "settings_extra.py"
+ ],
+ "✨ %d brouillon(s) de réponse prêt(s) dans Brouillons — à relire avant envoi": [
+  "extras.py"
+ ],
+ "✨ %d message(s) important(s)": [
+  "ai_features.py"
+ ],
+ "✨ Activer l'IA": [
+  "window.py"
+ ],
+ "✨ Activer l'IA : classement, résumés, réponses…": [
+  "ai_features.py"
+ ],
+ "✨ Ajouter les %d tâche(s) détectée(s)": [
+  "ai_features.py"
+ ],
+ "✨ Ajouter à l'agenda : %s": [
+  "ai_features.py"
+ ],
+ "✨ Analyse de votre boîte…": [
+  "ai_features.py"
+ ],
+ "✨ Assistant": [
+  "window.py"
+ ],
+ "✨ Brouillons de réponse préparés (à relire avant envoi)": [
+  "extras.py"
+ ],
+ "✨ Cette conversation peut rester dans la boîte de réception.": [
+  "ai_features.py"
+ ],
+ "✨ Classer ma boîte de réception": [
+  "listing.py"
+ ],
+ "✨ Classer ma boîte de réception (60 derniers)": [
+  "ai_features.py"
+ ],
+ "✨ Classer tous les messages de %s": [
+  "ai_features.py"
+ ],
+ "✨ Demander à l'assistant : « %s »": [
+  "window.py"
+ ],
+ "✨ Demander à l'assistant à propos de ce message…": [
+  "ai_features.py"
+ ],
+ "✨ Fait. Relisez avant d'envoyer.": [
+  "compose.py"
+ ],
+ "✨ IA": [
+  "compose.py"
+ ],
+ "✨ Intelligence artificielle": [
+  "settings.py"
+ ],
+ "✨ Ouvrir l'assistant IA": [
+  "window.py"
+ ],
+ "✨ Ranger / suggérer un dossier": [
+  "listing.py"
+ ],
+ "✨ Ranger dans « %s » (selon vos habitudes)": [
+  "ai_features.py"
+ ],
+ "✨ Ranger dans « %s » (suggéré)": [
+  "ai_features.py"
+ ],
+ "✨ Recherche : « %s »": [
+  "ai_features.py"
+ ],
+ "✨ Recherche du meilleur dossier…": [
+  "ai_features.py"
+ ],
+ "✨ RÉSUMÉ": [
+  "reader.py"
+ ],
+ "✨ RÉSUMÉ%s%s": [
+  "reader.py"
+ ],
+ "✨ Rédaction de la réponse…": [
+  "ai_features.py"
+ ],
+ "✨ Rédiger avec l'IA": [
+  "compose.py"
+ ],
+ "✨ Répondre": [
+  "reader.py"
+ ],
+ "✨ Répondre avec l'IA": [
+  "ai_features.py",
+  "listing.py",
+  "window.py"
+ ],
+ "✨ Résumer / analyser ce message": [
+  "ai_features.py",
+  "window.py"
+ ],
+ "✨ Résumer la conversation (%d messages)": [
+  "ai_features.py"
+ ],
+ "✨ Résumer ma boîte de réception": [
+  "window.py"
+ ],
+ "✨ Suggestion : « %s »%s": [
+  "ai_features.py"
+ ],
+ "✨ Suggérer un dossier…": [
+  "ai_features.py"
+ ],
+ "✨ Suggérer un objet": [
+  "compose.py"
+ ],
+ "✨ Toujours ranger %s dans « %s »": [
+  "ai_features.py"
+ ],
+ "✨ Traduire ce message": [
+  "ai_features.py",
+  "window.py"
+ ],
+ "⬆ La version %s est disponible (dernière vérification : %s).": [
+  "updates_ui.py"
+ ],
+ "⬆ MintMail %s est disponible.": [
+  "updates_ui.py"
+ ],
+ "⬇ Tout enregistrer (%s)": [
+  "reader.py"
+ ],
+ "＋ Ajouter un compte": [
+  "settings.py"
+ ],
+ "＋ Ajouter une identité": [
+  "settings_more.py"
+ ],
+ "＋ Nouveau modèle": [
+  "settings_extra.py"
+ ],
+ "📅 Agenda du jour": [
+  "extras.py"
+ ],
+ "📅 Proposer des créneaux (agenda)": [
+  "listing.py"
+ ],
+ "🔍 Détecter les modèles installés": [
+  "settings.py"
+ ],
+ "🔍 Rechercher les machines": [
+  "settings_extra.py"
+ ],
+ "🔎 Chercher aussi sur le serveur": [
+  "window.py"
+ ],
+ "🔑 Autoriser Google Agenda": [
+  "settings_more.py"
+ ],
+ "🔑 Reconnecter avec %s": [
+  "settings_more.py"
+ ],
+ "🔑 Se connecter": [
+  "settings.py"
+ ],
+ "🔑 Se connecter avec %s": [
+  "settings_more.py"
+ ]
+}

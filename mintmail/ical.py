@@ -3,6 +3,7 @@ import datetime
 import re
 import time
 from typing import Dict, Optional
+from .i18n import tr
 
 
 def _unfold(text: str) -> str:
@@ -80,7 +81,7 @@ def parse_invite(text: str) -> Optional[Dict]:
 
 
 PARTSTAT = {"accept": "ACCEPTED", "tentative": "TENTATIVE", "decline": "DECLINED"}
-SUBJECT = {"accept": "Accepté", "tentative": "Peut-être", "decline": "Refusé"}
+SUBJECT = {"accept": tr("Accepté"), "tentative": tr("Peut-être"), "decline": tr("Refusé")}
 
 
 def build_reply(inv: Dict, attendee_email: str, attendee_name: str, action: str) -> str:
@@ -92,7 +93,7 @@ def build_reply(inv: Dict, attendee_email: str, attendee_name: str, action: str)
     for raw in (inv.get("dtstart_raw"), inv.get("dtend_raw")):
         if raw:
             lines.append(raw)
-    lines += ["SUMMARY:" + _esc(inv.get("title") or "Rendez-vous"),
+    lines += ["SUMMARY:" + _esc(inv.get("title") or tr("Rendez-vous")),
               "ORGANIZER:mailto:" + inv.get("organizer", ""),
               "ATTENDEE;PARTSTAT=%s%s:mailto:%s" % (PARTSTAT[action], cn, attendee_email),
               "END:VEVENT", "END:VCALENDAR"]
@@ -100,4 +101,4 @@ def build_reply(inv: Dict, attendee_email: str, attendee_name: str, action: str)
 
 
 def reply_subject(inv: Dict, action: str) -> str:
-    return "%s : %s" % (SUBJECT[action], inv.get("title") or "Invitation")
+    return "%s : %s" % (SUBJECT[action], inv.get("title") or tr("Invitation"))

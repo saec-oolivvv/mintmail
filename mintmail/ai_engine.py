@@ -15,6 +15,7 @@ from typing import Any, Dict, List, Optional
 from .ai_service import AIService, AIServiceError, PROVIDERS, is_local_endpoint
 from .models import Message
 from .util import html_to_text, split_addresses
+from .i18n import tr
 
 LANGS = {"fr": "français", "en": "anglais", "nl": "néerlandais", "de": "allemand", "es": "espagnol"}
 REWRITE = {
@@ -96,9 +97,9 @@ def local_summary(msg: Message) -> str:
 
 
 def default_replies(lang: str = "fr") -> List[str]:
-    return {"fr": ["Merci, bien reçu !", "D'accord, je regarde ça.", "Pouvez-vous m'en dire plus ?"],
+    return {"fr": [tr("Merci, bien reçu !"), tr("D'accord, je regarde ça."), tr("Pouvez-vous m'en dire plus ?")],
             "en": ["Thanks, received!", "Okay, I'll look into it.", "Could you tell me more?"],
-            }.get(lang, ["Merci, bien reçu !", "D'accord, je regarde ça.", "Pouvez-vous m'en dire plus ?"])
+            }.get(lang, [tr("Merci, bien reçu !"), tr("D'accord, je regarde ça."), tr("Pouvez-vous m'en dire plus ?")])
 
 
 def local_analysis(msg: Message, lang: str = "fr") -> Dict[str, Any]:
@@ -123,7 +124,7 @@ def make_ics(event: Dict[str, str], organizer: str = "") -> str:
     uid = "%d@mintmail" % int(time.time() * 1000)
     lines = ["BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//MintMail//FR", "BEGIN:VEVENT", "UID:" + uid,
              "DTSTAMP:" + datetime.datetime.utcnow().strftime("%Y%m%dT%H%M%SZ"), "DTSTART:" + start,
-             "DTEND:" + end, "SUMMARY:" + esc(event.get("title") or "Rendez-vous")]
+             "DTEND:" + end, "SUMMARY:" + esc(event.get("title") or tr("Rendez-vous"))]
     if event.get("location"):
         lines.append("LOCATION:" + esc(event["location"]))
     lines += ["END:VEVENT", "END:VCALENDAR"]
@@ -142,7 +143,7 @@ def valid_event(e) -> Optional[Dict[str, str]]:
     except ValueError:
         return None
     end = _s(e.get("end"), 20)
-    return {"title": _s(e.get("title"), 120) or "Rendez-vous", "start": start,
+    return {"title": _s(e.get("title"), 120) or tr("Rendez-vous"), "start": start,
             "end": end if re.match(pat, end) else "", "location": _s(e.get("location"), 160)}
 
 
@@ -196,19 +197,19 @@ def validate_plan(obj: Any) -> Dict[str, Any]:
 
 
 def describe_action(a: Dict[str, Any], count: Optional[int] = None) -> str:
-    n = "" if count is None else " (%d message%s)" % (count, "s" if count > 1 else "")
+    n = "" if count is None else tr(" (%d message%s)") % (count, "s" if count > 1 else "")
     t = a["type"]
-    labels = {"search": "Rechercher « %s »" % a.get("query", ""), "archive": "Archiver" + n, "trash": "Supprimer" + n,
-              "spam": "Signaler comme spam" + n, "mark_read": "Marquer comme lu" + n,
-              "mark_unread": "Marquer comme non lu" + n, "star": "Ajouter aux favoris" + n,
-              "pin": "Épingler" + n, "move": "Déplacer vers « %s »%s" % (a.get("folder", ""), n), "snooze": "Reporter (%s)%s" % (a.get("until", "demain"), n),
-              "block_sender": "Bloquer %s" % (a.get("email") or "l'expéditeur sélectionné"),
-              "spam_sender": "Mettre %s en spam" % (a.get("email") or "l'expéditeur sélectionné"),
-              "compose": "Rédiger un message à %s" % (a.get("to") or "…"),
-              "create_rule": "Créer la règle : %s contient « %s » → %s" % (a.get("field"), a.get("text"), (a.get("action") or "") + ((" « %s »" % a["folder"]) if a.get("folder") else "")),
-              "create_folder": "Créer le dossier « %s »%s" % (a.get("name", ""), (" dans « %s »" % a["parent"]) if a.get("parent") else ""),
-              "classify": "Classer les messages avec l'IA (proposition à valider)" + n,
-              "open_settings": "Ouvrir les paramètres (%s)" % a.get("page"), "digest": "Résumer ma boîte"}
+    labels = {"search": tr("Rechercher « %s »") % a.get("query", ""), "archive": tr("Archiver") + n, "trash": tr("Supprimer") + n,
+              "spam": tr("Signaler comme spam") + n, "mark_read": tr("Marquer comme lu") + n,
+              "mark_unread": tr("Marquer comme non lu") + n, "star": tr("Ajouter aux favoris") + n,
+              "pin": tr("Épingler") + n, "move": tr("Déplacer vers « %s »%s") % (a.get("folder", ""), n), "snooze": tr("Reporter (%s)%s") % (a.get("until", "demain"), n),
+              "block_sender": "Bloquer %s" % (a.get("email") or tr("l'expéditeur sélectionné")),
+              "spam_sender": "Mettre %s en spam" % (a.get("email") or tr("l'expéditeur sélectionné")),
+              "compose": tr("Rédiger un message à %s") % (a.get("to") or "…"),
+              "create_rule": tr("Créer la règle : %s contient « %s » → %s") % (a.get("field"), a.get("text"), (a.get("action") or "") + ((" « %s »" % a["folder"]) if a.get("folder") else "")),
+              "create_folder": tr("Créer le dossier « %s »%s") % (a.get("name", ""), (tr(" dans « %s »") % a["parent"]) if a.get("parent") else ""),
+              "classify": tr("Classer les messages avec l'IA (proposition à valider)") + n,
+              "open_settings": tr("Ouvrir les paramètres (%s)") % a.get("page"), "digest": tr("Résumer ma boîte")}
     return labels.get(t, t)
 
 
@@ -251,13 +252,13 @@ class AIEngine:
     def _ask_json(self, prompt: str, max_tokens: int = 500) -> Any:
         svc = self.service()
         if not svc:
-            raise AIServiceError("IA non configurée.")
+            raise AIServiceError(tr("IA non configurée."))
         return parse_json(svc.call([{"role": "user", "content": prompt}], max_tokens=max_tokens, temperature=0.2))
 
     def _ask_text(self, prompt: str, max_tokens: int = 500, temperature: float = 0.5) -> str:
         svc = self.service()
         if not svc:
-            raise AIServiceError("IA non configurée.")
+            raise AIServiceError(tr("IA non configurée."))
         return svc.call([{"role": "user", "content": prompt}], max_tokens=max_tokens, temperature=temperature)
 
     def _msg_block(self, msg: Message, limit: Optional[int] = None) -> str:
@@ -346,7 +347,7 @@ class AIEngine:
             "is:unread, is:starred, has:attachment. Réponds uniquement par {\"query\": \"...\"}.\nDemande : %s" % text[:300], 80)
         q = _s(raw.get("query") if isinstance(raw, dict) else "", 200)
         if not q:
-            raise AIServiceError("Je n'ai pas compris cette recherche.")
+            raise AIServiceError(tr("Je n'ai pas compris cette recherche."))
         return q
 
     def classify(self, msgs: List[Message], existing: List[str], max_new: int = 6, chunk: int = 25, limit: int = 100,
@@ -465,7 +466,7 @@ class AIEngine:
         if hit and hit.get("key") == key and not force:
             return hit["text"]
         if not self.service():
-            raise AIServiceError("IA non configurée.")
+            raise AIServiceError(tr("IA non configurée."))
         items = "\n".join("- %s | %s | %s" % (m.sender_name or m.sender_email, m.subject[:90],
                                               re.sub(r"\s+", " ", m.snippet or "")[:90]) for m in msgs[:25])
         text = self._ask_text("Fais un point rapide (4 lignes maximum, en %s, tutoiement non) sur ces e-mails non lus : "
@@ -478,7 +479,7 @@ class AIEngine:
     def local_digest(counts: Dict[str, int], msgs: List[Message]) -> str:
         urgent = sum(1 for m in msgs if local_priority(m) == 3)
         news = sum(1 for m in msgs if m.category == "news")
-        return "%d non lu(s) — %d à traiter en priorité, %d newsletter(s). Activez l'IA pour un vrai résumé." % (
+        return tr("%d non lu(s) — %d à traiter en priorité, %d newsletter(s). Activez l'IA pour un vrai résumé.") % (
             len(msgs), urgent, news)
 
     # -- assistant (agent à actions validées)
@@ -499,7 +500,7 @@ class AIEngine:
         msgs.append({"role": "user", "content": "Contexte :\n%s\n\nDemande : %s" % (context[:3500], text[:600])})
         svc = self.service()
         if not svc:
-            raise AIServiceError("IA non configurée.")
+            raise AIServiceError(tr("IA non configurée."))
         raw = svc.call(msgs, max_tokens=500, temperature=0.2)
         try:
             return validate_plan(parse_json(raw))

@@ -50,7 +50,7 @@ def test_every_command_line_option_is_documented():
 
 
 def test_every_settings_page_is_described():
-    pages = re.findall(r'add_titled\([^\n]*?"(\w+)", "([^"]+)"\)', src("settings.py"))
+    pages = re.findall(r'add_titled\([^\n]*?"(\w+)", (?:tr\()?"([^"]+)"\)', src("settings.py"))
     assert len(pages) >= 12
     text = H.full_text(CTX).lower()
     for ident, title in pages:

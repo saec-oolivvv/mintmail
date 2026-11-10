@@ -7,6 +7,7 @@ import time
 import uuid
 
 import gi
+from .i18n import tr
 gi.require_version("Gtk", "3.0")
 from gi.repository import Gdk, Gio, Gtk, GLib
 
@@ -124,7 +125,7 @@ class ComposeWindow(Gtk.Window):
     def __init__(self, win, accounts, account_id=None, to="", cc="", subject="", body_html="",
                  quote_html="", in_reply_to="", references="", attachments=None, draft_id=None, raw=False,
                  ai_suggested_text=""):
-        super().__init__(title="Nouveau message")
+        super().__init__(title=tr("Nouveau message"))
         self.win, self.accounts = win, accounts
         self.in_reply_to, self.references = in_reply_to, references
         self.draft_id, self.attachments = draft_id, list(attachments or [])
@@ -137,19 +138,19 @@ class ComposeWindow(Gtk.Window):
         hb = Gtk.HeaderBar()
         hb.set_show_close_button(True)
         hb.set_decoration_layout(":minimize,maximize,close")
-        hb.set_title("Nouveau message")
+        hb.set_title(tr("Nouveau message"))
         self.set_titlebar(hb)
-        self.send_btn = Gtk.Button(label="Envoyer")
+        self.send_btn = Gtk.Button(label=tr("Envoyer"))
         self.send_btn.get_style_context().add_class("suggested-action")
         self.send_btn.connect("clicked", lambda *_: self.do_send(0))
         later = Gtk.MenuButton()
         later.set_image(icon("pan-down-symbolic"))
-        later.set_tooltip_text("Envoyer plus tard")
+        later.set_tooltip_text(tr("Envoyer plus tard"))
         menu = Gtk.Menu()
-        for label, fn in (("Dans 1 heure", lambda: time.time() + 3600),
-                          ("Demain à 8 h", lambda: self._at(1, 8)),
-                          ("Lundi prochain à 8 h", self._next_monday),
-                          ("Choisir une date…", None)):
+        for label, fn in ((tr("Dans 1 heure"), lambda: time.time() + 3600),
+                          (tr("Demain à 8 h"), lambda: self._at(1, 8)),
+                          (tr("Lundi prochain à 8 h"), self._next_monday),
+                          (tr("Choisir une date…"), None)):
             it = Gtk.MenuItem(label=label)
             it.connect("activate", lambda _i, f=fn: self._schedule(f))
             menu.append(it)
@@ -160,10 +161,10 @@ class ComposeWindow(Gtk.Window):
         box.pack_start(self.send_btn, False, False, 0)
         box.pack_start(later, False, False, 0)
         hb.pack_end(box)
-        att = icon_button("mail-attachment-symbolic", "Joindre un fichier")
+        att = icon_button("mail-attachment-symbolic", tr("Joindre un fichier"))
         att.connect("clicked", self._attach)
         hb.pack_end(att)
-        disc = icon_button("user-trash-symbolic", "Supprimer le brouillon")
+        disc = icon_button("user-trash-symbolic", tr("Supprimer le brouillon"))
         disc.connect("clicked", lambda *_: self._discard())
         hb.pack_start(disc)
 
@@ -185,16 +186,16 @@ class ComposeWindow(Gtk.Window):
         self.bcc = Gtk.Entry()
         self.subject = Gtk.Entry(text=subject)
         self.subject.set_icon_from_icon_name(Gtk.EntryIconPosition.SECONDARY, "starred-symbolic")
-        self.subject.set_icon_tooltip_text(Gtk.EntryIconPosition.SECONDARY, "✨ Suggérer un objet")
+        self.subject.set_icon_tooltip_text(Gtk.EntryIconPosition.SECONDARY, tr("✨ Suggérer un objet"))
         self.subject.connect("icon-press", self._ai_subject_icon)
         self._attach_completion(self.to)
         self._attach_completion(self.cc)
         self._attach_completion(self.bcc)
-        self.cc_btn = Gtk.Button(label="Cc / Cci")
+        self.cc_btn = Gtk.Button(label=tr("Cc / Cci"))
         self.cc_btn.set_relief(Gtk.ReliefStyle.NONE)
         self.cc_btn.connect("clicked", self._show_cc)
-        rows = [("De", self.from_combo, None), ("À", self.to, self.cc_btn), ("Cc", self.cc, None),
-                ("Cci", self.bcc, None), ("Objet", self.subject, None)]
+        rows = [(tr("De"), self.from_combo, None), ("À", self.to, self.cc_btn), ("Cc", self.cc, None),
+                (tr("Cci"), self.bcc, None), (tr("Objet"), self.subject, None)]
         self.row_widgets = {}
         for i, (lab, w, extra) in enumerate(rows):
             l = Gtk.Label(label=lab, xalign=1)
@@ -210,21 +211,21 @@ class ComposeWindow(Gtk.Window):
         fmt = Gtk.Box(spacing=2)
         fmt.get_style_context().add_class("mm-toolbar")
         for name, tip, cmd, val in (
-                ("format-text-bold-symbolic", "Gras", "bold", None),
-                ("format-text-italic-symbolic", "Italique", "italic", None),
-                ("format-text-underline-symbolic", "Souligné", "underline", None),
-                ("format-text-strikethrough-symbolic", "Barré", "strikeThrough", None),
-                ("view-list-symbolic", "Liste à puces", "insertUnorderedList", None),
-                ("view-list-ordered-symbolic", "Liste numérotée", "insertOrderedList", None),
-                ("format-indent-more-symbolic", "Citation", "formatBlock", "blockquote"),
-                ("edit-clear-all-symbolic", "Effacer la mise en forme", "removeFormat", None)):
+                ("format-text-bold-symbolic", tr("Gras"), "bold", None),
+                ("format-text-italic-symbolic", tr("Italique"), "italic", None),
+                ("format-text-underline-symbolic", tr("Souligné"), "underline", None),
+                ("format-text-strikethrough-symbolic", tr("Barré"), "strikeThrough", None),
+                ("view-list-symbolic", tr("Liste à puces"), "insertUnorderedList", None),
+                ("view-list-ordered-symbolic", tr("Liste numérotée"), "insertOrderedList", None),
+                ("format-indent-more-symbolic", tr("Citation"), "formatBlock", "blockquote"),
+                ("edit-clear-all-symbolic", tr("Effacer la mise en forme"), "removeFormat", None)):
             b = icon_button(name, tip, relief=False)
             b.connect("clicked", lambda _b, c=cmd, v=val: self.editor.exec(c, v))
             fmt.pack_start(b, False, False, 0)
-        link = icon_button("insert-link-symbolic", "Insérer un lien", relief=False)
+        link = icon_button("insert-link-symbolic", tr("Insérer un lien"), relief=False)
         link.connect("clicked", self._link)
         fmt.pack_start(link, False, False, 0)
-        tpl = Gtk.MenuButton(label="Modèles")
+        tpl = Gtk.MenuButton(label=tr("Modèles"))
         tpl.set_relief(Gtk.ReliefStyle.NONE)
         tmenu = Gtk.Menu()
         for t in self.win.config["templates"]:
@@ -232,25 +233,25 @@ class ComposeWindow(Gtk.Window):
             it.connect("activate", lambda _i, h=t["html"]: self.editor.exec("insertHTML", sanitize_html(h)))
             tmenu.append(it)
         if not self.win.config["templates"]:
-            empty = Gtk.MenuItem(label="Aucun modèle (voir Paramètres)")
+            empty = Gtk.MenuItem(label=tr("Aucun modèle (voir Paramètres)"))
             empty.set_sensitive(False)
             tmenu.append(empty)
         tmenu.show_all()
         tpl.set_popup(tmenu)
         fmt.pack_start(tpl, False, False, 8)
         # Bouton IA pour aide à la rédaction
-        self.ai_btn = Gtk.MenuButton(label="✨ IA")
+        self.ai_btn = Gtk.MenuButton(label=tr("✨ IA"))
         self.ai_btn.get_style_context().add_class("ai-btn")
         self.ai_btn.set_no_show_all(True)
         aim = Gtk.Menu()
-        for entry in (("Rédiger à partir d'une idée…", "write"), None,
-                      ("Améliorer le texte", "improve"), ("Corriger l'orthographe", "fix"),
-                      ("Raccourcir", "shorten"), ("Développer", "expand"),
-                      ("Ton plus formel", "formal"), ("Ton plus amical", "friendly"), None,
-                      ("Traduire en français", "translate:fr"), ("Traduire en anglais", "translate:en"),
-                      ("Traduire en néerlandais", "translate:nl"), ("Traduire en allemand", "translate:de"),
-                      ("Traduire en espagnol", "translate:es"), None,
-                      ("Suggérer un objet", "subject")):
+        for entry in ((tr("Rédiger à partir d'une idée…"), "write"), None,
+                      (tr("Améliorer le texte"), "improve"), (tr("Corriger l'orthographe"), "fix"),
+                      (tr("Raccourcir"), "shorten"), (tr("Développer"), "expand"),
+                      (tr("Ton plus formel"), "formal"), (tr("Ton plus amical"), "friendly"), None,
+                      (tr("Traduire en français"), "translate:fr"), (tr("Traduire en anglais"), "translate:en"),
+                      (tr("Traduire en néerlandais"), "translate:nl"), (tr("Traduire en allemand"), "translate:de"),
+                      (tr("Traduire en espagnol"), "translate:es"), None,
+                      (tr("Suggérer un objet"), "subject")):
             if entry is None:
                 aim.append(Gtk.SeparatorMenuItem())
                 continue
@@ -286,7 +287,7 @@ class ComposeWindow(Gtk.Window):
         self.add(root)
         self.connect("delete-event", self._on_delete)
         self.show_all()
-        for lab in ("Cc", "Cci"):
+        for lab in ("Cc", tr("Cci")):
             if lab == "Cc" and cc:
                 continue
             for w in self.row_widgets[lab]:
@@ -361,7 +362,7 @@ class ComposeWindow(Gtk.Window):
         entry.set_completion(comp)
 
     def _show_cc(self, btn):
-        for lab in ("Cc", "Cci"):
+        for lab in ("Cc", tr("Cci")):
             for w in self.row_widgets[lab]:
                 w.show()
         btn.hide()
@@ -375,7 +376,7 @@ class ComposeWindow(Gtk.Window):
         """Opérations IA du composeur : rédiger, améliorer, corriger, raccourcir, traduire, objet…"""
         eng = self.win.engine
         if not eng.enabled():
-            self.win.toast.popup("IA non configurée : Paramètres → IA.", timeout=4)
+            self.win.toast.popup(tr("IA non configurée : Paramètres → IA."), timeout=4)
             self.win.show_settings("ai")
             return
         subject, to = self.subject.get_text().strip(), self.to.get_text().strip()
@@ -383,12 +384,12 @@ class ComposeWindow(Gtk.Window):
         def finish(text, err, apply):
             self._ai_busy(False)
             if err:
-                self.win.toast.popup("Erreur IA : %s" % str(err)[:90], timeout=6)
+                self.win.toast.popup(tr("Erreur IA : %s") % str(err)[:90], timeout=6)
             elif text:
                 apply(text)
-                self.win.toast.popup("✨ Fait. Relisez avant d'envoyer.", timeout=3)
+                self.win.toast.popup(tr("✨ Fait. Relisez avant d'envoyer."), timeout=3)
             else:
-                self.win.toast.popup("L'IA n'a rien renvoyé.", timeout=3)
+                self.win.toast.popup(tr("L'IA n'a rien renvoyé."), timeout=3)
 
         if op == "write":
             idea = self._ask_idea()
@@ -408,7 +409,7 @@ class ComposeWindow(Gtk.Window):
         def got(text, selection):
             if not text.strip():
                 self._ai_busy(False)
-                self.win.toast.popup("Écrivez d'abord un peu de texte.", timeout=3)
+                self.win.toast.popup(tr("Écrivez d'abord un peu de texte."), timeout=3)
                 return
             if op == "subject":
                 self.win.run_bg(lambda: eng.subject_for(text),
@@ -420,8 +421,8 @@ class ComposeWindow(Gtk.Window):
         self.editor.get_user_text(got)
 
     def _ask_idea(self):
-        d = Gtk.Dialog(title="✨ Rédiger avec l'IA", transient_for=self, modal=True)
-        d.add_buttons("Annuler", Gtk.ResponseType.CANCEL, "Rédiger", Gtk.ResponseType.OK)
+        d = Gtk.Dialog(title=tr("✨ Rédiger avec l'IA"), transient_for=self, modal=True)
+        d.add_buttons(tr("Annuler"), Gtk.ResponseType.CANCEL, tr("Rédiger"), Gtk.ResponseType.OK)
         d.set_default_size(460, 200)
         tv = Gtk.TextView()
         tv.set_wrap_mode(Gtk.WrapMode.WORD_CHAR)
@@ -432,7 +433,7 @@ class ComposeWindow(Gtk.Window):
         box = d.get_content_area()
         box.set_spacing(8)
         box.set_border_width(12)
-        box.pack_start(Gtk.Label(label="Que voulez-vous dire ? (quelques mots suffisent)", xalign=0), False, False, 0)
+        box.pack_start(Gtk.Label(label=tr("Que voulez-vous dire ? (quelques mots suffisent)"), xalign=0), False, False, 0)
         box.pack_start(sw, True, True, 0)
         d.show_all()
         ok = d.run() == Gtk.ResponseType.OK
@@ -446,9 +447,9 @@ class ComposeWindow(Gtk.Window):
 
     # -- pièces jointes
     def _attach(self, *_):
-        dlg = Gtk.FileChooserDialog(title="Joindre des fichiers", parent=self,
+        dlg = Gtk.FileChooserDialog(title=tr("Joindre des fichiers"), parent=self,
                                     action=Gtk.FileChooserAction.OPEN)
-        dlg.add_buttons("Annuler", Gtk.ResponseType.CANCEL, "Joindre", Gtk.ResponseType.OK)
+        dlg.add_buttons(tr("Annuler"), Gtk.ResponseType.CANCEL, tr("Joindre"), Gtk.ResponseType.OK)
         dlg.set_select_multiple(True)
         if dlg.run() == Gtk.ResponseType.OK:
             self.attachments += [f for f in dlg.get_filenames() if f not in self.attachments]
@@ -480,7 +481,7 @@ class ComposeWindow(Gtk.Window):
             big = total > 20 * 1024 * 1024
             self.att_total.set_markup("<span foreground='%s'>%d fichier(s) · %s%s</span>" % (
                 "#dc2626" if big else "#888888", len(self.attachments), human_size(total),
-                " — attention : la plupart des serveurs refusent plus de 20-25 Mo" if big else ""))
+                tr(" — attention : la plupart des serveurs refusent plus de 20-25 Mo") if big else ""))
             self.att_total.show()
         else:
             self.att_total.hide()
@@ -503,8 +504,8 @@ class ComposeWindow(Gtk.Window):
         self.att_flow.show_all()
 
     def _link(self, *_):
-        dlg = Gtk.Dialog(title="Insérer un lien", transient_for=self, modal=True)
-        dlg.add_buttons("Annuler", Gtk.ResponseType.CANCEL, "Insérer", Gtk.ResponseType.OK)
+        dlg = Gtk.Dialog(title=tr("Insérer un lien"), transient_for=self, modal=True)
+        dlg.add_buttons(tr("Annuler"), Gtk.ResponseType.CANCEL, tr("Insérer"), Gtk.ResponseType.OK)
         e = Gtk.Entry(text="https://")
         e.set_activates_default(True)
         dlg.get_content_area().pack_start(e, True, True, 12)
@@ -515,7 +516,7 @@ class ComposeWindow(Gtk.Window):
             if clean_url(url, "link", False):
                 self.editor.exec("createLink", url)
             else:
-                self.win.toast.popup("Lien refusé : seuls http, https, mailto et tel sont acceptés.", timeout=5)
+                self.win.toast.popup(tr("Lien refusé : seuls http, https, mailto et tel sont acceptés."), timeout=5)
         dlg.destroy()
 
     # -- envoi
@@ -530,8 +531,8 @@ class ComposeWindow(Gtk.Window):
 
     def _schedule(self, fn):
         if fn is None:
-            dlg = Gtk.Dialog(title="Envoyer plus tard", transient_for=self, modal=True)
-            dlg.add_buttons("Annuler", Gtk.ResponseType.CANCEL, "Planifier", Gtk.ResponseType.OK)
+            dlg = Gtk.Dialog(title=tr("Envoyer plus tard"), transient_for=self, modal=True)
+            dlg.add_buttons(tr("Annuler"), Gtk.ResponseType.CANCEL, tr("Planifier"), Gtk.ResponseType.OK)
             cal = Gtk.Calendar()
             hour = Gtk.SpinButton.new_with_range(0, 23, 1)
             hour.set_value(9)
@@ -539,7 +540,7 @@ class ComposeWindow(Gtk.Window):
             box.set_spacing(8)
             box.pack_start(cal, False, False, 0)
             row = Gtk.Box(spacing=6)
-            row.pack_start(Gtk.Label(label="Heure :"), False, False, 0)
+            row.pack_start(Gtk.Label(label=tr("Heure :")), False, False, 0)
             row.pack_start(hour, False, False, 0)
             box.pack_start(row, False, False, 0)
             dlg.show_all()
@@ -565,15 +566,15 @@ class ComposeWindow(Gtk.Window):
         if not self._valid():
             d = Gtk.MessageDialog(transient_for=self, modal=True, message_type=Gtk.MessageType.WARNING,
                                   buttons=Gtk.ButtonsType.OK,
-                                  text="Adresse de destinataire manquante ou invalide.")
+                                  text=tr("Adresse de destinataire manquante ou invalide."))
             d.run()
             d.destroy()
             self.to.grab_focus()
             return
         if not self.subject.get_text().strip():
             d = Gtk.MessageDialog(transient_for=self, modal=True, message_type=Gtk.MessageType.QUESTION,
-                                  text="Envoyer ce message sans objet ?")
-            d.add_buttons("Annuler", Gtk.ResponseType.CANCEL, "Envoyer", Gtk.ResponseType.OK)
+                                  text=tr("Envoyer ce message sans objet ?"))
+            d.add_buttons(tr("Annuler"), Gtk.ResponseType.CANCEL, tr("Envoyer"), Gtk.ResponseType.OK)
             ok = d.run() == Gtk.ResponseType.OK
             d.destroy()
             if not ok:
@@ -614,9 +615,9 @@ class ComposeWindow(Gtk.Window):
                 self.destroy()
                 return
             d = Gtk.MessageDialog(transient_for=self, modal=True, message_type=Gtk.MessageType.QUESTION,
-                                  text="Enregistrer ce message comme brouillon ?")
-            d.add_buttons("Supprimer", Gtk.ResponseType.REJECT, "Continuer l'écriture", Gtk.ResponseType.CANCEL,
-                          "Enregistrer", Gtk.ResponseType.OK)
+                                  text=tr("Enregistrer ce message comme brouillon ?"))
+            d.add_buttons(tr("Supprimer"), Gtk.ResponseType.REJECT, tr("Continuer l'écriture"), Gtk.ResponseType.CANCEL,
+                          tr("Enregistrer"), Gtk.ResponseType.OK)
             r = d.run()
             d.destroy()
             if r == Gtk.ResponseType.OK:

@@ -16,6 +16,7 @@ from typing import Any, Dict, Optional, Tuple
 
 from .ai_service import is_local_endpoint
 from .store import DEFAULTS
+from .i18n import tr
 
 ACCOUNT_FIELDS = ("id", "name", "email", "username", "imap_host", "imap_port", "imap_ssl", "smtp_host", "smtp_port",
                   "signature_html", "has_password", "auth", "oauth_provider")
@@ -344,6 +345,6 @@ def _apply_list_item(config, kind, rest, v, deleted, cache=None):
 
 
 def describe(res: dict) -> str:
-    names = {"acct": "compte(s)", "set": "réglage(s)", "secret": "clé IA", "rule": "règle(s)", "blocked": "blocage(s)",
-             "spam": "expéditeur(s) en spam", "search": "recherche(s)", "tpl": "modèle(s)", "ident": "identité(s)", "contact": "contact(s)", "task": "tâche(s)"}
-    return ", ".join("%d %s" % (n, names.get(k, k)) for k, n in res.get("kinds", {}).items()) or "à jour"
+    names = {"acct": tr("compte(s)"), "set": tr("réglage(s)"), "secret": tr("clé IA"), "rule": tr("règle(s)"), "blocked": tr("blocage(s)"),
+             "spam": tr("expéditeur(s) en spam"), "search": tr("recherche(s)"), "tpl": tr("modèle(s)"), "ident": tr("identité(s)"), "contact": tr("contact(s)"), "task": tr("tâche(s)")}
+    return ", ".join("%d %s" % (n, names.get(k, k)) for k, n in res.get("kinds", {}).items()) or tr("à jour")

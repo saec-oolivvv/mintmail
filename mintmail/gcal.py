@@ -11,10 +11,11 @@ import urllib.error
 import urllib.parse
 import urllib.request
 from typing import Dict, List, Optional, Tuple
+from .i18n import tr
 
 API = "https://www.googleapis.com/calendar/v3"
 SCOPE = "https://www.googleapis.com/auth/calendar.events"
-NEED_SCOPE = "autorisation de l'agenda manquante : Paramètres → Agenda → « Autoriser Google Agenda »"
+NEED_SCOPE = tr("autorisation de l'agenda manquante : Paramètres → Agenda → « Autoriser Google Agenda »")
 
 
 def _allowed(base: str) -> bool:
@@ -29,7 +30,7 @@ def _allowed(base: str) -> bool:
 
 def _call(method: str, url: str, token: str, body: Optional[dict] = None, timeout: float = 20.0) -> Tuple[int, dict]:
     if not _allowed(url):
-        return 0, {"error": {"message": "HTTPS obligatoire"}}
+        return 0, {"error": {"message": tr("HTTPS obligatoire")}}
     data = json.dumps(body).encode("utf-8") if body is not None else None
     req = urllib.request.Request(url, data=data, method=method, headers={
         "Authorization": "Bearer " + token, "Content-Type": "application/json", "Accept": "application/json", "User-Agent": "MintMail"})
@@ -51,12 +52,12 @@ def _explain(code: int, body: dict) -> str:
     if code in (401, 403):
         if "scope" in msg.lower() or "insufficient" in msg.lower() or code == 403:
             return NEED_SCOPE if "not been used" not in msg and "disabled" not in msg.lower() else \
-                "l'API Google Calendar n'est pas activée dans votre projet Google Cloud (API et services → Bibliothèque → Google Calendar API → Activer)"
-        return "jeton refusé : reconnectez le compte (Paramètres → Comptes)"
+                tr("l'API Google Calendar n'est pas activée dans votre projet Google Cloud (API et services → Bibliothèque → Google Calendar API → Activer)")
+        return tr("jeton refusé : reconnectez le compte (Paramètres → Comptes)")
     if code == 404:
-        return "agenda introuvable"
+        return tr("agenda introuvable")
     if code == 0:
-        return msg or "connexion impossible"
+        return msg or tr("connexion impossible")
     return "HTTP %d %s" % (code, msg[:80])
 
 
@@ -71,7 +72,7 @@ def to_google_event(ev: Dict, uid: str = "") -> Dict:
     end = _local_dt(ev["end"]) if ev.get("end") else start + datetime.timedelta(hours=1)
     if end <= start:
         end = start + datetime.timedelta(hours=1)
-    out = {"summary": (ev.get("title") or "Rendez-vous")[:200],
+    out = {"summary": (ev.get("title") or tr("Rendez-vous"))[:200],
            "start": {"dateTime": start.isoformat()}, "end": {"dateTime": end.isoformat()},
            "source": {"title": "MintMail", "url": "https://saec.me"}}
     if ev.get("location"):
@@ -87,9 +88,9 @@ def insert_event(token: str, ev: Dict, uid: str = "", calendar: str = "primary",
     base = base or API
     code, body = _call("POST", "%s/calendars/%s/events" % (base, urllib.parse.quote(calendar)), token, to_google_event(ev, uid))
     if code in (200, 201):
-        return True, "ajouté"
+        return True, tr("ajouté")
     if code == 409:
-        return True, "déjà dans votre agenda"
+        return True, tr("déjà dans votre agenda")
     return False, _explain(code, body)
 
 
@@ -105,7 +106,7 @@ def parse_item(item: Dict) -> Optional[Dict]:
             start = datetime.datetime.fromisoformat(s["date"])
             end = datetime.datetime.fromisoformat(e["date"])
             allday = True
-        return {"title": item.get("summary") or "(sans titre)", "start": start, "end": end, "all_day": allday,
+        return {"title": item.get("summary") or tr("(sans titre)"), "start": start, "end": end, "all_day": allday,
                 "location": item.get("location", ""), "status": item.get("status", "confirmed"),
                 "busy": item.get("transparency", "opaque") != "transparent"}     # « disponible » : ne bloque pas un créneau
     except (KeyError, ValueError, TypeError):

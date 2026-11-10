@@ -8,6 +8,7 @@ import sys
 import traceback
 
 HERE = os.path.dirname(os.path.abspath(__file__))
+os.environ["MINTMAIL_LANG"] = os.environ.get("MINTMAIL_TEST_LANG", "fr")   # les tests attendent le français ; les tests anglais fixent leur propre langue
 sys.path.insert(0, HERE)
 sys.path.insert(0, os.path.dirname(HERE))
 ok = bad = skipped = 0

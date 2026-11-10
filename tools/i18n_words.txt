@@ -1,0 +1,174 @@
+Accepter
+Refuser poliment
+Demander plus d'informations
+Ton formel
+Ton amical
+Traduction…
+Traduction
+Cci
+De
+Objet
+Gras
+Italique
+Citation
+Corriger l'orthographe
+Raccourcir
+Ton plus formel
+Ton plus amical
+Traduire en anglais
+Traduire en allemand
+Traduire en espagnol
+Titre
+Date (AAAA-MM-JJ)
+Heure (HH:MM)
+Lieu
+Conversation
+Archives
+Corbeille
+Recherches
+Recherche
+Renommer…
+HTTPS obligatoire
+Signaler comme spam
+En spam :
+Signaler comme spam (!)
+Mettre son domaine en spam
+Bloquer son domaine
+Copier son adresse
+Texte plus grand
+Texte plus petit
+Taille normale
+Refuser
+Fichier potentiellement dangereux
+Palette de commandes
+Menu Bloquer (adresse / domaine)
+Basculer colonnes / liste seule
+Assistant IA
+Fournisseur
+Adresse e-mail invalide.
+Clair
+Sombre
+Compacte
+Confortable
+Test en cours…
+Adresse e-mail
+Identifiant
+Mode
+Couleur d'accent
+Notifications de bureau
+Formel
+Amical
+L'objet contient
+Mettre en spam
+Marquer comme lu
+Synchronisation entre machines
+Sans titre
+Synchronisation inactive (code de jumelage requis)
+Test…
+Nom
+Notes
+Adresse (alias)
+Indigo
+Cyan
+Menthe
+Vert
+Orange
+Rose
+Terracotta
+Phosphore
+Plus ancien
+Hier
+Aujourd'hui
+Ko
+Mo
+Go
+Favoris
+Personnes
+Notifications
+Newsletters
+Aujourd'hui (T)
+Basculer clair / sombre
+Journal d'erreurs
+Lu
+Demain 8 h
+Semaine prochaine (lundi 8 h)
+Synchro :
+Copier l'adresse
+Contacts
+Agenda
+Aide
+Langue
+Style visuel
+Style
+Autre (manuel)
+Langue de l'IA
+Aide — %s %s
+Utiliser Google Agenda
+Aide (F1)
+Contacts…
+Agenda : %s
+Google Agenda : %s
+Google Agenda : %s ✔
+Agenda CalDAV : %s
+agenda introuvable
+Assistant IA (Ctrl+J)
+✨ Recherche : « %s »
+Vue actuelle : %s
+✨ Suggestion : « %s »%s
+Recherche : %s
+(IA : %s)
+lanceur local
+application locale
+MintMail %s — options :
+J'ai %s l'invitation.
+Aujourd'hui — %s
+· %d tentative(s)
+(sans titre)
+Marquer comme %s
+Copier l'adresse %s
+Mettre %s en spam
+Bloquer %s
+30 minutes
+1 heure
+1 h 30
+· peu important
+IA indisponible : %s
+# / Suppr
+? … (recherche)
+… jusqu'au bout (droite)
+… jusqu'au bout (gauche)
+machine injoignable
+Autorisation : %s
+Terminal — phosphore
+Palette de commandes (Ctrl+K)
+Plus tard aujourd'hui (+3 h)
+janvier
+mars
+avril
+mai
+juin
+juillet
+septembre
+octobre
+novembre
+janv.
+avr.
+juil.
+sept.
+oct.
+nov.
+lundi
+mardi
+mercredi
+jeudi
+vendredi
+samedi
+dimanche
+Langue de l'interface
+Ctrl+Maj+,
+Port IMAP
+Port SMTP
+Endpoint API
+Droits administrateur requis.
+jamais
+Installer MintMail %s ?

@@ -3,6 +3,7 @@ import re
 import threading
 
 import gi
+from .i18n import tr
 gi.require_version("Gtk", "3.0")
 gi.require_version("Gdk", "3.0")
 from gi.repository import Gtk, Gdk, GObject, Gio, GLib, Pango
@@ -21,7 +22,7 @@ from .util import (attachment_kind, attachment_risk, save_attachments, format_fu
                    text_to_html, split_addresses)
 from .widgets import Avatar, icon, icon_button
 
-QUICK_REPLIES = ["Merci !", "OK, bien reçu 👍", "Je regarde ça et je reviens vers vous.", "Parfait, à bientôt."]
+QUICK_REPLIES = [tr("Merci !"), tr("OK, bien reçu 👍"), tr("Je regarde ça et je reviens vers vous."), tr("Parfait, à bientôt.")]
 
 
 def open_uri(widget, uri):
@@ -171,7 +172,7 @@ class Reader(Gtk.Stack):
         img = icon("mail-read-symbolic", Gtk.IconSize.DIALOG)
         img.set_pixel_size(72)
         img.get_style_context().add_class("empty-state")
-        self.empty_label = Gtk.Label(label="Sélectionnez un message pour le lire")
+        self.empty_label = Gtk.Label(label=tr("Sélectionnez un message pour le lire"))
         self.empty_label.get_style_context().add_class("empty-state")
         empty.pack_start(img, False, False, 0)
         empty.pack_start(self.empty_label, False, False, 0)
@@ -183,7 +184,7 @@ class Reader(Gtk.Stack):
         self.multi_label = Gtk.Label()
         self.multi_label.get_style_context().add_class("subject-big")
         multi.pack_start(self.multi_label, False, False, 0)
-        hint = Gtk.Label(label="Utilisez la barre d'actions pour archiver, supprimer ou marquer ces messages.")
+        hint = Gtk.Label(label=tr("Utilisez la barre d'actions pour archiver, supprimer ou marquer ces messages."))
         hint.get_style_context().add_class("dim")
         multi.pack_start(hint, False, False, 0)
         self.add_named(multi, "multi")
@@ -192,54 +193,54 @@ class Reader(Gtk.Stack):
         page = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
         tb = Gtk.Box(spacing=4)
         tb.get_style_context().add_class("mm-toolbar")
-        self.back_btn = icon_button("go-previous-symbolic", "Retour à la liste", relief=False)
+        self.back_btn = icon_button("go-previous-symbolic", tr("Retour à la liste"), relief=False)
         self.back_btn.connect("clicked", lambda *_: self.emit("action", "back"))
         self.back_btn.set_no_show_all(True)
         tb.pack_start(self.back_btn, False, False, 0)
-        for name, tip, act in (("mail-reply-sender-symbolic", "Répondre (R)", "reply"),
-                               ("mail-reply-all-symbolic", "Répondre à tous (A)", "reply_all"),
-                               ("mail-forward-symbolic", "Transférer (F)", "forward")):
+        for name, tip, act in (("mail-reply-sender-symbolic", tr("Répondre (R)"), "reply"),
+                               ("mail-reply-all-symbolic", tr("Répondre à tous (A)"), "reply_all"),
+                               ("mail-forward-symbolic", tr("Transférer (F)"), "forward")):
             b = icon_button(name, tip, relief=False)
             b.connect("clicked", lambda _b, a=act: self.emit("action", a))
             if act != "reply":
                 self.secondary.append(b)
             tb.pack_start(b, False, False, 0)
         # Bouton IA NVIDIA
-        self.ai_reply_btn = Gtk.Button(label="✨ Répondre")
-        self.ai_reply_btn.set_tooltip_text("Rédiger une réponse avec l'IA")
+        self.ai_reply_btn = Gtk.Button(label=tr("✨ Répondre"))
+        self.ai_reply_btn.set_tooltip_text(tr("Rédiger une réponse avec l'IA"))
         self.ai_reply_btn.get_style_context().add_class("ai-btn")
         self.ai_reply_btn.connect("clicked", lambda *_: self.emit("ai-action", "reply_ai", ""))
         self.ai_reply_btn.set_no_show_all(True)
         tb.pack_start(Gtk.Separator(orientation=Gtk.Orientation.VERTICAL), False, False, 6)
         tb.pack_start(self.ai_reply_btn, False, False, 0)
         tb.pack_start(Gtk.Separator(orientation=Gtk.Orientation.VERTICAL), False, False, 6)
-        for name, tip, act in (("folder-symbolic", "Archiver (E)", "archive"),
-                               ("user-trash-symbolic", "Supprimer (#)", "trash")):
+        for name, tip, act in (("folder-symbolic", tr("Archiver (E)"), "archive"),
+                               ("user-trash-symbolic", tr("Supprimer (#)"), "trash")):
             b = icon_button(name, tip, relief=False)
             b.connect("clicked", lambda _b, a=act: self.emit("action", a))
             tb.pack_start(b, False, False, 0)
-        self.spam_btn = Gtk.Button(label="Spam ▾")
-        self.spam_btn.set_tooltip_text("Spam : ce message, l'expéditeur ou tout le domaine")
+        self.spam_btn = Gtk.Button(label=tr("Spam ▾"))
+        self.spam_btn.set_tooltip_text(tr("Spam : ce message, l'expéditeur ou tout le domaine"))
         self.spam_btn.get_style_context().add_class("pill")
         self.spam_btn.connect("clicked", lambda *_: self.emit("action", "menu_spam"))
-        self.block_btn = Gtk.Button(label="Bloquer ▾")
-        self.block_btn.set_tooltip_text("Bloquer l'adresse ou tout le domaine")
+        self.block_btn = Gtk.Button(label=tr("Bloquer ▾"))
+        self.block_btn.set_tooltip_text(tr("Bloquer l'adresse ou tout le domaine"))
         self.block_btn.get_style_context().add_class("pill")
         self.block_btn.connect("clicked", lambda *_: self.emit("action", "menu_block"))
         tb.pack_start(self.spam_btn, False, False, 2)
         tb.pack_start(self.block_btn, False, False, 2)
-        self.move_btn = icon_button("folder-open-symbolic", "Déplacer vers un dossier (V)", relief=False)
+        self.move_btn = icon_button("folder-open-symbolic", tr("Déplacer vers un dossier (V)"), relief=False)
         self.move_btn.connect("clicked", lambda *_: self.emit("action", "move_menu"))
         tb.pack_start(self.move_btn, False, False, 0)
         self.snooze_btn = Gtk.MenuButton()
         self.snooze_btn.set_image(icon("alarm-symbolic", Gtk.IconSize.LARGE_TOOLBAR))
-        self.snooze_btn.set_tooltip_text("Reporter")
+        self.snooze_btn.set_tooltip_text(tr("Reporter"))
         self.snooze_btn.set_relief(Gtk.ReliefStyle.NONE)
         self.snooze_btn.set_popup(self._snooze_factory(None))
         tb.pack_start(self.snooze_btn, False, False, 0)
-        self.star_btn = icon_button("non-starred-symbolic", "Favori (S)", relief=False)
+        self.star_btn = icon_button("non-starred-symbolic", tr("Favori (S)"), relief=False)
         self.star_btn.connect("clicked", lambda *_: self.emit("action", "star"))
-        self.pin_btn = icon_button("view-pin-symbolic", "Épingler (P)", relief=False)
+        self.pin_btn = icon_button("view-pin-symbolic", tr("Épingler (P)"), relief=False)
         self.pin_btn.connect("clicked", lambda *_: self.emit("action", "pin"))
         tb.pack_start(self.star_btn, False, False, 0)
         tb.pack_start(self.pin_btn, False, False, 0)
@@ -248,18 +249,18 @@ class Reader(Gtk.Stack):
         more.set_image(icon("view-more-symbolic", Gtk.IconSize.LARGE_TOOLBAR))
         more.set_relief(Gtk.ReliefStyle.NONE)
         menu = Gtk.Menu()
-        for entry in (("Répondre à tous", "reply_all"), ("Transférer", "forward"), ("Favori", "star"),
-                      ("Épingler", "pin"), None,
-                      ("Marquer comme non lu (U)", "unread"), ("Afficher les images distantes", "images"), None,
-                      ("Signaler comme spam (!)", "spam"), ("Mettre l'expéditeur en spam", "spam_sender"),
-                      ("Mettre son domaine en spam", "spam_domain"),
-                      ("Bloquer l'expéditeur", "block"), ("Bloquer son domaine", "block_domain"),
-                      ("Débloquer l'expéditeur", "unblock"), None,
-                      ("Voir tous ses messages", "from_sender"), ("Copier son adresse", "copy_addr"),
-                      ("Me rappeler si pas de réponse — 3 jours", "followup_3"),
-                      ("Me rappeler si pas de réponse — 7 jours", "followup_7"), None,
-                      ("Texte plus grand", "zoom_in"), ("Texte plus petit", "zoom_out"),
-                      ("Taille normale", "zoom_reset")):
+        for entry in ((tr("Répondre à tous"), "reply_all"), (tr("Transférer"), "forward"), (tr("Favori"), "star"),
+                      (tr("Épingler"), "pin"), None,
+                      (tr("Marquer comme non lu (U)"), "unread"), (tr("Afficher les images distantes"), "images"), None,
+                      (tr("Signaler comme spam (!)"), "spam"), (tr("Mettre l'expéditeur en spam"), "spam_sender"),
+                      (tr("Mettre son domaine en spam"), "spam_domain"),
+                      (tr("Bloquer l'expéditeur"), "block"), (tr("Bloquer son domaine"), "block_domain"),
+                      (tr("Débloquer l'expéditeur"), "unblock"), None,
+                      (tr("Voir tous ses messages"), "from_sender"), (tr("Copier son adresse"), "copy_addr"),
+                      (tr("Me rappeler si pas de réponse — 3 jours"), "followup_3"),
+                      (tr("Me rappeler si pas de réponse — 7 jours"), "followup_7"), None,
+                      (tr("Texte plus grand"), "zoom_in"), (tr("Texte plus petit"), "zoom_out"),
+                      (tr("Taille normale"), "zoom_reset")):
             if entry is None:
                 menu.append(Gtk.SeparatorMenuItem())
                 continue
@@ -305,7 +306,7 @@ class Reader(Gtk.Stack):
         self.att_flow.set_max_children_per_line(4)
         head.pack_start(self.att_flow, False, False, 0)
         page.pack_start(head, False, False, 0)
-        self.thread_exp = Gtk.Expander(label="Conversation")
+        self.thread_exp = Gtk.Expander(label=tr("Conversation"))
         self.thread_exp.set_margin_start(16)
         self.thread_exp.set_margin_end(16)
         self.thread_list = Gtk.ListBox()
@@ -322,8 +323,8 @@ class Reader(Gtk.Stack):
         self.invite_lbl.set_line_wrap(True)
         self.invite_box.pack_start(self.invite_lbl, True, True, 0)
         self.invite_btns = []
-        for label, act in (("Accepter", "invite_accept"), ("Peut-être", "invite_tentative"), ("Refuser", "invite_decline"),
-                           ("Ajouter à l'agenda", "invite_add")):
+        for label, act in ((tr("Accepter"), "invite_accept"), (tr("Peut-être"), "invite_tentative"), (tr("Refuser"), "invite_decline"),
+                           (tr("Ajouter à l'agenda"), "invite_add")):
             b = Gtk.Button(label=label)
             b.get_style_context().add_class("pill")
             b.connect("clicked", lambda _b, a=act: self.emit("action", a))
@@ -335,13 +336,13 @@ class Reader(Gtk.Stack):
 
         self.banner = Gtk.Box(spacing=10)
         self.banner.get_style_context().add_class("banner")
-        self.banner_lbl = Gtk.Label(label="Images distantes bloquées (vie privée).")
+        self.banner_lbl = Gtk.Label(label=tr("Images distantes bloquées (vie privée)."))
         self.banner_lbl.set_line_wrap(True)
         self.banner.pack_start(self.banner_lbl, True, True, 0)
-        b_img = Gtk.Button(label="Afficher")
+        b_img = Gtk.Button(label=tr("Afficher"))
         b_img.connect("clicked", lambda *_: self.emit("action", "images"))
         self.banner.pack_end(b_img, False, False, 0)
-        self.unsub_btn = Gtk.Button(label="Désabonner")
+        self.unsub_btn = Gtk.Button(label=tr("Désabonner"))
         self.unsub_btn.connect("clicked", self._unsub)
         self.banner.pack_end(self.unsub_btn, False, False, 0)
         self.banner.set_no_show_all(True)
@@ -364,12 +365,12 @@ class Reader(Gtk.Stack):
         csw.add(chips)
         row = Gtk.Box(spacing=6)
         self.quick = Gtk.Entry()
-        self.quick.set_placeholder_text("Réponse rapide…")
+        self.quick.set_placeholder_text(tr("Réponse rapide…"))
         self.quick.connect("activate", self._send_quick)
-        send = icon_button("mail-send-symbolic", "Envoyer la réponse")
+        send = icon_button("mail-send-symbolic", tr("Envoyer la réponse"))
         send.connect("clicked", self._send_quick)
         self.quick_ai = Gtk.Button(label="✨")
-        self.quick_ai.set_tooltip_text("Développer ce texte en réponse complète avec l'IA")
+        self.quick_ai.set_tooltip_text(tr("Développer ce texte en réponse complète avec l'IA"))
         self.quick_ai.get_style_context().add_class("pill")
         self.quick_ai.set_no_show_all(True)
         self.quick_ai.connect("clicked", lambda *_: self.quick.get_text().strip() and
@@ -403,7 +404,7 @@ class Reader(Gtk.Stack):
         card = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
         card.get_style_context().add_class("ai-card")
         head = Gtk.Box(spacing=8)
-        self.ai_title = Gtk.Label(xalign=0, label="✨ RÉSUMÉ")
+        self.ai_title = Gtk.Label(xalign=0, label=tr("✨ RÉSUMÉ"))
         self.ai_title.get_style_context().add_class("ai-title")
         self.ai_spinner = Gtk.Spinner()
         head.pack_start(self.ai_title, False, False, 0)
@@ -439,7 +440,7 @@ class Reader(Gtk.Stack):
         self.ai_warn.hide()
         self.ai_answer.set_text("")
         self.ai_answer.hide()
-        self.ai_title.set_text("✨ RÉSUMÉ")
+        self.ai_title.set_text(tr("✨ RÉSUMÉ"))
 
     def _ai_show_card(self):
         self.ai_warn.set_visible(bool(self.ai_warn.get_text()))
@@ -448,7 +449,7 @@ class Reader(Gtk.Stack):
 
     def ai_loading(self):
         self._ai_reset()
-        self.ai_summary.set_text("Lecture du message…")
+        self.ai_summary.set_text(tr("Lecture du message…"))
         self.ai_spinner.start()
         self._ai_show_card()
 
@@ -472,8 +473,8 @@ class Reader(Gtk.Stack):
         """Résumé (IA ou local) : phrase de synthèse, points clés, tâches, alerte d'hameçonnage. Rien d'autre."""
         self._ai_reset()
         self.ai_spinner.stop()
-        prio = {3: " · URGENT", 1: " · peu important"}.get(res.get("priority"), "")
-        self.ai_title.set_text("✨ RÉSUMÉ%s%s" % (" (local)" if res.get("local") else "", prio))
+        prio = {3: " · URGENT", 1: tr(" · peu important")}.get(res.get("priority"), "")
+        self.ai_title.set_text(tr("✨ RÉSUMÉ%s%s") % (" (local)" if res.get("local") else "", prio))
         self.ai_summary.set_text(res.get("summary") or "")
         for mark, items in (("•  ", res.get("points", [])), ("☐  ", res.get("tasks", []))):
             for t in items:
@@ -482,10 +483,10 @@ class Reader(Gtk.Stack):
                 l.show()
                 self.ai_points.pack_start(l, False, False, 0)
         if res.get("suspicious"):
-            self.ai_warn.set_text("⚠ Message suspect (hameçonnage possible)%s. Ne cliquez sur aucun lien." % (
+            self.ai_warn.set_text(tr("⚠ Message suspect (hameçonnage possible)%s. Ne cliquez sur aucun lien.") % (
                 " : " + res["why"] if res.get("why") else ""))
         if error:
-            self.ai_answer.set_text("IA indisponible : %s" % error)
+            self.ai_answer.set_text(tr("IA indisponible : %s") % error)
         self._ai_show_card()
 
     def is_open(self):
@@ -510,7 +511,7 @@ class Reader(Gtk.Stack):
     def set_narrow(self, narrow):
         self.back_btn.set_visible(narrow)
 
-    def show_empty(self, text="Sélectionnez un message pour le lire"):
+    def show_empty(self, text=tr("Sélectionnez un message pour le lire")):
         self.msg = None
         self.empty_label.set_text(text)
         self.set_visible_child_name("empty")
@@ -518,7 +519,7 @@ class Reader(Gtk.Stack):
 
     def show_multi(self, n):
         self.msg = None
-        self.multi_label.set_text("%d messages sélectionnés" % n)
+        self.multi_label.set_text(tr("%d messages sélectionnés") % n)
         self.set_visible_child_name("multi")
 
     def show_message(self, msg, load_images=None):
@@ -541,7 +542,7 @@ class Reader(Gtk.Stack):
         for a in msg.attachments:
             self.att_flow.add(self._att_chip(a))
         if len(msg.attachments) > 1:
-            allb = Gtk.Button(label="⬇ Tout enregistrer (%s)" % human_size(sum(a["size"] for a in msg.attachments)))
+            allb = Gtk.Button(label=tr("⬇ Tout enregistrer (%s)") % human_size(sum(a["size"] for a in msg.attachments)))
             allb.get_style_context().add_class("pill")
             allb.connect("clicked", self._save_all_att, list(msg.attachments))
             self.att_flow.add(allb)
@@ -589,7 +590,7 @@ class Reader(Gtk.Stack):
         self.thread_exp.set_visible(bool(others))
         if not others:
             return
-        self.thread_exp.set_label("Conversation · %d autre%s message%s" % (len(others), "s" if len(others) > 1 else "", "s" if len(others) > 1 else ""))
+        self.thread_exp.set_label(tr("Conversation · %d autre%s message%s") % (len(others), "s" if len(others) > 1 else "", "s" if len(others) > 1 else ""))
         for m in reversed(others):
             row = Gtk.ListBoxRow()
             row.mid = m.id
@@ -620,12 +621,12 @@ class Reader(Gtk.Stack):
             return
         method = inv.get("method", "PUBLISH")
         when = (inv.get("start") or "").replace("T", " à ")
-        text = "📅 <b>%s</b>\n%s%s" % (html.escape(inv.get("title") or "Événement"), html.escape(when),
+        text = "📅 <b>%s</b>\n%s%s" % (html.escape(inv.get("title") or tr("Événement")), html.escape(when),
                                        (" · " + html.escape(inv["location"])) if inv.get("location") else "")
         if method == "CANCEL":
-            text += "\n<i>Cet événement a été annulé par l'organisateur.</i>"
+            text += tr("\n<i>Cet événement a été annulé par l'organisateur.</i>")
         elif method == "REPLY":
-            text += "\n<i>Réponse à une invitation.</i>"
+            text += tr("\n<i>Réponse à une invitation.</i>")
         self._invite_base = text
         self.invite_lbl.set_markup(text)
         can_reply = method == "REQUEST" and bool(inv.get("organizer"))
@@ -663,7 +664,7 @@ class Reader(Gtk.Stack):
         box.pack_start(lab, False, False, 0)
         b.add(box)
         b.get_style_context().add_class("chip")
-        b.set_tooltip_text("Cliquer pour ouvrir · clic droit : enregistrer, copier le chemin · glisser vers un dossier")
+        b.set_tooltip_text(tr("Cliquer pour ouvrir · clic droit : enregistrer, copier le chemin · glisser vers un dossier"))
         b.connect("clicked", lambda *_: self._open_att(a))
         b.connect("button-press-event", lambda w, ev: self._att_menu(w, ev, a) if ev.button == 3 else False)
         b.drag_source_set(Gdk.ModifierType.BUTTON1_MASK, [Gtk.TargetEntry.new("text/uri-list", 0, 0)], Gdk.DragAction.COPY)
@@ -672,9 +673,9 @@ class Reader(Gtk.Stack):
 
     def _att_menu(self, w, ev, a):
         menu = Gtk.Menu()
-        for label, fn in (("Ouvrir", lambda: self._open_att(a, preview=False)), ("Aperçu", lambda: self._open_att(a, preview=True)),
-                          ("Enregistrer sous…", lambda: self._save_att(None, a)),
-                          ("Copier le chemin", lambda: Gtk.Clipboard.get(Gdk.SELECTION_CLIPBOARD).set_text(a["path"], -1))):
+        for label, fn in ((tr("Ouvrir"), lambda: self._open_att(a, preview=False)), (tr("Aperçu"), lambda: self._open_att(a, preview=True)),
+                          (tr("Enregistrer sous…"), lambda: self._save_att(None, a)),
+                          (tr("Copier le chemin"), lambda: Gtk.Clipboard.get(Gdk.SELECTION_CLIPBOARD).set_text(a["path"], -1))):
             mi = Gtk.MenuItem(label=label)
             mi.connect("activate", lambda _i, f=fn: f())
             menu.append(mi)
@@ -687,12 +688,12 @@ class Reader(Gtk.Stack):
         (enregistrement seulement) et fichiers à risque (confirmation)."""
         risk = attachment_risk(a)
         if risk == "block":
-            self._warn_dialog("Fichier potentiellement dangereux", "« %s » est un programme ou un script : MintMail ne l'ouvre pas. "
+            self._warn_dialog(tr("Fichier potentiellement dangereux"), tr("« %s » est un programme ou un script : MintMail ne l'ouvre pas. "
                               "Si vous êtes certain de sa provenance, enregistrez-le (clic droit → Enregistrer sous…) et vérifiez-le avant "
-                              "de l'exécuter." % a["filename"], ok_label=None)
+                              "de l'exécuter.") % a["filename"], ok_label=None)
             return
-        if risk == "warn" and not self._warn_dialog("Ouvrir ce fichier ?", "« %s » peut contenir des macros ou du code actif. "
-                                                    "Ouvrez-le seulement si vous attendiez ce fichier." % a["filename"], ok_label="Ouvrir quand même"):
+        if risk == "warn" and not self._warn_dialog(tr("Ouvrir ce fichier ?"), tr("« %s » peut contenir des macros ou du code actif. "
+                                                    "Ouvrez-le seulement si vous attendiez ce fichier.") % a["filename"], ok_label=tr("Ouvrir quand même")):
             return
         kind = attachment_kind(a)
         if preview and kind in ("image", "text") and a.get("size", 0) <= 15_000_000:
@@ -705,7 +706,7 @@ class Reader(Gtk.Stack):
 
     def _warn_dialog(self, title, text, ok_label=None):
         d = Gtk.MessageDialog(transient_for=self.get_toplevel(), modal=True, message_type=Gtk.MessageType.WARNING, text=title, secondary_text=text)
-        d.add_button("Annuler" if ok_label else "Fermer", Gtk.ResponseType.CANCEL)
+        d.add_button(tr("Annuler") if ok_label else tr("Fermer"), Gtk.ResponseType.CANCEL)
         if ok_label:
             d.add_button(ok_label, Gtk.ResponseType.OK)
         ok = d.run() == Gtk.ResponseType.OK
@@ -733,26 +734,26 @@ class Reader(Gtk.Stack):
                 tv.get_buffer().set_text(txt)
                 sw.add(tv)
         except Exception:
-            sw.add(Gtk.Label(label="Aperçu impossible : ouvrez le fichier avec « Ouvrir »."))
+            sw.add(Gtk.Label(label=tr("Aperçu impossible : ouvrez le fichier avec « Ouvrir ».")))
         area.pack_start(sw, True, True, 0)
-        dlg.add_button("Ouvrir avec…", 1)
-        dlg.add_button("Fermer", Gtk.ResponseType.CLOSE)
+        dlg.add_button(tr("Ouvrir avec…"), 1)
+        dlg.add_button(tr("Fermer"), Gtk.ResponseType.CLOSE)
         dlg.connect("response", lambda d, r: (self._open_att(a, preview=False) if r == 1 else None, d.destroy() if r != 1 else None))
         dlg.show_all()
 
     def _save_all_att(self, _b, atts):
-        dlg = Gtk.FileChooserDialog(title="Enregistrer toutes les pièces jointes dans…", parent=self.get_toplevel(),
+        dlg = Gtk.FileChooserDialog(title=tr("Enregistrer toutes les pièces jointes dans…"), parent=self.get_toplevel(),
                                     action=Gtk.FileChooserAction.SELECT_FOLDER)
-        dlg.add_buttons("Annuler", Gtk.ResponseType.CANCEL, "Enregistrer ici", Gtk.ResponseType.OK)
+        dlg.add_buttons(tr("Annuler"), Gtk.ResponseType.CANCEL, tr("Enregistrer ici"), Gtk.ResponseType.OK)
         if dlg.run() == Gtk.ResponseType.OK:
             done = save_attachments(atts, dlg.get_filename())
-            self.emit("ai-action", "toast", "%d fichier(s) enregistré(s) dans %s" % (len(done), dlg.get_filename()))
+            self.emit("ai-action", "toast", tr("%d fichier(s) enregistré(s) dans %s") % (len(done), dlg.get_filename()))
         dlg.destroy()
 
     def _save_att(self, _b, att):
-        dlg = Gtk.FileChooserDialog(title="Enregistrer la pièce jointe", parent=self.get_toplevel(),
+        dlg = Gtk.FileChooserDialog(title=tr("Enregistrer la pièce jointe"), parent=self.get_toplevel(),
                                     action=Gtk.FileChooserAction.SAVE)
-        dlg.add_buttons("Annuler", Gtk.ResponseType.CANCEL, "Enregistrer", Gtk.ResponseType.OK)
+        dlg.add_buttons(tr("Annuler"), Gtk.ResponseType.CANCEL, tr("Enregistrer"), Gtk.ResponseType.OK)
         dlg.set_current_name(att["filename"])
         dlg.set_do_overwrite_confirmation(True)
         if dlg.run() == Gtk.ResponseType.OK:

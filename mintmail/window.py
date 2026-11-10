@@ -5,6 +5,7 @@ import time
 import uuid
 
 import gi
+from .i18n import tr
 
 gi.require_version("Gtk", "3.0")
 gi.require_version("Gdk", "3.0")
@@ -18,6 +19,7 @@ from .ai_features import AIMixin
 from .listing import ListMixin, PAGE
 from .folders import FolderMixin, SMART_VIEWS, dest_of
 from .offline import OfflineMixin, is_retryable
+from .updates_ui import UpdateMixin
 from .extras import ExtrasMixin
 from .models import Message, Outgoing
 from .p2p import SyncEngine
@@ -45,25 +47,25 @@ from .widgets import (
 )
 
 NAV = [
-    ("inbox", "Boîte intelligente", "mail-inbox-symbolic"),
-    ("unread", "Non lus", "mail-unread-symbolic"),
-    ("starred", "Favoris", "starred-symbolic"),
-    ("pinned", "Épinglés", "view-pin-symbolic"),
-    ("snoozed", "Reportés", "alarm-symbolic"),
-    ("drafts", "Brouillons", "document-edit-symbolic"),
-    ("sent", "Envoyés", "mail-send-symbolic"),
-    ("archive", "Archives", "folder-symbolic"),
+    ("inbox", tr("Boîte intelligente"), "mail-inbox-symbolic"),
+    ("unread", tr("Non lus"), "mail-unread-symbolic"),
+    ("starred", tr("Favoris"), "starred-symbolic"),
+    ("pinned", tr("Épinglés"), "view-pin-symbolic"),
+    ("snoozed", tr("Reportés"), "alarm-symbolic"),
+    ("drafts", tr("Brouillons"), "document-edit-symbolic"),
+    ("sent", tr("Envoyés"), "mail-send-symbolic"),
+    ("archive", tr("Archives"), "folder-symbolic"),
     ("spam", "Spam", "mail-mark-junk-symbolic"),
-    ("trash", "Corbeille", "user-trash-symbolic"),
+    ("trash", tr("Corbeille"), "user-trash-symbolic"),
 ]
 TITLES = {k: v for k, v, _ in NAV}
-CATEGORIES = [(None, "Tout"), ("people", "Personnes"), ("notif", "Notifications"), ("news", "Newsletters")]
+CATEGORIES = [(None, tr("Tout")), ("people", tr("Personnes")), ("notif", tr("Notifications")), ("news", tr("Newsletters"))]
 DEMO_ACCOUNT = {"id": "demo", "name": "Démo", "email": "demo@mintmail.local", "demo": True,
                 "signature_html": "<i>Envoyé avec MintMail</i>"}
 NARROW, RAIL_BELOW, HIDE_BELOW = 700, 1250, 900
 
 
-class MainWindow(ExtrasMixin, OfflineMixin, ListMixin, AIMixin, FolderMixin, Gtk.ApplicationWindow):
+class MainWindow(UpdateMixin, ExtrasMixin, OfflineMixin, ListMixin, AIMixin, FolderMixin, Gtk.ApplicationWindow):
     NAV_ROWS = NAV
     TITLES = TITLES
 
@@ -115,10 +117,11 @@ class MainWindow(ExtrasMixin, OfflineMixin, ListMixin, AIMixin, FolderMixin, Gtk
         GLib.timeout_add(6000, lambda: (self.contacts_refresh(), self.flush_ops(), False)[2])   # carnet d'adresses + actions en attente
         if self.config.p2p_notice == "short_code":   # l'ancien code (moins de 12 caractères) a désactivé la synchro
             GLib.timeout_add(2500, lambda: (self.toast.popup(
-                "Synchronisation désactivée : l'ancien code de jumelage est trop court (12 caractères minimum).",
-                "Corriger", lambda: self.show_settings("p2p"), timeout=15), False)[1])
+                tr("Synchronisation désactivée : l'ancien code de jumelage est trop court (12 caractères minimum)."),
+                tr("Corriger"), lambda: self.show_settings("p2p"), timeout=15), False)[1])
         GLib.timeout_add_seconds(3, lambda: (self._start_push(), False)[1])
         GLib.timeout_add_seconds(1, self._tick)
+        self._init_updates()
 
     # ------------------------------------------------------------------ UI
     def _build(self):
@@ -128,18 +131,18 @@ class MainWindow(ExtrasMixin, OfflineMixin, ListMixin, AIMixin, FolderMixin, Gtk
         self.set_titlebar(hb)
         self.side_toggle = Gtk.ToggleButton()
         self.side_toggle.set_image(icon("view-sidebar-start-symbolic", Gtk.IconSize.LARGE_TOOLBAR))
-        self.side_toggle.set_tooltip_text("Afficher / masquer le panneau latéral")
+        self.side_toggle.set_tooltip_text(tr("Afficher / masquer le panneau latéral"))
         self.side_toggle.set_active(True)
         self.side_toggle.connect("toggled", self._side_toggled)
         hb.pack_start(self.side_toggle)
         comp = Gtk.Button()
         comp.set_image(icon("mail-message-new-symbolic", Gtk.IconSize.LARGE_TOOLBAR))
-        comp.set_tooltip_text("Nouveau message (C)")
+        comp.set_tooltip_text(tr("Nouveau message (C)"))
         comp.get_style_context().add_class("round-accent")
         comp.connect("clicked", lambda *_: self.compose())
         hb.pack_start(comp)
         self.search_entry = Gtk.SearchEntry()
-        self.search_entry.set_placeholder_text("Rechercher — ou « ? » + une question pour l'IA")
+        self.search_entry.set_placeholder_text(tr("Rechercher — ou « ? » + une question pour l'IA"))
         self.search_entry.set_width_chars(22)
         self.search_entry.get_style_context().add_class("mm-search")
         self.search_entry.connect("search-changed", self._search_changed)
@@ -148,10 +151,10 @@ class MainWindow(ExtrasMixin, OfflineMixin, ListMixin, AIMixin, FolderMixin, Gtk
         menu_btn = Gtk.MenuButton()
         menu_btn.set_image(icon("open-menu-symbolic", Gtk.IconSize.LARGE_TOOLBAR))
         menu = Gtk.Menu()
-        for label, fn in (("Palette de commandes (Ctrl+K)", self.show_palette), ("Paramètres (Ctrl+,)", self.show_settings), ("Paramètres dans une fenêtre séparée", lambda: self.show_settings(window=True)),
-                          ("Aujourd'hui (T)", self.show_today), ("Aide (F1)", lambda: self.show_settings("help")),
-                          ("Basculer clair / sombre", self.toggle_theme), ("Tout marquer comme lu", self.mark_all_read),
-                          ("Journal d'erreurs", self.show_log), ("À propos", self.show_about)):
+        for label, fn in ((tr("Palette de commandes (Ctrl+K)"), self.show_palette), (tr("Paramètres (Ctrl+,)"), self.show_settings), (tr("Paramètres dans une fenêtre séparée"), lambda: self.show_settings(window=True)),
+                          (tr("Aujourd'hui (T)"), self.show_today), (tr("Aide (F1)"), lambda: self.show_settings("help")),
+                          (tr("Basculer clair / sombre"), self.toggle_theme), (tr("Tout marquer comme lu"), self.mark_all_read),
+                          (tr("Mises à jour"), lambda: self.show_settings("updates")), (tr("Journal d'erreurs"), self.show_log), (tr("À propos"), self.show_about)):
             it = Gtk.MenuItem(label=label)
             it.connect("activate", lambda _i, f=fn: f())
             menu.append(it)
@@ -161,33 +164,33 @@ class MainWindow(ExtrasMixin, OfflineMixin, ListMixin, AIMixin, FolderMixin, Gtk
         gear = Gtk.Button()
         gb = Gtk.Box(spacing=6)
         gb.pack_start(icon("preferences-system-symbolic"), False, False, 0)
-        gb.pack_start(Gtk.Label(label="Paramètres"), False, False, 0)
+        gb.pack_start(Gtk.Label(label=tr("Paramètres")), False, False, 0)
         gear.add(gb)
-        gear.set_tooltip_text("Paramètres (Ctrl+,)")
+        gear.set_tooltip_text(tr("Paramètres (Ctrl+,)"))
         gear.get_style_context().add_class("pill")
         gear.connect("clicked", lambda *_: self.show_settings())
         hb.pack_end(gear)
-        self.ai_btn = Gtk.ToggleButton(label="✨ Assistant")
+        self.ai_btn = Gtk.ToggleButton(label=tr("✨ Assistant"))
         self.ai_btn.get_style_context().add_class("ai-btn")
-        self.ai_btn.set_tooltip_text("Assistant IA (Ctrl+J)")
+        self.ai_btn.set_tooltip_text(tr("Assistant IA (Ctrl+J)"))
         self.ai_btn.connect("toggled", lambda b: self.toggle_assistant(b.get_active()))
         hb.pack_end(self.ai_btn)
-        self.refresh_btn = icon_button("view-refresh-symbolic", "Actualiser (Ctrl+R)")
+        self.refresh_btn = icon_button("view-refresh-symbolic", tr("Actualiser (Ctrl+R)"))
         self.refresh_btn.connect("clicked", lambda *_: self.sync(True))
         hb.pack_end(self.refresh_btn)
         self.sel_btn = Gtk.ToggleButton()
         self.sel_btn.set_image(icon("object-select-symbolic", Gtk.IconSize.LARGE_TOOLBAR))
-        self.sel_btn.set_tooltip_text("Mode sélection multiple")
+        self.sel_btn.set_tooltip_text(tr("Mode sélection multiple"))
         self.sel_btn.connect("toggled", self._toggle_select_mode)
         hb.pack_end(self.sel_btn)
         lay = Gtk.MenuButton()
         lay.set_image(icon("view-dual-symbolic", Gtk.IconSize.LARGE_TOOLBAR))
-        lay.set_tooltip_text("Disposition")
+        lay.set_tooltip_text(tr("Disposition"))
         lm = Gtk.Menu()
-        for label, fn in (("Colonnes : liste | lecture", lambda: self.set_layout("columns")),
-                          ("Lecture en bas", lambda: self.set_layout("bottom")),
-                          ("Liste seule (lecture plein écran)", lambda: self.set_layout("list")),
-                          ("Barre latérale réduite / étendue", self.toggle_rail)):
+        for label, fn in ((tr("Colonnes : liste | lecture"), lambda: self.set_layout("columns")),
+                          (tr("Lecture en bas"), lambda: self.set_layout("bottom")),
+                          (tr("Liste seule (lecture plein écran)"), lambda: self.set_layout("list")),
+                          (tr("Barre latérale réduite / étendue"), self.toggle_rail)):
             it = Gtk.MenuItem(label=label)
             it.connect("activate", lambda _i, f=fn: f())
             lm.append(it)
@@ -205,14 +208,14 @@ class MainWindow(ExtrasMixin, OfflineMixin, ListMixin, AIMixin, FolderMixin, Gtk
         bar = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
         bar.get_style_context().add_class("mm-listbar")
         self.title_lbl = Gtk.Label(xalign=0)
-        self.title_lbl.set_markup("<b>Boîte intelligente</b>")
+        self.title_lbl.set_markup(tr("<b>Boîte intelligente</b>"))
         self.title_lbl.get_style_context().add_class("list-title")
         self.count_lbl = Gtk.Label(xalign=0)
         self.count_lbl.get_style_context().add_class("count-lbl")
         bar.pack_start(self.count_lbl, False, False, 0)
-        self.srv_btn = Gtk.Button(label="🔎 Chercher aussi sur le serveur")
+        self.srv_btn = Gtk.Button(label=tr("🔎 Chercher aussi sur le serveur"))
         self.srv_btn.get_style_context().add_class("pill")
-        self.srv_btn.set_tooltip_text("Cherche dans tous les messages du serveur, même ceux qui ne sont pas encore téléchargés")
+        self.srv_btn.set_tooltip_text(tr("Cherche dans tous les messages du serveur, même ceux qui ne sont pas encore téléchargés"))
         self.srv_btn.set_no_show_all(True)
         self.srv_btn.connect("clicked", lambda *_: self.search_server_now())
         bar.pack_start(self.srv_btn, False, False, 0)
@@ -231,8 +234,8 @@ class MainWindow(ExtrasMixin, OfflineMixin, ListMixin, AIMixin, FolderMixin, Gtk
         self.cat_sw.add(self.cat_box)
         bar.pack_start(self.cat_sw, False, False, 0)
         flt = Gtk.Box(spacing=6)
-        self.f_unread = Gtk.ToggleButton(label="Non lus")
-        self.f_att = Gtk.ToggleButton(label="Pièces jointes")
+        self.f_unread = Gtk.ToggleButton(label=tr("Non lus"))
+        self.f_att = Gtk.ToggleButton(label=tr("Pièces jointes"))
         for w, a in ((self.f_unread, "unread_only"), (self.f_att, "att_only")):
             w.connect("toggled", lambda b, attr=a: (setattr(self, attr, b.get_active()), self.reload_list(reset=True)))
             w.get_style_context().add_class("pill-toggle")
@@ -241,12 +244,12 @@ class MainWindow(ExtrasMixin, OfflineMixin, ListMixin, AIMixin, FolderMixin, Gtk
         self.list_box.pack_start(bar, False, False, 0)
         self.demo_banner = Gtk.Box(spacing=8)
         self.demo_banner.get_style_context().add_class("banner")
-        self.demo_banner.pack_start(Gtk.Label(label="Mode démonstration"), True, True, 0)
-        abtn = Gtk.Button(label="✨ Activer l'IA")
+        self.demo_banner.pack_start(Gtk.Label(label=tr("Mode démonstration")), True, True, 0)
+        abtn = Gtk.Button(label=tr("✨ Activer l'IA"))
         abtn.get_style_context().add_class("ai-chip")
         abtn.connect("clicked", lambda *_: self.show_settings("ai"))
         self.demo_banner.pack_end(abtn, False, False, 0)
-        ab = Gtk.Button(label="Ajouter mon compte")
+        ab = Gtk.Button(label=tr("Ajouter mon compte"))
         ab.connect("clicked", lambda *_: self.show_settings())
         self.demo_banner.pack_end(ab, False, False, 0)
         self.list_box.pack_start(self.demo_banner, False, False, 0)
@@ -257,12 +260,12 @@ class MainWindow(ExtrasMixin, OfflineMixin, ListMixin, AIMixin, FolderMixin, Gtk
         bulk.get_style_context().add_class("bulkbar")
         self.bulk_lbl = Gtk.Label()
         bulk.pack_start(self.bulk_lbl, True, True, 0)
-        for label, fn in (("Archiver", lambda: self.move_messages(self.selected_msgs(), "archive")),
-                          ("Supprimer", lambda: self.move_messages(self.selected_msgs(), "trash")),
-                          ("Lu", lambda: self.set_unread(self.selected_msgs(), False)),
-                          ("Non lu", lambda: self.set_unread(self.selected_msgs(), True)),
+        for label, fn in ((tr("Archiver"), lambda: self.move_messages(self.selected_msgs(), "archive")),
+                          (tr("Supprimer"), lambda: self.move_messages(self.selected_msgs(), "trash")),
+                          (tr("Lu"), lambda: self.set_unread(self.selected_msgs(), False)),
+                          (tr("Non lu"), lambda: self.set_unread(self.selected_msgs(), True)),
                           ("★", lambda: self.set_flag(self.selected_msgs(), "starred", True)),
-                          ("Tout", lambda: self.listbox.select_all() if self.select_mode else None),
+                          (tr("Tout"), lambda: self.listbox.select_all() if self.select_mode else None),
                           ("✕", lambda: self.listbox.unselect_all())):
             b = Gtk.Button(label=label)
             b.connect("clicked", lambda _b, f=fn: f())
@@ -285,7 +288,7 @@ class MainWindow(ExtrasMixin, OfflineMixin, ListMixin, AIMixin, FolderMixin, Gtk
         sw = self.list_scroll = Gtk.ScrolledWindow()
         sw.add(self.listbox)
         sw.connect("edge-reached", self._on_edge)
-        self.empty_lbl = Gtk.Label(label="Aucun message")
+        self.empty_lbl = Gtk.Label(label=tr("Aucun message"))
         self.empty_lbl.get_style_context().add_class("empty-state")
         self.list_stack = Gtk.Stack()
         self.list_stack.add_named(sw, "list")
@@ -343,13 +346,13 @@ class MainWindow(ExtrasMixin, OfflineMixin, ListMixin, AIMixin, FolderMixin, Gtk
         self.p2p_lbl.get_style_context().add_class("dim")
         self.p2p_lbl.set_line_wrap(True)
         box.pack_start(self.p2p_lbl, False, False, 0)
-        b = self.settings_btn = Gtk.Button(label="Paramètres")
+        b = self.settings_btn = Gtk.Button(label=tr("Paramètres"))
         b.set_image(icon("preferences-system-symbolic"))
         b.set_always_show_image(True)
         b.set_relief(Gtk.ReliefStyle.NONE)
         b.connect("clicked", lambda *_: self.show_settings())
         box.pack_start(b, False, False, 0)
-        rail = icon_button("pan-start-symbolic", "Réduire / étendre la barre latérale", relief=False)
+        rail = icon_button("pan-start-symbolic", tr("Réduire / étendre la barre latérale"), relief=False)
         rail.connect("clicked", lambda *_: self.toggle_rail())
         box.pack_start(rail, False, False, 0)
         return box
@@ -364,7 +367,7 @@ class MainWindow(ExtrasMixin, OfflineMixin, ListMixin, AIMixin, FolderMixin, Gtk
         if aid not in self._backends:
             acc = next((a for a in self.accounts() if a["id"] == aid), None)
             if not acc:
-                raise RuntimeError("Compte introuvable")
+                raise RuntimeError(tr("Compte introuvable"))
             self._backends[aid] = make_backend(acc, self.config)
         return self._backends[aid]
 
@@ -440,7 +443,7 @@ class MainWindow(ExtrasMixin, OfflineMixin, ListMixin, AIMixin, FolderMixin, Gtk
                 self._settings_window(page)
             except Exception as e2:
                 log_exception("show_settings (fenêtre séparée)")
-                self.show_error("Impossible d'ouvrir les paramètres", e2 or e)
+                self.show_error(tr("Impossible d'ouvrir les paramètres"), e2 or e)
 
     def _settings_window(self, page=None):
         w = getattr(self, "_swin", None)
@@ -449,7 +452,7 @@ class MainWindow(ExtrasMixin, OfflineMixin, ListMixin, AIMixin, FolderMixin, Gtk
             if page:
                 w.page.show_page(page)
             return
-        w = Gtk.Window(title="Paramètres de MintMail")
+        w = Gtk.Window(title=tr("Paramètres de MintMail"))
         w.set_transient_for(self)
         w.set_default_size(960, 660)
         w.page = SettingsPage(self, page)
@@ -471,14 +474,14 @@ class MainWindow(ExtrasMixin, OfflineMixin, ListMixin, AIMixin, FolderMixin, Gtk
 
     def show_error(self, title, exc):
         d = Gtk.MessageDialog(transient_for=self, modal=True, message_type=Gtk.MessageType.ERROR,
-                              text=title, secondary_text="%s\n\nDétails dans le journal : %s" % (exc, LOG))
-        d.add_buttons("Fermer", Gtk.ResponseType.CLOSE)
+                              text=title, secondary_text=tr("%s\n\nDétails dans le journal : %s") % (exc, LOG))
+        d.add_buttons(tr("Fermer"), Gtk.ResponseType.CLOSE)
         d.run()
         d.destroy()
 
     def show_log(self):
-        d = Gtk.Dialog(title="Journal d'erreurs", transient_for=self, modal=True)
-        d.add_buttons("Fermer", Gtk.ResponseType.CLOSE)
+        d = Gtk.Dialog(title=tr("Journal d'erreurs"), transient_for=self, modal=True)
+        d.add_buttons(tr("Fermer"), Gtk.ResponseType.CLOSE)
         d.set_default_size(720, 420)
         tv = Gtk.TextView()
         tv.set_editable(False)
@@ -495,7 +498,7 @@ class MainWindow(ExtrasMixin, OfflineMixin, ListMixin, AIMixin, FolderMixin, Gtk
         d = Gtk.AboutDialog(transient_for=self, modal=True)
         d.set_program_name(APP_NAME)
         d.set_version(__version__)
-        d.set_comments("Client mail moderne pour Linux Mint.\nBoîte intelligente, reports, envoi annulable, signatures HTML.")
+        d.set_comments(tr("Client mail moderne pour Linux Mint.\nBoîte intelligente, reports, envoi annulable, signatures HTML."))
         d.set_website("https://saec.me")
         d.set_copyright("© 2026 SAEC")
         d.set_license_type(Gtk.License.MIT_X11)          # logiciel libre : licence MIT
@@ -520,7 +523,7 @@ class MainWindow(ExtrasMixin, OfflineMixin, ListMixin, AIMixin, FolderMixin, Gtk
             if text.startswith(("?", "✨")):
                 return False   # question pour l'IA : attendre la touche Entrée
             self.search = text
-            self.title_lbl.set_markup("<b>Résultats</b>" if self.search else "<b>%s</b>" % GLib.markup_escape_text(self._view_title()))
+            self.title_lbl.set_markup(tr("<b>Résultats</b>") if self.search else "<b>%s</b>" % GLib.markup_escape_text(self._view_title()))
             self.cat_sw.set_visible(self.view == "inbox" and not self.search)
             self.reload_list(reset=True)
             return False
@@ -575,7 +578,7 @@ class MainWindow(ExtrasMixin, OfflineMixin, ListMixin, AIMixin, FolderMixin, Gtk
         self.status.set_visible(not rail)
         for l in self.brand_labels:
             l.set_visible(not rail)
-        self.settings_btn.set_label("" if rail else "Paramètres")
+        self.settings_btn.set_label("" if rail else tr("Paramètres"))
         self.compose_lbl.set_visible(not rail)
         self.ai_nav_lbl.set_visible(not rail)
         self.sidebar.set_size_request(60 if rail else 190, -1)
@@ -639,7 +642,7 @@ class MainWindow(ExtrasMixin, OfflineMixin, ListMixin, AIMixin, FolderMixin, Gtk
     def _notify(self, msgs):
         if not msgs or not self.config["notifications"]:
             return
-        n = Gio.Notification.new("%d nouveaux messages" % len(msgs) if len(msgs) > 1 else msgs[0].display_sender)
+        n = Gio.Notification.new(tr("%d nouveaux messages") % len(msgs) if len(msgs) > 1 else msgs[0].display_sender)
         n.set_body(msgs[0].subject if len(msgs) == 1 else "\n".join(
             "%s — %s" % (m.display_sender, m.subject) for m in msgs[:3]))
         self.get_application().send_notification("new-mail", n)
@@ -662,8 +665,8 @@ class MainWindow(ExtrasMixin, OfflineMixin, ListMixin, AIMixin, FolderMixin, Gtk
         if self._ticks % 3 == 0 and hasattr(self, "p2p_lbl"):
             eng = self.sync_engine
             short = 0 < len(str(self.config.get("p2p_secret") or "")) < P2P_MIN_SECRET
-            self.p2p_lbl.set_text("⇄ " + eng.state_label().replace("Active — appareil ", "").replace(" — synchronisé à ", " · ")
-                                  if eng.is_enabled() else ("⇄ désactivée : code < %d car." % P2P_MIN_SECRET if short else ""))
+            self.p2p_lbl.set_text("⇄ " + eng.short_label()
+                                  if eng.is_enabled() else (tr("⇄ désactivée : code < %d car.") % P2P_MIN_SECRET if short else ""))
         if self._ticks % 30 == 0:
             woken = self.cache.wake_snoozed()
             if woken:
@@ -692,11 +695,11 @@ class MainWindow(ExtrasMixin, OfflineMixin, ListMixin, AIMixin, FolderMixin, Gtk
 
         def wd():
             return datetime.datetime.now().weekday()
-        opts = [("Plus tard aujourd'hui (+3 h)", lambda: time.time() + 3 * 3600),
-                ("Demain 8 h", lambda: at(1, 8)),
-                ("Ce week-end (samedi 9 h)", lambda: at((5 - wd()) % 7 or 7, 9)),
-                ("Semaine prochaine (lundi 8 h)", lambda: at((7 - wd()) % 7 or 7, 8)),
-                ("Choisir une date…", None)]
+        opts = [(tr("Plus tard aujourd'hui (+3 h)"), lambda: time.time() + 3 * 3600),
+                (tr("Demain 8 h"), lambda: at(1, 8)),
+                (tr("Ce week-end (samedi 9 h)"), lambda: at((5 - wd()) % 7 or 7, 9)),
+                (tr("Semaine prochaine (lundi 8 h)"), lambda: at((7 - wd()) % 7 or 7, 8)),
+                (tr("Choisir une date…"), None)]
         for label, fn in opts:
             it = Gtk.MenuItem(label=label)
             it.connect("activate", lambda _i, f=fn: self._snooze_pick(f, cb))
@@ -708,8 +711,8 @@ class MainWindow(ExtrasMixin, OfflineMixin, ListMixin, AIMixin, FolderMixin, Gtk
         if fn:
             cb(fn())
             return
-        dlg = Gtk.Dialog(title="Reporter jusqu'au…", transient_for=self, modal=True)
-        dlg.add_buttons("Annuler", Gtk.ResponseType.CANCEL, "Reporter", Gtk.ResponseType.OK)
+        dlg = Gtk.Dialog(title=tr("Reporter jusqu'au…"), transient_for=self, modal=True)
+        dlg.add_buttons(tr("Annuler"), Gtk.ResponseType.CANCEL, tr("Reporter"), Gtk.ResponseType.OK)
         cal = Gtk.Calendar()
         hour = Gtk.SpinButton.new_with_range(0, 23, 1)
         hour.set_value(9)
@@ -765,7 +768,7 @@ class MainWindow(ExtrasMixin, OfflineMixin, ListMixin, AIMixin, FolderMixin, Gtk
             self._rebuild_nav_dynamic()
             self.reload_list()
         names = res.get("new_accounts") or []
-        self.toast.popup(("Synchro : compte « %s » ajouté — " % names[0] if names else "Synchro : ") + describe_sync(res),
+        self.toast.popup((tr("Synchro : compte « %s » ajouté — ") % names[0] if names else tr("Synchro : ")) + describe_sync(res),
                          timeout=6)
 
     def sync_from_store(self):
@@ -802,9 +805,9 @@ class MainWindow(ExtrasMixin, OfflineMixin, ListMixin, AIMixin, FolderMixin, Gtk
                           body_html=out.html, raw=True, in_reply_to=out.in_reply_to, references=out.references,
                           attachments=out.attachments)
         if scheduled:
-            self.toast.popup("Envoi programmé pour le %s" % format_full(time.time() + delay), "Annuler", undo, timeout=6)
+            self.toast.popup(tr("Envoi programmé pour le %s") % format_full(time.time() + delay), tr("Annuler"), undo, timeout=6)
         else:
-            self.toast.popup("Envoi du message…", "Annuler", undo, timeout=max(2, self.config["undo_seconds"] - 1))
+            self.toast.popup(tr("Envoi du message…"), tr("Annuler"), undo, timeout=max(2, self.config["undo_seconds"] - 1))
 
     def process_outbox(self):
         for oid, out in self.cache.outbox_due():
@@ -818,15 +821,15 @@ class MainWindow(ExtrasMixin, OfflineMixin, ListMixin, AIMixin, FolderMixin, Gtk
                     self.cache.outbox_reschedule(oid, time.time() + 60)        # hors ligne : conservé, nouvel essai dans 1 min
                     self._net_error = True
                     self.update_offline_status()
-                    self.toast.popup("Hors ligne : message conservé, nouvel essai automatique.", timeout=5)
+                    self.toast.popup(tr("Hors ligne : message conservé, nouvel essai automatique."), timeout=5)
                     return
                 self.cache.outbox_remove(oid)
                 if err:
-                    self.toast.popup("Échec de l'envoi : %s" % str(err)[:90], "Rouvrir", lambda: ComposeWindow(
+                    self.toast.popup(tr("Échec de l'envoi : %s") % str(err)[:90], tr("Rouvrir"), lambda: ComposeWindow(
                         self, self.accounts(), account_id=out.account, to=out.to, cc=out.cc, subject=out.subject,
                         body_html=out.html, raw=True, attachments=out.attachments), timeout=10)
                     return
-                self.toast.popup("Message envoyé ✔", timeout=3)
+                self.toast.popup(tr("Message envoyé ✔"), timeout=3)
                 be = self.backend(out.account)
                 acc = next((a for a in self.accounts() if a["id"] == out.account), {})
                 if be.demo:
@@ -986,7 +989,7 @@ class MainWindow(ExtrasMixin, OfflineMixin, ListMixin, AIMixin, FolderMixin, Gtk
         for k in ("blocked", "spam_senders"):
             self.config[k] = [x for x in self.config[k] if x.lower() not in (em, dom)]
         self.config.save()
-        self.toast.popup("%s débloqué" % msg.sender_email, timeout=3)
+        self.toast.popup(tr("%s débloqué") % msg.sender_email, timeout=3)
 
     def is_blocked(self, msg):
         keys = {self._key(msg), self._key(msg, True)}
@@ -998,7 +1001,7 @@ class MainWindow(ExtrasMixin, OfflineMixin, ListMixin, AIMixin, FolderMixin, Gtk
 
     def copy_text(self, text):
         Gtk.Clipboard.get(Gdk.SELECTION_CLIPBOARD).set_text(text, -1)
-        self.toast.popup("Copié : " + text, timeout=2)
+        self.toast.popup(tr("Copié : ") + text, timeout=2)
 
     @staticmethod
     def _rule_match(r, m):
@@ -1055,7 +1058,7 @@ class MainWindow(ExtrasMixin, OfflineMixin, ListMixin, AIMixin, FolderMixin, Gtk
         left = self._auto_route(self.cache.query("inbox", "all"))
         self.reload_list()
         self.update_counts()
-        self.toast.popup("Règles appliquées (%d message(s) restent dans la boîte)" % len(left), timeout=4)
+        self.toast.popup(tr("Règles appliquées (%d message(s) restent dans la boîte)") % len(left), timeout=4)
 
 
 
@@ -1065,7 +1068,7 @@ class MainWindow(ExtrasMixin, OfflineMixin, ListMixin, AIMixin, FolderMixin, Gtk
             "id": msg.id, "at": time.time() + days * 86400, "subject": msg.subject, "date": msg.date,
             "to": msg.to if msg.folder == "sent" else msg.sender_email})
         self.config.save()
-        self.toast.popup("Rappel dans %d jours si aucune réponse" % days, timeout=4)
+        self.toast.popup(tr("Rappel dans %d jours si aucune réponse") % days, timeout=4)
 
     def check_followups(self):
         now, keep, due = time.time(), [], []
@@ -1087,7 +1090,7 @@ class MainWindow(ExtrasMixin, OfflineMixin, ListMixin, AIMixin, FolderMixin, Gtk
             n = Gio.Notification.new("Pas de réponse")
             n.set_body("« %s » — %s" % (f["subject"], f["to"]))
             self.get_application().send_notification("followup-" + f["id"], n)
-            self.toast.popup("Pas de réponse à « %s »" % f["subject"][:50], timeout=8)
+            self.toast.popup(tr("Pas de réponse à « %s »") % f["subject"][:50], timeout=8)
 
     # ---------------------------------------------------- recherches enregistrées
 
@@ -1106,10 +1109,10 @@ class MainWindow(ExtrasMixin, OfflineMixin, ListMixin, AIMixin, FolderMixin, Gtk
     def save_current_search(self):
         q = (self.search_entry.get_text() or self.search).strip()
         if not q:
-            self.toast.popup("Tapez d'abord une recherche, puis enregistrez-la", timeout=3)
+            self.toast.popup(tr("Tapez d'abord une recherche, puis enregistrez-la"), timeout=3)
             return
-        d = Gtk.Dialog(title="Enregistrer la recherche", transient_for=self, modal=True)
-        d.add_buttons("Annuler", Gtk.ResponseType.CANCEL, "Enregistrer", Gtk.ResponseType.OK)
+        d = Gtk.Dialog(title=tr("Enregistrer la recherche"), transient_for=self, modal=True)
+        d.add_buttons(tr("Annuler"), Gtk.ResponseType.CANCEL, tr("Enregistrer"), Gtk.ResponseType.OK)
         e = Gtk.Entry(text=q)
         e.set_activates_default(True)
         d.set_default_response(Gtk.ResponseType.OK)
@@ -1143,11 +1146,11 @@ class MainWindow(ExtrasMixin, OfflineMixin, ListMixin, AIMixin, FolderMixin, Gtk
         """Synchronise les comptes en arrière-plan ; les nouveaux messages apparaissent par lots, les plus récents d'abord."""
         if self._sync_busy or self._pending:
             if manual:
-                self.toast.popup("Synchronisation déjà en cours…", timeout=2)
+                self.toast.popup(tr("Synchronisation déjà en cours…"), timeout=2)
             return
         self._sync_busy = True
         if not quiet:
-            self.status.set_text("Synchronisation…")
+            self.status.set_text(tr("Synchronisation…"))
         accounts = [a for a in self.accounts() if not accounts or a["id"] in accounts]
         known = {(a["id"], f): self.cache.uids(a["id"], f) for a in accounts for f in folders}
         self._partial_ids = set()
@@ -1178,11 +1181,12 @@ class MainWindow(ExtrasMixin, OfflineMixin, ListMixin, AIMixin, FolderMixin, Gtk
     def _sync_done(self, results, err, known, manual):
         """Intègre les résultats de synchronisation dans le cache et l'interface."""
         self._sync_busy = False
-        errors, fresh, routed_inbox = [], [], []
+        errors, fresh, routed_inbox, net_flags = [], [], [], []
         for aid, f, data, e in results:
             if e or not data:
                 if e:
                     errors.append(str(e))
+                    net_flags.append(is_retryable(e))      # indépendant de la langue des messages
                 continue
             msgs, flags, present, minuid = data
             self.cache.upsert_many([m for m in msgs if m.id not in self._partial_ids])
@@ -1204,8 +1208,7 @@ class MainWindow(ExtrasMixin, OfflineMixin, ListMixin, AIMixin, FolderMixin, Gtk
                 if kn:
                     fresh += [m for m in keep if m.unread]
         self._last_sync = time.time()
-        self._net_error = bool(errors) and any(w in errors[0].lower() for w in (
-            "connexion", "connection", "timed out", "resolution", "unreachable", "réseau", "name or service"))
+        self._net_error = bool(errors) and any(net_flags)
         if not errors:
             self._set_offline(False)
         if errors:
@@ -1213,7 +1216,7 @@ class MainWindow(ExtrasMixin, OfflineMixin, ListMixin, AIMixin, FolderMixin, Gtk
             if manual:
                 self.toast.popup(errors[0][:100], timeout=6)
         else:
-            self.status.set_text("Synchronisé à " + time.strftime("%H:%M"))
+            self.status.set_text(tr("Synchronisé à ") + time.strftime("%H:%M"))
             self.flush_ops()
         if errors and self._net_error:
             self.update_offline_status()
@@ -1265,12 +1268,12 @@ class MainWindow(ExtrasMixin, OfflineMixin, ListMixin, AIMixin, FolderMixin, Gtk
             _ok, errs, offline = res if res else ([], [], False)
             self._set_offline(offline)
             if offline:
-                self.toast.popup("Hors ligne : le déplacement est conservé et sera envoyé dès le retour du réseau.", timeout=6)
+                self.toast.popup(tr("Hors ligne : le déplacement est conservé et sera envoyé dès le retour du réseau."), timeout=6)
                 self.reload_list()
                 self.update_counts()
                 return
             if err or errs:
-                self.toast.popup("Échec du déplacement : %s" % ((errs or [str(err)])[0][:80]), timeout=6)
+                self.toast.popup(tr("Échec du déplacement : %s") % ((errs or [str(err)])[0][:80]), timeout=6)
             real = []
             for m in msgs:
                 try:
@@ -1298,7 +1301,7 @@ class MainWindow(ExtrasMixin, OfflineMixin, ListMixin, AIMixin, FolderMixin, Gtk
 
     def _quote(self, msg):
         orig = sanitize_html(msg.html) if msg.html else text_to_html(msg.text)
-        return '<div id="qt"><br><div>Le %s, %s a écrit :</div><blockquote>%s</blockquote></div>' % (
+        return tr('<div id="qt"><br><div>Le %s, %s a écrit :</div><blockquote>%s</blockquote></div>') % (
             format_full(msg.date), html.escape(msg.display_sender), orig)
 
     def reply(self, msg, all_=False, ai_text=""):
@@ -1316,7 +1319,7 @@ class MainWindow(ExtrasMixin, OfflineMixin, ListMixin, AIMixin, FolderMixin, Gtk
 
     def forward(self, msg):
         msg = self._full(msg)
-        head = ("<br>---------- Message transféré ----------<br>De : %s &lt;%s&gt;<br>Date : %s<br>Objet : %s<br>À : %s<br>"
+        head = (tr("<br>---------- Message transféré ----------<br>De : %s &lt;%s&gt;<br>Date : %s<br>Objet : %s<br>À : %s<br>")
                 % (html.escape(msg.sender_name), html.escape(msg.sender_email), format_full(msg.date),
                    html.escape(msg.subject), html.escape(msg.to)))
         self.compose(account_id=self._default_account(msg), subject="Fwd: " + normalize_subject(msg.subject),
@@ -1363,69 +1366,70 @@ class MainWindow(ExtrasMixin, OfflineMixin, ListMixin, AIMixin, FolderMixin, Gtk
         if m:
             who, dom = m.sender_email, "@" + m.sender_email.split("@")[-1]
             cmds += [
-                ("Se désabonner de cet expéditeur", lambda: self.unsubscribe(m)),
-                ("✨ Résumer / analyser ce message", lambda: self.ai_fetch(self._full(m), force=True)),
-                ("✨ Répondre avec l'IA", lambda: self.ai_reply_with_ai(m)),
-                ("✨ Traduire ce message", lambda: self._on_ai_action(self.reader, "translate", "")),
-                ("Répondre", lambda: self.reply(m)), ("Répondre à tous", lambda: self.reply(m, True)),
-                ("Transférer", lambda: self.forward(m)),
-                ("Archiver", lambda: self.move_messages(self.selected_msgs() or [m], "archive")),
-                ("Supprimer", lambda: self.move_messages(self.selected_msgs() or [m], "trash")),
-                ("Signaler comme spam (ce message)", lambda: self.move_messages(self.selected_msgs() or [m], "spam")),
-                ("Mettre l'expéditeur en spam — " + who, lambda: self.spam_sender(m)),
-                ("Mettre le domaine en spam — " + dom, lambda: self.spam_sender(m, True)),
-                ("Bloquer l'expéditeur — " + who, lambda: self.block_sender(m)),
-                ("Bloquer le domaine — " + dom, lambda: self.block_sender(m, True)),
-                ("Voir tous les messages de " + who, lambda: self.show_from(m)),
-                ("Copier l'adresse " + who, lambda: self.copy_text(who)),
-                ("Reporter à demain 8 h", lambda: self.run_action("snooze", self.selected_msgs() or [m])),
-                ("Me rappeler si pas de réponse (3 jours)", lambda: self.add_followup(m, 3)),
-                ("Me rappeler si pas de réponse (7 jours)", lambda: self.add_followup(m, 7)),
-                ("Créer une règle pour " + who, lambda: self.show_settings("filters")),
+                (tr("Se désabonner de cet expéditeur"), lambda: self.unsubscribe(m)),
+                (tr("✨ Résumer / analyser ce message"), lambda: self.ai_fetch(self._full(m), force=True)),
+                (tr("✨ Répondre avec l'IA"), lambda: self.ai_reply_with_ai(m)),
+                (tr("✨ Traduire ce message"), lambda: self._on_ai_action(self.reader, "translate", "")),
+                (tr("Répondre"), lambda: self.reply(m)), (tr("Répondre à tous"), lambda: self.reply(m, True)),
+                (tr("Transférer"), lambda: self.forward(m)),
+                (tr("Archiver"), lambda: self.move_messages(self.selected_msgs() or [m], "archive")),
+                (tr("Supprimer"), lambda: self.move_messages(self.selected_msgs() or [m], "trash")),
+                (tr("Signaler comme spam (ce message)"), lambda: self.move_messages(self.selected_msgs() or [m], "spam")),
+                (tr("Mettre l'expéditeur en spam — ") + who, lambda: self.spam_sender(m)),
+                (tr("Mettre le domaine en spam — ") + dom, lambda: self.spam_sender(m, True)),
+                (tr("Bloquer l'expéditeur — ") + who, lambda: self.block_sender(m)),
+                (tr("Bloquer le domaine — ") + dom, lambda: self.block_sender(m, True)),
+                (tr("Voir tous les messages de ") + who, lambda: self.show_from(m)),
+                (tr("Copier l'adresse ") + who, lambda: self.copy_text(who)),
+                (tr("Reporter à demain 8 h"), lambda: self.run_action("snooze", self.selected_msgs() or [m])),
+                (tr("Me rappeler si pas de réponse (3 jours)"), lambda: self.add_followup(m, 3)),
+                (tr("Me rappeler si pas de réponse (7 jours)"), lambda: self.add_followup(m, 7)),
+                (tr("Créer une règle pour ") + who, lambda: self.show_settings("filters")),
             ]
             if self.is_blocked(m):
-                cmds.insert(9, ("Débloquer " + who, lambda: self.unblock(m)))
+                cmds.insert(9, (tr("Débloquer ") + who, lambda: self.unblock(m)))
         cmds += [
-            ("✨ Ouvrir l'assistant IA", lambda: self.toggle_assistant(True)),
-            ("✨ Résumer ma boîte de réception", lambda: self._maybe_digest(force=True)),
-            ("Nouveau message", self.compose), ("Actualiser", lambda: self.sync(True)),
-            ("Boîte d'envoi (messages en attente ou programmés)…", self.show_outbox),
-            ("Chercher aussi sur le serveur", self.search_server_now),
-            ("Aide et raccourcis (F1)", lambda: self.show_settings("help")),
-            ("Aujourd'hui : agenda, priorités, tâches, relances", self.show_today),
-            ("Nouvelle tâche…", self.task_add_dialog),
-            ("Agenda : prochains rendez-vous (Google Agenda)", self.show_agenda),
-            ("Nouvel événement dans l'agenda…", self.new_event_dialog),
-            ("Contacts…", lambda: self.show_settings("contacts")),
-            ("Identités d'envoi (alias)…", lambda: self.show_settings("identities")),
-            ("Gérer les expéditeurs bloqués et les règles", lambda: self.show_settings("filters")),
-            ("Appliquer les règles à la boîte de réception", self.apply_rules_now),
-            ("Enregistrer la recherche actuelle", self.save_current_search),
-            ("Disposition : colonnes", lambda: self.set_layout("columns")),
-            ("Disposition : lecture en bas", lambda: self.set_layout("bottom")),
-            ("Disposition : liste seule", lambda: self.set_layout("list")),
-            ("Barre latérale : réduire / étendre", self.toggle_rail),
-            ("Paramètres (Ctrl+,)", self.show_settings),
-            ("Paramètres dans une fenêtre séparée", lambda: self.show_settings(window=True)),
-            ("Réglages de l'IA", lambda: self.show_settings("ai")),
-            ("Journal d'erreurs", self.show_log), ("Gestes de swipe (réglages)", lambda: self.show_settings("gestures")),
-            ("Basculer thème clair / sombre", self.toggle_theme), ("Plein écran (F11)", self.toggle_fullscreen),
-            ("Tout marquer comme lu", self.mark_all_read),
-            ("Tout sélectionner", lambda: (self.sel_btn.set_active(True), self.listbox.select_all())),
-            ("Rechercher", lambda: self.search_entry.grab_focus()),
+            (tr("✨ Ouvrir l'assistant IA"), lambda: self.toggle_assistant(True)),
+            (tr("✨ Résumer ma boîte de réception"), lambda: self._maybe_digest(force=True)),
+            (tr("Nouveau message"), self.compose), (tr("Actualiser"), lambda: self.sync(True)),
+            (tr("Boîte d'envoi (messages en attente ou programmés)…"), self.show_outbox),
+            (tr("Chercher aussi sur le serveur"), self.search_server_now),
+            (tr("Aide et raccourcis (F1)"), lambda: self.show_settings("help")),
+            (tr("Aujourd'hui : agenda, priorités, tâches, relances"), self.show_today),
+            (tr("Nouvelle tâche…"), self.task_add_dialog),
+            (tr("Agenda : prochains rendez-vous (Google Agenda)"), self.show_agenda),
+            (tr("Nouvel événement dans l'agenda…"), self.new_event_dialog),
+            (tr("Contacts…"), lambda: self.show_settings("contacts")),
+            (tr("Identités d'envoi (alias)…"), lambda: self.show_settings("identities")),
+            (tr("Gérer les expéditeurs bloqués et les règles"), lambda: self.show_settings("filters")),
+            (tr("Appliquer les règles à la boîte de réception"), self.apply_rules_now),
+            (tr("Enregistrer la recherche actuelle"), self.save_current_search),
+            (tr("Disposition : colonnes"), lambda: self.set_layout("columns")),
+            (tr("Disposition : lecture en bas"), lambda: self.set_layout("bottom")),
+            (tr("Disposition : liste seule"), lambda: self.set_layout("list")),
+            (tr("Barre latérale : réduire / étendre"), self.toggle_rail),
+            (tr("Paramètres (Ctrl+,)"), self.show_settings),
+            (tr("Paramètres dans une fenêtre séparée"), lambda: self.show_settings(window=True)),
+            (tr("Réglages de l'IA"), lambda: self.show_settings("ai")),
+            (tr("Rechercher les mises à jour"), lambda: self.check_updates(manual=True)), (tr("Mises à jour"), lambda: self.show_settings("updates")),
+            (tr("Journal d'erreurs"), self.show_log), (tr("Gestes de swipe (réglages)"), lambda: self.show_settings("gestures")),
+            (tr("Basculer thème clair / sombre"), self.toggle_theme), (tr("Plein écran (F11)"), self.toggle_fullscreen),
+            (tr("Tout marquer comme lu"), self.mark_all_read),
+            (tr("Tout sélectionner"), lambda: (self.sel_btn.set_active(True), self.listbox.select_all())),
+            (tr("Rechercher"), lambda: self.search_entry.grab_focus()),
         ]
         for i, sv in enumerate(self.config["saved_searches"]):
-            cmds.append(("Supprimer la recherche enregistrée : " + sv["name"], lambda i=i: self.delete_saved(i)))
+            cmds.append((tr("Supprimer la recherche enregistrée : ") + sv["name"], lambda i=i: self.delete_saved(i)))
         multi = len(self.accounts()) > 1
         for acc in self.accounts():
             for e in self.tree_of(acc["id"]):
                 if e["selectable"]:
                     nm = e["path"] + ((" — " + (acc.get("name") or acc["email"])) if multi else "")
-                    cmds.append(("Aller au dossier : " + nm, lambda a=acc["id"], e=e: self.goto_folder(a, e)))
+                    cmds.append((tr("Aller au dossier : ") + nm, lambda a=acc["id"], e=e: self.goto_folder(a, e)))
         if m:
-            cmds.insert(0, ("Déplacer vers un dossier…", lambda: self.choose_folder_dialog(self.selected_msgs() or [m])))
+            cmds.insert(0, (tr("Déplacer vers un dossier…"), lambda: self.choose_folder_dialog(self.selected_msgs() or [m])))
         for vid, label, _ in NAV:
-            cmds.append(("Aller à : " + label, lambda v=vid: self._goto(v)))
+            cmds.append((tr("Aller à : ") + label, lambda v=vid: self._goto(v)))
         return cmds
 
     def show_palette(self):
@@ -1436,7 +1440,7 @@ class MainWindow(ExtrasMixin, OfflineMixin, ListMixin, AIMixin, FolderMixin, Gtk
         box = dlg.get_content_area()
         box.set_border_width(8)
         e = Gtk.SearchEntry()
-        e.set_placeholder_text("Tapez une commande — ou demandez n'importe quoi à l'IA…")
+        e.set_placeholder_text(tr("Tapez une commande — ou demandez n'importe quoi à l'IA…"))
         box.pack_start(e, False, False, 4)
         lb = Gtk.ListBox()
         sw = Gtk.ScrolledWindow()
@@ -1472,7 +1476,7 @@ class MainWindow(ExtrasMixin, OfflineMixin, ListMixin, AIMixin, FolderMixin, Gtk
             return t in r.label
 
         def changed(*_):
-            ai_lbl.set_text("✨ Demander à l'assistant : « %s »" % e.get_text().strip())
+            ai_lbl.set_text(tr("✨ Demander à l'assistant : « %s »") % e.get_text().strip())
             lb.invalidate_filter()
         lb.set_filter_func(visible)
         e.connect("search-changed", changed)

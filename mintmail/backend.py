@@ -20,6 +20,7 @@ from .models import Message
 from .store import DATA_DIR, private_dir, write_private
 from . import ical, oauth
 from .util import html_to_text, split_addresses, text_to_html, thread_key
+from .i18n import tr
 
 PRESETS = {
     "Gmail — connexion Google (OAuth, sans mot de passe)": dict(imap_host="imap.gmail.com", imap_port=993, smtp_host="smtp.gmail.com", smtp_port=587, oauth="google"),
@@ -108,7 +109,7 @@ TOP_RANK = {"inbox": 0, "drafts": 1, "sent": 2, "archive": 3, "spam": 4, "trash"
 
 def _q(name):
     if re.search(r"[\x00-\x1f\x7f]", name or ""):                 # CR / LF / NUL : injection de commande IMAP
-        raise BackendError("Nom de dossier invalide (caractères de contrôle)")
+        raise BackendError(tr("Nom de dossier invalide (caractères de contrôle)"))
     return '"' + name.replace("\\", "\\\\").replace('"', '\\"') + '"'
 
 
@@ -171,7 +172,7 @@ def parse_message(raw, account, logical, real_folder, uid, flags):
             d = DATA_DIR / "attachments" / re.sub(r"\W", "_", mid)
             private_dir(DATA_DIR / "attachments")
             private_dir(d)
-            fname = _safe(fname or "pièce jointe" + (mimetypes.guess_extension(part.get_content_type()) or ""))
+            fname = _safe(fname or tr("pièce jointe") + (mimetypes.guess_extension(part.get_content_type()) or ""))
             path = d / fname
             try:
                 write_private(path, data)                                    # 0600 : lisible par vous seul
@@ -273,9 +274,9 @@ class IMAPBackend:
                 imap.login(user, self.password)
             return imap
         except oauth.OAuthError as e:
-            raise BackendError("Connexion OAuth : %s" % e)
+            raise BackendError(tr("Connexion OAuth : %s") % e)
         except Exception as e:
-            raise BackendError("Connexion IMAP impossible : %s" % e, retryable=isinstance(e, (OSError, imaplib.IMAP4.abort)))
+            raise BackendError(tr("Connexion IMAP impossible : %s") % e, retryable=isinstance(e, (OSError, imaplib.IMAP4.abort)))
 
     def _list_raw(self, imap):
         """Liste complète des dossiers : [{name, path, label, depth, delim, special, selectable}] (arborescence triée)."""
@@ -365,7 +366,7 @@ class IMAPBackend:
         def fn(conn):
             typ, d = conn.imap.create(_q(utf7_encode(path)))
             if typ != "OK":
-                raise BackendError("Création impossible : %s" % (d[0].decode("utf-8", "replace") if d and d[0] else typ))
+                raise BackendError(tr("Création impossible : %s") % (d[0].decode("utf-8", "replace") if d and d[0] else typ))
         self._run("act", fn)
         self._reset_selection()
 
@@ -373,7 +374,7 @@ class IMAPBackend:
         def fn(conn):
             typ, d = conn.imap.rename(_q(old_raw), _q(utf7_encode(new_path)))
             if typ != "OK":
-                raise BackendError("Renommage impossible : %s" % (d[0].decode("utf-8", "replace") if d and d[0] else typ))
+                raise BackendError(tr("Renommage impossible : %s") % (d[0].decode("utf-8", "replace") if d and d[0] else typ))
         self._reset_selection()
         self._run("act", fn)
         self._reset_selection()
@@ -387,7 +388,7 @@ class IMAPBackend:
             conn.sel = None
             typ, d = conn.imap.delete(_q(raw))
             if typ != "OK":
-                raise BackendError("Suppression impossible : %s" % (d[0].decode("utf-8", "replace") if d and d[0] else typ))
+                raise BackendError(tr("Suppression impossible : %s") % (d[0].decode("utf-8", "replace") if d and d[0] else typ))
         self._run("act", fn)
         self._reset_selection()
 
@@ -422,7 +423,7 @@ class IMAPBackend:
                 except (imaplib.IMAP4.abort, ssl.SSLError, OSError) as e:
                     self._drop(conn)
                     if attempt:
-                        raise BackendError("Connexion IMAP perdue : %s" % e)
+                        raise BackendError(tr("Connexion IMAP perdue : %s") % e)
 
     def _select(self, conn, real, readonly=False):
         key = (real, readonly)
@@ -430,7 +431,7 @@ class IMAPBackend:
             typ, _ = conn.imap.select(_q(real), readonly=readonly)
             if typ != "OK":
                 conn.sel = None
-                raise BackendError("Dossier introuvable : %s" % real)
+                raise BackendError(tr("Dossier introuvable : %s") % real)
             conn.sel = key
 
     # ------------------------------------------------------------------------ API
@@ -554,7 +555,7 @@ class IMAPBackend:
             imap = conn.imap
             target = self._resolve(imap, dest)
             if not target and dest != "trash":
-                raise BackendError("Dossier « %s » introuvable sur le serveur." % dest)
+                raise BackendError(tr("Dossier « %s » introuvable sur le serveur.") % dest)
             for real, uids in by.items():
                 self._select(conn, real)
                 ids = ",".join(str(u) for u in uids)
@@ -621,16 +622,16 @@ class IMAPBackend:
                     return b""
             data = sock.recv(4096)
             if not data:
-                raise imaplib.IMAP4.abort("connexion fermée")
+                raise imaplib.IMAP4.abort(tr("connexion fermée"))
             return data
         sock.sendall(tag + b" IDLE\r\n")
         buf, t0 = b"", time.time()
         while b"\n" not in buf:
             buf += read(2)
             if time.time() - t0 > 15:
-                raise imaplib.IMAP4.abort("IDLE sans réponse")
+                raise imaplib.IMAP4.abort(tr("IDLE sans réponse"))
         if not buf.startswith(b"+"):
-            raise imaplib.IMAP4.error("IDLE non pris en charge")
+            raise imaplib.IMAP4.error(tr("IDLE non pris en charge"))
         buf = buf.split(b"\n", 1)[1]
         changed, end = False, time.time() + max_wait
         while not stop.is_set() and time.time() < end and not changed:
@@ -688,17 +689,17 @@ class IMAPBackend:
                 em.add_attachment(f.read(), maintype=mt, subtype=st, filename=os.path.basename(path))
         rcpt = split_addresses(out.to) + split_addresses(out.cc) + split_addresses(out.bcc)
         if not rcpt:
-            raise BackendError("Aucun destinataire valide.")
+            raise BackendError(tr("Aucun destinataire valide."))
         try:
             s = self._smtp()
             s.send_message(em, from_addr=from_email, to_addrs=rcpt)
             s.quit()
         except (smtplib.SMTPAuthenticationError, smtplib.SMTPRecipientsRefused, smtplib.SMTPSenderRefused, smtplib.SMTPDataError) as e:
-            raise BackendError("Envoi impossible : %s" % e)                       # refus définitif : inutile de réessayer
+            raise BackendError(tr("Envoi impossible : %s") % e)                       # refus définitif : inutile de réessayer
         except oauth.OAuthError as e:
-            raise BackendError("Envoi impossible : %s" % e, retryable="connexion impossible" in str(e))
+            raise BackendError(tr("Envoi impossible : %s") % e, retryable=getattr(e, "retryable", False))
         except (OSError, smtplib.SMTPException) as e:
-            raise BackendError("Envoi impossible : %s" % e, retryable=True)       # réseau : conservé et rejoué plus tard
+            raise BackendError(tr("Envoi impossible : %s") % e, retryable=True)       # réseau : conservé et rejoué plus tard
         if "gmail" not in a.get("imap_host", ""):
             try:
                 imap = self._connect()

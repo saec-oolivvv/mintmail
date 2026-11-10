@@ -2,6 +2,7 @@
 from types import SimpleNamespace
 
 from .backend import is_retryable      # noqa: F401  (réexporté pour la fenêtre)
+from .i18n import tr
 
 MAX_TRIES = 8
 
@@ -73,9 +74,9 @@ class OfflineMixin:
                 self.cache.delete_many([i["id"] for o in moved for i in o["payload"]["items"]])
                 self.sync(folders=("inbox", "sent", "archive", "trash", "spam"), quiet=True)
             if errors:
-                self.toast.popup("Une action en attente a été refusée par le serveur : %s" % errors[0][:80], timeout=6)
+                self.toast.popup(tr("Une action en attente a été refusée par le serveur : %s") % errors[0][:80], timeout=6)
             elif ok and not offline:
-                self.toast.popup("Réseau rétabli : %d action(s) envoyée(s) au serveur" % len(ok), timeout=4)
+                self.toast.popup(tr("Réseau rétabli : %d action(s) envoyée(s) au serveur") % len(ok), timeout=4)
             self.reload_list()
             self.update_counts()
         self.run_bg(work, done)
@@ -87,6 +88,6 @@ class OfflineMixin:
     def update_offline_status(self):
         n = self.cache.ops_count() + self.cache.outbox_count()
         if self.offline or (n and getattr(self, "_net_error", False)):
-            self.status.set_text("⚠ Hors ligne — %d action(s) en attente, rejouées automatiquement" % n)
+            self.status.set_text(tr("⚠ Hors ligne — %d action(s) en attente, rejouées automatiquement") % n)
         elif n:
-            self.status.set_text("%d action(s) en attente d'envoi" % n)
+            self.status.set_text(tr("%d action(s) en attente d'envoi") % n)

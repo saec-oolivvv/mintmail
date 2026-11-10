@@ -4,6 +4,7 @@ import datetime
 import time
 
 import gi
+from .i18n import tr
 gi.require_version("Gtk", "3.0")
 gi.require_version("Gdk", "3.0")
 from gi.repository import Gtk, Gdk, GLib
@@ -12,7 +13,7 @@ from .util import format_full
 from .widgets import MessageRow, row_at_event
 
 PAGE = 100
-FOLDER_VERBS = {"archive": "archivé", "trash": "supprimé", "spam": "signalé comme spam", "inbox": "déplacé"}
+FOLDER_VERBS = {"archive": tr("archivé"), "trash": tr("supprimé"), "spam": tr("signalé comme spam"), "inbox": tr("déplacé")}
 
 
 class ListMixin:
@@ -65,12 +66,12 @@ class ListMixin:
         finally:
             self._loading = False
         self.list_stack.set_visible_child_name("list" if msgs else "empty")
-        self.empty_lbl.set_text("Aucun résultat" if self._effective_search() else "Aucun message ici — profitez-en 🎉")
+        self.empty_lbl.set_text(tr("Aucun résultat") if self._effective_search() else tr("Aucun message ici — profitez-en 🎉"))
         self._sync_reader()
         self.refresh_digest_visibility()
         unread = sum(1 for r in self.rows.values() if r.msg.unread)
         n = len(self.rows)
-        self.count_lbl.set_text("%d message%s · %d non lu%s" % (n, "s" if n > 1 else "", unread, "s" if unread > 1 else ""))
+        self.count_lbl.set_text(tr("%d message%s · %d non lu%s") % (n, "s" if n > 1 else "", unread, "s" if unread > 1 else ""))
 
     def _sync_reader(self):
         """Aligne le lecteur sur la sélection après une mise à jour de la liste."""
@@ -131,7 +132,7 @@ class ListMixin:
         for r in self.rows.values():
             r.set_checked(r in sel)
         self.bulk_rev.set_reveal_child(n >= 1)
-        self.bulk_lbl.set_text("%d sélectionné%s" % (n, "s" if n > 1 else ""))
+        self.bulk_lbl.set_text(tr("%d sélectionné%s") % (n, "s" if n > 1 else ""))
         if n > 1:
             self.reader.show_multi(n)
         elif n == 1:
@@ -188,27 +189,27 @@ class ListMixin:
                 lb.select_row(row)
         m = self.cache.get(row.msg.id) or row.msg
         menu = Gtk.Menu()
-        items = [("Répondre", lambda: self.reply(m)), ("Répondre à tous", lambda: self.reply(m, True)),
-                 ("Transférer", lambda: self.forward(m)), ("✨ Répondre avec l'IA", lambda: self.ai_reply_with_ai(m)), None,
-                 ("Archiver", lambda: self.move_messages(self.selected_msgs(), "archive")),
-                 ("Supprimer", lambda: self.move_messages(self.selected_msgs(), "trash")),
-                 ("Marquer comme %s" % ("lu" if m.unread else "non lu"),
+        items = [(tr("Répondre"), lambda: self.reply(m)), (tr("Répondre à tous"), lambda: self.reply(m, True)),
+                 (tr("Transférer"), lambda: self.forward(m)), (tr("✨ Répondre avec l'IA"), lambda: self.ai_reply_with_ai(m)), None,
+                 (tr("Archiver"), lambda: self.move_messages(self.selected_msgs(), "archive")),
+                 (tr("Supprimer"), lambda: self.move_messages(self.selected_msgs(), "trash")),
+                 (tr("Marquer comme %s") % ("lu" if m.unread else tr("non lu")),
                   lambda: self.set_unread(self.selected_msgs(), not m.unread)),
-                 ("Retirer des favoris" if m.starred else "Ajouter aux favoris",
+                 (tr("Retirer des favoris") if m.starred else tr("Ajouter aux favoris"),
                   lambda: self.set_flag(self.selected_msgs(), "starred", not m.starred)),
-                 ("Désépingler" if m.pinned else "Épingler",
+                 (tr("Désépingler") if m.pinned else tr("Épingler"),
                   lambda: self.set_flag(self.selected_msgs(), "pinned", not m.pinned)), None,
-                 ("Signaler comme spam", lambda: self.move_messages(self.selected_msgs(), "spam")),
-                 ("Mettre l'expéditeur en spam", lambda: self.spam_sender(m)),
-                 ("Bloquer l'expéditeur", lambda: self.block_sender(m)),
-                 ("Voir tous ses messages", lambda: self.show_from(m)),
-                 ("Ajouter aux contacts", lambda: self.contact_add(m)),
-                 ("✔ Ajouter aux tâches…", lambda: self.task_add_dialog(m))]
+                 (tr("Signaler comme spam"), lambda: self.move_messages(self.selected_msgs(), "spam")),
+                 (tr("Mettre l'expéditeur en spam"), lambda: self.spam_sender(m)),
+                 (tr("Bloquer l'expéditeur"), lambda: self.block_sender(m)),
+                 (tr("Voir tous ses messages"), lambda: self.show_from(m)),
+                 (tr("Ajouter aux contacts"), lambda: self.contact_add(m)),
+                 (tr("✔ Ajouter aux tâches…"), lambda: self.task_add_dialog(m))]
         if self._gcal_cfg():
-            items.append(("sous-menu", "📅 Proposer des créneaux (agenda)",
-                          [(lab, lambda mn=mn: self.propose_slots(m, mn)) for lab, mn in (("30 minutes", 30), ("1 heure", 60), ("1 h 30", 90))]))
+            items.append(("sous-menu", tr("📅 Proposer des créneaux (agenda)"),
+                          [(lab, lambda mn=mn: self.propose_slots(m, mn)) for lab, mn in ((tr("30 minutes"), 30), (tr("1 heure"), 60), ("1 h 30", 90))]))
         if getattr(m, "unsubscribe", ""):
-            items.append(("Se désabonner de cet expéditeur", lambda: self.unsubscribe(m)))
+            items.append((tr("Se désabonner de cet expéditeur"), lambda: self.unsubscribe(m)))
         items += [None] + self.ai_menu_items(m)    # section IA : classement, réponses, résumé, traduction, agenda…
         for it in items:
             if it is None:
@@ -227,10 +228,10 @@ class ListMixin:
             mi = Gtk.MenuItem(label=it[0])
             mi.connect("activate", lambda _i, f=it[1]: f())
             menu.append(mi)
-        sn = Gtk.MenuItem(label="Reporter")
+        sn = Gtk.MenuItem(label=tr("Reporter"))
         sn.set_submenu(self.build_snooze_menu())
         menu.append(sn)
-        mv = Gtk.MenuItem(label="Déplacer vers un dossier")
+        mv = Gtk.MenuItem(label=tr("Déplacer vers un dossier"))
         mv.set_submenu(self.build_move_menu(self.selected_msgs()))
         menu.append(mv)
         menu.show_all()
@@ -291,25 +292,25 @@ class ListMixin:
         who = msg.sender_email
         dom = "@" + who.split("@")[-1]
         if kind == "spam":
-            return [("Signaler ce message comme spam", lambda: self.move_messages([msg], "spam")),
-                    ("Mettre %s en spam" % who, lambda: self.spam_sender(msg)),
-                    ("Mettre tout le domaine %s en spam" % dom, lambda: self.spam_sender(msg, True))]
+            return [(tr("Signaler ce message comme spam"), lambda: self.move_messages([msg], "spam")),
+                    (tr("Mettre %s en spam") % who, lambda: self.spam_sender(msg)),
+                    (tr("Mettre tout le domaine %s en spam") % dom, lambda: self.spam_sender(msg, True))]
         if kind == "block":
-            items = [("Bloquer %s" % who, lambda: self.block_sender(msg)),
-                     ("Bloquer tout le domaine %s" % dom, lambda: self.block_sender(msg, True))]
+            items = [(tr("Bloquer %s") % who, lambda: self.block_sender(msg)),
+                     (tr("Bloquer tout le domaine %s") % dom, lambda: self.block_sender(msg, True))]
             if self.is_blocked(msg):
-                items.append(("Débloquer %s" % who, lambda: self.unblock(msg)))
+                items.append((tr("Débloquer %s") % who, lambda: self.unblock(msg)))
             return items
-        return [("Marquer comme %s" % ("lu" if msg.unread else "non lu"), lambda: self.set_unread([msg], not msg.unread)),
-                ("Désépingler" if msg.pinned else "Épingler", lambda: self.set_flag([msg], "pinned", not msg.pinned)),
-                ("Retirer des favoris" if msg.starred else "Ajouter aux favoris",
+        return [(tr("Marquer comme %s") % ("lu" if msg.unread else tr("non lu")), lambda: self.set_unread([msg], not msg.unread)),
+                (tr("Désépingler") if msg.pinned else tr("Épingler"), lambda: self.set_flag([msg], "pinned", not msg.pinned)),
+                (tr("Retirer des favoris") if msg.starred else tr("Ajouter aux favoris"),
                  lambda: self.set_flag([msg], "starred", not msg.starred)),
-                ("✨ Ranger / suggérer un dossier", lambda: self.ai_suggest_folder(msg)),
-                ("✨ Classer ma boîte de réception", lambda: self.ai_classify(self.cache.query("inbox", self.account, limit=60))),
-                ("✨ Répondre avec l'IA", lambda: self.ai_reply_with_ai(msg)),
-                ("Voir tous les messages de %s" % who, lambda: self.show_from(msg)),
-                ("Copier l'adresse %s" % who, lambda: self.copy_text(who)),
-                ("Me rappeler si pas de réponse (3 jours)", lambda: self.add_followup(msg, 3))]
+                (tr("✨ Ranger / suggérer un dossier"), lambda: self.ai_suggest_folder(msg)),
+                (tr("✨ Classer ma boîte de réception"), lambda: self.ai_classify(self.cache.query("inbox", self.account, limit=60))),
+                (tr("✨ Répondre avec l'IA"), lambda: self.ai_reply_with_ai(msg)),
+                (tr("Voir tous les messages de %s") % who, lambda: self.show_from(msg)),
+                (tr("Copier l'adresse %s") % who, lambda: self.copy_text(who)),
+                (tr("Me rappeler si pas de réponse (3 jours)"), lambda: self.add_followup(msg, 3))]
 
     def sender_menu(self, kind, msg):
         menu = Gtk.Menu()
@@ -318,10 +319,10 @@ class ListMixin:
             mi.connect("activate", lambda _i, f=fn: f())
             menu.append(mi)
         if kind == "more":
-            sn = Gtk.MenuItem(label="Reporter")
+            sn = Gtk.MenuItem(label=tr("Reporter"))
             sn.set_submenu(self.build_snooze_menu(lambda ts: self.snooze_msgs([msg], ts)))
             menu.append(sn)
-            mv = Gtk.MenuItem(label="Déplacer vers un dossier")
+            mv = Gtk.MenuItem(label=tr("Déplacer vers un dossier"))
             mv.set_submenu(self.build_move_menu([msg]))
             menu.append(mv)
         menu.show_all()
@@ -407,8 +408,8 @@ class ListMixin:
             return
         if dest == "trash" and all(m.folder == "trash" for m in msgs):
             d = Gtk.MessageDialog(transient_for=self, modal=True, message_type=Gtk.MessageType.QUESTION,
-                                  text="Supprimer définitivement %d message(s) ?" % len(msgs))
-            d.add_buttons("Annuler", Gtk.ResponseType.CANCEL, "Supprimer", Gtk.ResponseType.OK)
+                                  text=tr("Supprimer définitivement %d message(s) ?") % len(msgs))
+            d.add_buttons(tr("Annuler"), Gtk.ResponseType.CANCEL, tr("Supprimer"), Gtk.ResponseType.OK)
             ok = d.run() == Gtk.ResponseType.OK
             d.destroy()
             if not ok:
@@ -448,8 +449,8 @@ class ListMixin:
             self._bg_move(msgs, dest)
         n = len(msgs)
         verb = label or FOLDER_VERBS.get(dest, "déplacé")
-        self.toast.popup("%d message%s %s%s" % (n, "s" if n > 1 else "", verb, "s" if n > 1 and not label else ""),
-                         "Annuler", undo, timeout=self.config["undo_seconds"], on_expire=commit)
+        self.toast.popup(tr("%d message%s %s%s") % (n, "s" if n > 1 else "", verb, "s" if n > 1 and not label else ""),
+                         tr("Annuler"), undo, timeout=self.config["undo_seconds"], on_expire=commit)
 
     def snooze_selected(self, ts):
         self.snooze_msgs(self.selected_msgs(), ts)
@@ -471,7 +472,7 @@ class ListMixin:
                 self.cache.update(mid, snoozed_until=sn)
             self.reload_list()
             self.update_counts()
-        self.toast.popup("Reporté au %s" % format_full(ts), "Annuler", undo, timeout=5)
+        self.toast.popup(tr("Reporté au %s") % format_full(ts), tr("Annuler"), undo, timeout=5)
 
     def mark_all_read(self):
         msgs = self.cache.query(self.view, self.account, None, True, False, self._effective_search(), limit=1000)
@@ -494,7 +495,7 @@ class ListMixin:
         if msg is not None and msg.id not in {x.id for x in msgs} and msg.folder in ("inbox", "archive"):
             msgs.append(msg)
         dest = "trash" if kind == "blocked" else "spam"
-        label = ("Bloqué : " if kind == "blocked" else "En spam : ") + key
+        label = (tr("Bloqué : ") if kind == "blocked" else tr("En spam : ")) + key
         if msgs:
             self.move_messages(msgs, dest)
         else:

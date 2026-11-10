@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE policyconfig PUBLIC "-//freedesktop//DTD PolicyKit Policy Configuration 1.0//EN" "http://www.freedesktop.org/standards/PolicyKit/1.0/policyconfig.dtd">
+<policyconfig>
+  <vendor>SAEC</vendor>
+  <vendor_url>https://saec.me</vendor_url>
+  <action id="me.saec.mintmail.update">
+    <description>Install a MintMail update</description>
+    <description xml:lang="fr">Installer une mise à jour de MintMail</description>
+    <message>Authentication is required to install a MintMail update (signature already verified)</message>
+    <message xml:lang="fr">Une authentification est nécessaire pour installer une mise à jour de MintMail (signature déjà vérifiée)</message>
+    <defaults>
+      <allow_any>auth_admin</allow_any>
+      <allow_inactive>auth_admin</allow_inactive>
+      <allow_active>auth_admin</allow_active>
+    </defaults>
+    <annotate key="org.freedesktop.policykit.exec.path">/usr/lib/mintmail/apply-update</annotate>
+  </action>
+</policyconfig>

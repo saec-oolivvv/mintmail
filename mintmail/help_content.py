@@ -133,7 +133,7 @@ SECTIONS: List[Dict] = [
          "Clic droit sur un message → « 📅 Proposer des créneaux (agenda) » → 30 min / 1 h / 1 h 30. MintMail lit votre agenda, trouve 3 créneaux libres sur des jours "
          "ouvrables DIFFÉRENTS et ouvre la réponse avec le texte « Je vous propose les créneaux suivants : … » à relire et envoyer.\n"
          "Règles fixes : lundi–vendredi, de 9h00 à 17h30, à partir de dans 2 heures, sur les 15 prochains jours ; les événements « occupés » (y compris les journées entières) "
-         "bloquent, les événements marqués « disponible » non. Le texte est en français. Nécessite Google Agenda activé (Paramètres → Agenda) ; l'option n'apparaît pas sinon."),
+         "bloquent, les événements marqués « disponible » non. Le texte suit la langue de l'interface. Nécessite Google Agenda activé (Paramètres → Agenda) ; l'option n'apparaît pas sinon."),
         ("Brouillons de réponse préparés par l'IA (optionnel)",
          "Paramètres → IA → « Préparer des brouillons de réponse (messages importants) » (désactivé par défaut).\n"
          "• Quand arrive un message que l'IA juge important, de type « personne », qui attend une réponse (moins de 3 jours), MintMail prépare un brouillon dans Brouillons "
@@ -226,7 +226,7 @@ SECTIONS: List[Dict] = [
         ("Classement par l'IA dans des dossiers",
          "• Dans l'assistant : « classe mes emails » ; ou clic droit → ✨ Classer tous les messages de l'expéditeur / Classer ma boîte de réception.\n"
          "• L'IA propose un dossier par message : un dossier existant en priorité, sinon un nouveau nom court (6 nouveaux dossiers au maximum). "
-         "Elle suit vos habitudes de rangement.\n"
+         "Elle suit vos habitudes de rangement, la langue de l'interface.\n"
          "• Rien n'est déplacé ni créé avant votre validation (ligne par ligne ou en bloc). Les dossiers manquants sont créés sur le serveur au moment de valider.\n"
          "• Pour un seul message : ✨ Ranger dans « … » (suggéré par l'analyse, ou « selon vos habitudes »), ou « Suggérer un dossier… »."),
         ("Vos habitudes de rangement",
@@ -270,7 +270,8 @@ SECTIONS: List[Dict] = [
          "• Clic : aperçu intégré des images et des fichiers texte (txt, csv, json, md, log…), sinon ouverture avec l'application par défaut (PDF, Office…).\n"
          "• Clic droit : Ouvrir, Aperçu, Enregistrer sous…, Copier le chemin.\n"
          "• « ⬇ Tout enregistrer » (2 fichiers ou plus) copie tout dans un dossier sans rien écraser.\n"
-         "• Glisser une pastille vers le gestionnaire de fichiers ou le bureau copie le fichier."),
+         "• Glisser une pastille vers le gestionnaire de fichiers ou le bureau copie le fichier.\n"
+         "• Sécurité : les programmes et scripts (.exe, .sh, .desktop, .AppImage…) ne sont jamais ouverts depuis MintMail (enregistrement seulement) ; les fichiers HTML, SVG et Office avec macros demandent une confirmation."),
         ("Invitations",
          "Un message contenant une invitation (fichier .ics) affiche un encadré 📅 avec le titre, la date et le lieu :\n"
          "• Accepter / Peut-être / Refuser envoient la réponse iCalendar à l'organisateur (compris par Outlook, Google, Apple…), depuis l'adresse qui "
@@ -341,12 +342,31 @@ SECTIONS: List[Dict] = [
          "sombre (ou selon le système), couleur d'accent, densité de la liste (compacte, confortable, aérée), zoom du texte des messages. "
          "☰ → « Basculer clair / sombre » pour changer en un clic."),
         ("Autres réglages",
-         "• Charger les images distantes (non recommandé) · notifications de bureau · fréquence d'actualisation · délai d'annulation d'envoi.\n"
+         "• Charger les images distantes (non recommandé) · notifications de bureau · fréquence d'actualisation · délai d'annulation d'envoi · langue de l'interface (redémarrage nécessaire).\n"
          "• Gestes & disposition : disposition, gestes de balayage, inversion pavé tactile, conversations.\n"
          "• Paramètres → Raccourcis : liste des touches. « Réinitialiser l'apparence » remet les valeurs par défaut."),
         ("Pages de paramètres",
          "Comptes · Signatures · Apparence · ✨ Intelligence artificielle · Synchronisation P2P · Gestes & disposition · Filtres & blocage · "
-         "Modèles de réponse · Contacts · Identités d'envoi · Agenda (Google / CalDAV) · Raccourcis · Aide & Crédits. Échap revient à la boîte de réception."),
+         "Modèles de réponse · Contacts · Identités d'envoi · Agenda (Google / CalDAV) · Raccourcis · Mises à jour · Aide & Crédits. Échap revient à la boîte de réception."),
+    ]},
+    {"id": "updates", "title": "Mises à jour automatiques", "items": [
+        ("Comment ça marche",
+         "MintMail cherche une nouvelle version sur GitHub (dépôt réglé dans Paramètres → Mises à jour) au plus UNE FOIS PAR JOUR et vous l'annonce. "
+         "Une seule requête anonyme est envoyée, sans aucune donnée personnelle. Désactivable dans Paramètres → Mises à jour ; palette → « Rechercher les mises à jour » pour vérifier tout de suite."),
+        ("Installer en un clic",
+         "Paramètres → Mises à jour → « Installer la mise à jour » : le paquet est téléchargé, sa signature est vérifiée, puis le système demande votre mot de passe "
+         "administrateur. Fermez et relancez MintMail ensuite. Rien ne s'installe sans votre accord."),
+        ("Sécurité des mises à jour",
+         "• Chaque version est signée par SAEC. La clé de vérification est installée avec MintMail (/usr/share/mintmail/update-pubkey.pem, propriété de root) : "
+         "aucun réglage, aucune « Release » et aucun compte GitHub piraté ne peut la remplacer. GitHub ne sert que de transport.\n"
+         "• Refusés : signature absente ou invalide, paquet qui n'est pas MintMail, version qui n'est pas strictement plus récente (aucun retour en arrière), téléchargement corrompu ou trop gros, hôte inattendu.\n"
+         "• Le programme qui installe s'exécute en administrateur, copie le paquet dans un dossier privé, re-vérifie tout sur cette copie, puis installe avec apt.\n"
+         "• Sans clé de vérification installée, MintMail vous INFORME seulement des nouvelles versions."),
+        ("Si l'installation automatique est désactivée",
+         "La page Mises à jour en donne la raison. Clé de vérification absente : ce MintMail n'a pas été construit par la chaîne de publication signée. "
+         "pkexec absent : sudo apt install policykit-1. Dans tous les cas, vous pouvez télécharger le .deb de la « Release » sur GitHub et faire : sudo apt install ./mintmail_X.Y.Z_all.deb."),
+        ("Publier une version (développeurs)",
+         "Voir docs/RELEASING.md dans le dépôt : numéro de version unique (fichier VERSION), journal CHANGELOG.md, étiquette vX.Y.Z, paquet signé par tools/release.sh."),
     ]},
     {"id": "security", "title": "Sécurité et vie privée", "items": [
         ("Où sont vos données",
@@ -403,6 +423,23 @@ SECTIONS: List[Dict] = [
 ]
 
 
+def _data():
+    """(sections, raccourcis, options) dans la langue de l'interface. Le français est la source ; une langue sans aide dédiée
+    (locale/help_<langue>.json) retombe sur l'anglais, plus largement compris que le français."""
+    import json
+    from . import i18n
+    lang = i18n.current()
+    for code in ([lang] if lang != "fr" else []) + (["en"] if lang != "fr" else []):
+        try:
+            with open(i18n.LOCALE_DIR / ("help_%s.json" % code), encoding="utf-8") as f:
+                d = json.load(f)
+            return ([{"id": s["id"], "title": s["title"], "items": [tuple(i) for i in s["items"]]} for s in d["sections"]],
+                    [tuple(x) for x in d["shortcuts"]], [tuple(x) for x in d["cli"]])
+        except (OSError, ValueError, KeyError):
+            continue
+    return SECTIONS, SHORTCUTS_HELP, CLI_OPTIONS
+
+
 def _fill(text: str, ctx: Dict[str, str]) -> str:
     for k, v in ctx.items():
         text = text.replace("{%s}" % k, v)
@@ -410,17 +447,17 @@ def _fill(text: str, ctx: Dict[str, str]) -> str:
 
 
 def shortcuts_text() -> str:
-    return "\n".join("%-18s %s" % (k, d) for k, d in SHORTCUTS_HELP)
+    return "\n".join("%-18s %s" % (k, d) for k, d in _data()[1])
 
 
 def cli_text(ctx: Dict[str, str]) -> str:
-    return "\n".join("%s\n    %s" % (c, _fill(d, ctx)) for c, d in CLI_OPTIONS)
+    return "\n".join("%s\n    %s" % (c, _fill(d, ctx)) for c, d in _data()[2])
 
 
 def sections(ctx: Dict[str, str]) -> List[Dict]:
     """Sections prêtes à afficher : espaces réservés remplacés, tableaux de raccourcis et d'options développés."""
     out = []
-    for s in SECTIONS:
+    for s in _data()[0]:
         items = []
         for title, body in s["items"]:
             body = shortcuts_text() if body == "@SHORTCUTS@" else cli_text(ctx) if body == "@CLI@" else _fill(body, ctx)

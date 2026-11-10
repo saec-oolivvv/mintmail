@@ -6,6 +6,7 @@ import urllib.error
 import urllib.parse
 import urllib.request
 from typing import Dict, List, Tuple
+from .i18n import tr
 
 
 def parse_list_unsubscribe(header: str) -> Dict[str, List[str]]:
@@ -52,7 +53,7 @@ def public_host(url: str) -> bool:
 class _HttpsOnlyRedirect(urllib.request.HTTPRedirectHandler):
     def redirect_request(self, req, fp, code, msg, headers, newurl):
         if not newurl.lower().startswith("https://") or not public_host(newurl):
-            raise urllib.error.URLError("redirection non sécurisée refusée")
+            raise urllib.error.URLError(tr("redirection non sécurisée refusée"))
         return super().redirect_request(req, fp, code, msg, headers, newurl)
 
 
@@ -66,9 +67,9 @@ def _loopback(url: str) -> bool:
 def one_click_post(url: str, timeout: float = 15.0, allow_loopback_http: bool = False) -> Tuple[bool, str]:
     """POST « List-Unsubscribe=One-Click » (RFC 8058). HTTPS obligatoire (HTTP seulement vers le bouclage, pour les tests)."""
     if not (url.lower().startswith("https://") or (allow_loopback_http and _loopback(url))):
-        return False, "adresse non sécurisée"
+        return False, tr("adresse non sécurisée")
     if not allow_loopback_http and not public_host(url):
-        return False, "adresse interne ou non publique refusée"
+        return False, tr("adresse interne ou non publique refusée")
     req = urllib.request.Request(url, data=b"List-Unsubscribe=One-Click", method="POST",
                                  headers={"Content-Type": "application/x-www-form-urlencoded", "User-Agent": "MintMail"})
     try:

@@ -1,4 +1,4 @@
-# MintMail 1.10.2
+# MintMail 1.11.0
 
 Client mail moderne pour Linux Mint (Python / GTK3), inspiré de Spark Mail.
 
@@ -24,6 +24,11 @@ Dépendances (installées automatiquement via apt) : `python3-gi`, `gir1.2-gtk-3
 - Palette de commandes `Ctrl+K`, raccourcis clavier (voir Paramètres → Raccourcis), thème clair/sombre, couleur d'accent
 - Interface adaptative (panneau latéral escamotable, mode une colonne en fenêtre étroite), notifications de bureau, gestionnaire `mailto:`
 - Sans compte configuré : mode démonstration avec messages d'exemple
+
+## Nouveautés 1.11.0 — traduction et mises à jour automatiques
+**Mises à jour** : Paramètres → Mises à jour (recherche quotidienne sur GitHub, installation en un clic après vérification d'une signature ; voir docs/UPDATES.md). Elles ne s'installent automatiquement que si ce paquet contient la clé de vérification (voir docs/UPDATES.md, « Mise en route »).
+
+MintMail existe maintenant en **français et en anglais** (interface, aide F1, ligne de commande). Choix : Paramètres → Apparence → « Langue de l'interface » (Automatique = langue du système ; redémarrage nécessaire). Sont restés en français : les messages d'exemple du mode démonstration, le rapport de diagnostic, le journal, l'analyse des échéances de tâches (« demain », « avant vendredi »… ; les dates numériques 15/11 fonctionnent partout), les noms de dossiers que MintMail reconnaît chez votre fournisseur, et les invites envoyées à l'IA. D'autres langues (néerlandais, allemand, espagnol…) peuvent être pré-traduites avec `tools/translate_catalog.py` puis relues : voir `docs/I18N.md`.
 
 ## Nouveautés 1.10.2 — audit de sécurité
 Revue de sécurité complète et corrections ; le rapport (failles trouvées, corrigées, risques restants) est dans `SECURITY.md`. Principaux changements : HTML des e-mails nettoyé par liste blanche avec politique de sécurité de contenu (la fenêtre de rédaction exécutait du JavaScript à partir d'un nettoyage contournable), liens limités à http / https / mailto, pièces jointes exécutables bloquées, données privées en 0600 / 0700, lanceur isolé, synchronisation et désabonnement durcis. **Vous devez générer un nouveau code de jumelage si le vôtre est jugé faible** (avertissement dans Paramètres → Synchronisation).

@@ -2,6 +2,9 @@ import re
 import threading
 
 import gi
+from . import i18n
+from .updates_ui import updates_page
+from .i18n import tr
 gi.require_version("Gtk", "3.0")
 gi.require_version("Gdk", "3.0")
 from gi.repository import Gtk, Gdk, GLib
@@ -16,18 +19,18 @@ from .ai_service import AIService, AIServiceError, DEFAULT_API_BASE, DEFAULT_MOD
 from .settings_more import OAuthMixin, calendar_page, contacts_page, identities_page
 
 SHORTCUTS = [
-    ("C", "Nouveau message"), ("R", "Répondre"), ("A", "Répondre à tous"), ("F", "Transférer"),
-    ("E", "Archiver"), ("# / Suppr", "Supprimer"), ("S", "Favori"), ("P", "Épingler"),
-    ("U", "Marquer lu / non lu"), ("H", "Reporter à demain 8 h"), ("J / K", "Message suivant / précédent"),
-    ("/  ou  Ctrl+F", "Rechercher"), ("Ctrl+K", "Palette de commandes"), ("Ctrl+A", "Tout sélectionner"),
-    ("!", "Signaler comme spam"), ("B", "Menu Bloquer (adresse / domaine)"), ("\\", "Basculer colonnes / liste seule"), ("X", "Mode sélection"),
-    ("Ctrl+J", "Assistant IA"), ("F11", "Plein écran"), ("? … (recherche)", "Poser une question à l'IA"),
-    ("Ctrl+,", "Ouvrir les paramètres"), ("Ctrl+R", "Actualiser"), ("Échap", "Annuler la sélection / la recherche"),
-    ("V", "Déplacer vers un dossier"), ("T", "Aujourd'hui (agenda, priorités, tâches)"), ("Ctrl+N", "Nouveau message"), ("Ctrl+Maj+,", "Paramètres dans une fenêtre séparée"), ("F1", "Aide"),
+    ("C", tr("Nouveau message")), ("R", tr("Répondre")), ("A", tr("Répondre à tous")), ("F", tr("Transférer")),
+    ("E", tr("Archiver")), (tr("# / Suppr"), tr("Supprimer")), ("S", tr("Favori")), ("P", tr("Épingler")),
+    ("U", tr("Marquer lu / non lu")), ("H", tr("Reporter à demain 8 h")), ("J / K", tr("Message suivant / précédent")),
+    (tr("/  ou  Ctrl+F"), tr("Rechercher")), ("Ctrl+K", tr("Palette de commandes")), ("Ctrl+A", tr("Tout sélectionner")),
+    ("!", tr("Signaler comme spam")), ("B", tr("Menu Bloquer (adresse / domaine)")), ("\\", tr("Basculer colonnes / liste seule")), ("X", tr("Mode sélection")),
+    ("Ctrl+J", tr("Assistant IA")), ("F11", tr("Plein écran")), (tr("? … (recherche)"), tr("Poser une question à l'IA")),
+    ("Ctrl+,", tr("Ouvrir les paramètres")), ("Ctrl+R", tr("Actualiser")), (tr("Échap"), tr("Annuler la sélection / la recherche")),
+    ("V", tr("Déplacer vers un dossier")), ("T", tr("Aujourd'hui (agenda, priorités, tâches)")), ("Ctrl+N", tr("Nouveau message")), (tr("Ctrl+Maj+,"), tr("Paramètres dans une fenêtre séparée")), ("F1", tr("Aide")),
 ]
-SIG_TEMPLATE = ('<p><b>Prénom Nom</b><br>Fonction — Société<br>'
+SIG_TEMPLATE = (tr('<p><b>Prénom Nom</b><br>Fonction — Société<br>'
                 '📞 +32 000 00 00 00 · ✉ vous@exemple.be<br>'
-                '<a href="https://exemple.be">exemple.be</a></p>')
+                '<a href="https://exemple.be">exemple.be</a></p>'))
 
 
 def _row(grid, i, label, widget):
@@ -36,6 +39,15 @@ def _row(grid, i, label, widget):
     widget.set_hexpand(True)
     grid.attach(l, 0, i, 1, 1)
     grid.attach(widget, 1, i, 1, 1)
+
+
+# noms des fournisseurs affichés (les clés de PRESETS restent des identifiants stables)
+PRESET_LABELS = {
+    "Gmail — connexion Google (OAuth, sans mot de passe)": tr("Gmail — connexion Google (OAuth, sans mot de passe)"),
+    "Outlook / Microsoft 365 — connexion Microsoft (OAuth)": tr("Outlook / Microsoft 365 — connexion Microsoft (OAuth)"),
+    "Gmail (mot de passe d'application)": tr("Gmail (mot de passe d'application)"),
+    "Autre (manuel)": tr("Autre (manuel)"),
+}
 
 
 class SettingsPage(OAuthMixin, Gtk.Box):
@@ -51,32 +63,33 @@ class SettingsPage(OAuthMixin, Gtk.Box):
         back = Gtk.Button()
         bb = Gtk.Box(spacing=6)
         bb.pack_start(icon("go-previous-symbolic"), False, False, 0)
-        bb.pack_start(Gtk.Label(label="Retour"), False, False, 0)
+        bb.pack_start(Gtk.Label(label=tr("Retour")), False, False, 0)
         back.add(bb)
         back.get_style_context().add_class("pill")
         back.connect("clicked", lambda *_: self.win.close_settings())
-        ttl = Gtk.Label(label="Paramètres", xalign=0)
+        ttl = Gtk.Label(label=tr("Paramètres"), xalign=0)
         ttl.get_style_context().add_class("list-title")
         top.pack_start(back, False, False, 0)
         top.pack_start(ttl, True, True, 0)
-        hint = Gtk.Label(label="Échap pour revenir · Ctrl+, pour rouvrir")
+        hint = Gtk.Label(label=tr("Échap pour revenir · Ctrl+, pour rouvrir"))
         hint.get_style_context().add_class("dim")
         top.pack_end(hint, False, False, 0)
         self.pack_start(top, False, False, 0)
         self.stack = stack = Gtk.Stack()
-        stack.add_titled(self._scr(self._accounts_page()), "accounts", "Comptes")
-        stack.add_titled(self._scr(self._signature_page()), "sig", "Signatures")
-        stack.add_titled(self._scr(self._appearance_page()), "look", "Apparence")
-        stack.add_titled(self._ai_page(), "ai", "✨ Intelligence artificielle")
-        stack.add_titled(p2p_page(win), "p2p", "Synchronisation P2P")
-        stack.add_titled(gestures_page(win), "gestures", "Gestes & disposition")
-        stack.add_titled(filters_page(win), "filters", "Filtres & blocage")
-        stack.add_titled(templates_page(win), "templates", "Modèles de réponse")
-        stack.add_titled(contacts_page(win), "contacts", "Contacts")
-        stack.add_titled(identities_page(win), "identities", "Identités d'envoi")
-        stack.add_titled(self._scr(calendar_page(win)), "calendar", "Agenda (Google / CalDAV)")
-        stack.add_titled(self._shortcuts_page(), "keys", "Raccourcis")
-        stack.add_titled(help_page(), "help", "Aide & Crédits")
+        stack.add_titled(self._scr(self._accounts_page()), "accounts", tr("Comptes"))
+        stack.add_titled(self._scr(self._signature_page()), "sig", tr("Signatures"))
+        stack.add_titled(self._scr(self._appearance_page()), "look", tr("Apparence"))
+        stack.add_titled(self._ai_page(), "ai", tr("✨ Intelligence artificielle"))
+        stack.add_titled(p2p_page(win), "p2p", tr("Synchronisation P2P"))
+        stack.add_titled(gestures_page(win), "gestures", tr("Gestes & disposition"))
+        stack.add_titled(filters_page(win), "filters", tr("Filtres & blocage"))
+        stack.add_titled(templates_page(win), "templates", tr("Modèles de réponse"))
+        stack.add_titled(contacts_page(win), "contacts", tr("Contacts"))
+        stack.add_titled(identities_page(win), "identities", tr("Identités d'envoi"))
+        stack.add_titled(self._scr(calendar_page(win)), "calendar", tr("Agenda (Google / CalDAV)"))
+        stack.add_titled(self._shortcuts_page(), "keys", tr("Raccourcis"))
+        stack.add_titled(self._scr(updates_page(win)), "updates", tr("Mises à jour"))
+        stack.add_titled(help_page(), "help", tr("Aide & Crédits"))
         side = Gtk.StackSidebar()
         side.set_stack(stack)
         box = Gtk.Box()
@@ -113,7 +126,7 @@ class SettingsPage(OAuthMixin, Gtk.Box):
         sw.set_size_request(200, -1)
         sw.add(self.acc_list)
         left.pack_start(sw, True, True, 0)
-        add = Gtk.Button(label="＋ Ajouter un compte")
+        add = Gtk.Button(label=tr("＋ Ajouter un compte"))
         add.connect("clicked", self._add_account)
         left.pack_start(add, False, False, 0)
         page.pack_start(left, False, False, 0)
@@ -121,31 +134,31 @@ class SettingsPage(OAuthMixin, Gtk.Box):
         grid = Gtk.Grid(column_spacing=8, row_spacing=6)
         self.f_preset = Gtk.ComboBoxText()
         for k in PRESETS:
-            self.f_preset.append_text(k)
+            self.f_preset.append_text(PRESET_LABELS.get(k, k))
         self.f_preset.connect("changed", self._preset)
         self.f_name, self.f_email = Gtk.Entry(), Gtk.Entry()
         self.f_user, self.f_pass = Gtk.Entry(), Gtk.Entry()
         self.f_pass.set_visibility(False)
         self.f_ihost, self.f_iport = Gtk.Entry(), Gtk.Entry()
         self.f_shost, self.f_sport = Gtk.Entry(), Gtk.Entry()
-        self.f_ssl = Gtk.CheckButton(label="IMAP en SSL/TLS direct (port 993)")
+        self.f_ssl = Gtk.CheckButton(label=tr("IMAP en SSL/TLS direct (port 993)"))
         self.f_ssl.set_active(True)
-        for i, (lab, w) in enumerate((("Fournisseur", self.f_preset), ("Nom affiché", self.f_name),
-                                      ("Adresse e-mail", self.f_email), ("Identifiant", self.f_user),
-                                      ("Mot de passe", self.f_pass), ("Serveur IMAP", self.f_ihost),
-                                      ("Port IMAP", self.f_iport), ("Serveur SMTP", self.f_shost),
-                                      ("Port SMTP", self.f_sport))):
+        for i, (lab, w) in enumerate(((tr("Fournisseur"), self.f_preset), (tr("Nom affiché"), self.f_name),
+                                      (tr("Adresse e-mail"), self.f_email), (tr("Identifiant"), self.f_user),
+                                      (tr("Mot de passe"), self.f_pass), (tr("Serveur IMAP"), self.f_ihost),
+                                      (tr("Port IMAP"), self.f_iport), (tr("Serveur SMTP"), self.f_shost),
+                                      (tr("Port SMTP"), self.f_sport))):
             _row(grid, i, lab, w)
         grid.attach(self.f_ssl, 1, 9, 1, 1)
         btns = Gtk.Box(spacing=6)
-        test = Gtk.Button(label="Tester la connexion")
+        test = Gtk.Button(label=tr("Tester la connexion"))
         test.connect("clicked", self._test)
-        save = Gtk.Button(label="Enregistrer")
+        save = Gtk.Button(label=tr("Enregistrer"))
         save.get_style_context().add_class("suggested-action")
         save.connect("clicked", self._save_account)
-        rm = Gtk.Button(label="Supprimer ce compte")
+        rm = Gtk.Button(label=tr("Supprimer ce compte"))
         rm.connect("clicked", self._remove_account)
-        self.oauth_btn = Gtk.Button(label="🔑 Se connecter")
+        self.oauth_btn = Gtk.Button(label=tr("🔑 Se connecter"))
         self.oauth_btn.get_style_context().add_class("suggested-action")
         self.oauth_btn.set_no_show_all(True)
         self.oauth_btn.connect("clicked", self._oauth_login)
@@ -160,8 +173,8 @@ class SettingsPage(OAuthMixin, Gtk.Box):
         self.status = Gtk.Label(xalign=0)
         self.status.set_line_wrap(True)
         grid.attach(self.status, 1, 11, 1, 1)
-        note = Gtk.Label(xalign=0, label="Gmail / Yahoo / iCloud : créez un « mot de passe d'application » dans les "
-                                         "paramètres de sécurité du compte.")
+        note = Gtk.Label(xalign=0, label=tr("Gmail / Yahoo / iCloud : créez un « mot de passe d'application » dans les "
+                                         "paramètres de sécurité du compte."))
         note.set_line_wrap(True)
         note.get_style_context().add_class("dim")
         grid.attach(note, 1, 12, 1, 1)
@@ -196,8 +209,8 @@ class SettingsPage(OAuthMixin, Gtk.Box):
         self.f_email.set_text(a.get("email", ""))
         self.f_user.set_text(a.get("username", ""))
         self.f_pass.set_text("")
-        self.f_pass.set_placeholder_text("Enregistré — laisser vide pour le conserver"
-                                         if a.get("email") and a.get("has_password", True) else "Mot de passe")
+        self.f_pass.set_placeholder_text(tr("Enregistré — laisser vide pour le conserver")
+                                         if a.get("email") and a.get("has_password", True) else tr("Mot de passe"))
         self.f_ihost.set_text(a.get("imap_host", ""))
         self.f_iport.set_text(str(a.get("imap_port", 993)))
         self.f_shost.set_text(a.get("smtp_host", ""))
@@ -215,7 +228,8 @@ class SettingsPage(OAuthMixin, Gtk.Box):
         self.f_email.grab_focus()
 
     def _preset(self, combo):
-        p = PRESETS.get(combo.get_active_text() or "")
+        shown = combo.get_active_text() or ""
+        p = PRESETS.get({v: k for k, v in PRESET_LABELS.items()}.get(shown, shown))
         self._oauth = p.get("oauth") if p else None
         if p:
             self._oauth_token = None
@@ -231,7 +245,7 @@ class SettingsPage(OAuthMixin, Gtk.Box):
         try:
             ip, sp = int(self.f_iport.get_text()), int(self.f_sport.get_text())
         except ValueError:
-            self._say("Les ports doivent être des nombres.", True)
+            self._say(tr("Les ports doivent être des nombres."), True)
             return None
         a.update(name=self.f_name.get_text().strip(), email=self.f_email.get_text().strip(),
                  username=self.f_user.get_text().strip(), imap_host=self.f_ihost.get_text().strip(),
@@ -244,13 +258,13 @@ class SettingsPage(OAuthMixin, Gtk.Box):
             a.pop("auth", None)
             a.pop("oauth_provider", None)
         if not re.match(r"^[^@\s]+@[^@\s]+\.[^@\s]+$", a["email"]):
-            self._say("Adresse e-mail invalide.", True)
+            self._say(tr("Adresse e-mail invalide."), True)
             return None
         if not a["imap_host"] or not a["smtp_host"]:
-            self._say("Serveurs IMAP et SMTP requis (choisissez un fournisseur).", True)
+            self._say(tr("Serveurs IMAP et SMTP requis (choisissez un fournisseur)."), True)
             return None
         if not (1 <= ip <= 65535 and 1 <= sp <= 65535):
-            self._say("Port invalide (1 à 65535).", True)
+            self._say(tr("Port invalide (1 à 65535)."), True)
             return None
         return a
 
@@ -260,9 +274,9 @@ class SettingsPage(OAuthMixin, Gtk.Box):
             return
         typed = self._oauth_token or self.f_pass.get_text()
         if not typed and not a.get("has_password", True):
-            self._say("Saisissez le mot de passe (ou mot de passe d'application).", True)
+            self._say(tr("Saisissez le mot de passe (ou mot de passe d'application)."), True)
             return
-        self._say("Test de connexion en cours…")
+        self._say(tr("Test de connexion en cours…"))
 
         def work():
             pw = typed or self.cfg.password(a["id"])
@@ -279,7 +293,7 @@ class SettingsPage(OAuthMixin, Gtk.Box):
                 def set_password(self_, *_a):
                     pass
             err = make_backend(a, _C()).test()
-            GLib.idle_add(lambda: self._say("Connexion réussie (IMAP + SMTP)." if not err else err, bool(err)))
+            GLib.idle_add(lambda: self._say(tr("Connexion réussie (IMAP + SMTP).") if not err else err, bool(err)))
         threading.Thread(target=work, daemon=True).start()
 
     def _save_account(self, *_):
@@ -289,13 +303,13 @@ class SettingsPage(OAuthMixin, Gtk.Box):
         pw = self._oauth_token or self.f_pass.get_text()
         existing = next((x for x in self.cfg["accounts"] if x["id"] == a["id"]), None)
         if self._oauth and not pw and not (existing and existing.get("auth") == "oauth2" and existing.get("has_password", True)):
-            self._say("Connectez-vous d'abord avec le bouton « Se connecter ».", True)
+            self._say(tr("Connectez-vous d'abord avec le bouton « Se connecter »."), True)
             return
         if not self._oauth and not pw and not (existing and existing.get("has_password", True)):
-            self._say("Mot de passe requis.", True)
+            self._say(tr("Mot de passe requis."), True)
             return
         if any(x["email"].lower() == a["email"].lower() and x["id"] != a["id"] for x in self.cfg["accounts"]):
-            self._say("Ce compte existe déjà.", True)
+            self._say(tr("Ce compte existe déjà."), True)
             return
         first = not self.cfg["accounts"]
         if pw:
@@ -311,8 +325,8 @@ class SettingsPage(OAuthMixin, Gtk.Box):
         self.cfg.save()
         self.win.accounts_changed()
         self._reload_accounts(select=a["id"])
-        self._say("Compte enregistré. Synchronisation en cours…")
-        self.win.toast.popup("Compte ajouté. Réglages : icône ⚙ en haut à droite ou Ctrl+,", timeout=7)
+        self._say(tr("Compte enregistré. Synchronisation en cours…"))
+        self.win.toast.popup(tr("Compte ajouté. Réglages : icône ⚙ en haut à droite ou Ctrl+,"), timeout=7)
         if first:
             GLib.timeout_add(900, lambda: (self.win.close_settings(), False)[1])
 
@@ -320,9 +334,9 @@ class SettingsPage(OAuthMixin, Gtk.Box):
         aid = self.current.get("id")
         if aid and any(x["id"] == aid for x in self.cfg["accounts"]):
             d = Gtk.MessageDialog(transient_for=self.win, modal=True, message_type=Gtk.MessageType.QUESTION,
-                                  text="Supprimer ce compte de MintMail ?",
-                                  secondary_text="Les messages en cache seront effacés. Vos mails restent sur le serveur.")
-            d.add_buttons("Annuler", Gtk.ResponseType.CANCEL, "Supprimer", Gtk.ResponseType.OK)
+                                  text=tr("Supprimer ce compte de MintMail ?"),
+                                  secondary_text=tr("Les messages en cache seront effacés. Vos mails restent sur le serveur."))
+            d.add_buttons(tr("Annuler"), Gtk.ResponseType.CANCEL, tr("Supprimer"), Gtk.ResponseType.OK)
             ok = d.run() == Gtk.ResponseType.OK
             d.destroy()
             if not ok:
@@ -339,19 +353,19 @@ class SettingsPage(OAuthMixin, Gtk.Box):
         page = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
         page.set_border_width(14)
         top = Gtk.Box(spacing=8)
-        top.pack_start(Gtk.Label(label="Compte :"), False, False, 0)
+        top.pack_start(Gtk.Label(label=tr("Compte :")), False, False, 0)
         self.sig_combo = Gtk.ComboBoxText()
         self.sig_combo.connect("changed", self._sig_account)
         top.pack_start(self.sig_combo, False, False, 0)
-        tpl = Gtk.Button(label="Insérer un modèle")
+        tpl = Gtk.Button(label=tr("Insérer un modèle"))
         tpl.connect("clicked", lambda *_: self.sig_buf.set_text(SIG_TEMPLATE))
         top.pack_start(tpl, False, False, 0)
-        save = Gtk.Button(label="Enregistrer la signature")
+        save = Gtk.Button(label=tr("Enregistrer la signature"))
         save.get_style_context().add_class("suggested-action")
         save.connect("clicked", self._sig_save)
         top.pack_end(save, False, False, 0)
         page.pack_start(top, False, False, 0)
-        page.pack_start(Gtk.Label(label="Signature HTML (balises <b>, <a>, <img>… autorisées) :", xalign=0), False, False, 0)
+        page.pack_start(Gtk.Label(label=tr("Signature HTML (balises <b>, <a>, <img>… autorisées) :"), xalign=0), False, False, 0)
         self.sig_view = Gtk.TextView()
         self.sig_view.set_monospace(True)
         self.sig_buf = self.sig_view.get_buffer()
@@ -360,7 +374,7 @@ class SettingsPage(OAuthMixin, Gtk.Box):
         sw.set_size_request(-1, 150)
         sw.add(self.sig_view)
         page.pack_start(sw, False, True, 0)
-        page.pack_start(Gtk.Label(label="Aperçu :", xalign=0), False, False, 0)
+        page.pack_start(Gtk.Label(label=tr("Aperçu :"), xalign=0), False, False, 0)
         if HAS_WEBKIT:
             s = WebKit2.Settings()
             s.set_enable_javascript(False)
@@ -395,7 +409,7 @@ class SettingsPage(OAuthMixin, Gtk.Box):
         if a:
             a["signature_html"] = self.sig_buf.get_text(self.sig_buf.get_start_iter(), self.sig_buf.get_end_iter(), False)
             self.cfg.save()
-            self.win.toast.popup("Signature enregistrée", timeout=3)
+            self.win.toast.popup(tr("Signature enregistrée"), timeout=3)
 
     # --------------------------------------------------------- apparence
     def _appearance_page(self):
@@ -412,12 +426,12 @@ class SettingsPage(OAuthMixin, Gtk.Box):
             self._set("style", k)
         stylec.connect("changed", style_changed)
         theme = Gtk.ComboBoxText()
-        for k, v in (("system", "Système"), ("light", "Clair"), ("dark", "Sombre")):
+        for k, v in (("system", tr("Système")), ("light", tr("Clair")), ("dark", tr("Sombre"))):
             theme.append(k, v)
         theme.set_active_id(self.cfg["theme"])
         theme.connect("changed", lambda c: self._set("theme", c.get_active_id()))
         dens = Gtk.ComboBoxText()
-        for k, v in (("compact", "Compacte"), ("comfortable", "Confortable"), ("spacious", "Aérée")):
+        for k, v in (("compact", tr("Compacte")), ("comfortable", tr("Confortable")), ("spacious", tr("Aérée"))):
             dens.append(k, v)
         dens.set_active_id(self.cfg["density"])
         dens.connect("changed", lambda c: self._set("density", c.get_active_id()))
@@ -438,9 +452,9 @@ class SettingsPage(OAuthMixin, Gtk.Box):
         undo = Gtk.SpinButton.new_with_range(3, 30, 1)
         undo.set_value(self.cfg["undo_seconds"])
         undo.connect("value-changed", lambda s: self._set("undo_seconds", int(s.get_value())))
-        for i, (lab, w) in enumerate((("Style visuel", stylec), ("Mode", theme), ("Densité de la liste", dens), ("Couleur d'accent", color),
-                                      ("Charger les images distantes", imgs), ("Notifications de bureau", notif),
-                                      ("Actualiser toutes les (min)", refresh), ("Délai d'annulation d'envoi (s)", undo))):
+        for i, (lab, w) in enumerate(((tr("Style visuel"), stylec), (tr("Mode"), theme), (tr("Densité de la liste"), dens), (tr("Couleur d'accent"), color),
+                                      (tr("Charger les images distantes"), imgs), (tr("Notifications de bureau"), notif),
+                                      (tr("Actualiser toutes les (min)"), refresh), (tr("Délai d'annulation d'envoi (s)"), undo))):
             l = Gtk.Label(label=lab, xalign=1)
             w.set_halign(Gtk.Align.START)
             grid.attach(l, 0, i, 1, 1)
@@ -453,16 +467,31 @@ class SettingsPage(OAuthMixin, Gtk.Box):
             b.get_style_context().add_class("pill")
             b.connect("clicked", lambda _b, h=hexcol: (self._set("accent", h), color.set_rgba(self._rgba(h))))
             swatches.add(b)
-        grid.attach(Gtk.Label(label="Couleurs prédéfinies", xalign=1), 0, 8, 1, 1)
+        grid.attach(Gtk.Label(label=tr("Couleurs prédéfinies"), xalign=1), 0, 8, 1, 1)
         grid.attach(swatches, 1, 8, 1, 1)
-        clear = Gtk.Button(label="Vider le cache des messages")
+        clear = Gtk.Button(label=tr("Vider le cache des messages"))
         clear.set_halign(Gtk.Align.START)
         clear.connect("clicked", self._clear_cache)
-        reset = Gtk.Button(label="Rétablir l'apparence et la disposition par défaut")
+        reset = Gtk.Button(label=tr("Rétablir l'apparence et la disposition par défaut"))
         reset.set_halign(Gtk.Align.START)
         reset.connect("clicked", self._reset_look)
         grid.attach(clear, 1, 9, 1, 1)
         grid.attach(reset, 1, 10, 1, 1)
+        # langue de l'interface : « Automatique » = langue du système ; changement pris en compte au prochain démarrage
+        langc = Gtk.ComboBoxText()
+        langc.append("auto", tr("Automatique (langue du système)"))
+        for code in i18n.available():
+            langc.append(code, i18n.NAMES.get(code, code))
+        cur = self.cfg.get("ui_lang", "auto")
+        langc.set_active_id(cur if cur in ["auto"] + i18n.available() else "auto")
+
+        def lang_changed(c):
+            self._set("ui_lang", c.get_active_id())
+            self.win.toast.popup(tr("Langue enregistrée : redémarrez MintMail pour l'appliquer."), timeout=6)
+        langc.connect("changed", lang_changed)
+        langc.set_halign(Gtk.Align.START)
+        grid.attach(Gtk.Label(label=tr("Langue de l'interface"), xalign=1), 0, 11, 1, 1)
+        grid.attach(langc, 1, 11, 1, 1)
         return grid
 
     def _clear_cache(self, *_):
@@ -470,12 +499,12 @@ class SettingsPage(OAuthMixin, Gtk.Box):
         self.win.reload_list()
         self.win.update_counts()
         self.win.sync(True)
-        self.win.toast.popup("Cache vidé, resynchronisation…", timeout=3)
+        self.win.toast.popup(tr("Cache vidé, resynchronisation…"), timeout=3)
 
     def _reset_look(self, *_):
         d = Gtk.MessageDialog(transient_for=self.win, modal=True, message_type=Gtk.MessageType.QUESTION,
-                              text="Rétablir l'apparence, la disposition et les gestes par défaut ?")
-        d.add_buttons("Annuler", Gtk.ResponseType.CANCEL, "Rétablir", Gtk.ResponseType.OK)
+                              text=tr("Rétablir l'apparence, la disposition et les gestes par défaut ?"))
+        d.add_buttons(tr("Annuler"), Gtk.ResponseType.CANCEL, tr("Rétablir"), Gtk.ResponseType.OK)
         ok = d.run() == Gtk.ResponseType.OK
         d.destroy()
         if not ok:
@@ -510,14 +539,14 @@ class SettingsPage(OAuthMixin, Gtk.Box):
         cfg = self.cfg
         grid = Gtk.Grid(column_spacing=12, row_spacing=10)
         grid.set_border_width(18)
-        ttl = Gtk.Label(label="✨ Intelligence artificielle", xalign=0)
+        ttl = Gtk.Label(label=tr("✨ Intelligence artificielle"), xalign=0)
         ttl.get_style_context().add_class("list-title")
         grid.attach(ttl, 0, 0, 2, 1)
-        note = Gtk.Label(xalign=0, label="Résumés, réponses suggérées, tri par priorité, détection d'hameçonnage, rédaction, "
+        note = Gtk.Label(xalign=0, label=tr("Résumés, réponses suggérées, tri par priorité, détection d'hameçonnage, rédaction, "
                                          "traduction, assistant conversationnel capable d'agir sur votre boîte. Désactivée "
                                          "par défaut : une fois activée, le texte des messages traités est envoyé au fournisseur choisi "
                                          "(voir « Confidentialité »). Avec Ollama, tout reste sur votre machine. Aucune action "
-                                         "n'est exécutée sans votre accord.")
+                                         "n'est exécutée sans votre accord."))
         note.set_line_wrap(True)
         note.get_style_context().add_class("dim")
         grid.attach(note, 0, 1, 2, 1)
@@ -552,33 +581,33 @@ class SettingsPage(OAuthMixin, Gtk.Box):
                 self.win.refresh_ai()
             c.connect("changed", changed)
             add(label, c)
-        switch("IA activée", "ai_enabled")
-        switch("Analyser chaque message à l'ouverture", "ai_auto", True)
-        switch("Trier les nouveaux messages (priorité, spam)", "ai_triage", True)
-        switch("Résumé « En bref » de la boîte", "ai_digest", True)
-        switch("Préparer des brouillons de réponse (messages importants)", "ai_prepare_drafts", False)
-        combo("Confidentialité", "ai_privacy", (("full", "Texte complet (meilleurs résultats)"),
-                                                ("minimal", "Minimal : 500 premiers caractères")), "full")
-        combo("Langue de l'IA", "ai_lang", (("fr", "Français"), ("en", "English"), ("nl", "Nederlands"),
-                                            ("de", "Deutsch"), ("es", "Español")), "fr")
-        combo("Ton des rédactions", "ai_tone", (("neutral", "Neutre et poli"), ("formal", "Formel"),
-                                                 ("friendly", "Amical")), "neutral")
+        switch(tr("IA activée"), "ai_enabled")
+        switch(tr("Analyser chaque message à l'ouverture"), "ai_auto", True)
+        switch(tr("Trier les nouveaux messages (priorité, spam)"), "ai_triage", True)
+        switch(tr("Résumé « En bref » de la boîte"), "ai_digest", True)
+        switch(tr("Préparer des brouillons de réponse (messages importants)"), "ai_prepare_drafts", False)
+        combo(tr("Confidentialité"), "ai_privacy", (("full", tr("Texte complet (meilleurs résultats)")),
+                                                ("minimal", tr("Minimal : 500 premiers caractères"))), "full")
+        combo(tr("Langue de l'IA"), "ai_lang", (("fr", tr("Français")), ("en", "English"), ("nl", "Nederlands"),
+                                            ("de", "Deutsch"), ("es", tr("Español"))), "fr")
+        combo(tr("Ton des rédactions"), "ai_tone", (("neutral", tr("Neutre et poli")), ("formal", tr("Formel")),
+                                                 ("friendly", tr("Amical"))), "neutral")
 
         prov = Gtk.ComboBoxText()
         for k, (lab, _b, _m, _needs) in PROVIDERS.items():
             prov.append(k, lab)
         prov.set_active_id(cfg.get("ai_provider", "nvidia"))
-        add("Fournisseur", prov)
+        add(tr("Fournisseur"), prov)
         self.ai_key_entry = Gtk.Entry()
         self.ai_key_entry.set_visibility(False)
         self.ai_key_entry.set_hexpand(True)
         has_key = bool(cfg.get("ai_has_key") or cfg.get("nvidia_api_key"))
-        self.ai_key_entry.set_placeholder_text("Clé enregistrée — saisir pour la remplacer" if has_key else "Clé API NVIDIA (nvapi-…)")
-        save_key = Gtk.Button(label="Enregistrer la clé")
+        self.ai_key_entry.set_placeholder_text(tr("Clé enregistrée — saisir pour la remplacer") if has_key else tr("Clé API NVIDIA (nvapi-…)"))
+        save_key = Gtk.Button(label=tr("Enregistrer la clé"))
         krow = Gtk.Box(spacing=6)
         krow.pack_start(self.ai_key_entry, True, True, 0)
         krow.pack_start(save_key, False, False, 0)
-        add("Clé API", krow)
+        add(tr("Clé API"), krow)
         endpoint, model = Gtk.Entry(), Gtk.Entry()
         endpoint.set_placeholder_text(DEFAULT_API_BASE)
         endpoint.set_text(cfg.get("nvidia_api_base") or "")
@@ -586,9 +615,9 @@ class SettingsPage(OAuthMixin, Gtk.Box):
         model.set_text(cfg.get("ai_model") or "")
         for e in (endpoint, model):
             e.set_hexpand(True)
-        add("Endpoint API", endpoint)
-        add("Modèle", model)
-        detect = Gtk.Button(label="🔍 Détecter les modèles installés")
+        add(tr("Endpoint API"), endpoint)
+        add(tr("Modèle"), model)
+        detect = Gtk.Button(label=tr("🔍 Détecter les modèles installés"))
         add("", detect)
 
         def provider_changed(c):
@@ -603,20 +632,20 @@ class SettingsPage(OAuthMixin, Gtk.Box):
                 cfg.save()
                 self.win.refresh_ai()
             endpoint.set_placeholder_text(base or "https://…/v1 (compatible OpenAI)")
-            model.set_placeholder_text(mdl or "nom du modèle")
+            model.set_placeholder_text(mdl or tr("nom du modèle"))
             self.ai_key_entry.set_sensitive(needs_key or k == "custom")
             detect.set_visible(k != "nvidia")
-            self.ai_key_entry.set_placeholder_text("Clé enregistrée — saisir pour la remplacer" if has_key else (
-                "Clé API NVIDIA (nvapi-…)" if needs_key else "Facultatif (service local : aucune clé nécessaire)"))
+            self.ai_key_entry.set_placeholder_text(tr("Clé enregistrée — saisir pour la remplacer") if has_key else (
+                tr("Clé API NVIDIA (nvapi-…)") if needs_key else tr("Facultatif (service local : aucune clé nécessaire)")))
         prov.connect("changed", provider_changed)
         detect.set_no_show_all(True)
         self.ai_status = Gtk.Label(xalign=0)
         self.ai_status.set_line_wrap(True)
-        test_btn = Gtk.Button(label="Tester la connexion")
-        clear_btn = Gtk.Button(label="Vider le cache IA (%d éléments)" % self.win.cache.ai_count())
-        learn_btn = Gtk.Button(label="Oublier mes habitudes de rangement")
-        learn_btn.set_tooltip_text("Efface ce que MintMail a retenu de vos rangements (expéditeur → dossier)")
-        learn_btn.connect("clicked", lambda *_: (self.win.cache.learn_clear(), say("Habitudes de rangement effacées.")))
+        test_btn = Gtk.Button(label=tr("Tester la connexion"))
+        clear_btn = Gtk.Button(label=tr("Vider le cache IA (%d éléments)") % self.win.cache.ai_count())
+        learn_btn = Gtk.Button(label=tr("Oublier mes habitudes de rangement"))
+        learn_btn.set_tooltip_text(tr("Efface ce que MintMail a retenu de vos rangements (expéditeur → dossier)"))
+        learn_btn.connect("clicked", lambda *_: (self.win.cache.learn_clear(), say(tr("Habitudes de rangement effacées."))))
         brow = Gtk.Box(spacing=6)
         brow.pack_start(test_btn, False, False, 0)
         brow.pack_start(clear_btn, False, False, 0)
@@ -637,15 +666,15 @@ class SettingsPage(OAuthMixin, Gtk.Box):
             cfg.data.pop("nvidia_api_key", None)   # migration : plus jamais en clair
             cfg.save()
             self.ai_key_entry.set_text("")
-            self.ai_key_entry.set_placeholder_text("Clé enregistrée — saisir pour la remplacer")
+            self.ai_key_entry.set_placeholder_text(tr("Clé enregistrée — saisir pour la remplacer"))
             self.win.refresh_ai()
-            say("Clé enregistrée dans le trousseau.")
+            say(tr("Clé enregistrée dans le trousseau."))
 
         def store_text(key, entry, https=False):
             def save(*_):
                 v = entry.get_text().strip()
                 if https and v and not (v.startswith("https://") or (v.startswith("http://") and is_local_endpoint(v))):
-                    say("L'endpoint doit commencer par https:// (http:// seulement sur cette machine ou le réseau local).", True)
+                    say(tr("L'endpoint doit commencer par https:// (http:// seulement sur cette machine ou le réseau local)."), True)
                     return False
                 cfg[key] = v
                 cfg.save()
@@ -662,19 +691,19 @@ class SettingsPage(OAuthMixin, Gtk.Box):
             typed = self.ai_key_entry.get_text().strip()
             _l, pbase, pmodel, _n = PROVIDERS[cfg.get("ai_provider", "nvidia")]
             base, mdl = endpoint.get_text().strip() or pbase or None, model.get_text().strip() or pmodel or None
-            say("Test en cours…")
+            say(tr("Test en cours…"))
 
             def work():
                 key = typed or cfg.ai_key()
                 err, ok = AIService(api_key=key, api_base=base, model=mdl).test_connection()
-                GLib.idle_add(lambda: (say("Connexion réussie." if ok else err, not ok), False)[1])
+                GLib.idle_add(lambda: (say(tr("Connexion réussie.") if ok else err, not ok), False)[1])
             threading.Thread(target=work, daemon=True).start()
         test_btn.connect("clicked", test)
 
         def do_detect(*_):
             _l, pbase, _m, _n = PROVIDERS[cfg.get("ai_provider", "nvidia")]
             base = endpoint.get_text().strip() or pbase
-            say("Recherche des modèles…")
+            say(tr("Recherche des modèles…"))
 
             def work():
                 try:
@@ -684,7 +713,7 @@ class SettingsPage(OAuthMixin, Gtk.Box):
 
                 def show():
                     if err:
-                        say(err + " — Ollama est-il lancé (ollama serve) et un modèle installé (ollama pull llama3.2) ?", True)
+                        say(err + tr(" — Ollama est-il lancé (ollama serve) et un modèle installé (ollama pull llama3.2) ?"), True)
                         return False
                     menu = Gtk.Menu()
                     for n in names[:40]:
@@ -693,7 +722,7 @@ class SettingsPage(OAuthMixin, Gtk.Box):
                         menu.append(mi)
                     menu.show_all()
                     menu.popup_at_widget(detect, Gdk.Gravity.SOUTH_WEST, Gdk.Gravity.NORTH_WEST, None)
-                    say("%d modèle(s) trouvé(s) : choisissez-en un." % len(names))
+                    say(tr("%d modèle(s) trouvé(s) : choisissez-en un.") % len(names))
                     return False
                 GLib.idle_add(show)
             threading.Thread(target=work, daemon=True).start()
@@ -702,7 +731,7 @@ class SettingsPage(OAuthMixin, Gtk.Box):
 
         def clear(*_):
             self.win.cache.ai_clear()
-            clear_btn.set_label("Vider le cache IA (0 élément)")
+            clear_btn.set_label(tr("Vider le cache IA (0 élément)"))
             self.win.reload_list()
         clear_btn.connect("clicked", clear)
         return self._scr(grid)

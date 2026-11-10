@@ -9,15 +9,16 @@ from pathlib import Path
 from . import APP_NAME, __version__
 from .log import install_hook, log, log_exception
 from .store import CONFIG_DIR, DATA_DIR
+from .i18n import tr
 
-GUI_HELP = """MintMail ne peut pas démarrer : %s
+GUI_HELP = tr("""MintMail ne peut pas démarrer : %s
 
 Causes habituelles :
   - le Python utilisé n'est pas celui du système (conda, pyenv, venv…) : lancez /usr/bin/mintmail ;
   - il manque un composant : sudo apt install python3-gi gir1.2-gtk-3.0 gir1.2-webkit2-4.1
   - pas de session graphique (DISPLAY / WAYLAND_DISPLAY).
 Pour un rapport complet : /usr/bin/mintmail --diagnose
-"""
+""")
 
 
 def _head(path: Path, n: int = 4096) -> str:
@@ -49,13 +50,13 @@ def local_installs():
             ver = (app / "VERSION").read_text(encoding="utf-8").strip()
         except OSError:
             ver = "?"
-        found.append((app, "application locale", ver))
-    for p, what in ((home / ".local/bin/mintmail", "lanceur local"), (Path("/usr/local/bin/mintmail"), "lanceur système (/usr/local)")):
+        found.append((app, tr("application locale"), ver))
+    for p, what in ((home / ".local/bin/mintmail", tr("lanceur local")), (Path("/usr/local/bin/mintmail"), tr("lanceur système (/usr/local)"))):
         if p.exists() or p.is_symlink():
             found.append((p, what, _launcher_version(p) if "mintmail" in _head(p) else "?"))
-    for p, what in ((home / ".local/share/applications/mintmail.desktop", "entrée de menu locale"),
-                    (home / ".local/share/applications/me.saec.mintmail.desktop", "entrée de menu locale"),
-                    (home / ".local/share/icons/hicolor/scalable/apps/mintmail.svg", "icône locale")):
+    for p, what in ((home / ".local/share/applications/mintmail.desktop", tr("entrée de menu locale")),
+                    (home / ".local/share/applications/me.saec.mintmail.desktop", tr("entrée de menu locale")),
+                    (home / ".local/share/icons/hicolor/scalable/apps/mintmail.svg", tr("icône locale"))):
         if p.exists():
             found.append((p, what, ""))
     opt = Path("/opt/mintmail")
@@ -64,7 +65,7 @@ def local_installs():
             ver = (opt / "VERSION").read_text(encoding="utf-8").strip()
         except OSError:
             ver = "?"
-        found.append((opt, "application système (/opt)", ver))
+        found.append((opt, tr("application système (/opt)"), ver))
     return found
 
 
@@ -75,29 +76,29 @@ def remove_local_install(argv=None) -> int:
     home = Path.home()
     items = local_installs()
     if not items:
-        print("Aucune installation de MintMail hors paquet .deb.")
+        print(tr("Aucune installation de MintMail hors paquet .deb."))
         return 0
-    print("Installations de MintMail hors paquet .deb (le paquet installé est la version %s) :" % __version__)
+    print(tr("Installations de MintMail hors paquet .deb (le paquet installé est la version %s) :") % __version__)
     for p, what, ver in items:
         flag = ""
         if ver and ver != "?" and not ver.startswith("1."):
-            flag = "   <-- version INCONNUE de ce paquet : peut-être votre propre version, ne la retirez pas sans vérifier"
+            flag = tr("   <-- version INCONNUE de ce paquet : peut-être votre propre version, ne la retirez pas sans vérifier")
         print("  - %-30s %s%s%s" % (what, p, ("  [version %s]" % ver) if ver else "", flag))
     mine = [(p, w, v) for p, w, v in items if str(p).startswith(str(home))]
     system = [(p, w, v) for p, w, v in items if not str(p).startswith(str(home))]
     if system:
-        print("\nÉléments système (ce programme n'y touche jamais) : retirez-les vous-même si besoin, par ex.")
+        print(tr("\nÉléments système (ce programme n'y touche jamais) : retirez-les vous-même si besoin, par ex."))
         for p, _w, _v in system:
             print("    sudo mv %s %s.sauvegarde" % (p, p))
     if "--yes" not in argv:
-        print("\nRien n'a été modifié. Pour METTRE DE CÔTÉ (sans supprimer) les éléments de votre dossier personnel :")
+        print(tr("\nRien n'a été modifié. Pour METTRE DE CÔTÉ (sans supprimer) les éléments de votre dossier personnel :"))
         print("    /usr/bin/mintmail --remove-local-install --yes")
         return 0
     dest = home / ("mintmail-sauvegarde-" + time.strftime("%Y%m%d-%H%M%S"))
     moved = []
     for p, what, ver in mine:
         if p.is_file() and p.suffix != ".svg" and "mintmail" not in _head(p):
-            print("Conservé (ne semble pas venir de MintMail) : %s" % p)
+            print(tr("Conservé (ne semble pas venir de MintMail) : %s") % p)
             continue
         try:
             dest.mkdir(exist_ok=True)
@@ -105,13 +106,13 @@ def remove_local_install(argv=None) -> int:
             shutil.move(str(p), str(target))
             moved.append((p, target))
         except OSError as e:
-            print("Impossible de déplacer %s : %s" % (p, e))
+            print(tr("Impossible de déplacer %s : %s") % (p, e))
     for p, t in moved:
-        print("Mis de côté : %s  ->  %s" % (p, t))
-    print("\nVos réglages (~/.config/mintmail) et votre courrier en cache n'ont pas été touchés.")
+        print(tr("Mis de côté : %s  ->  %s") % (p, t))
+    print(tr("\nVos réglages (~/.config/mintmail) et votre courrier en cache n'ont pas été touchés."))
     if moved:
-        print("Pour tout restaurer, remettez les éléments de %s à leur place d'origine." % dest)
-        print("Ouvrez un nouveau terminal (ou tapez : hash -r) puis lancez : mintmail")
+        print(tr("Pour tout restaurer, remettez les éléments de %s à leur place d'origine.") % dest)
+        print(tr("Ouvrez un nouveau terminal (ou tapez : hash -r) puis lancez : mintmail"))
     return 0
 
 
@@ -127,10 +128,10 @@ def reset_data() -> int:
                 os.replace(src, dst)
                 moved.append((src, dst))
             except OSError as e:
-                print("Impossible de déplacer %s : %s" % (src, e))
+                print(tr("Impossible de déplacer %s : %s") % (src, e))
     for src, dst in moved:
-        print("Mis de côté : %s -> %s" % (src, dst.name))
-    print("Réglages et cache réinitialisés." if moved else "Rien à réinitialiser.")
+        print(tr("Mis de côté : %s -> %s") % (src, dst.name))
+    print(tr("Réglages et cache réinitialisés.") if moved else tr("Rien à réinitialiser."))
     return 0
 
 
@@ -167,21 +168,34 @@ def send_due() -> int:
                 log("Envoi différé abandonné (%s) : %s" % (out.subject[:40], e))
                 try:
                     import subprocess
-                    subprocess.run(["notify-send", "MintMail : envoi impossible", "%s — %s" % (out.subject[:50], str(e)[:120])], timeout=5)
+                    subprocess.run(["notify-send", tr("MintMail : envoi impossible"), "%s — %s" % (out.subject[:50], str(e)[:120])], timeout=5)
                 except Exception:
                     pass
-    print("Envois différés : %d envoyé(s), %d abandonné(s)." % (sent, failed))
+    print(tr("Envois différés : %d envoyé(s), %d abandonné(s).") % (sent, failed))
     return 0
+
+
+def _init_language() -> str:
+    """Choisit la langue AVANT toute chaîne affichée : réglage « Langue de l'interface », variable MINTMAIL_LANG, sinon langue du système."""
+    import json
+    from . import i18n
+    try:
+        with open(CONFIG_DIR / "config.json", encoding="utf-8") as f:
+            value = json.load(f).get("ui_lang", "auto")
+    except (OSError, ValueError, AttributeError):
+        value = "auto"
+    return i18n.init_from_config(value if isinstance(value, str) else "auto")
 
 
 def main(argv=None) -> int:
     argv = list(argv if argv is not None else sys.argv)
+    _init_language()
     if "--help" in argv or "-h" in argv:
         from . import help_content as H
         from .store import CONFIG_DIR, DATA_DIR
-        print("MintMail %s — options :\n" % __version__)
+        print(tr("MintMail %s — options :\n") % __version__)
         print(H.cli_text({"config": str(CONFIG_DIR), "data": str(DATA_DIR), "version": __version__}))
-        print("\nAide complète dans l'application : touche F1.")
+        print(tr("\nAide complète dans l'application : touche F1."))
         return 0
     if "--version" in argv:
         print("%s %s" % (APP_NAME, __version__))

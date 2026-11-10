@@ -1,0 +1,74 @@
+{"f": "ai_engine.py", "s": "Résumer ma boîte"}
+{"f": "ai_engine.py", "s": "Merci, bien reçu !"}
+{"f": "ai_engine.py", "s": "D'accord, je regarde ça."}
+{"f": "ai_engine.py", "s": "Pouvez-vous m'en dire plus ?"}
+{"f": "ai_engine.py", "s": "Rendez-vous"}
+{"f": "ai_engine.py", "s": " (%d message%s)"}
+{"f": "ai_engine.py", "s": "Rechercher « %s »"}
+{"f": "ai_engine.py", "s": "Archiver"}
+{"f": "ai_engine.py", "s": "Supprimer"}
+{"f": "ai_engine.py", "s": "Signaler comme spam"}
+{"f": "ai_engine.py", "s": "Marquer comme lu"}
+{"f": "ai_engine.py", "s": "Marquer comme non lu"}
+{"f": "ai_engine.py", "s": "Ajouter aux favoris"}
+{"f": "ai_engine.py", "s": "Épingler"}
+{"f": "ai_engine.py", "s": "Déplacer vers « %s »%s"}
+{"f": "ai_engine.py", "s": "Reporter (%s)%s"}
+{"f": "ai_engine.py", "s": "Rédiger un message à %s"}
+{"f": "ai_engine.py", "s": "Créer la règle : %s contient « %s » → %s"}
+{"f": "ai_engine.py", "s": "Créer le dossier « %s »%s"}
+{"f": "ai_engine.py", "s": "Classer les messages avec l'IA (proposition à valider)"}
+{"f": "ai_engine.py", "s": "Ouvrir les paramètres (%s)"}
+{"f": "ai_engine.py", "s": "%d non lu(s) — %d à traiter en priorité, %d newsletter(s). Activez l'IA pour un vrai résumé."}
+{"f": "ai_engine.py", "s": "l'expéditeur sélectionné"}
+{"f": "ai_engine.py", "s": "IA non configurée."}
+{"f": "ai_engine.py", "s": "Je n'ai pas compris cette recherche."}
+{"f": "ai_engine.py", "s": " dans « %s »"}
+{"f": "ai_service.py", "s": "Ollama (local — rien ne quitte votre machine)"}
+{"f": "ai_service.py", "s": "Aucun modèle trouvé : %s"}
+{"f": "ai_service.py", "s": "Clé API manquante."}
+{"f": "ai_service.py", "s": "Adresse du service IA manquante."}
+{"f": "ai_service.py", "s": "L'endpoint doit utiliser HTTPS (HTTP seulement sur cette machine ou le réseau local)."}
+{"f": "ai_service.py", "s": "clé API refusée"}
+{"f": "ai_service.py", "s": "accès refusé"}
+{"f": "ai_service.py", "s": "endpoint ou modèle introuvable"}
+{"f": "ai_service.py", "s": "quota ou débit dépassé"}
+{"f": "ai_service.py", "s": "Délai dépassé : le service IA ne répond pas."}
+{"f": "ai_service.py", "s": "Réponse illisible du service IA."}
+{"f": "ai_service.py", "s": "Réponse inattendue du service IA."}
+{"f": "ai_service.py", "s": "Erreur HTTP %d (%s). %s"}
+{"f": "ai_service.py", "s": "Connexion impossible : %s"}
+{"f": "p2p.py", "s": "Désactivée"}
+{"f": "p2p.py", "s": "code de jumelage requis"}
+{"f": "p2p.py", "s": "Code de jumelage requis (%d caractères minimum)"}
+{"f": "p2p.py", "s": " — aucune machine vue (voir Paramètres → Synchronisation)"}
+{"f": "p2p.py", "s": "aucune machine vue"}
+{"f": "p2p.py", "s": " — synchronisé à "}
+{"f": "p2p.py", "s": "%d pair(s)"}
+{"f": "p2p.py", "s": "découverte automatique indisponible (%s)"}
+{"f": "p2p.py", "s": "code de jumelage différent sur « %s »"}
+{"f": "syncdata.py", "s": "compte(s)"}
+{"f": "syncdata.py", "s": "réglage(s)"}
+{"f": "syncdata.py", "s": "clé IA"}
+{"f": "syncdata.py", "s": "règle(s)"}
+{"f": "syncdata.py", "s": "expéditeur(s) en spam"}
+{"f": "syncdata.py", "s": "modèle(s)"}
+{"f": "syncdata.py", "s": "identité(s)"}
+{"f": "syncdata.py", "s": "contact(s)"}
+{"f": "syncdata.py", "s": "tâche(s)"}
+{"f": "syncdata.py", "s": "à jour"}
+{"f": "ical.py", "s": "Accepté"}
+{"f": "ical.py", "s": "Peut-être"}
+{"f": "ical.py", "s": "Refusé"}
+{"f": "ical.py", "s": "Rendez-vous"}
+{"f": "tasks.py", "s": "dans %d j (%s)"}
+{"f": "tasks.py", "s": "en retard de %d j"}
+{"f": "tasks.py", "s": "aujourd'hui"}
+{"f": "tasks.py", "s": "demain"}
+{"f": "ical.py", "s": "Invitation"}
+{"f": "syncdata.py", "s": "blocage(s)"}
+{"f": "syncdata.py", "s": "recherche(s)"}
+{"f": "p2p.py", "s": "Active — appareil %s — %d pair(s)"}
+{"f": "p2p.py", "s": "port TCP %d indisponible (%s)"}
+{"f": "ai_service.py", "s": "Autre service compatible OpenAI"}
+{"f": "ai_service.py", "s": "service injoignable"}

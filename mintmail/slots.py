@@ -1,9 +1,10 @@
 """Créneaux libres d'après l'agenda : propositions de rendez-vous prêtes à coller dans une réponse."""
 import datetime
 from typing import Dict, List, Tuple
+from .i18n import tr
 
-DAYS_FR = ["lundi", "mardi", "mercredi", "jeudi", "vendredi", "samedi", "dimanche"]
-MONTHS_FR = ["janvier", "février", "mars", "avril", "mai", "juin", "juillet", "août", "septembre", "octobre", "novembre", "décembre"]
+DAYS_FR = [tr("lundi"), tr("mardi"), tr("mercredi"), tr("jeudi"), tr("vendredi"), tr("samedi"), tr("dimanche")]
+MONTHS_FR = [tr("janvier"), tr("février"), tr("mars"), tr("avril"), tr("mai"), tr("juin"), tr("juillet"), tr("août"), tr("septembre"), tr("octobre"), tr("novembre"), tr("décembre")]
 
 
 def free_slots(events: List[Dict], now: datetime.datetime, days: int = 14, duration: int = 60, count: int = 3,
@@ -37,9 +38,9 @@ def free_slots(events: List[Dict], now: datetime.datetime, days: int = 14, durat
 
 def format_slot(slot: Tuple[datetime.datetime, datetime.datetime]) -> str:
     s, e = slot
-    return "%s %d %s, de %dh%02d à %dh%02d" % (DAYS_FR[s.weekday()], s.day, MONTHS_FR[s.month - 1], s.hour, s.minute, e.hour, e.minute)
+    return tr("%s %d %s, de %dh%02d à %dh%02d") % (DAYS_FR[s.weekday()], s.day, MONTHS_FR[s.month - 1], s.hour, s.minute, e.hour, e.minute)
 
 
 def proposal_text(slots: List[Tuple[datetime.datetime, datetime.datetime]]) -> str:
-    return "Je vous propose les créneaux suivants :\n" + "\n".join("- " + format_slot(s) for s in slots) + \
-           "\nDites-moi celui qui vous convient."
+    return tr("Je vous propose les créneaux suivants :\n") + "\n".join("- " + format_slot(s) for s in slots) + \
+           tr("\nDites-moi celui qui vous convient.")

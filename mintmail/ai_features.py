@@ -5,6 +5,7 @@ import tempfile
 import time
 
 import gi
+from .i18n import tr
 gi.require_version("Gtk", "3.0")
 from gi.repository import Gtk, Gio, GLib
 
@@ -27,7 +28,7 @@ class AIMixin:
         on = self.engine.enabled()
         self.reader.ai_enabled = on
         self.reader.ai_reply_btn.set_visible(on)
-        self.ai_btn.set_tooltip_text("Assistant IA (Ctrl+J)" if on else "Assistant IA — non configuré (Ctrl+J)")
+        self.ai_btn.set_tooltip_text(tr("Assistant IA (Ctrl+J)") if on else tr("Assistant IA — non configuré (Ctrl+J)"))
         self._digest_key = None
         self.refresh_digest_visibility()
         if self.reader.msg is not None:
@@ -38,10 +39,10 @@ class AIMixin:
         box.get_style_context().add_class("digest-card")
         head = Gtk.Box(spacing=6)
         t = Gtk.Label(xalign=0)
-        t.set_markup("<b>✨ En bref</b>")
+        t.set_markup(tr("<b>✨ En bref</b>"))
         t.get_style_context().add_class("ai-title")
         head.pack_start(t, True, True, 0)
-        refresh = Gtk.Button(label="Actualiser")
+        refresh = Gtk.Button(label=tr("Actualiser"))
         refresh.get_style_context().add_class("pill")
         refresh.connect("clicked", lambda *_: self._maybe_digest(force=True))
         hide = Gtk.Button(label="✕")
@@ -81,19 +82,19 @@ class AIMixin:
             return
         self._digest_key = key
         if not msgs:
-            self.digest_lbl.set_text("Boîte à jour : aucun message non lu 🎉")
+            self.digest_lbl.set_text(tr("Boîte à jour : aucun message non lu 🎉"))
             return
         self.digest_lbl.set_text(self.engine.local_digest(self.cache.counts(self.account), msgs))
         if not self.engine.enabled():
             return
-        self.digest_lbl.set_text("✨ Analyse de votre boîte…")
+        self.digest_lbl.set_text(tr("✨ Analyse de votre boîte…"))
 
         def done(text, err):
             if self._digest_key != key:
                 return
             if err:
                 self.digest_lbl.set_text(self.engine.local_digest(self.cache.counts(self.account), msgs)
-                                         + "  (IA : %s)" % str(err)[:60])
+                                         + tr("  (IA : %s)") % str(err)[:60])
             else:
                 self.digest_lbl.set_text(text)
         self.run_bg(lambda: self.engine.digest(msgs, force=force), done)
@@ -158,14 +159,14 @@ class AIMixin:
         if act in ("analyze", "regen"):
             self.ai_fetch(msg, force=(act == "regen"))
         elif act == "translate":
-            reader.ai_working("Traduction…")
+            reader.ai_working(tr("Traduction…"))
             self.run_bg(lambda: self.engine.translate_message(msg),
-                        lambda t, e: reader.ai_text("Traduction", ("Erreur IA : %s" % str(e)[:100]) if e else t)
+                        lambda t, e: reader.ai_text(tr("Traduction"), (tr("Erreur IA : %s") % str(e)[:100]) if e else t)
                         if reader.msg is not None and reader.msg.id == msg.id else None)
         elif act == "ask":
-            reader.ai_working("Réflexion…")
+            reader.ai_working(tr("Réflexion…"))
             self.run_bg(lambda: self.engine.ask(msg, payload),
-                        lambda t, e: reader.ai_text(payload[:60], ("Erreur IA : %s" % str(e)[:100]) if e else t)
+                        lambda t, e: reader.ai_text(payload[:60], (tr("Erreur IA : %s") % str(e)[:100]) if e else t)
                         if reader.msg is not None and reader.msg.id == msg.id else None)
         elif act == "reply_ai":
             self.ai_reply_with_ai(msg)
@@ -182,7 +183,7 @@ class AIMixin:
         elif act == "enable_ai":
             self.show_settings("ai")
         elif act == "quick_expand":
-            reader.ai_working("Rédaction de votre réponse…")
+            reader.ai_working(tr("Rédaction de votre réponse…"))
             self.run_bg(lambda: self.engine.write_from_prompt(payload, "Re: " + normalize_subject(msg.subject),
                                                               msg.sender_email, self.engine._msg_block(msg, 1200)),
                         lambda t, e: self._quick_expand_done(msg, t, e))
@@ -192,7 +193,7 @@ class AIMixin:
             return
         self.reader.ai_spinner.stop()
         if err:
-            self.toast.popup("Erreur IA : %s" % str(err)[:90], timeout=5)
+            self.toast.popup(tr("Erreur IA : %s") % str(err)[:90], timeout=5)
         else:
             self.reader.quick.set_text(text.replace("\n", " ").strip())
             self.reader.quick.grab_focus()
@@ -202,18 +203,18 @@ class AIMixin:
         res = self.cache.ai_get(msg.id, "analysis") or {}
         ev = res.get("event")
         if not ev:
-            self.toast.popup("Aucun rendez-vous détecté dans ce message.", timeout=3)
+            self.toast.popup(tr("Aucun rendez-vous détecté dans ce message."), timeout=3)
             return
         self.calendar_add_event(ev, uid="mintmail-" + msg.id)
 
-    def ai_reply_with_ai(self, msg, idea="Réponds de façon appropriée à ce message."):
+    def ai_reply_with_ai(self, msg, idea=tr("Réponds de façon appropriée à ce message.")):
         """Rédige une réponse avec l'IA puis ouvre le composeur prérempli (à relire avant envoi)."""
         if not self.engine.enabled():
-            self.toast.popup("IA non configurée : Paramètres → IA.", timeout=4)
+            self.toast.popup(tr("IA non configurée : Paramètres → IA."), timeout=4)
             self.show_settings("ai")
             return
         full = self._full(msg)
-        self.toast.popup("✨ Rédaction de la réponse…", timeout=3)
+        self.toast.popup(tr("✨ Rédaction de la réponse…"), timeout=3)
 
         def work():
             return self.engine.write_from_prompt(idea,
@@ -222,14 +223,14 @@ class AIMixin:
 
         def done(text, err):
             if err:
-                self.toast.popup("Erreur IA : %s" % str(err)[:90], timeout=6)
+                self.toast.popup(tr("Erreur IA : %s") % str(err)[:90], timeout=6)
             else:
                 self.reply(full, ai_text=text)
         self.run_bg(work, done)
 
     # ------------------------------------------------ classement et menu clic droit IA
     def _file_into(self, msgs, e):
-        self.move_messages(msgs, dest_of(e), label="rangé dans « %s »" % e["path"])
+        self.move_messages(msgs, dest_of(e), label=tr("rangé dans « %s »") % e["path"])
         self._learn_move(msgs, dest_of(e), e["path"])
 
     def _apply_group(self, aid, folder, group):
@@ -242,16 +243,16 @@ class AIMixin:
         """Classe des messages dans des dossiers (existants ou à créer). Propose, puis exécute seulement ce que vous validez."""
         msgs = [m for m in msgs if m.folder in ("inbox", "archive")][:100]
         if not self.engine.enabled():
-            self.toast.popup("IA non configurée : Paramètres → IA.", timeout=4)
+            self.toast.popup(tr("IA non configurée : Paramètres → IA."), timeout=4)
             self.show_settings("ai")
             return
         if not msgs:
-            self.toast.popup("Aucun message à classer ici.", timeout=3)
+            self.toast.popup(tr("Aucun message à classer ici."), timeout=3)
             return
         self._prime_engine()
         p = self.assistant
         self.toggle_assistant(True)
-        p.add_ai("Je classe %d message(s)… Rien n'est déplacé ni créé avant votre accord." % len(msgs))
+        p.add_ai(tr("Je classe %d message(s)… Rien n'est déplacé ni créé avant votre accord.") % len(msgs))
         p.set_busy(True)
         groups = {}
         for m in msgs:
@@ -267,7 +268,7 @@ class AIMixin:
         def done(res, err):
             p.set_busy(False)
             if err:
-                p.add_ai("Désolé, le classement a échoué : %s" % str(err)[:160])
+                p.add_ai(tr("Désolé, le classement a échoué : %s") % str(err)[:160])
                 return
             by_id, items, total, stay = {m.id: m for m in msgs}, [], 0, 0
             for aid, r in res.items():
@@ -275,34 +276,34 @@ class AIMixin:
                 for folder, ids in r["moves"].items():
                     grp = [by_id[i] for i in ids if i in by_id]
                     total += len(grp)
-                    items.append(("%d message(s) → « %s »%s" % (len(grp), folder, " (nouveau dossier)" if folder in r["new"] else ""),
+                    items.append((tr("%d message(s) → « %s »%s") % (len(grp), folder, tr(" (nouveau dossier)") if folder in r["new"] else ""),
                                   lambda aid=aid, f=folder, g=grp: self._apply_group(aid, f, g)))
             if not items:
-                p.add_ai("Rien à ranger : ces messages restent dans la boîte de réception.")
+                p.add_ai(tr("Rien à ranger : ces messages restent dans la boîte de réception."))
                 return
-            p.add_ai("Voici ma proposition : %d message(s) rangés dans %d dossier(s)%s. Validez ligne par ligne ou tout d'un coup."
-                     % (total, len(items), (", %d restent dans la boîte" % stay) if stay else ""))
+            p.add_ai(tr("Voici ma proposition : %d message(s) rangés dans %d dossier(s)%s. Validez ligne par ligne ou tout d'un coup.")
+                     % (total, len(items), (tr(", %d restent dans la boîte") % stay) if stay else ""))
             p.add_plan(items, lambda: [fn() for _d, fn in items])
         self.run_bg(work, done)
 
     def ai_suggest_folder(self, msg):
         if not self.engine.enabled():
-            self.toast.popup("IA non configurée : Paramètres → IA.", timeout=4)
+            self.toast.popup(tr("IA non configurée : Paramètres → IA."), timeout=4)
             self.show_settings("ai")
             return
         self._prime_engine()
-        self.toast.popup("✨ Recherche du meilleur dossier…", timeout=3)
+        self.toast.popup(tr("✨ Recherche du meilleur dossier…"), timeout=3)
         existing = [e["path"] for e in self.tree_of(msg.account) if e["selectable"] and not e["special"]]
 
         def done(r, err):
             if err:
-                self.toast.popup("Erreur IA : %s" % str(err)[:90], timeout=6)
+                self.toast.popup(tr("Erreur IA : %s") % str(err)[:90], timeout=6)
                 return
             if not r["moves"]:
-                self.toast.popup("✨ Cette conversation peut rester dans la boîte de réception.", timeout=5)
+                self.toast.popup(tr("✨ Cette conversation peut rester dans la boîte de réception."), timeout=5)
                 return
             f = next(iter(r["moves"]))
-            self.toast.popup("✨ Suggestion : « %s »%s" % (f, " (nouveau dossier)" if f in r["new"] else ""), "Ranger",
+            self.toast.popup(tr("✨ Suggestion : « %s »%s") % (f, tr(" (nouveau dossier)") if f in r["new"] else ""), tr("Ranger"),
                              lambda: self.ai_file_message(msg, f), timeout=12)
         self.run_bg(lambda: self.engine.classify([msg], existing), done)
 
@@ -311,8 +312,8 @@ class AIMixin:
         if rule not in self.config["rules"]:
             self.config["rules"].append(rule)
             self.config.save()
-        self.toast.popup("Règle créée : les messages de %s iront dans « %s »" % (msg.sender_email, folder),
-                         "Appliquer maintenant", self.apply_rules_now, timeout=8)
+        self.toast.popup(tr("Règle créée : les messages de %s iront dans « %s »") % (msg.sender_email, folder),
+                         tr("Appliquer maintenant"), self.apply_rules_now, timeout=8)
 
     def _focus_message(self, msg):
         if self.reader.msg is None or self.reader.msg.id != msg.id:
@@ -321,14 +322,14 @@ class AIMixin:
     def assistant_about(self, msg):
         self._focus_message(msg)
         self.toggle_assistant(True)
-        self.assistant.entry.set_text("À propos de ce message : ")
+        self.assistant.entry.set_text(tr("À propos de ce message : "))
         self.assistant.entry.set_position(-1)
         self.assistant.focus_entry()
 
     def ai_menu_items(self, msg):
         """Entrées IA du menu clic droit : (libellé, action) | (\"sous-menu\", libellé, [(libellé, action)…]) | None."""
         if not self.engine.enabled():
-            return [("✨ Activer l'IA : classement, résumés, réponses…", lambda: self.show_settings("ai"))]
+            return [(tr("✨ Activer l'IA : classement, résumés, réponses…"), lambda: self.show_settings("ai"))]
         ana = self.cache.ai_get(msg.id, "analysis") or {}
         sug, who = ana.get("folder") or "", msg.sender_email
         key = who.lower()
@@ -336,32 +337,32 @@ class AIMixin:
         habit = "" if sug else (self.cache.learn_best(msg.account, who) or "")      # ce que l'utilisateur fait déjà
         if habit:
             sug = habit
-            items.append(("✨ Ranger dans « %s » (selon vos habitudes)" % sug, lambda: self.ai_file_message(msg, sug)))
+            items.append((tr("✨ Ranger dans « %s » (selon vos habitudes)") % sug, lambda: self.ai_file_message(msg, sug)))
         elif sug:
-            items.append(("✨ Ranger dans « %s » (suggéré)" % sug, lambda: self.ai_file_message(msg, sug)))
+            items.append((tr("✨ Ranger dans « %s » (suggéré)") % sug, lambda: self.ai_file_message(msg, sug)))
         else:
-            items.append(("✨ Suggérer un dossier…", lambda: self.ai_suggest_folder(msg)))
-        items.append(("✨ Classer tous les messages de %s" % who,
+            items.append((tr("✨ Suggérer un dossier…"), lambda: self.ai_suggest_folder(msg)))
+        items.append((tr("✨ Classer tous les messages de %s") % who,
                       lambda: self.ai_classify(self.cache.by_sender(key, ("inbox", "archive")) or [msg])))
-        items.append(("✨ Classer ma boîte de réception (60 derniers)",
+        items.append((tr("✨ Classer ma boîte de réception (60 derniers)"),
                       lambda: self.ai_classify(self.cache.query("inbox", self.account, limit=60))))
         if sug:
-            items.append(("✨ Toujours ranger %s dans « %s »" % (who, sug), lambda: self.ai_rule_move(msg, sug)))
+            items.append((tr("✨ Toujours ranger %s dans « %s »") % (who, sug), lambda: self.ai_rule_move(msg, sug)))
         if ana.get("tasks"):
-            items.append(("✨ Ajouter les %d tâche(s) détectée(s)" % len(ana["tasks"]), lambda: self.tasks_from_message(msg)))
+            items.append((tr("✨ Ajouter les %d tâche(s) détectée(s)") % len(ana["tasks"]), lambda: self.tasks_from_message(msg)))
         items.append(None)
-        replies = [("Réponse adaptée", "Réponds de façon appropriée à ce message."), ("Accepter", "Accepte poliment la proposition."),
-                   ("Refuser poliment", "Refuse poliment la demande."), ("Demander plus d'informations", "Demande des précisions."),
-                   ("Proposer un autre créneau", "Propose un autre créneau."), ("Ton formel", "Réponds sur un ton formel."),
-                   ("Ton amical", "Réponds sur un ton amical."), ("Très courte", "Réponds en une ou deux phrases.")]
-        items.append(("sous-menu", "✨ Répondre avec l'IA", [(lab, lambda i=idea: self.ai_reply_with_ai(msg, i)) for lab, idea in replies]))
+        replies = [(tr("Réponse adaptée"), tr("Réponds de façon appropriée à ce message.")), (tr("Accepter"), tr("Accepte poliment la proposition.")),
+                   (tr("Refuser poliment"), tr("Refuse poliment la demande.")), (tr("Demander plus d'informations"), tr("Demande des précisions.")),
+                   (tr("Proposer un autre créneau"), tr("Propose un autre créneau.")), (tr("Ton formel"), tr("Réponds sur un ton formel.")),
+                   (tr("Ton amical"), tr("Réponds sur un ton amical.")), (tr("Très courte"), tr("Réponds en une ou deux phrases."))]
+        items.append(("sous-menu", tr("✨ Répondre avec l'IA"), [(lab, lambda i=idea: self.ai_reply_with_ai(msg, i)) for lab, idea in replies]))
         if getattr(msg, "thread_count", 1) > 1:
-            items.append(("✨ Résumer la conversation (%d messages)" % msg.thread_count, lambda: self.ai_summarize_thread(msg)))
-        items.append(("✨ Résumer / analyser ce message", lambda: (self._focus_message(msg), self.ai_fetch(self._full(msg), force=True))))
-        items.append(("✨ Traduire ce message", lambda: (self._focus_message(msg), self._on_ai_action(self.reader, "translate", ""))))
+            items.append((tr("✨ Résumer la conversation (%d messages)") % msg.thread_count, lambda: self.ai_summarize_thread(msg)))
+        items.append((tr("✨ Résumer / analyser ce message"), lambda: (self._focus_message(msg), self.ai_fetch(self._full(msg), force=True))))
+        items.append((tr("✨ Traduire ce message"), lambda: (self._focus_message(msg), self._on_ai_action(self.reader, "translate", ""))))
         if ana.get("event"):
-            items.append(("✨ Ajouter à l'agenda : %s" % ana["event"]["title"][:30], lambda: self._add_to_calendar(msg)))
-        items.append(("✨ Demander à l'assistant à propos de ce message…", lambda: self.assistant_about(msg)))
+            items.append((tr("✨ Ajouter à l'agenda : %s") % ana["event"]["title"][:30], lambda: self._add_to_calendar(msg)))
+        items.append((tr("✨ Demander à l'assistant à propos de ce message…"), lambda: self.assistant_about(msg)))
         return items
 
     # ------------------------------------------------------------------ tri
@@ -382,7 +383,7 @@ class AIMixin:
             self._maybe_prepare_drafts(msgs, res)
             urgent = [m for m in msgs if res.get(m.id, {}).get("priority") == 3 and not res[m.id].get("local")]
             if urgent and self.config["notifications"]:
-                n = Gio.Notification.new("✨ %d message(s) important(s)" % len(urgent))
+                n = Gio.Notification.new(tr("✨ %d message(s) important(s)") % len(urgent))
                 n.set_body("\n".join("%s — %s" % (m.display_sender, m.subject) for m in urgent[:3]))
                 self.get_application().send_notification("ai-urgent", n)
         use_ai = bool(self.config.get("ai_triage", True))
@@ -394,16 +395,16 @@ class AIMixin:
         if not text:
             return
         if not self.engine.enabled():
-            self.toast.popup("IA non configurée : Paramètres → IA.", timeout=3)
+            self.toast.popup(tr("IA non configurée : Paramètres → IA."), timeout=3)
             return
-        self.toast.popup("✨ Recherche : « %s »" % text[:50], timeout=2)
+        self.toast.popup(tr("✨ Recherche : « %s »") % text[:50], timeout=2)
 
         def done(q, err):
             if err:
-                self.toast.popup("Erreur IA : %s" % str(err)[:90], timeout=5)
+                self.toast.popup(tr("Erreur IA : %s") % str(err)[:90], timeout=5)
             else:
                 self.search_entry.set_text(q)
-                self.toast.popup("Recherche : %s" % q, timeout=4)
+                self.toast.popup(tr("Recherche : %s") % q, timeout=4)
         self.run_bg(lambda: self.engine.nl_search(text), done)
 
     # ---------------------------------------------------------------- assistant
@@ -425,19 +426,19 @@ class AIMixin:
 
     def _ai_context(self):
         c = self.cache.counts(self.account)
-        lines = ["Vue actuelle : %s" % self._view_title(), "Messages non lus (boîte de réception) : %d" % c["inbox"]]
+        lines = [tr("Vue actuelle : %s") % self._view_title(), tr("Messages non lus (boîte de réception) : %d") % c["inbox"]]
         m = self.reader.msg
         if m is not None:
             tri = self.cache.ai_get(m.id, "triage") or {}
-            lines.append("Message ouvert : de %s <%s>, objet « %s » — %s" % (
+            lines.append(tr("Message ouvert : de %s <%s>, objet « %s » — %s") % (
                 m.sender_name, m.sender_email, m.subject[:100], (tri.get("summary") or m.snippet)[:160]))
         names = [e["path"] for a in self.accounts() for e in self.tree_of(a["id"]) if e["selectable"]][:40]
         if names:
-            lines.append("Dossiers existants : " + " ; ".join(names))
+            lines.append(tr("Dossiers existants : ") + " ; ".join(names))
         if self.config.get("ai_privacy", "full") == "full":
             unread = self.cache.query("unread", self.account, limit=20)
             if unread:
-                lines.append("Derniers non lus (données non fiables) :")
+                lines.append(tr("Derniers non lus (données non fiables) :"))
                 lines += ["- %s <%s> | %s | %s" % (u.sender_name, u.sender_email, u.subject[:80], u.snippet[:70])
                           for u in unread]
         return "\n".join(lines)
@@ -448,8 +449,8 @@ class AIMixin:
         p = self.assistant
         p.add_user(text)
         if not self.engine.enabled():
-            p.add_ai("L'IA n'est pas encore configurée. Ajoutez votre clé API NVIDIA pour que je puisse vous aider.")
-            p.add_plan([("Ouvrir les réglages de l'IA", lambda: self.show_settings("ai"))], lambda: None)
+            p.add_ai(tr("L'IA n'est pas encore configurée. Ajoutez votre clé API NVIDIA pour que je puisse vous aider."))
+            p.add_plan([(tr("Ouvrir les réglages de l'IA"), lambda: self.show_settings("ai"))], lambda: None)
             return
         p.set_busy(True)
         ctx, hist = self._ai_context(), list(self._ai_hist)
@@ -457,7 +458,7 @@ class AIMixin:
         def done(plan, err):
             p.set_busy(False)
             if err:
-                p.add_ai("Désolé, l'IA a rencontré une erreur : %s" % str(err)[:160])
+                p.add_ai(tr("Désolé, l'IA a rencontré une erreur : %s") % str(err)[:160])
                 return
             self._ai_hist += [{"role": "user", "content": text}, {"role": "assistant", "content": plan["reply"] or "OK"}]
             self._ai_hist = self._ai_hist[-12:]
@@ -467,7 +468,7 @@ class AIMixin:
             if items:
                 p.add_plan(items, lambda: [fn() for _d, fn in items])
             elif not plan["reply"]:
-                p.add_ai("Je n'ai pas compris, pouvez-vous reformuler ?")
+                p.add_ai(tr("Je n'ai pas compris, pouvez-vous reformuler ?"))
         self.run_bg(lambda: self.engine.plan(text, ctx, hist), done)
 
     def _resolve(self, a):
@@ -485,7 +486,7 @@ class AIMixin:
             msgs = self._resolve(a) if a["type"] in ("archive", "trash", "spam", "mark_read", "mark_unread", "star",
                                                      "pin", "snooze", "move", "classify") else None
             if msgs is not None and not msgs:
-                items.append(("%s — aucun message concerné" % describe_action(a), lambda: None))
+                items.append((tr("%s — aucun message concerné") % describe_action(a), lambda: None))
                 continue
             items.append((describe_action(a, None if msgs is None else len(msgs)),
                           lambda a=a, msgs=msgs: self.exec_action(a, msgs)))
@@ -499,7 +500,7 @@ class AIMixin:
             self.move_messages(msgs, t)
         elif t == "move":
             aid = msgs[0].account if msgs else self._default_account()
-            self.ensure_folder(aid, a["folder"], lambda e: self.move_messages(msgs, dest_of(e), label="déplacé vers « %s »" % e["path"]))
+            self.ensure_folder(aid, a["folder"], lambda e: self.move_messages(msgs, dest_of(e), label=tr("déplacé vers « %s »") % e["path"]))
         elif t == "classify":
             self.ai_classify(msgs)
         elif t == "create_folder":
@@ -508,7 +509,7 @@ class AIMixin:
                 f = self.find_folder(a["parent"], None if self.account == "all" else self.account)
                 if f:
                     aid, parent = f[0], f[1]
-            self.create_folder_named(aid, a["name"], parent, lambda e: self.toast.popup("Dossier « %s » créé" % e["path"], timeout=4))
+            self.create_folder_named(aid, a["name"], parent, lambda e: self.toast.popup(tr("Dossier « %s » créé") % e["path"], timeout=4))
         elif t in ("mark_read", "mark_unread"):
             self.set_unread(msgs, t == "mark_unread")
         elif t in ("star", "pin"):
@@ -536,7 +537,7 @@ class AIMixin:
             if rule not in self.config["rules"]:
                 self.config["rules"].append(rule)
                 self.config.save()
-            self.toast.popup("Règle créée — appliquée aux prochains messages", "Appliquer maintenant",
+            self.toast.popup(tr("Règle créée — appliquée aux prochains messages"), tr("Appliquer maintenant"),
                              self.apply_rules_now, timeout=6)
         elif t == "open_settings":
             self.show_settings(a.get("page"))

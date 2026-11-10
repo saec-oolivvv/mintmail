@@ -1,4 +1,5 @@
 import gi
+from .i18n import tr
 gi.require_version("Gtk", "3.0")
 gi.require_version("Gdk", "3.0")
 from gi.repository import Gtk, Gdk, GLib, Pango
@@ -31,15 +32,15 @@ class Avatar(Gtk.Label):
 
 
 SWIPE_ACTIONS = {
-    "archive": ("Archiver", "folder-symbolic", "green"),
-    "trash": ("Supprimer", "user-trash-symbolic", "red"),
-    "snooze": ("Reporter à demain", "alarm-symbolic", "orange"),
-    "read": ("Lu / non lu", "mail-read-symbolic", "blue"),
-    "star": ("Favori", "starred-symbolic", "yellow"),
-    "pin": ("Épingler", "view-pin-symbolic", "purple"),
+    "archive": (tr("Archiver"), "folder-symbolic", "green"),
+    "trash": (tr("Supprimer"), "user-trash-symbolic", "red"),
+    "snooze": (tr("Reporter à demain"), "alarm-symbolic", "orange"),
+    "read": (tr("Lu / non lu"), "mail-read-symbolic", "blue"),
+    "star": (tr("Favori"), "starred-symbolic", "yellow"),
+    "pin": (tr("Épingler"), "view-pin-symbolic", "purple"),
     "spam": ("Spam", "mail-mark-junk-symbolic", "grey"),
-    "block": ("Bloquer l'expéditeur", "action-unavailable-symbolic", "red"),
-    "none": ("Aucune action", "", "grey"),
+    "block": (tr("Bloquer l'expéditeur"), "action-unavailable-symbolic", "red"),
+    "none": (tr("Aucune action"), "", "grey"),
 }
 DEFAULT_SWIPE = {"right": "archive", "right_long": "trash", "left": "snooze", "left_long": "read"}
 SWIPE_SHORT, SWIPE_LONG = 90, 230
@@ -330,15 +331,15 @@ class MessageRow(Gtk.ListBoxRow):
         n = getattr(m, "thread_count", 1)
         if n > 1:   # conversation : nombre de messages
             cnt = Gtk.Label(label=str(n))
-            cnt.set_tooltip_text("%d messages dans cette conversation" % n)
+            cnt.set_tooltip_text(tr("%d messages dans cette conversation") % n)
             cnt.get_style_context().add_class("badge-thread")
             self.icons.pack_start(cnt, False, False, 0)
         if self.ai.get("spam"):
-            lab = Gtk.Label(label="Suspect")
+            lab = Gtk.Label(label=tr("Suspect"))
             lab.get_style_context().add_class("badge-suspect")
             self.icons.pack_start(lab, False, False, 0)
         elif self.ai.get("priority") == 3:
-            lab = Gtk.Label(label="Important")
+            lab = Gtk.Label(label=tr("Important"))
             lab.get_style_context().add_class("badge-important")
             self.icons.pack_start(lab, False, False, 0)
         if m.unread:
@@ -356,7 +357,7 @@ class MessageRow(Gtk.ListBoxRow):
 
 
 def group_key(msg):
-    return "Épinglés" if msg.pinned else date_group(msg.date)
+    return tr("Épinglés") if msg.pinned else date_group(msg.date)
 
 
 def row_header(row, before):

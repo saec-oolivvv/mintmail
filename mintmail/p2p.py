@@ -27,6 +27,7 @@ from typing import Any, Dict, List, Optional
 from . import netutil, syncdata
 from .netutil import local_ip   # noqa: F401  (compatibilité : importé depuis ce module par les réglages)
 from .store import P2P_MIN_SECRET
+from .i18n import tr
 
 PROTOCOL = 3
 MAX_LINE = 4096
@@ -163,19 +164,36 @@ class SyncEngine:
 
     def state_label(self) -> str:
         if not self._enabled:
-            return "Désactivée"
+            return tr("Désactivée")
         if self._key is None:
-            return "Code de jumelage requis (%d caractères minimum)" % MIN_SECRET
+            return tr("Code de jumelage requis (%d caractères minimum)") % MIN_SECRET
         with self._lock:
             n = len(self._peers)
-        base = "Active — appareil %s — %d pair(s)" % (self._node_id[:6], n)
+        base = tr("Active — appareil %s — %d pair(s)") % (self._node_id[:6], n)
         if self.last_error:
             return base + " — " + self.last_error
         if self.last_sync:
-            return base + " — synchronisé à " + time.strftime("%H:%M:%S", time.localtime(self.last_sync))
+            return base + tr(" — synchronisé à ") + time.strftime("%H:%M:%S", time.localtime(self.last_sync))
         if n == 0 and self._started_at and time.time() - self._started_at > 30:
-            return base + " — aucune machine vue (voir Paramètres → Synchronisation)"
+            return base + tr(" — aucune machine vue (voir Paramètres → Synchronisation)")
         return base
+
+    def short_label(self) -> str:
+        """Libellé compact du pied de barre latérale (sans dépendre du texte traduit de state_label)."""
+        if not self._enabled:
+            return ""
+        if self._key is None:
+            return tr("code de jumelage requis")
+        with self._lock:
+            n = len(self._peers)
+        out = "%s — %s" % (self._node_id[:6], tr("%d pair(s)") % n)
+        if self.last_error:
+            return out + " — " + self.last_error
+        if self.last_sync:
+            return out + " · " + time.strftime("%H:%M", time.localtime(self.last_sync))
+        if n == 0 and self._started_at and time.time() - self._started_at > 30:
+            return out + " — " + tr("aucune machine vue")
+        return out
 
     def diagnostics(self) -> Dict[str, Any]:
         """Tout ce qu'il faut pour comprendre pourquoi deux machines ne se voient pas."""
@@ -208,7 +226,7 @@ class SyncEngine:
             self._udp = u
         except OSError as e:
             self._udp = None
-            self.last_error = "découverte automatique indisponible (%s)" % e.strerror
+            self.last_error = tr("découverte automatique indisponible (%s)") % e.strerror
         try:
             s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
@@ -218,7 +236,7 @@ class SyncEngine:
             self._srv = s
         except OSError as e:
             self._srv = None
-            self.last_error = "port TCP %d indisponible (%s)" % (self._tcp_port, e.strerror)
+            self.last_error = tr("port TCP %d indisponible (%s)") % (self._tcp_port, e.strerror)
         for spec in self._static:
             host, _, port = spec.partition(":")
             if host:
@@ -465,7 +483,7 @@ class SyncEngine:
             ch = self._read_line(f)
             ns, node_s = str(ch.get("ns", "")), str(ch.get("node", ""))
             if ch.get("t") != "challenge" or not hmac.compare_digest(str(ch.get("ps", "")), self._mac(b"S", nc, ns, node_s)):
-                self.last_error = "code de jumelage différent sur « %s »" % node_s[:6]
+                self.last_error = tr("code de jumelage différent sur « %s »") % node_s[:6]
                 return -1
             self._write_line(f, {"t": "auth", "pc": self._mac(b"C", ns, nc, self._node_id)})
             chan = SecureChannel(f, self._key, nc.encode(), ns.encode(), initiator=True)

@@ -1,5 +1,6 @@
 """Dossiers : arborescence IMAP complète par compte, navigation, compteurs, déplacement, création / renommage / suppression."""
 import gi
+from .i18n import tr
 gi.require_version("Gtk", "3.0")
 gi.require_version("Gdk", "3.0")
 from gi.repository import Gtk, Gdk, GLib
@@ -11,8 +12,8 @@ SMART_VIEWS = ("inbox", "unread", "starred", "pinned", "snoozed", "drafts")
 LOGICAL = ("inbox", "sent", "drafts", "archive", "trash", "spam")
 SPECIAL_ICONS = {"inbox": "mail-inbox-symbolic", "drafts": "document-edit-symbolic", "sent": "mail-send-symbolic",
                  "archive": "folder-symbolic", "spam": "mail-mark-junk-symbolic", "trash": "user-trash-symbolic"}
-SPECIAL_LABELS = {"inbox": "Boîte de réception", "drafts": "Brouillons", "sent": "Envoyés", "archive": "Archives",
-                  "spam": "Spam", "trash": "Corbeille"}
+SPECIAL_LABELS = {"inbox": tr("Boîte de réception"), "drafts": tr("Brouillons"), "sent": tr("Envoyés"), "archive": tr("Archives"),
+                  "spam": "Spam", "trash": tr("Corbeille")}
 DEFAULT_TREE = [{"name": n, "path": SPECIAL_LABELS[k], "label": SPECIAL_LABELS[k], "depth": 0, "delim": "/",
                  "special": k, "selectable": True}
                 for n, k in (("INBOX", "inbox"), ("Drafts", "drafts"), ("Sent", "sent"), ("Archive", "archive"),
@@ -79,7 +80,7 @@ class FolderMixin:
         cbox = Gtk.Box(spacing=8)
         cbox.set_halign(Gtk.Align.CENTER)
         cbox.pack_start(icon("mail-message-new-symbolic", Gtk.IconSize.LARGE_TOOLBAR), False, False, 0)
-        self.compose_lbl = Gtk.Label(label="Nouveau message")
+        self.compose_lbl = Gtk.Label(label=tr("Nouveau message"))
         cbox.pack_start(self.compose_lbl, False, False, 0)
         self.compose_btn.add(cbox)
         self.compose_btn.get_style_context().add_class("compose-btn")
@@ -88,7 +89,7 @@ class FolderMixin:
         self.ai_nav_btn = Gtk.Button()
         abox = Gtk.Box(spacing=8)
         abox.pack_start(Gtk.Label(label="✨"), False, False, 0)
-        self.ai_nav_lbl = Gtk.Label(label="Assistant IA")
+        self.ai_nav_lbl = Gtk.Label(label=tr("Assistant IA"))
         abox.pack_start(self.ai_nav_lbl, False, False, 0)
         self.ai_nav_btn.add(abox)
         self.ai_nav_btn.get_style_context().add_class("ai-nav-btn")
@@ -99,7 +100,7 @@ class FolderMixin:
         self.nav.set_selection_mode(Gtk.SelectionMode.SINGLE)
         self.nav.set_activate_on_single_click(True)
         self.badges, self.nav_labels = {}, []
-        self.nav.add(self._caption_row("Boîtes intelligentes"))
+        self.nav.add(self._caption_row(tr("Boîtes intelligentes")))
         for vid in SMART_VIEWS:
             label, ic = next((l, i) for k, l, i in self.NAV_ROWS if k == vid)
             r = Gtk.ListBoxRow()
@@ -211,7 +212,7 @@ class FolderMixin:
             self.nav.remove(r)
         self._dyn_rows, self._folder_badges = [], {}
         multi = len(self.accounts()) > 1
-        added = [self._caption_row("Dossiers")]
+        added = [self._caption_row(tr("Dossiers"))]
         for acc in self.accounts():
             aid = acc["id"]
             hide_all = False
@@ -235,7 +236,7 @@ class FolderMixin:
                     skip_prefix = e["path"]
                 added.append(self._folder_row(aid, e, has_children, collapsed, multi))
         if self.config["saved_searches"]:
-            added.append(self._caption_row("Recherches"))
+            added.append(self._caption_row(tr("Recherches")))
             for i, sv in enumerate(self.config["saved_searches"]):
                 r = Gtk.ListBoxRow()
                 r.view, r.account, r.toggle_key = "saved:%d" % i, None, None
@@ -326,7 +327,7 @@ class FolderMixin:
             try:
                 return self.config["saved_searches"][int(v[6:])]["name"]
             except (ValueError, IndexError):
-                return "Recherche"
+                return tr("Recherche")
         acc = next((a for a in self.accounts() if a["id"] == self.account), None)
         suffix = (" — " + (acc.get("name") or acc["email"])) if acc and len(self.accounts()) > 1 else ""
         if v.startswith("f:"):
@@ -350,7 +351,7 @@ class FolderMixin:
         self._orbs = {}
         if self.account != "all" and self.account not in [a["id"] for a in self.accounts()]:
             self.account = "all"
-        items = [("all", "Tous les comptes", None)] + [(a["id"], a.get("name") or a["email"], a) for a in self.accounts()]
+        items = [("all", tr("Tous les comptes"), None)] + [(a["id"], a.get("name") or a["email"], a) for a in self.accounts()]
         for aid, name, acc in items:
             btn = Gtk.Button()
             btn.set_relief(Gtk.ReliefStyle.NONE)
@@ -441,7 +442,7 @@ class FolderMixin:
             return menu
         aid = msgs[0].account
         current = {m.folder for m in msgs}
-        head = Gtk.MenuItem(label="Déplacer vers…")
+        head = Gtk.MenuItem(label=tr("Déplacer vers…"))
         head.set_sensitive(False)
         menu.append(head)
         for e in self.tree_of(aid):
@@ -455,7 +456,7 @@ class FolderMixin:
         return menu
 
     def _move_to(self, msgs, dest, name):
-        self.move_messages(msgs, dest, label="déplacé vers « %s »" % name)
+        self.move_messages(msgs, dest, label=tr("déplacé vers « %s »") % name)
         self._learn_move(msgs, dest, name)
 
     def choose_folder_dialog(self, msgs):
@@ -463,8 +464,8 @@ class FolderMixin:
         if not msgs:
             return
         aid = msgs[0].account
-        dlg = Gtk.Dialog(title="Déplacer vers…", transient_for=self, modal=True)
-        dlg.add_buttons("Annuler", Gtk.ResponseType.CANCEL)
+        dlg = Gtk.Dialog(title=tr("Déplacer vers…"), transient_for=self, modal=True)
+        dlg.add_buttons(tr("Annuler"), Gtk.ResponseType.CANCEL)
         dlg.set_default_size(380, 420)
         e = Gtk.SearchEntry()
         lb = Gtk.ListBox()
@@ -514,13 +515,13 @@ class FolderMixin:
         menu = Gtk.Menu()
         items = []
         if entry is not None and entry["selectable"]:
-            items.append(("Actualiser ce dossier", lambda: self.sync(folders=(dest_of(entry),), accounts=[aid], manual=True)))
-        items.append(("Nouveau dossier…" if entry is None else "Nouveau sous-dossier…",
+            items.append((tr("Actualiser ce dossier"), lambda: self.sync(folders=(dest_of(entry),), accounts=[aid], manual=True)))
+        items.append((tr("Nouveau dossier…") if entry is None else tr("Nouveau sous-dossier…"),
                       lambda: self.folder_create(aid, entry)))
         if entry is not None and not entry["special"]:
-            items.append(("Renommer…", lambda: self.folder_rename(aid, entry)))
-            items.append(("Supprimer…", lambda: self.folder_delete(aid, entry)))
-        items.append(("Actualiser la liste des dossiers", self.refresh_folders))
+            items.append((tr("Renommer…"), lambda: self.folder_rename(aid, entry)))
+            items.append((tr("Supprimer…"), lambda: self.folder_delete(aid, entry)))
+        items.append((tr("Actualiser la liste des dossiers"), self.refresh_folders))
         for label, fn in items:
             mi = Gtk.MenuItem(label=label)
             mi.connect("activate", lambda _i, f=fn: f())
@@ -531,7 +532,7 @@ class FolderMixin:
 
     def _ask_text(self, title, label, default=""):
         d = Gtk.Dialog(title=title, transient_for=self, modal=True)
-        d.add_buttons("Annuler", Gtk.ResponseType.CANCEL, "OK", Gtk.ResponseType.OK)
+        d.add_buttons(tr("Annuler"), Gtk.ResponseType.CANCEL, "OK", Gtk.ResponseType.OK)
         d.set_default_response(Gtk.ResponseType.OK)
         e = Gtk.Entry(text=default)
         e.set_activates_default(True)
@@ -549,7 +550,7 @@ class FolderMixin:
     def _folder_op(self, aid, fn, ok_text):
         def done(_res, err):
             if err:
-                self.toast.popup("Dossier : %s" % str(err)[:100], timeout=6)
+                self.toast.popup(tr("Dossier : %s") % str(err)[:100], timeout=6)
             else:
                 self.toast.popup(ok_text, timeout=3)
             self.refresh_folders()
@@ -580,7 +581,7 @@ class FolderMixin:
 
         def done(_r, err):
             if err:
-                self.toast.popup("Création du dossier impossible : %s" % str(err)[:100], timeout=6)
+                self.toast.popup(tr("Création du dossier impossible : %s") % str(err)[:100], timeout=6)
                 return
             self.refresh_folders(after=(lambda: then(self.find_folder(label, aid)[1]) if then and self.find_folder(label, aid) else None))
         self.run_bg(lambda: self.backend(aid).create_folder(path), done)
@@ -599,29 +600,29 @@ class FolderMixin:
             self.create_folder_named(aid, spec, None, cb)
 
     def folder_create(self, aid, parent):
-        name = self._ask_text("Nouveau dossier", "Nom du dossier" + (" (dans « %s »)" % parent["label"] if parent else ""))
+        name = self._ask_text(tr("Nouveau dossier"), tr("Nom du dossier") + (tr(" (dans « %s »)") % parent["label"] if parent else ""))
         if not name:
             return
         delim = parent["delim"] if parent else "/"
         if delim in name:
-            self.toast.popup("Le nom ne peut pas contenir « %s »" % delim, timeout=4)
+            self.toast.popup(tr("Le nom ne peut pas contenir « %s »") % delim, timeout=4)
             return
         path = (utf7_decode(parent["name"]) + delim + name) if parent else name
-        self._folder_op(aid, lambda be: be.create_folder(path), "Dossier « %s » créé" % name)
+        self._folder_op(aid, lambda be: be.create_folder(path), tr("Dossier « %s » créé") % name)
 
     def folder_rename(self, aid, entry):
-        name = self._ask_text("Renommer le dossier", "Nouveau nom", entry["label"])
+        name = self._ask_text(tr("Renommer le dossier"), tr("Nouveau nom"), entry["label"])
         if not name or name == entry["label"]:
             return
         decoded, delim = utf7_decode(entry["name"]), entry["delim"]
         new_path = (decoded[:decoded.rfind(delim)] + delim + name) if delim and delim in decoded else name
-        self._folder_op(aid, lambda be: be.rename_folder(entry["name"], new_path), "Dossier renommé en « %s »" % name)
+        self._folder_op(aid, lambda be: be.rename_folder(entry["name"], new_path), tr("Dossier renommé en « %s »") % name)
 
     def folder_delete(self, aid, entry):
         d = Gtk.MessageDialog(transient_for=self, modal=True, message_type=Gtk.MessageType.WARNING,
-                              text="Supprimer le dossier « %s » ?" % entry["path"],
-                              secondary_text="Les messages qu'il contient seront supprimés du serveur.")
-        d.add_buttons("Annuler", Gtk.ResponseType.CANCEL, "Supprimer", Gtk.ResponseType.OK)
+                              text=tr("Supprimer le dossier « %s » ?") % entry["path"],
+                              secondary_text=tr("Les messages qu'il contient seront supprimés du serveur."))
+        d.add_buttons(tr("Annuler"), Gtk.ResponseType.CANCEL, tr("Supprimer"), Gtk.ResponseType.OK)
         ok = d.run() == Gtk.ResponseType.OK
         d.destroy()
         if not ok:
@@ -629,4 +630,4 @@ class FolderMixin:
         self.cache.delete_folder(aid, "f:" + entry["name"])
         if self.view == "f:" + entry["name"]:
             self.view = "inbox"
-        self._folder_op(aid, lambda be: be.delete_folder(entry["name"]), "Dossier supprimé")
+        self._folder_op(aid, lambda be: be.delete_folder(entry["name"]), tr("Dossier supprimé"))

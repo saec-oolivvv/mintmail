@@ -16,6 +16,7 @@ import urllib.error
 import urllib.parse
 import urllib.request
 from typing import Callable, Dict, Optional
+from .i18n import tr
 
 PROVIDERS: Dict[str, Dict] = {
     "google": {
@@ -23,7 +24,7 @@ PROVIDERS: Dict[str, Dict] = {
         "token_url": "https://oauth2.googleapis.com/token", "scopes": "https://mail.google.com/ openid email",
         "extra": {"access_type": "offline", "prompt": "consent"},
         "imap": ("imap.gmail.com", 993), "smtp": ("smtp.gmail.com", 587),
-        "help": "console.cloud.google.com → API et services → Identifiants → ID client OAuth (type « Application de bureau »)",
+        "help": tr("console.cloud.google.com → API et services → Identifiants → ID client OAuth (type « Application de bureau »)"),
     },
     "microsoft": {
         "label": "Microsoft (Outlook / 365)", "auth_url": "https://login.microsoftonline.com/common/oauth2/v2.0/authorize",
@@ -31,13 +32,15 @@ PROVIDERS: Dict[str, Dict] = {
         "scopes": "https://outlook.office.com/IMAP.AccessAsUser.All https://outlook.office.com/SMTP.Send offline_access openid email profile",
         "extra": {"prompt": "select_account"},
         "imap": ("outlook.office365.com", 993), "smtp": ("smtp.office365.com", 587),
-        "help": "portal.azure.com → Inscriptions d'applications → Nouvelle (client public, URI de redirection « http://localhost »)",
+        "help": tr("portal.azure.com → Inscriptions d'applications → Nouvelle (client public, URI de redirection « http://localhost »)"),
     },
 }
 
 
 class OAuthError(Exception):
-    pass
+    def __init__(self, msg="", retryable=False):
+        super().__init__(msg)
+        self.retryable = retryable          # problème de réseau passager (rejouable), indépendant de la langue du message
 
 
 SYSTEM_CLIENTS = "/etc/mintmail/oauth-clients.json"
@@ -45,20 +48,20 @@ SYSTEM_CLIENTS = "/etc/mintmail/oauth-clients.json"
 # Assistant de configuration : étapes à faire UNE FOIS chez le fournisseur (libellé, adresse exacte à ouvrir)
 WIZARD: Dict[str, list] = {
     "google": [
-        ("Créer un projet nommé « MintMail »", "https://console.cloud.google.com/projectcreate"),
-        ("Activer « Google Calendar API » (pour l'agenda ; facultatif pour le courrier seul)",
+        (tr("Créer un projet nommé « MintMail »"), "https://console.cloud.google.com/projectcreate"),
+        (tr("Activer « Google Calendar API » (pour l'agenda ; facultatif pour le courrier seul)"),
          "https://console.cloud.google.com/apis/library/calendar-json.googleapis.com"),
-        ("Écran de consentement : type « Externe », nom « MintMail », votre e-mail ; ajoutez les portées https://mail.google.com/ et "
-         ".../auth/calendar.events ; ajoutez-vous comme utilisateur test ; puis « Publier l'application » (sinon le jeton expire après 7 jours)",
+        (tr("Écran de consentement : type « Externe », nom « MintMail », votre e-mail ; ajoutez les portées https://mail.google.com/ et "
+         ".../auth/calendar.events ; ajoutez-vous comme utilisateur test ; puis « Publier l'application » (sinon le jeton expire après 7 jours)"),
          "https://console.cloud.google.com/apis/credentials/consent"),
-        ("Créer l'identifiant : type « Application de bureau », nom « MintMail », puis copier l'ID client et le secret",
+        (tr("Créer l'identifiant : type « Application de bureau », nom « MintMail », puis copier l'ID client et le secret"),
          "https://console.cloud.google.com/apis/credentials/oauthclient"),
     ],
     "microsoft": [
-        ("Nouvelle inscription : nom « MintMail », comptes de tous annuaires + comptes Microsoft personnels, URI de redirection de type "
-         "« Client public » : http://localhost",
+        (tr("Nouvelle inscription : nom « MintMail », comptes de tous annuaires + comptes Microsoft personnels, URI de redirection de type "
+         "« Client public » : http://localhost"),
          "https://entra.microsoft.com/#view/Microsoft_AAD_RegisteredApps/CreateApplicationBlade/isMSAApp~/false"),
-        ("Autorisations d'API → Exchange Online : IMAP.AccessAsUser.All et SMTP.Send (+ offline_access), puis copier l'ID d'application (client)",
+        (tr("Autorisations d'API → Exchange Online : IMAP.AccessAsUser.All et SMTP.Send (+ offline_access), puis copier l'ID d'application (client)"),
          "https://entra.microsoft.com/#view/Microsoft_AAD_RegisteredApps/ApplicationsListBlade"),
     ],
 }
@@ -119,7 +122,7 @@ def _loopback(url: str) -> bool:
 
 def post_form(url: str, data: Dict[str, str], timeout: float = 20.0) -> Dict:
     if not (url.startswith("https://") or _loopback(url)):
-        raise OAuthError("le serveur d'authentification doit utiliser HTTPS")
+        raise OAuthError(tr("le serveur d'authentification doit utiliser HTTPS"))
     req = urllib.request.Request(url, data=urllib.parse.urlencode(data).encode(), method="POST",
                                  headers={"Content-Type": "application/x-www-form-urlencoded", "Accept": "application/json"})
     try:
@@ -128,11 +131,11 @@ def post_form(url: str, data: Dict[str, str], timeout: float = 20.0) -> Dict:
     except urllib.error.HTTPError as e:
         try:
             body = json.loads(e.read().decode("utf-8"))
-            raise OAuthError("%s : %s" % (body.get("error", "erreur %d" % e.code), body.get("error_description", ""))[:240])
+            raise OAuthError("%s : %s" % (body.get("error", tr("erreur %d") % e.code), body.get("error_description", ""))[:240])
         except (ValueError, UnicodeDecodeError):
-            raise OAuthError("erreur HTTP %d" % e.code)
+            raise OAuthError(tr("erreur HTTP %d") % e.code)
     except (urllib.error.URLError, OSError, ValueError) as e:
-        raise OAuthError("connexion impossible : %s" % getattr(e, "reason", e))
+        raise OAuthError(tr("connexion impossible : %s") % getattr(e, "reason", e), retryable=True)
 
 
 def exchange_code(provider: str, client_id: str, client_secret: str, code: str, redirect_uri: str, verifier: str) -> Dict:
@@ -142,7 +145,7 @@ def exchange_code(provider: str, client_id: str, client_secret: str, code: str, 
         data["client_secret"] = client_secret
     res = post_form(PROVIDERS[provider]["token_url"], data)
     if "access_token" not in res:
-        raise OAuthError("réponse sans jeton d'accès")
+        raise OAuthError(tr("réponse sans jeton d'accès"))
     return res
 
 
@@ -152,7 +155,7 @@ def refresh_access_token(provider: str, client_id: str, client_secret: str, refr
         data["client_secret"] = client_secret
     res = post_form(PROVIDERS[provider]["token_url"], data)
     if "access_token" not in res:
-        raise OAuthError("actualisation refusée")
+        raise OAuthError(tr("actualisation refusée"))
     return res
 
 
@@ -171,8 +174,8 @@ def email_from_id_token(id_token: str) -> str:
         return ""
 
 
-_PAGE = ("<html><head><meta charset='utf-8'><title>MintMail</title></head><body style='font-family:sans-serif;text-align:center;"
-         "padding-top:15vh'><h2>%s</h2><p>Vous pouvez fermer cet onglet et revenir à MintMail.</p></body></html>")
+_PAGE = (tr("<html><head><meta charset='utf-8'><title>MintMail</title></head><body style='font-family:sans-serif;text-align:center;"
+         "padding-top:15vh'><h2>%s</h2><p>Vous pouvez fermer cet onglet et revenir à MintMail.</p></body></html>"))
 
 
 def run_loopback_flow(provider: str, client_id: str, client_secret: str, open_url: Callable[[str], None],
@@ -180,7 +183,7 @@ def run_loopback_flow(provider: str, client_id: str, client_secret: str, open_ur
     """Ouvre le navigateur, attend le retour sur http://127.0.0.1:<port>/ (état vérifié), échange le code. Retourne les jetons
     (+ « email » si disponible). Bloquant : à lancer dans un thread."""
     if not client_id:
-        raise OAuthError("identifiant client OAuth manquant (Paramètres → Comptes)")
+        raise OAuthError(tr("identifiant client OAuth manquant (Paramètres → Comptes)"))
     verifier, challenge = pkce_pair()
     state = secrets.token_urlsafe(24)
     got: Dict[str, str] = {}
@@ -198,7 +201,7 @@ def run_loopback_flow(provider: str, client_id: str, client_secret: str, open_ur
                 self.send_response(200)
                 self.send_header("Content-Type", "text/html; charset=utf-8")
                 self.end_headers()
-                self.wfile.write((_PAGE % ("Connexion réussie ✔" if ok else "Connexion refusée")).encode("utf-8"))
+                self.wfile.write((_PAGE % (tr("Connexion réussie ✔") if ok else tr("Connexion refusée"))).encode("utf-8"))
                 done.set()
             else:
                 self.send_response(404)
@@ -210,14 +213,14 @@ def run_loopback_flow(provider: str, client_id: str, client_secret: str, open_ur
     try:
         open_url(build_auth_url(provider, client_id, redirect, state, challenge, login_hint, extra_scopes))
         if not done.wait(timeout):
-            raise OAuthError("délai dépassé : connexion non terminée dans le navigateur")
+            raise OAuthError(tr("délai dépassé : connexion non terminée dans le navigateur"))
     finally:
         srv.shutdown()
         srv.server_close()
     if got.get("error"):
-        raise OAuthError("refusé : %s" % got.get("error_description", got["error"]))
+        raise OAuthError(tr("refusé : %s") % got.get("error_description", got["error"]))
     if got.get("state") != state:
-        raise OAuthError("réponse invalide (état différent) : connexion annulée par sécurité")
+        raise OAuthError(tr("réponse invalide (état différent) : connexion annulée par sécurité"))
     res = exchange_code(provider, client_id, client_secret, got["code"], redirect, verifier)
     res["email"] = email_from_id_token(res.get("id_token", ""))
     return res
@@ -240,7 +243,7 @@ class TokenManager:
             client = client_for(self.config, provider)
             rt = self.config.password(aid)
             if provider not in PROVIDERS or not client.get("client_id") or not rt:
-                raise OAuthError("connexion OAuth incomplète : reconnectez le compte (Paramètres → Comptes)")
+                raise OAuthError(tr("connexion OAuth incomplète : reconnectez le compte (Paramètres → Comptes)"))
             res = refresh_access_token(provider, client["client_id"], client.get("client_secret", ""), rt)
             if res.get("refresh_token") and res["refresh_token"] != rt:
                 self.config.set_password(aid, res["refresh_token"])

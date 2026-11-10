@@ -1,5 +1,6 @@
 """Pages de réglages : gestes & disposition, filtres & blocage, modèles de réponse, aide & synchronisation."""
 import gi
+from .i18n import tr
 
 gi.require_version("Gtk", "3.0")
 from gi.repository import Gdk, GLib, Gtk
@@ -7,11 +8,11 @@ from gi.repository import Gdk, GLib, Gtk
 from . import APP_NAME, __version__
 from .widgets import SWIPE_ACTIONS, icon
 
-LAYOUTS = [("columns", "Colonnes : liste | lecture"), ("bottom", "Lecture en bas"), ("list", "Liste seule (lecture plein écran)")]
-RULE_FIELDS = [("from", "L'expéditeur contient"), ("subject", "L'objet contient"), ("to", "Les destinataires contiennent")]
-RULE_ACTIONS = [("archive", "Archiver"), ("trash", "Supprimer"), ("spam", "Mettre en spam"),
-                ("read", "Marquer comme lu"), ("star", "Ajouter aux favoris"), ("pin", "Épingler"),
-                ("move", "Ranger dans le dossier →")]
+LAYOUTS = [("columns", tr("Colonnes : liste | lecture")), ("bottom", tr("Lecture en bas")), ("list", tr("Liste seule (lecture plein écran)"))]
+RULE_FIELDS = [("from", tr("L'expéditeur contient")), ("subject", tr("L'objet contient")), ("to", tr("Les destinataires contiennent"))]
+RULE_ACTIONS = [("archive", tr("Archiver")), ("trash", tr("Supprimer")), ("spam", tr("Mettre en spam")),
+                ("read", tr("Marquer comme lu")), ("star", tr("Ajouter aux favoris")), ("pin", tr("Épingler")),
+                ("move", tr("Ranger dans le dossier →"))]
 
 
 def _combo(options, active):
@@ -33,19 +34,19 @@ def gestures_page(win):
     cfg = win.config
     grid = Gtk.Grid(column_spacing=14, row_spacing=10)
     grid.set_border_width(18)
-    intro = Gtk.Label(xalign=0, label="Faites glisser un message vers la droite ou la gauche (souris, pavé tactile à deux "
+    intro = Gtk.Label(xalign=0, label=tr("Faites glisser un message vers la droite ou la gauche (souris, pavé tactile à deux "
                                       "doigts, écran tactile). Un glissement court déclenche l'action principale, un "
-                                      "glissement long l'action secondaire.")
+                                      "glissement long l'action secondaire."))
     intro.set_line_wrap(True)
     intro.get_style_context().add_class("dim")
     grid.attach(intro, 0, 0, 2, 1)
     lay = _combo(LAYOUTS, cfg["layout"])
     lay.connect("changed", lambda c: win.set_layout(c.get_active_id()))
-    grid.attach(Gtk.Label(label="Disposition", xalign=1), 0, 1, 1, 1)
+    grid.attach(Gtk.Label(label=tr("Disposition"), xalign=1), 0, 1, 1, 1)
     grid.attach(lay, 1, 1, 1, 1)
     opts = [(k, v[0]) for k, v in SWIPE_ACTIONS.items()]
-    for i, (key, label) in enumerate((("right", "Glisser vers la droite"), ("right_long", "… jusqu'au bout (droite)"),
-                                      ("left", "Glisser vers la gauche"), ("left_long", "… jusqu'au bout (gauche)"))):
+    for i, (key, label) in enumerate((("right", tr("Glisser vers la droite")), ("right_long", tr("… jusqu'au bout (droite)")),
+                                      ("left", tr("Glisser vers la gauche")), ("left_long", tr("… jusqu'au bout (gauche)")))):
         c = _combo(opts, cfg["swipe"].get(key, "none"))
 
         def changed(combo, k=key):
@@ -64,7 +65,7 @@ def gestures_page(win):
         cfg.save()
         win.reload_list()
     inv.connect("notify::active", inv_changed)
-    grid.attach(Gtk.Label(label="Inverser le sens au pavé tactile", xalign=1), 0, 6, 1, 1)
+    grid.attach(Gtk.Label(label=tr("Inverser le sens au pavé tactile"), xalign=1), 0, 6, 1, 1)
     grid.attach(inv, 1, 6, 1, 1)
     thr = Gtk.Switch()
     thr.set_active(bool(cfg.get("threads", True)))
@@ -75,7 +76,7 @@ def gestures_page(win):
         cfg.save()
         win.reload_list(full=True)
     thr.connect("notify::active", thr_changed)
-    grid.attach(Gtk.Label(label="Regrouper en conversations", xalign=1), 0, 7, 1, 1)
+    grid.attach(Gtk.Label(label=tr("Regrouper en conversations"), xalign=1), 0, 7, 1, 1)
     grid.attach(thr, 1, 7, 1, 1)
     return _scrolled(grid)
 
@@ -98,7 +99,7 @@ def _list_editor(win, title, key, placeholder, hint):
     entry = Gtk.Entry()
     entry.set_placeholder_text(placeholder)
     entry.set_hexpand(True)
-    btn = Gtk.Button(label="Ajouter")
+    btn = Gtk.Button(label=tr("Ajouter"))
     add.pack_start(entry, True, True, 0)
     add.pack_start(btn, False, False, 0)
     box.pack_start(add, False, False, 0)
@@ -113,7 +114,7 @@ def _list_editor(win, title, key, placeholder, hint):
             rm = Gtk.Button()
             rm.set_image(icon("list-remove-symbolic"))
             rm.set_relief(Gtk.ReliefStyle.NONE)
-            rm.set_tooltip_text("Retirer")
+            rm.set_tooltip_text(tr("Retirer"))
             rm.connect("clicked", lambda _b, val=v: (cfg[key].remove(val), cfg.save(), refresh()))
             row.pack_end(rm, False, False, 0)
             lb.add(row)
@@ -137,16 +138,16 @@ def filters_page(win):
     page = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=18)
     page.set_border_width(18)
     page.pack_start(_list_editor(
-        win, "Expéditeurs bloqués", "blocked", "adresse@exemple.com ou @domaine.com",
-        "Leurs messages vont directement à la corbeille (marqués comme lus)."), False, False, 0)
+        win, tr("Expéditeurs bloqués"), "blocked", tr("adresse@exemple.com ou @domaine.com"),
+        tr("Leurs messages vont directement à la corbeille (marqués comme lus).")), False, False, 0)
     page.pack_start(_list_editor(
-        win, "Expéditeurs envoyés en spam", "spam_senders", "adresse@exemple.com ou @domaine.com",
-        "Leurs messages vont directement dans le dossier Spam."), False, False, 0)
+        win, tr("Expéditeurs envoyés en spam"), "spam_senders", tr("adresse@exemple.com ou @domaine.com"),
+        tr("Leurs messages vont directement dans le dossier Spam.")), False, False, 0)
 
     head = Gtk.Label(xalign=0)
-    head.set_markup("<b>Règles automatiques</b>")
+    head.set_markup(tr("<b>Règles automatiques</b>"))
     page.pack_start(head, False, False, 0)
-    hint = Gtk.Label(xalign=0, label="Appliquées à chaque nouveau message de la boîte de réception.")
+    hint = Gtk.Label(xalign=0, label=tr("Appliquées à chaque nouveau message de la boîte de réception."))
     hint.get_style_context().add_class("dim")
     page.pack_start(hint, False, False, 0)
     lb = Gtk.ListBox()
@@ -155,17 +156,17 @@ def filters_page(win):
     form = Gtk.Box(spacing=6)
     f_field = _combo(RULE_FIELDS, "from")
     f_text = Gtk.Entry()
-    f_text.set_placeholder_text("texte…")
+    f_text.set_placeholder_text(tr("texte…"))
     f_text.set_hexpand(True)
     f_act = _combo(RULE_ACTIONS, "archive")
     f_folder = Gtk.Entry()
-    f_folder.set_placeholder_text("dossier (pour « Ranger »)")
+    f_folder.set_placeholder_text(tr("dossier (pour « Ranger »)"))
     f_folder.set_width_chars(16)
-    add = Gtk.Button(label="Ajouter la règle")
+    add = Gtk.Button(label=tr("Ajouter la règle"))
     for w in (f_field, f_text, f_act, f_folder, add):
         form.pack_start(w, w is f_text, True, 0)
     page.pack_start(form, False, False, 0)
-    apply_btn = Gtk.Button(label="Appliquer maintenant à la boîte de réception")
+    apply_btn = Gtk.Button(label=tr("Appliquer maintenant à la boîte de réception"))
     apply_btn.set_halign(Gtk.Align.START)
     apply_btn.connect("clicked", lambda *_: win.apply_rules_now())
     page.pack_start(apply_btn, False, False, 0)
@@ -196,7 +197,7 @@ def filters_page(win):
                 from .ai_engine import sanitize_folder_name
                 rule["folder"] = sanitize_folder_name(f_folder.get_text())
                 if not rule["folder"]:
-                    win.toast.popup("Indiquez le dossier de destination", timeout=3)
+                    win.toast.popup(tr("Indiquez le dossier de destination"), timeout=3)
                     return
             cfg["rules"].append(rule)
             cfg.save()
@@ -220,24 +221,24 @@ def templates_page(win):
     sw.set_size_request(200, -1)
     sw.add(lb)
     left.pack_start(sw, True, True, 0)
-    new = Gtk.Button(label="＋ Nouveau modèle")
+    new = Gtk.Button(label=tr("＋ Nouveau modèle"))
     left.pack_start(new, False, False, 0)
     page.pack_start(left, False, False, 0)
     right = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
     name = Gtk.Entry()
-    name.set_placeholder_text("Nom du modèle")
+    name.set_placeholder_text(tr("Nom du modèle"))
     tv = Gtk.TextView()
     tv.set_monospace(True)
     tv.set_wrap_mode(Gtk.WrapMode.WORD_CHAR)
     tsw = Gtk.ScrolledWindow()
     tsw.add(tv)
     btns = Gtk.Box(spacing=6)
-    save = Gtk.Button(label="Enregistrer")
+    save = Gtk.Button(label=tr("Enregistrer"))
     save.get_style_context().add_class("suggested-action")
-    rm = Gtk.Button(label="Supprimer")
+    rm = Gtk.Button(label=tr("Supprimer"))
     btns.pack_start(save, False, False, 0)
     btns.pack_start(rm, False, False, 0)
-    hint = Gtk.Label(xalign=0, label="Contenu HTML. Insertion depuis le bouton « Modèles » de la fenêtre de rédaction.")
+    hint = Gtk.Label(xalign=0, label=tr("Contenu HTML. Insertion depuis le bouton « Modèles » de la fenêtre de rédaction."))
     hint.get_style_context().add_class("dim")
     for w, ex in ((name, False), (hint, False), (tsw, True), (btns, False)):
         right.pack_start(w, ex, ex, 0)
@@ -268,7 +269,7 @@ def templates_page(win):
         buf.set_text(t["html"])
 
     def on_new(*_):
-        cfg["templates"].append({"name": "Nouveau modèle", "html": "<p>Bonjour,</p>"})
+        cfg["templates"].append({"name": tr("Nouveau modèle"), "html": tr("<p>Bonjour,</p>")})
         cfg.save()
         refresh(len(cfg["templates"]) - 1)
 
@@ -276,11 +277,11 @@ def templates_page(win):
         i = state["i"]
         if i is None or i >= len(cfg["templates"]):
             return
-        cfg["templates"][i] = {"name": name.get_text().strip() or "Sans titre",
+        cfg["templates"][i] = {"name": name.get_text().strip() or tr("Sans titre"),
                                "html": buf.get_text(buf.get_start_iter(), buf.get_end_iter(), False)}
         cfg.save()
         refresh(i)
-        win.toast.popup("Modèle enregistré", timeout=2)
+        win.toast.popup(tr("Modèle enregistré"), timeout=2)
 
     def on_rm(*_):
         i = state["i"]
@@ -300,8 +301,8 @@ def templates_page(win):
 
 
 # ------------------------------------------------------------------ synchronisation
-_SYNC_NOUNS = {"rules": "règles", "templates": "modèles", "blocked": "expéditeurs bloqués",
-               "spam_senders": "expéditeurs en spam", "saved_searches": "recherches", "signatures": "signatures"}
+_SYNC_NOUNS = {"rules": tr("règles"), "templates": tr("modèles"), "blocked": tr("expéditeurs bloqués"),
+               "spam_senders": tr("expéditeurs en spam"), "saved_searches": "recherches", "signatures": "signatures"}
 
 
 def p2p_page(win):
@@ -321,14 +322,14 @@ def p2p_page(win):
         if dim:
             l.get_style_context().add_class("dim")
         return l
-    title = label("Synchronisation entre machines", dim=False)
+    title = label(tr("Synchronisation entre machines"), dim=False)
     title.get_style_context().add_class("list-title")
     grid.attach(title, 0, 0, 2, 1)
-    grid.attach(label("Tout est synchronisé automatiquement entre vos machines MintMail du même réseau dès qu'elles se voient : "
+    grid.attach(label(tr("Tout est synchronisé automatiquement entre vos machines MintMail du même réseau dès qu'elles se voient : "
                       "comptes (avec leurs mots de passe), signatures, IA (clé API), modèles de réponse rapide, règles, "
                       "blocages, recherches enregistrées et apparence. Les suppressions sont propagées aussi. "
                       "Les échanges sont authentifiés et chiffrés ; le courrier n'est pas échangé (chaque machine le "
-                      "télécharge depuis son serveur). Utilisez le même code de jumelage partout."),
+                      "télécharge depuis son serveur). Utilisez le même code de jumelage partout.")),
                 0, 1, 2, 1)
 
     # --- code de jumelage
@@ -336,15 +337,15 @@ def p2p_page(win):
     secret.set_visibility(False)
     secret.set_hexpand(True)
     secret.set_text(cfg.get("p2p_secret") or "")
-    secret.set_placeholder_text("%d caractères minimum, identique sur les deux machines" % MIN_SECRET)
-    show = Gtk.CheckButton(label="Afficher")
+    secret.set_placeholder_text(tr("%d caractères minimum, identique sur les deux machines") % MIN_SECRET)
+    show = Gtk.CheckButton(label=tr("Afficher"))
     show.connect("toggled", lambda b: secret.set_visibility(b.get_active()))
-    gen = Gtk.Button(label="Générer")
-    apply_btn = Gtk.Button(label="Appliquer")
+    gen = Gtk.Button(label=tr("Générer"))
+    apply_btn = Gtk.Button(label=tr("Appliquer"))
     srow = Gtk.Box(spacing=6)
     for w, ex in ((secret, True), (show, False), (gen, False), (apply_btn, False)):
         srow.pack_start(w, ex, ex, 0)
-    grid.attach(Gtk.Label(label="Code de jumelage", xalign=1), 0, 2, 1, 1)
+    grid.attach(Gtk.Label(label=tr("Code de jumelage"), xalign=1), 0, 2, 1, 1)
     grid.attach(srow, 1, 2, 1, 1)
 
     def on_generate(_b):
@@ -362,14 +363,14 @@ def p2p_page(win):
         code = secret.get_text().strip()
         want = enabled.get_active()
         if want and code != (cfg.get("p2p_secret") or "") and len(code) >= MIN_SECRET and not code_is_acceptable(code):
-            win.toast.popup("Code trop faible (≈ %d bits) : il protège vos mots de passe sur le réseau. Cliquez « Générer » ou utilisez au moins "
-                            "16 caractères variés (lettres, chiffres, symboles), sans mot courant." % code_strength(code), timeout=9)
+            win.toast.popup(tr("Code trop faible (≈ %d bits) : il protège vos mots de passe sur le réseau. Cliquez « Générer » ou utilisez au moins "
+                            "16 caractères variés (lettres, chiffres, symboles), sans mot courant.") % code_strength(code), timeout=9)
             guard["busy"] = True
             enabled.set_active(False)
             guard["busy"] = False
             return
         if want and len(code) < MIN_SECRET:
-            win.toast.popup("Définissez d'abord un code de jumelage (%d caractères minimum)" % MIN_SECRET, timeout=4)
+            win.toast.popup(tr("Définissez d'abord un code de jumelage (%d caractères minimum)") % MIN_SECRET, timeout=4)
             guard["busy"] = True
             enabled.set_active(False)
             guard["busy"] = False
@@ -385,7 +386,7 @@ def p2p_page(win):
     enabled.connect("notify::active", on_switch)
     apply_btn.connect("clicked", apply_settings)
     secret.connect("activate", apply_settings)
-    grid.attach(Gtk.Label(label="Synchronisation activée", xalign=1), 0, 3, 1, 1)
+    grid.attach(Gtk.Label(label=tr("Synchronisation activée"), xalign=1), 0, 3, 1, 1)
     grid.attach(enabled, 1, 3, 1, 1)
 
     # --- état, identifiant, pairs
@@ -393,14 +394,14 @@ def p2p_page(win):
     id_lbl = Gtk.Label(xalign=0)
     id_lbl.set_selectable(True)
     peers_lbl = label("")
-    grid.attach(Gtk.Label(label="État", xalign=1), 0, 4, 1, 1)
+    grid.attach(Gtk.Label(label=tr("État"), xalign=1), 0, 4, 1, 1)
     grid.attach(state_lbl, 1, 4, 1, 1)
-    grid.attach(Gtk.Label(label="Cet appareil", xalign=1), 0, 5, 1, 1)
+    grid.attach(Gtk.Label(label=tr("Cet appareil"), xalign=1), 0, 5, 1, 1)
     grid.attach(id_lbl, 1, 5, 1, 1)
-    grid.attach(Gtk.Label(label="Pairs détectés", xalign=1), 0, 6, 1, 1)
+    grid.attach(Gtk.Label(label=tr("Pairs détectés"), xalign=1), 0, 6, 1, 1)
     grid.attach(peers_lbl, 1, 6, 1, 1)
 
-    sync_btn = Gtk.Button(label="↔ Synchroniser maintenant")
+    sync_btn = Gtk.Button(label=tr("↔ Synchroniser maintenant"))
     sync_btn.set_halign(Gtk.Align.START)
 
     def do_sync(_b):
@@ -412,33 +413,33 @@ def p2p_page(win):
             def done():
                 sync_btn.set_sensitive(True)
                 if not win.sync_engine.can_run():
-                    msg = "Synchronisation inactive (code de jumelage requis)"
+                    msg = tr("Synchronisation inactive (code de jumelage requis)")
                 elif not res.get("peers_checked"):
-                    msg = "Aucune autre machine détectée"
+                    msg = tr("Aucune autre machine détectée")
                 elif res.get("failed") and not res.get("applied"):
-                    msg = "Échange impossible : %s" % (win.sync_engine.last_error or "machine injoignable")
+                    msg = tr("Échange impossible : %s") % (win.sync_engine.last_error or tr("machine injoignable"))
                 else:
-                    msg = ("%d élément(s) reçu(s) — %s" % (res["applied"], win.sync_engine.last_summary)) if res["applied"] else "Tout est à jour"
+                    msg = (tr("%d élément(s) reçu(s) — %s") % (res["applied"], win.sync_engine.last_summary)) if res["applied"] else tr("Tout est à jour")
                 win.toast.popup(msg, timeout=3)
                 refresh()
                 return False
             GLib.idle_add(done)
         threading.Thread(target=work, daemon=True).start()
     sync_btn.connect("clicked", do_sync)
-    scan_btn = Gtk.Button(label="🔍 Rechercher les machines")
-    scan_btn.set_tooltip_text("Sonde le réseau local (utile si la détection automatique est bloquée par la box ou un VPN)")
+    scan_btn = Gtk.Button(label=tr("🔍 Rechercher les machines"))
+    scan_btn.set_tooltip_text(tr("Sonde le réseau local (utile si la détection automatique est bloquée par la box ou un VPN)"))
 
     def do_scan(_b):
         scan_btn.set_sensitive(False)
-        win.toast.popup("Recherche des machines sur le réseau local…", timeout=3)
+        win.toast.popup(tr("Recherche des machines sur le réseau local…"), timeout=3)
 
         def work():
             n = win.sync_engine.scan_now()
 
             def done():
                 scan_btn.set_sensitive(True)
-                win.toast.popup("%d machine(s) trouvée(s)" % n if win.sync_engine.can_run()
-                                else "Synchronisation inactive (code de jumelage requis)", timeout=4)
+                win.toast.popup(tr("%d machine(s) trouvée(s)") % n if win.sync_engine.can_run()
+                                else tr("Synchronisation inactive (code de jumelage requis)"), timeout=4)
                 refresh()
                 return False
             GLib.idle_add(done)
@@ -450,14 +451,14 @@ def p2p_page(win):
     grid.attach(brow, 1, 7, 1, 1)
 
     # --- pairs statiques (secours si la découverte automatique est bloquée)
-    grid.attach(label("Secours si la découverte automatique est bloquée (isolation Wi-Fi de certaines box) : "
-                      "adresse IP de l'autre machine. Votre adresse : %s" % local_ip()), 0, 8, 2, 1)
+    grid.attach(label(tr("Secours si la découverte automatique est bloquée (isolation Wi-Fi de certaines box) : "
+                      "adresse IP de l'autre machine. Votre adresse : %s") % local_ip()), 0, 8, 2, 1)
     peer_entry = Gtk.Entry()
-    peer_entry.set_placeholder_text("192.168.1.42 ou 192.168.1.42:54322")
+    peer_entry.set_placeholder_text(tr("192.168.1.42 ou 192.168.1.42:54322"))
     peer_entry.set_text(", ".join(cfg.get("p2p_static_peers") or []))
     peer_entry.set_hexpand(True)
-    save_peers_btn = Gtk.Button(label="Enregistrer")
-    test_peer_btn = Gtk.Button(label="Tester")
+    save_peers_btn = Gtk.Button(label=tr("Enregistrer"))
+    test_peer_btn = Gtk.Button(label=tr("Tester"))
 
     def parse_peers(text):
         out = []
@@ -476,7 +477,7 @@ def p2p_page(win):
         cfg["p2p_static_peers"] = lst
         cfg.save()
         win._init_sync()
-        win.toast.popup("%d pair(s) statique(s) enregistré(s)" % len(lst), timeout=3)
+        win.toast.popup(tr("%d pair(s) statique(s) enregistré(s)") % len(lst), timeout=3)
     save_peers_btn.connect("clicked", save_peers)
 
     def test_peer(_b):
@@ -489,9 +490,9 @@ def p2p_page(win):
         def work():
             try:
                 socket.create_connection((host, port), timeout=3).close()
-                msg = "Connexion TCP vers %s:%d : OK" % (host, port)
+                msg = tr("Connexion TCP vers %s:%d : OK") % (host, port)
             except OSError as e:
-                msg = "Impossible de joindre %s:%d (%s)" % (host, port, e.strerror or e)
+                msg = tr("Impossible de joindre %s:%d (%s)") % (host, port, e.strerror or e)
             GLib.idle_add(lambda: (win.toast.popup(msg, timeout=4), False)[1])
         threading.Thread(target=work, daemon=True).start()
     test_peer_btn.connect("clicked", test_peer)
@@ -500,42 +501,42 @@ def p2p_page(win):
     prow.pack_start(save_peers_btn, False, False, 0)
     prow.pack_start(test_peer_btn, False, False, 0)
     grid.attach(prow, 0, 9, 2, 1)
-    grid.attach(label("Pare-feu : autoriser UDP 54321 et TCP 54322 entre les machines "
+    grid.attach(label(tr("Pare-feu : autoriser UDP 54321 et TCP 54322 entre les machines "
                       "(ex. sudo ufw allow from 192.168.1.0/24 to any port 54322 proto tcp). "
-                      "Les échanges sont chiffrés et authentifiés par le code de jumelage."), 0, 10, 2, 1)
+                      "Les échanges sont chiffrés et authentifiés par le code de jumelage.")), 0, 10, 2, 1)
     diag_lbl = label("")
     diag_lbl.set_selectable(True)
-    grid.attach(Gtk.Label(label="Diagnostic réseau", xalign=1, yalign=0), 0, 11, 1, 1)
+    grid.attach(Gtk.Label(label=tr("Diagnostic réseau"), xalign=1, yalign=0), 0, 11, 1, 1)
     grid.attach(diag_lbl, 1, 11, 1, 1)
 
     def diag_text():
         d = win.sync_engine.diagnostics()
         out = []
         if not d["enabled"]:
-            out.append("⚠ Synchronisation désactivée sur CETTE machine (elle ne se voit pas elle-même ni les autres).")
+            out.append(tr("⚠ Synchronisation désactivée sur CETTE machine (elle ne se voit pas elle-même ni les autres)."))
         if d["code_len"] and d["code_len"] < MIN_SECRET:
-            out.append("⚠ Code trop court : %d caractères (%d minimum). Cliquez « Générer », « Appliquer », puis "
-                       "saisissez EXACTEMENT le même code sur chaque machine." % (d["code_len"], MIN_SECRET))
+            out.append(tr("⚠ Code trop court : %d caractères (%d minimum). Cliquez « Générer », « Appliquer », puis "
+                       "saisissez EXACTEMENT le même code sur chaque machine.") % (d["code_len"], MIN_SECRET))
         if d["code_len"] >= MIN_SECRET and d.get("code_bits", 99) < 64:
-            out.append("⚠ Code de jumelage faible (≈ %d bits) : un attaquant du réseau pourrait le deviner hors ligne. Générez-en un nouveau "
-                       "(bouton « Générer ») puis saisissez-le sur chaque machine." % d["code_bits"])
+            out.append(tr("⚠ Code de jumelage faible (≈ %d bits) : un attaquant du réseau pourrait le deviner hors ligne. Générez-en un nouveau "
+                       "(bouton « Générer ») puis saisissez-le sur chaque machine.") % d["code_bits"])
         if d["enabled"] and not d["code_ok"]:
-            out.append("⚠ Aucun code valide : la synchronisation ne démarre pas.")
-        out.append("• Adresses de cette machine : %s" % (", ".join(d["own_ips"]) or "aucune détectée (réseau déconnecté ?)"))
+            out.append(tr("⚠ Aucun code valide : la synchronisation ne démarre pas."))
+        out.append(tr("• Adresses de cette machine : %s") % (", ".join(d["own_ips"]) or tr("aucune détectée (réseau déconnecté ?)")))
         if d["enabled"]:
-            out.append("• Écoute : UDP %d %s — TCP %d %s" % (d["disc_port"], "OK" if d["udp_bound"] else "✗ port occupé",
-                                                           d["tcp_port"], "OK" if d["tcp_bound"] else "✗ port occupé"))
-            out.append("• Annonces envoyées : %d (échecs : %d) — reçues d'autres machines : %d" % (
+            out.append(tr("• Écoute : UDP %d %s — TCP %d %s") % (d["disc_port"], "OK" if d["udp_bound"] else tr("✗ port occupé"),
+                                                           d["tcp_port"], "OK" if d["tcp_bound"] else tr("✗ port occupé")))
+            out.append(tr("• Annonces envoyées : %d (échecs : %d) — reçues d'autres machines : %d") % (
                 d["sent"], d["send_errors"], d["received"]))
             if d["foreign_versions"]:
-                out.append("⚠ Une machine d'une AUTRE version (protocole %s) annonce sa présence : mettez MintMail à jour "
-                           "partout (même version)." % ", ".join(d["foreign_versions"]))
+                out.append(tr("⚠ Une machine d'une AUTRE version (protocole %s) annonce sa présence : mettez MintMail à jour "
+                           "partout (même version).") % ", ".join(d["foreign_versions"]))
             if d["filtered"]:
-                out.append("• Annonces ignorées (adresse publique) : %s" % ", ".join(d["filtered"][:4]))
+                out.append(tr("• Annonces ignorées (adresse publique) : %s") % ", ".join(d["filtered"][:4]))
             if d["scanned"]:
-                out.append("• Dernière recherche active : %d adresses sondées" % d["scanned"])
+                out.append(tr("• Dernière recherche active : %d adresses sondées") % d["scanned"])
             if not d["received"] and d["sent"]:
-                out.append("→ Aucune annonce reçue : box ou pare-feu qui bloque UDP %d ? Essayez « Rechercher les machines »." % d["disc_port"])
+                out.append(tr("→ Aucune annonce reçue : box ou pare-feu qui bloque UDP %d ? Essayez « Rechercher les machines ».") % d["disc_port"])
         return "\n".join(out)
 
     def refresh(*_):
@@ -543,7 +544,7 @@ def p2p_page(win):
         state_lbl.set_text(eng.state_label())
         id_lbl.set_markup("<b>%s</b>" % GLib.markup_escape_text(eng.node_id() or "—"))
         peers_lbl.set_text("\n".join("%s @ %s:%s (%s)" % (p["node_id"], p["host"], p["port"], p["via"]) for p in eng.peers())
-                           or "Aucune autre machine détectée pour l'instant.")
+                           or tr("Aucune autre machine détectée pour l'instant."))
         diag_lbl.set_text(diag_text())
 
     sw = _scrolled(grid)
@@ -566,15 +567,15 @@ def help_page():
     from .store import CONFIG_DIR, DATA_DIR
     ctx = {"version": __version__, "config": str(CONFIG_DIR), "data": str(DATA_DIR), "log": str(LOG)}
     secs = H.sections(ctx)
-    mono = ("Tous les raccourcis clavier", "Options de la commande mintmail")
+    mono = (tr("Tous les raccourcis clavier"), tr("Options de la commande mintmail"))
 
     root = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
     top = Gtk.Box(spacing=12)
     top.set_border_width(12)
-    title = Gtk.Label(label="Aide — %s %s" % (APP_NAME, __version__), xalign=0)
+    title = Gtk.Label(label=tr("Aide — %s %s") % (APP_NAME, __version__), xalign=0)
     title.get_style_context().add_class("list-title")
     search = Gtk.SearchEntry()
-    search.set_placeholder_text("Rechercher dans l'aide (ex. OAuth, spam, hors ligne, raccourcis)")
+    search.set_placeholder_text(tr("Rechercher dans l'aide (ex. OAuth, spam, hors ligne, raccourcis)"))
     search.set_hexpand(True)
     top.pack_start(title, False, False, 0)
     top.pack_start(search, True, True, 0)
@@ -631,7 +632,7 @@ def help_page():
             box.pack_start(bl, False, False, 0)
             content.pack_start(box, False, False, 0)
         if not entries:
-            content.pack_start(Gtk.Label(label="Aucun résultat : essayez un autre mot (sans accent, une partie de mot suffit).", xalign=0), False, False, 0)
+            content.pack_start(Gtk.Label(label=tr("Aucun résultat : essayez un autre mot (sans accent, une partie de mot suffit)."), xalign=0), False, False, 0)
         content.show_all()
         vadj = csw.get_vadjustment()
         if vadj is not None:
@@ -647,7 +648,7 @@ def help_page():
         if len(q) >= 2:
             lb.unselect_all()
             hits = H.search(q, ctx)
-            render(hits, heading="%d résultat%s pour « %s »" % (len(hits), "s" if len(hits) > 1 else "", q), show_section=True)
+            render(hits, heading=tr("%d résultat%s pour « %s »") % (len(hits), "s" if len(hits) > 1 else "", q), show_section=True)
         elif not q:
             lb.select_row(lb.get_row_at_index(0))
     search.connect("search-changed", changed)
