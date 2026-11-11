@@ -1,0 +1,22 @@
+name: Vérifier les étiquettes de version
+# Ce workflow NE PUBLIE PAS de Release : les Releases sont créées et SIGNÉES par tools/release.sh sur la machine du mainteneur (la clé privée ne doit jamais être confiée à la CI).
+# À chaque étiquette vX.Y.Z : tests + construction du paquet (conservé comme artefact du workflow pour contrôle).
+on:
+  push:
+    tags: ["v*"]
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install pillow
+      - run: python3 tools/check-version.py
+      - run: python3 tests/run_all.py
+      - run: packaging/build-deb.sh
+      - uses: actions/upload-artifact@v4
+        with:
+          name: mintmail-deb
+          path: dist/*.deb

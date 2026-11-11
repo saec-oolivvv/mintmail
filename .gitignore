@@ -1,0 +1,12 @@
+__pycache__/
+*.pyc
+dist/
+build/
+.pytest_cache/
+.ruff_cache/
+*.bak-*
+data/oauth-clients.json
+*.key
+signing.key
+SHA256SUMS
+*.sig
