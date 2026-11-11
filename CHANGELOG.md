@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.12.2
+- (à compléter)
+
 ## 1.12.1
 - Correctif des tests : ils n'utilisent plus jamais le trousseau, le dossier personnel ni les réglages réels (sur une machine avec trousseau, la batterie écrasait la clé d'API enregistrée) ; la variable MINTMAIL_NO_KEYRING=1 désactive l'accès au trousseau
 - Test de synchronisation plus robuste (attend la fin de l'échange et affiche les valeurs reçues en cas d'échec)
