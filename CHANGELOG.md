@@ -1,7 +1,7 @@
 # Changelog
 
 ## 1.12.2
-- (à compléter)
+- Essai de la mise à jour automatique depuis l'application
 
 ## 1.12.1
 - Correctif des tests : ils n'utilisent plus jamais le trousseau, le dossier personnel ni les réglages réels (sur une machine avec trousseau, la batterie écrasait la clé d'API enregistrée) ; la variable MINTMAIL_NO_KEYRING=1 désactive l'accès au trousseau
