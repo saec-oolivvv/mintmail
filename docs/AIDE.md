@@ -1,4 +1,4 @@
-# Aide de MintMail 1.12.0
+# Aide de MintMail 1.12.1
 _Généré par `make docs` depuis l'aide intégrée (touche F1 dans l'application)._
 
 ## Premiers pas
@@ -375,11 +375,11 @@ Comptes · Signatures · Apparence · ✨ Intelligence artificielle · Synchroni
 
 ### Comment ça marche
 
-MintMail cherche une nouvelle version sur GitHub (dépôt réglé dans Paramètres → Mises à jour) au plus UNE FOIS PAR JOUR et vous l'annonce. Une seule requête anonyme est envoyée, sans aucune donnée personnelle. Désactivable dans Paramètres → Mises à jour ; palette → « Rechercher les mises à jour » pour vérifier tout de suite.
+MintMail cherche une nouvelle version sur GitHub (dépôt réglé dans Paramètres → Mises à jour) au plus UNE FOIS PAR JOUR et vous l'annonce. Une seule requête anonyme est envoyée, sans aucune donnée personnelle. Désactivable dans Paramètres → Mises à jour ; palette → « Rechercher les mises à jour » pour vérifier tout de suite. Quand une version est disponible, un BANDEAU apparaît en haut de la fenêtre dès l'ouverture (« Installer maintenant », « Notes de version », « Plus tard ») et une pastille « ⬆ Mise à jour X » reste dans la barre latérale. « Plus tard » repousse le bandeau de 24 h pour cette version ; ✕ le masque jusqu'au prochain lancement.
 
 ### Installer en un clic
 
-Paramètres → Mises à jour → « Installer la mise à jour » : le paquet est téléchargé, sa signature est vérifiée, puis le système demande votre mot de passe administrateur. Fermez et relancez MintMail ensuite. Rien ne s'installe sans votre accord.
+Paramètres → Mises à jour → « Installer la mise à jour » (ou « Installer maintenant » dans le bandeau) : le paquet est téléchargé avec une barre de progression, sa signature est vérifiée, puis le système demande votre mot de passe administrateur. Le bandeau passe à « installé » avec un bouton « Relancer maintenant ». Rien ne s'installe sans votre accord.
 
 ### Sécurité des mises à jour
 
@@ -477,7 +477,7 @@ Mise à jour : sudo apt install ./mintmail_X.Y.Z_all.deb (vos réglages et votre
 
 ## À propos et crédits
 
-### MintMail 1.12.0
+### MintMail 1.12.1
 
 Le client mail pour Linux Mint dont l'IA est l'ADN : il lit, trie, résume, classe, rédige et agit avec vous — toujours avec votre accord.  
 Développé par SAEC — https://saec.me · Logiciel libre sous licence MIT (© 2026 SAEC) : vous pouvez l'utiliser, le modifier et le redistribuer. Application GTK3 / Python, sans service cloud imposé : vos mails, vos clés et vos réglages restent chez vous.

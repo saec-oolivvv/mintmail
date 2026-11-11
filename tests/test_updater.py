@@ -439,10 +439,47 @@ class FakeCfg(dict):
         self.saved = getattr(self, "saved", 0) + 1
 
 
-def make_win(**cfg):
+class FakeBanner:
+    def __init__(self):
+        self.state, self.log = "hidden", []
+
+    def show_available(self, up, current):
+        self.state = "available"; self.log.append(("available", up.version, current))
+
+    def show_progress(self, version, text, fraction=None):
+        self.state = "progress"; self.log.append(("progress", version, text, fraction))
+
+    def show_done(self, version):
+        self.state = "done"; self.log.append(("done", version))
+
+    def show_error(self, text, page=""):
+        self.state = "error"; self.log.append(("error", text, page))
+
+    def hide(self):
+        self.state = "hidden"; self.log.append(("hide",))
+
+
+class FakeChip:
+    visible, label, tooltip = False, "", ""
+
+    def set_visible(self, v):
+        self.visible = bool(v)
+
+    def set_label(self, t):
+        self.label = t
+
+    def set_tooltip_text(self, t):
+        self.tooltip = t
+
+
+def make_win(banner=False, **cfg):
     class W(UI.UpdateMixin):
-        pass
+        def get_application(self):
+            return self.app
     w = W()
+    w.app = types.SimpleNamespace(quit=lambda: w.__dict__.setdefault("quit_calls", []).append(1))
+    if banner:
+        w.update_banner, w.update_chip = FakeBanner(), FakeChip()
     w.config = FakeCfg({"update_check": True, "update_repo": "o/r", "update_last_check": 0, "update_etag": "", "update_seen": ""})
     w.config.update(cfg)
     w.toasts, w.settings, w.confirm_answer, w.confirm_calls = [], [], True, []
@@ -478,47 +515,254 @@ def avail(version="1.99.0"):
     return U.Result("available", U.Update(version, "https://github.com/o/r/d.deb", 10, "https://github.com/o/r/d.sig", "", "Notes de version", "https://github.com/o/r/releases/tag/v" + version))
 
 
-def test_automatic_check_runs_daily_announces_each_version_once_and_can_be_disabled():
+def test_automatic_check_runs_daily_shows_the_banner_persists_the_update_and_can_be_disabled():
     calls = []
     sv = with_patches(check=lambda repo, etag="": (calls.append((repo, etag)), avail())[1])
     try:
-        w = make_win(update_check=False)
+        w = make_win(banner=True, update_check=False)
         w.check_updates()
-        assert calls == [] and w.toasts == []                                                        # désactivé : aucun accès réseau
-        w = make_win(update_last_check=__import__("time").time() - 60)
+        assert calls == [] and w.update_banner.log == []                                           # désactivé : aucun accès réseau
+        w = make_win(banner=True, update_last_check=__import__("time").time() - 60)
         w.check_updates()
-        assert calls == []                                                                           # vérifié il y a une minute : rien
-        w = make_win()
+        assert calls == []                                                                         # vérifié il y a une minute : rien
+        w = make_win(banner=True)
         w.check_updates()
-        assert calls == [("o/r", "")] and w._update.version == "1.99.0" and len(w.toasts) == 1 and "1.99.0" in w.toasts[0][0]
-        assert w.config["update_seen"] == "1.99.0" and w.config["update_last_check"] > 0 and w.toasts[0][1]
-        w.toasts[0][2]()
-        assert w.settings == ["updates"]                                                             # le bouton « Voir » ouvre la page
+        assert calls == [("o/r", "")] and w._update.version == "1.99.0"
+        assert w.update_banner.log[-1][:2] == ("available", "1.99.0") and w.update_chip.visible and "1.99.0" in w.update_chip.label and "1.99.0" in w.update_chip.tooltip
+        assert w.toasts == []                                                                       # le bandeau remplace la notification éphémère
+        saved = w.config["update_available"]
+        assert saved["version"] == "1.99.0" and saved["deb_url"].startswith("https://github.com/") and w.config["update_seen"] == "1.99.0"
+        # mise à jour disparue (installée ailleurs / retirée) : bandeau et pastille s'effacent, l'enregistrement aussi
+        U.check = lambda repo, etag="": U.Result("uptodate", etag='W/"x"')
         w.config["update_last_check"] = 0
         w.check_updates()
-        assert len(w.toasts) == 1                                                                    # même version : pas de nouvelle annonce
-        w.check_updates(manual=True)
-        assert len(w.toasts) == 2                                                                    # à la demande : toujours une réponse
-        w._update_busy = True
-        n = len(calls)
-        w.check_updates(manual=True)
-        assert len(calls) == n                                                                       # pas deux recherches en même temps
-        # à jour / erreurs
-        U.check = lambda repo, etag="": U.Result("uptodate", etag='W/"x"')
-        w = make_win(update_last_check=0)
-        w._update = avail().update
-        w.check_updates()
-        assert w._update is None and w.config["update_etag"] == 'W/"x"' and w.toasts == []
+        assert w._update is None and w.config["update_available"] is None and w.update_banner.state == "hidden" and not w.update_chip.visible
+        assert w.config["update_etag"] == 'W/"x"' and w.toasts == []
         w.check_updates(manual=True)
         assert "à jour" in w.toasts[-1][0] or "up to date" in w.toasts[-1][0]
+        # erreurs : silencieuses en automatique (on réessaiera), expliquées à la demande
         U.check = lambda repo, etag="": U.Result("error", code="ratelimit")
-        w = make_win()
+        w = make_win(banner=True)
         w.check_updates()
-        assert w.toasts == [] and w.config["update_last_check"] == 0                                 # erreur silencieuse en automatique, et on réessaiera
+        assert w.toasts == [] and w.config["update_last_check"] == 0 and w.update_banner.log == [("hide",)] or w.update_banner.log == []
         w.check_updates(manual=True)
         assert w.toasts and w.config["update_last_check"] == 0
+        w._update_busy = True
+        n = len(calls)
+        U.check = lambda repo, etag="": (calls.append(1), avail())[1]
+        w.check_updates(manual=True)
+        assert len(calls) == n                                                                      # pas deux recherches en même temps
     finally:
         restore(sv)
+
+
+def test_a_known_update_is_shown_immediately_at_launch_and_forged_or_stale_saved_state_is_discarded():
+    sv = with_patches(check=lambda *a, **k: (_ for _ in ()).throw(AssertionError("aucun accès réseau pour afficher le bandeau")))
+    UI.GLib.timeout_add_seconds = lambda *a, **k: 1
+    try:
+        good = U.update_to_dict(avail("1.99.0").update)
+        w = make_win(banner=True, update_available=good)
+        w._init_updates()
+        assert w._update.version == "1.99.0" and w.update_banner.log == [("available", "1.99.0", UI.__version__)] and w.update_chip.visible      # dès le lancement
+        w = make_win(banner=True, update_available=dict(good, version=UI.__version__))                  # déjà installée depuis : oubliée
+        w._init_updates()
+        assert w._update is None and w.config["update_available"] is None and w.update_banner.state == "hidden" and not w.update_chip.visible
+        for bad in (dict(good, deb_url="https://evil.example/x.deb"), dict(good, sig_url="http://github.com/x"), dict(good, version="99"), dict(good, version=["1.99.0"]),
+                    dict(good, deb_size=-1), dict(good, deb_size=10 ** 12), "n'importe quoi", ["liste"], 42, {}):
+            w = make_win(banner=True, update_available=bad)
+            w._init_updates()
+            assert w._update is None and w.update_banner.state == "hidden" and not w.update_chip.visible, bad
+        w = make_win(banner=True, update_available=dict(good, page="https://evil.example/p"))             # page étrangère : on garde la mise à jour, sans la page
+        w._init_updates()
+        assert w._update.version == "1.99.0" and w._update.page == ""
+        w = make_win(banner=True, update_available=good, update_snooze_version="1.99.0", update_snooze_until=__import__("time").time() + 3600)
+        w._init_updates()
+        assert w.update_banner.state == "hidden" and w.update_chip.visible                               # repoussée : pas de bandeau, mais la pastille reste
+    finally:
+        restore(sv)
+
+
+def test_later_snoozes_the_banner_for_24h_for_that_version_only_and_manual_check_overrides():
+    import time
+    sv = with_patches(check=lambda repo, etag="": avail("1.99.0"))
+    try:
+        w = make_win(banner=True)
+        w._update = avail("1.99.0").update
+        w._refresh_update_ui()
+        assert w.update_banner.state == "available"
+        w.snooze_update()
+        assert w.update_banner.state == "hidden" and w.update_chip.visible
+        assert w.config["update_snooze_version"] == "1.99.0" and 86300 < w.config["update_snooze_until"] - time.time() <= 86400 and w.config.saved
+        w._refresh_update_ui()
+        assert w.update_banner.state == "hidden"                                                        # toujours repoussé
+        w._update = avail("1.99.1").update
+        w._refresh_update_ui()
+        assert w.update_banner.state == "available"                                                     # une version PLUS récente réapparaît aussitôt
+        w._update = avail("1.99.0").update
+        w.update_banner.hide()
+        w.config["update_snooze_until"] = time.time() - 1                                               # délai écoulé
+        w._refresh_update_ui()
+        assert w.update_banner.state == "available"
+        w.snooze_update()
+        w.config["update_last_check"] = 0
+        w.check_updates(manual=True)                                                                    # demande explicite : on montre quand même le bandeau
+        assert w.update_banner.state == "available" and w.config["update_snooze_until"] == 0
+        w.hide_update_banner()                                                                          # ✕ : masqué pour cette session seulement
+        assert w.update_banner.state == "hidden" and w.config["update_snooze_until"] == 0
+    finally:
+        restore(sv)
+
+
+def test_installing_from_the_banner_has_no_modal_shows_progress_then_done_and_restart():
+    stages = []
+    deb, sg = os.path.join(tmp, "b.deb"), os.path.join(tmp, "b.sig")
+
+    def fetch(up, d, progress=None, **k):
+        for done_, total in ((0, 100), (40, 100), (100, 100)):
+            progress(done_, total)
+        return deb, sg
+    sv = with_patches(can_install=lambda *a, **k: (True, ""), fetch=fetch, check_signature=lambda d, s, **k: "",
+                      install=lambda d, s, **k: (stages.append("install"), (True, "", "1.99.0"))[1], cleanup=lambda *a, **k: stages.append("cleanup"))
+    old_idle = UI.GLib.idle_add
+    UI.GLib.idle_add = lambda f, *a: f(*a)
+    try:
+        w = make_win(banner=True, update_available=U.update_to_dict(avail().update))
+        w._update = avail().update
+        w.install_update(confirm=False)
+        assert w.confirm_calls == []                                                                    # le bouton du bandeau EST la confirmation (la fenêtre système demande ensuite le mot de passe)
+        prog = [e for e in w.update_banner.log if e[0] == "progress"]
+        assert prog[0][2:] == ("Téléchargement…", 0.0) or prog[0][3] == 0.0
+        assert any(e[3] == 0.4 for e in prog) and any(e[3] == 1.0 for e in prog)                         # la barre avance avec le téléchargement
+        texts = [e[2] for e in prog]
+        assert any("signature" in t for t in texts) and any("administrateur" in t for t in texts)        # puis vérification, puis installation
+        assert stages == ["install", "cleanup"] and w.update_banner.log[-1] == ("done", "1.99.0") and w.update_banner.state == "done"
+        assert w._update is None and w.config["update_available"] is None and not w.update_chip.visible and not w._update_busy
+        w._update = avail().update
+        w._update_busy = True
+        n = len(w.update_banner.log)
+        w.install_update(confirm=False)                                                                  # double clic : ignoré
+        assert len(w.update_banner.log) == n
+    finally:
+        UI.GLib.idle_add = old_idle
+        restore(sv)
+
+
+def test_banner_install_failures_show_an_error_with_retry_and_keep_the_update_available():
+    deb, sg = os.path.join(tmp, "c.deb"), os.path.join(tmp, "c.sig")
+    outcome = {"sig": "bad_signature", "inst": (True, "", "1.99.0")}
+    sv = with_patches(can_install=lambda *a, **k: (True, ""), fetch=lambda up, d, **k: (deb, sg), check_signature=lambda d, s, **k: outcome["sig"],
+                      install=lambda d, s, **k: outcome["inst"], cleanup=lambda *a, **k: None)
+    old_idle = UI.GLib.idle_add
+    UI.GLib.idle_add = lambda f, *a: f(*a)
+    try:
+        w = make_win(banner=True)
+        w._update = avail().update
+        w.install_update(confirm=False)
+        err = w.update_banner.log[-1]
+        assert err[0] == "error" and "SIGNATURE" in err[1] and err[2].startswith("https://github.com/") and w._update is not None and not w._update_busy      # jamais installé
+        outcome["sig"] = ""
+        outcome["inst"] = (False, "cancelled", "")
+        w.update_banner.state = "error"
+        w.install_update(confirm=False)                                                                  # « Réessayer »
+        assert w.update_banner.log[-1][0] == "error" and ("annulée" in w.update_banner.log[-1][1] or "cancelled" in w.update_banner.log[-1][1].lower())
+        outcome["inst"] = (True, "", "1.99.0")
+        w.install_update(confirm=False)
+        assert w.update_banner.log[-1] == ("done", "1.99.0") and w._update is None                       # la nouvelle tentative réussit
+        def boom(up, d, **k):
+            raise U.UpdateError("checksum")
+        U.fetch = boom
+        w = make_win(banner=True)
+        w._update = avail().update
+        w.install_update(confirm=False)
+        assert w.update_banner.log[-1][0] == "error" and ("contrôle" in w.update_banner.log[-1][1] or "checksum" in w.update_banner.log[-1][1].lower())
+        U.can_install = lambda *a, **k: (False, "nokey")                                                 # clé absente : message clair dans le bandeau + page de la Release
+        w = make_win(banner=True)
+        w._update = avail().update
+        w.install_update(confirm=False)
+        assert w.update_banner.log[-1][0] == "error" and "clé" in w.update_banner.log[-1][1].lower() and w.toasts
+    finally:
+        UI.GLib.idle_add = old_idle
+        restore(sv)
+
+
+def test_restart_runs_a_fixed_command_in_a_detached_session_then_quits():
+    calls, real_exists = [], os.path.exists
+    old_popen, old_exists = UI.subprocess.Popen, os.path.exists
+    UI.subprocess.Popen = lambda *a, **k: calls.append((a, k))
+    try:
+        os.path.exists = lambda p: True if p == "/usr/bin/mintmail" else real_exists(p)
+        w = make_win(banner=True)
+        w.restart_app()
+        (args, kw), = calls
+        assert args[0] == ["/bin/sh", "-c", "sleep 2; exec /usr/bin/mintmail"] and kw["start_new_session"] is True and not kw.get("shell")       # commande FIXE, aucun texte externe
+        assert w.quit_calls == [1]
+        calls.clear()
+        os.path.exists = lambda p: False if p == "/usr/bin/mintmail" else real_exists(p)                 # lancé hors paquet : on ne relance pas, on le dit
+        w = make_win(banner=True)
+        w.restart_app()
+        assert calls == [] and w.toasts and not getattr(w, "quit_calls", None)
+    finally:
+        UI.subprocess.Popen, os.path.exists = old_popen, old_exists
+
+
+def test_release_notes_are_summarised_for_the_banner():
+    assert U.short_notes("- Bandeau visible au lancement\n- Autre chose") == "Bandeau visible au lancement"
+    assert U.short_notes("• Première\n• Seconde") == "Première" and U.short_notes("* Une étoile") == "Une étoile"
+    long_text = U.short_notes("- " + "mot " * 80)
+    assert len(long_text) <= 120 and long_text.endswith("…")
+    assert U.short_notes("Texte sans puce\nSuite") == "Texte sans puce" and U.short_notes("") == "" and U.short_notes(None) == "" and U.short_notes("# Titre\n\n") == ""
+
+
+def test_the_banner_widget_builds_and_goes_through_every_state_without_leaking_its_pulse_timer():
+    win = types.SimpleNamespace(install_update=lambda **k: None, restart_app=lambda: None, open_update_page=lambda: None, snooze_update=lambda: None, hide_update_banner=lambda: None)
+    removed = []
+    old_remove = UI.GLib.source_remove
+    UI.GLib.source_remove = lambda i: removed.append(i)
+    UI.GLib.timeout_add = lambda *a, **k: 77
+    try:
+        b = UI.UpdateBanner(win)
+        assert b.state == "hidden"
+        b.show_available(avail().update, "1.0.0")
+        assert b.state == "available"
+        b.show_available(U.Update("1.99.0", "https://github.com/o/r/d.deb", 1, "", "", "", ""), "1.0.0")        # sans notes ni page : ne casse rien
+        b.show_progress("1.99.0", "Téléchargement…", None)
+        assert b.state == "progress" and b._pulse_id == 77                                                       # barre « indéterminée » animée
+        b.show_progress("1.99.0", "Téléchargement…", 0.5)
+        assert b._fraction == 0.5
+        b.show_done("1.99.0")
+        assert b.state == "done" and b._pulse_id is None and removed == [77]                                     # l'animation est bien arrêtée
+        b.show_error("Erreur", "https://github.com/x")
+        assert b.state == "error"
+        b.hide()
+        assert b.state == "hidden"
+        assert b._pulse() is False
+    finally:
+        UI.GLib.source_remove = old_remove
+
+
+def test_banner_css_exists_in_every_style_and_theme_with_style_specific_looks():
+    from mintmail import style
+    dec = lambda x: x.decode("utf-8") if isinstance(x, bytes) else x
+    for st in style.STYLES:
+        for dark in (True, False):
+            base, fancy = (dec(x) for x in style.build_css(dark, style=st))
+            for sel in (".update-banner", ".update-icon", ".update-title", ".update-sub", "button.update-install", ".update-chip", "progressbar progress"):
+                assert sel in base, (st, dark, sel)
+            assert "%(" not in base + fancy and base.count("{") == base.count("}") and fancy.count("{") == fancy.count("}"), (st, dark)
+            if st == "aurora":
+                assert "linear-gradient" in fancy.split(".update-banner", 1)[1][:300] and "box-shadow" in fancy.split(".update-banner", 1)[1][:400]
+    papier = dec(style.build_css(False, style="papier")[0])
+    assert "border-radius: 0; border-top: none; border-right: none;" in papier and "border-left: 4px solid @accent; margin: 0 14px;" in papier          # papier : filet latéral net
+    papier_fancy = dec(style.build_css(False, style="papier")[1])
+    assert ".update-banner {" not in papier_fancy.replace(".update-banner button", "")                                                             # papier : pas de dégradé ni d'ombre sur le cadre
+
+
+def test_window_wires_the_banner_and_the_chip_and_restores_the_update_at_launch():
+    src = open(os.path.join(ROOT, "mintmail", "window.py"), encoding="utf-8").read()
+    assert "UpdateBanner(self)" in src and "mail_page.pack_start(self.update_banner" in src and "update_chip" in src and "self._init_updates()" in src
+    assert src.index("pack_start(self.update_banner") < src.index("mail_page.pack_start(body")                    # sous la barre de titre, au-dessus du courrier
+    ui = open(os.path.join(ROOT, "mintmail", "updates_ui.py"), encoding="utf-8").read()
+    assert "self._restore_update()" in ui and "set_no_show_all(True)" in ui and "start_new_session=True" in ui and "shell=True" not in ui
 
 
 def test_install_flow_confirms_downloads_verifies_then_calls_the_privileged_installer():

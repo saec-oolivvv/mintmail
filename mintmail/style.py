@@ -152,6 +152,20 @@ button.ai-btn:hover { opacity: 0.9; }
 .ai-text { font-size: 14px; }
 .ai-warn { background: rgba(239,68,68,0.14); border: 1px solid #ef4444; color: #ef4444; border-radius: %(rs)dpx; padding: 6px 10px; }
 .digest-card { background: %(card)s; border: 1px solid @ai1; border-radius: %(r)dpx; margin: 6px 12px 4px 12px; padding: 10px 14px; }
+.update-banner { background: %(card)s; border: 1px solid @accent; border-radius: %(r)dpx; margin: 10px 14px 0 14px; padding: 12px 16px; }
+.update-icon { color: @accent; font-size: 26px; font-weight: 800; }
+.update-title { font-size: 15px; font-weight: 800; }
+.update-sub { color: %(dim)s; font-size: 12px; }
+.update-notes { font-style: italic; font-size: 13px; }
+.update-banner progressbar trough { min-height: 6px; border-radius: 3px; background: %(line)s; border: none; }
+.update-banner progressbar progress { min-height: 6px; border-radius: 3px; background-image: none; background: @accent; border: none; }
+.update-banner button.update-install { background-image: none; background: @accent; color: %(on)s; border: none; box-shadow: none; text-shadow: none;
+                                       border-radius: %(rp)dpx; padding: 7px 20px; font-weight: 700; }
+.update-banner button.update-link { background: transparent; background-image: none; border: none; box-shadow: none; color: @accent; font-weight: 600; }
+.update-banner button.update-later { background: transparent; background-image: none; border: none; box-shadow: none; color: %(dim)s; }
+.update-banner button.update-later:hover { color: @accent; }
+.update-chip { background-image: none; background: @accent; color: %(on)s; border: none; box-shadow: none; text-shadow: none;
+               border-radius: %(rp)dpx; padding: 3px 12px; font-size: 12px; font-weight: 700; }
 .welcome-card { background: %(card)s; border: 1px solid %(line)s; border-radius: %(r)dpx; margin: 14px; padding: 18px; }
 .banner { background: %(hover)s; border: 1px solid %(line)s; border-radius: %(rs)dpx; padding: 8px 12px; margin: 8px 14px; }
 .toast { background: #0b1020; color: #fff; border-radius: %(r)dpx; padding: 10px 18px; margin: 18px; border: 1px solid rgba(255,255,255,0.14); }
@@ -207,6 +221,8 @@ window, .mm-root { font-size: 15px; }
 .wordmark { border-bottom: 1px solid %(line)s; margin: 0 14px 8px 14px; padding: 16px 4px 8px 4px; }
 .mm-toolbar { background: transparent; border-bottom: 1px solid %(line)s; border-radius: 0; margin: 0 14px; }
 .ai-card, .digest-card { border-radius: 0; border-left: 4px solid @ai1; border-top: none; border-right: none; border-bottom: 1px solid %(line)s; }
+.update-banner { border-radius: 0; border-top: none; border-right: none; border-bottom: 1px solid %(line)s; border-left: 4px solid @accent; margin: 0 14px; }
+.update-title { font-family: %(head)s; font-size: 17px; }
 .compose-btn { margin: 8px 14px 4px 14px; }
 """,
     "terminal": """
@@ -236,6 +252,11 @@ window { background-image: %(canvas)s; }
 button.ai-btn { background-image: linear-gradient(to bottom right, @ai1, @ai2); }
 .ai-card { background-image: linear-gradient(to bottom right, alpha(@ai1, 0.14), alpha(@ai2, 0.08));
            border-color: alpha(@ai1, 0.55); box-shadow: 0 0 28px alpha(@ai1, 0.14); }
+.update-banner { background-image: linear-gradient(to right, alpha(@accent, 0.24), alpha(@ai1, 0.14), alpha(@ai2, 0.08));
+                 border-color: alpha(@accent, 0.6); box-shadow: 0 10px 30px alpha(@accent, 0.26); }
+.update-banner button.update-install, .update-chip { background-image: linear-gradient(to bottom right, shade(@accent, 1.25), @accent);
+                                                    box-shadow: 0 4px 14px alpha(@accent, 0.5); }
+.update-icon { text-shadow: 0 0 14px alpha(@accent, 0.8); }
 .digest-card { background-image: linear-gradient(to bottom right, alpha(@ai1, 0.12), alpha(@ai2, 0.06));
                border-color: alpha(@ai1, 0.5); }
 .msg-row { box-shadow: 0 1px 2px rgba(0, 0, 0, 0.18); }
@@ -254,6 +275,7 @@ button.ai-btn { background-image: linear-gradient(to bottom right, @ai1, @ai2); 
 """,
     "papier": """
 .ai-card { background-image: none; }
+.update-banner button.update-install, .update-chip { box-shadow: 0 2px 0 shade(@accent, 0.75); }
 .compose-btn { box-shadow: 0 2px 0 shade(@accent, 0.75); }
 """,
     "terminal": """
@@ -261,6 +283,8 @@ button.ai-btn { background-image: linear-gradient(to bottom right, @ai1, @ai2); 
 .compose-btn, button.ai-btn { box-shadow: 0 0 12px alpha(@accent, 0.45); }
 .wm-dot { text-shadow: 0 0 8px alpha(@accent, 0.9); }
 .ai-card { box-shadow: 0 0 14px alpha(@ai1, 0.2); }
+.update-banner { box-shadow: 0 0 16px alpha(@accent, 0.35); }
+.update-banner button.update-install, .update-chip { box-shadow: 0 0 12px alpha(@accent, 0.5); }
 """,
 }
 

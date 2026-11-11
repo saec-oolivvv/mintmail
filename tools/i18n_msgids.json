@@ -697,6 +697,9 @@
  "Cliquer pour ouvrir · clic droit : enregistrer, copier le chemin · glisser vers un dossier": [
   "reader.py"
  ],
+ "Cliquez pour voir la mise à jour de MintMail %s": [
+  "updates_ui.py"
+ ],
  "Clé API": [
   "settings.py"
  ],
@@ -1207,6 +1210,7 @@
  "Fermer": [
   "extras.py",
   "reader.py",
+  "updates_ui.py",
   "window.py"
  ],
  "Fermer (Ctrl+J)": [
@@ -1377,6 +1381,9 @@
  "Impossible de joindre GitHub (réseau).": [
   "updates_ui.py"
  ],
+ "Impossible de relancer automatiquement : fermez puis relancez MintMail.": [
+  "updates_ui.py"
+ ],
  "Indigo": [
   "style.py"
  ],
@@ -1395,10 +1402,16 @@
  "Installations de MintMail hors paquet .deb (le paquet installé est la version %s) :": [
   "entry.py"
  ],
+ "Installation… (votre mot de passe administrateur est demandé)": [
+  "updates_ui.py"
+ ],
  "Installer MintMail %s ?": [
   "updates_ui.py"
  ],
  "Installer la mise à jour": [
+  "updates_ui.py"
+ ],
+ "Installer maintenant": [
   "updates_ui.py"
  ],
  "Insérer": [
@@ -1483,6 +1496,9 @@
   "settings_extra.py"
  ],
  "La clé de vérification installée n'est pas protégée : refusé.": [
+  "updates_ui.py"
+ ],
+ "La mise à jour a échoué": [
   "updates_ui.py"
  ],
  "La version publiée ne contient pas le paquet attendu.": [
@@ -1584,6 +1600,9 @@
  "Marquer lu / non lu": [
   "settings.py"
  ],
+ "Me le rappeler dans 24 h": [
+  "updates_ui.py"
+ ],
  "Me rappeler si pas de réponse (3 jours)": [
   "listing.py",
   "window.py"
@@ -1653,6 +1672,12 @@
  "Minimal : 500 premiers caractères": [
   "settings.py"
  ],
+ "MintMail %s est disponible": [
+  "updates_ui.py"
+ ],
+ "MintMail %s est installé": [
+  "updates_ui.py"
+ ],
  "MintMail %s — options :\n": [
   "entry.py"
  ],
@@ -1679,6 +1704,9 @@
  ],
  "Mis de côté : %s -> %s": [
   "entry.py"
+ ],
+ "Mise à jour vers MintMail %s": [
+  "updates_ui.py"
  ],
  "Mises à jour": [
   "settings.py",
@@ -1753,6 +1781,9 @@
  "Notes": [
   "settings_more.py"
  ],
+ "Notes de version": [
+  "updates_ui.py"
+ ],
  "Notifications": [
   "window.py"
  ],
@@ -1785,6 +1816,9 @@
  ],
  "Nouveau sous-dossier…": [
   "folders.py"
+ ],
+ "Nouveautés : %s": [
+  "updates_ui.py"
  ],
  "Nouvel événement": [
   "extras.py"
@@ -1933,6 +1967,9 @@
  "Plus ancien": [
   "util.py"
  ],
+ "Plus tard": [
+  "updates_ui.py"
+ ],
  "Plus tard aujourd'hui (+3 h)": [
   "window.py"
  ],
@@ -2048,6 +2085,12 @@
  "Regrouper en conversations": [
   "settings_extra.py"
  ],
+ "Relancer maintenant": [
+  "updates_ui.py"
+ ],
+ "Relancez MintMail pour profiter de la nouvelle version.": [
+  "updates_ui.py"
+ ],
  "Rendez-vous": [
   "ai_engine.py",
   "extras.py",
@@ -2146,6 +2189,9 @@
  ],
  "Réduire / étendre la barre latérale": [
   "window.py"
+ ],
+ "Réessayer": [
+  "updates_ui.py"
  ],
  "Réflexion…": [
   "ai_features.py"
@@ -2528,10 +2574,10 @@
  "Tâche ajoutée%s": [
   "extras.py"
  ],
- "Téléchargement de MintMail %s…": [
+ "Téléchargement incomplet.": [
   "updates_ui.py"
  ],
- "Téléchargement incomplet.": [
+ "Téléchargement…": [
   "updates_ui.py"
  ],
  "Téléphone": [
@@ -2576,9 +2622,6 @@
  "Voici ma proposition : %d message(s) rangés dans %d dossier(s)%s. Validez ligne par ligne ou tout d'un coup.": [
   "ai_features.py"
  ],
- "Voir": [
-  "updates_ui.py"
- ],
  "Voir tous les messages de ": [
   "window.py"
  ],
@@ -2592,8 +2635,14 @@
  "Vous rangez souvent %s dans « %s ».": [
   "extras.py"
  ],
+ "Vous utilisez la version %s. Installation sécurisée : signature vérifiée, puis mot de passe administrateur demandé.": [
+  "updates_ui.py"
+ ],
  "Vue actuelle : %s": [
   "ai_features.py"
+ ],
+ "Vérification de la signature…": [
+  "updates_ui.py"
  ],
  "Vérifier maintenant": [
   "updates_ui.py"
@@ -3217,7 +3266,7 @@
  "⬆ La version %s est disponible (dernière vérification : %s).": [
   "updates_ui.py"
  ],
- "⬆ MintMail %s est disponible.": [
+ "⬆ Mise à jour %s": [
   "updates_ui.py"
  ],
  "⬇ Tout enregistrer (%s)": [

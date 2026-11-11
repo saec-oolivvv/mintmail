@@ -3,6 +3,17 @@
 MintMail se met à jour depuis les **Releases** de son dépôt GitHub. Résumé pour l'utilisateur : Paramètres → **Mises à jour** (recherche automatique une fois par jour,
 installation en un clic avec votre mot de passe administrateur). Ce document explique le fonctionnement et la **sécurité**, puis comment mettre le système en route.
 
+## Ce que voit l'utilisateur
+
+- **Dès le lancement**, si une version plus récente est connue, un **bandeau** glisse sous la barre de titre : « MintMail X est disponible », la version actuelle, la première nouveauté de la Release, et trois actions —
+  **Installer maintenant**, **Notes de version** (page de la Release), **Plus tard** (repousse 24 h pour cette version ; une version encore plus récente réapparaît aussitôt). ✕ masque jusqu'au prochain lancement.
+- Une **pastille « ⬆ Mise à jour X »** reste dans le pied de la barre latérale tant que la mise à jour n'est pas installée, même si le bandeau a été repoussé ; un clic ouvre Paramètres → Mises à jour.
+- **Pendant l'installation**, le bandeau montre une barre de progression (téléchargement), puis « Vérification de la signature… », puis « Installation… (votre mot de passe administrateur est demandé) ». Ensuite : « MintMail X est installé »
+  avec **Relancer maintenant** (relance la fenêtre via une commande fixe). En cas d'échec : le motif exact et **Réessayer**.
+- La mise à jour détectée est **mémorisée** (réglages locaux, jamais synchronisés) : elle s'affiche immédiatement au lancement suivant, sans attendre le réseau. Cette mémoire est **revalidée à chaque lecture** (versions, hôtes GitHub) :
+  un fichier de réglages modifié ne peut pas faire apparaître une fausse mise à jour pointant ailleurs, et la signature reste de toute façon vérifiée avant toute installation.
+- La recherche se fait 8 secondes après le démarrage, puis au plus une fois par jour (désactivable).
+
 ## Principe de sécurité
 
 Installer un paquet avec les droits administrateur permet de tout faire sur la machine : le système est donc conçu pour que **GitHub ne soit jamais cru sur parole**.

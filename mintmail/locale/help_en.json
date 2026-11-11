@@ -308,11 +308,11 @@
    "items": [
     [
      "How it works",
-     "MintMail looks for a new version on GitHub (repository set in Settings → Updates) at most ONCE A DAY and tells you about it. Only one anonymous request is sent, with no personal data. Can be turned off in Settings → Updates; palette → “Check for updates” to check right away."
+     "MintMail looks for a new version on GitHub (repository set in Settings → Updates) at most ONCE A DAY and tells you about it. Only one anonymous request is sent, with no personal data. Can be turned off in Settings → Updates; palette → “Check for updates” to check right away. When a version is available, a BANNER appears at the top of the window as soon as it opens (“Install now”, “Release notes”, “Later”) and a “⬆ Update X” chip stays in the side panel. “Later” hides the banner for 24 h for that version; ✕ hides it until the next launch."
     ],
     [
      "Install in one click",
-     "Settings → Updates → “Install the update”: the package is downloaded, its signature is checked, then the system asks for your administrator password. Close and restart MintMail afterwards. Nothing is installed without your approval."
+     "Settings → Updates → “Install the update” (or “Install now” in the banner): the package is downloaded with a progress bar, its signature is checked, then the system asks for your administrator password. The banner then switches to “installed” with a “Restart now” button. Nothing is installed without your approval."
     ],
     [
      "Update security",

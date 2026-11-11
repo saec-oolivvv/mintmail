@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.13.0
+- Bandeau de mise à jour visible dès le lancement (installer maintenant, plus tard, notes de version, progression, relance) et pastille dans la barre latérale
+
 ## 1.12.2
 - Essai de la mise à jour automatique depuis l'application
 

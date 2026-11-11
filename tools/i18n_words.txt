@@ -172,3 +172,7 @@ Endpoint API
 Droits administrateur requis.
 jamais
 Installer MintMail %s ?
+Installer maintenant
+Relancer maintenant
+Notes de version
+Plus tard

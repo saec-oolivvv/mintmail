@@ -177,6 +177,44 @@ def check(repo, current=__version__, etag="", api=API, allow_loopback=False) -> 
                                       sums["browser_download_url"] if sums else "", str(data.get("body") or "")[:2000], page))
 
 
+def update_to_dict(up: Update) -> dict:
+    """Forme enregistrable (réglages) d'une mise à jour détectée : permet d'afficher le bandeau dès le lancement suivant."""
+    return {"version": up.version, "deb_url": up.deb_url, "deb_size": up.deb_size, "sig_url": up.sig_url, "sums_url": up.sums_url,
+            "notes": up.notes, "page": up.page}
+
+
+def update_from_dict(d, current=__version__, allow_loopback=False) -> Optional[Update]:
+    """Relit une mise à jour enregistrée en la REVALIDANT entièrement (le fichier de réglages n'est pas digne de confiance) : types, version
+    strictement plus récente que celle installée, adresses sur les hôtes GitHub autorisés. Tout écart : None (le bandeau n'apparaît pas)."""
+    if not isinstance(d, dict):
+        return None
+    try:
+        version, deb_url = d.get("version"), d.get("deb_url")
+        sig_url, sums_url, notes, page = d.get("sig_url") or "", d.get("sums_url") or "", d.get("notes") or "", d.get("page") or ""
+        size = d.get("deb_size") or 0
+        if not all(isinstance(x, str) for x in (version, deb_url, sig_url, sums_url, notes, page)) or not isinstance(size, int) or not 0 <= size <= MAX_DEB:
+            return None
+        v = parse_version(version)
+        if v is None or ".".join(map(str, v)) != version or not is_newer(version, current):
+            return None
+        if not host_allowed(deb_url, allow_loopback) or any(u and not host_allowed(u, allow_loopback) for u in (sig_url, sums_url)):
+            return None
+        if not page or not host_allowed(page, allow_loopback):
+            page = ""
+        return Update(version, deb_url, size, sig_url, sums_url, notes[:2000], page)
+    except (TypeError, ValueError):
+        return None
+
+
+def short_notes(notes: str, limit: int = 120) -> str:
+    """Première nouveauté d'une Release (première puce du journal des changements), raccourcie pour le bandeau."""
+    lines = [l.strip() for l in (notes or "").splitlines() if l.strip()]
+    bullets = [l.lstrip("-•* ").strip() for l in lines if l[:1] in "-•*"]
+    text = (bullets or [l for l in lines if not l.startswith("#")] or [""])[0]
+    text = " ".join(text.split())
+    return text if len(text) <= limit else text[:limit - 1].rstrip() + "…"
+
+
 def _download(url, dest, limit, expected=0, allow_loopback=False, progress: Optional[Callable] = None):
     if not host_allowed(url, allow_loopback):
         raise UpdateError("badurl")

@@ -19,7 +19,7 @@ from .ai_features import AIMixin
 from .listing import ListMixin, PAGE
 from .folders import FolderMixin, SMART_VIEWS, dest_of
 from .offline import OfflineMixin, is_retryable
-from .updates_ui import UpdateMixin
+from .updates_ui import UpdateBanner, UpdateMixin
 from .extras import ExtrasMixin
 from .models import Message, Outgoing
 from .p2p import SyncEngine
@@ -322,6 +322,8 @@ class MainWindow(UpdateMixin, ExtrasMixin, OfflineMixin, ListMixin, AIMixin, Fol
         line = Gtk.Box()
         line.get_style_context().add_class("aurora-line")   # filet dégradé signature (style Aurora)
         mail_page.pack_start(line, False, False, 0)
+        self.update_banner = UpdateBanner(self)           # bandeau de mise à jour (glisse sous la barre de titre)
+        mail_page.pack_start(self.update_banner, False, False, 0)
         mail_page.pack_start(body, True, True, 0)
         self.root_stack.add_named(mail_page, "mail")
         overlay = Gtk.Overlay()
@@ -346,6 +348,13 @@ class MainWindow(UpdateMixin, ExtrasMixin, OfflineMixin, ListMixin, AIMixin, Fol
         self.p2p_lbl.get_style_context().add_class("dim")
         self.p2p_lbl.set_line_wrap(True)
         box.pack_start(self.p2p_lbl, False, False, 0)
+        self.update_chip = Gtk.Button()                     # pastille « ⬆ Mise à jour X » : reste visible même si le bandeau est repoussé
+        self.update_chip.get_style_context().add_class("update-chip")
+        self.update_chip.set_halign(Gtk.Align.START)
+        self.update_chip.set_relief(Gtk.ReliefStyle.NONE)
+        self.update_chip.set_no_show_all(True)
+        self.update_chip.connect("clicked", lambda *_: self.show_settings("updates"))
+        box.pack_start(self.update_chip, False, False, 0)
         b = self.settings_btn = Gtk.Button(label=tr("Paramètres"))
         b.set_image(icon("preferences-system-symbolic"))
         b.set_always_show_image(True)
