@@ -2,7 +2,7 @@
 import os, shutil, stat, subprocess, sys, tempfile
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)
-NEEDED = ("tools/release.sh", "tools/make-signing-key.sh", "tools/sign-release.sh", "tools/bump-version.sh", "tools/check-version.py", "packaging/build-deb.sh")
+NEEDED = ("tools/release.sh", "tools/make-signing-key.sh", "tools/sign-release.sh", "tools/bump-version.sh", "tools/check-version.py", "packaging/build-deb.sh", "tools/backup-signing-key.sh", "tools/rotate-signing-key.sh")
 AVAILABLE = all(os.path.exists(os.path.join(ROOT, n)) for n in NEEDED) and all(shutil.which(b) for b in ("git", "openssl", "dpkg-deb"))
 
 
@@ -140,3 +140,104 @@ def test_real_release_tags_pushes_and_creates_a_github_release_with_signed_asset
     first_bullet = section.splitlines()[0][2:40]
     assert "--title MintMail %s" % version in head and first_bullet in text.split("--notes", 1)[1]                                   # notes = section du CHANGELOG de CETTE version
     sh("tools/release.sh --skip-tests", work, env, ok=False)                                                                         # on ne republie pas la même version
+
+
+def _verifies(pub_pem, sig, deb):
+    return subprocess.run(["openssl", "dgst", "-sha256", "-verify", pub_pem, "-signature", sig, deb], capture_output=True, text=True).returncode == 0
+
+
+def _bump(work, version, note="Essai"):
+    sh(["tools/bump-version.sh", version], work)
+    p = os.path.join(work, "CHANGELOG.md")
+    t = open(p, encoding="utf-8").read().replace("- (à compléter)", "- " + note, 1)
+    open(p, "w", encoding="utf-8").write(t)
+    sh("git add -A && git commit -q -m 'MintMail %s'" % version, work)
+
+
+def test_key_backup_makes_a_verified_copy_refuses_the_repository_and_never_prints_the_key():
+    if not AVAILABLE:
+        return
+    import glob, re
+    work, bare, log, env = make_repo()
+    dest = tempfile.mkdtemp()
+    assert "introuvable" in sh(["tools/backup-signing-key.sh", dest], work, env, ok=False).stdout                     # pas de clé : rien à sauvegarder
+    sh("tools/make-signing-key.sh --no-passphrase", work, env)
+    keydir = env["MINTMAIL_KEYDIR"]
+    key = os.path.join(keydir, "signing.key")
+    r = sh(["tools/backup-signing-key.sh", dest, "--verify"], work, env)
+    (out,) = glob.glob(os.path.join(dest, "mintmail-signing-backup-*"))
+    assert open(os.path.join(out, "signing.key"), "rb").read() == open(key, "rb").read() and stat.S_IMODE(os.stat(os.path.join(out, "signing.key")).st_mode) == 0o600
+    assert subprocess.run("sha256sum -c SHA256SUMS", shell=True, cwd=out, capture_output=True).returncode == 0
+    assert "Contrôle fonctionnel" in r.stdout and "Sauvegarde créée" in r.stdout
+    fp = re.search(r"^\s+([0-9a-f]{64})$", r.stdout, re.M).group(1)
+    der = subprocess.run(["openssl", "pkey", "-pubin", "-in", os.path.join(work, "data", "update-pubkey.pem"), "-outform", "DER"], capture_output=True).stdout
+    assert fp == __import__("hashlib").sha256(der).hexdigest()                                                           # empreinte = celle de la clé publique du dépôt
+    body = "".join(l for l in open(key).read().splitlines() if "-----" not in l)
+    assert "PRIVATE KEY" not in r.stdout + r.stderr and body[:40] not in r.stdout + r.stderr                            # la clé n'est jamais affichée
+    inside = os.path.join(work, "sauvegarde")
+    os.makedirs(inside)
+    r = sh(["tools/backup-signing-key.sh", inside], work, env, ok=False)
+    assert "dépôt git" in r.stdout and os.listdir(inside) == []                                                        # jamais la clé privée dans le dépôt
+    assert "dépôt git" in sh(["tools/backup-signing-key.sh", work], work, env, ok=False).stdout
+    assert "elle-même" in sh(["tools/backup-signing-key.sh", keydir], work, env, ok=False).stdout
+    sh(["tools/backup-signing-key.sh", "/nulle/part"], work, env, ok=False)
+    good = open(key, "rb").read()
+    open(key, "w").write("n'importe quoi")                                                                              # fichier qui n'est pas une clé : la sauvegarde est refusée
+    assert "pas une clé privée" in sh(["tools/backup-signing-key.sh", tempfile.mkdtemp()], work, env, ok=False).stdout
+    open(key, "wb").write(good)
+
+
+def test_planned_key_rotation_old_key_signs_the_bridge_release_then_the_new_key_takes_over():
+    if not AVAILABLE:
+        return
+    import glob
+    work, bare, log, env = make_repo()
+    keydir = env["MINTMAIL_KEYDIR"]
+    old_key, tmpd = os.path.join(keydir, "signing.key"), os.path.dirname(keydir)
+    sh("tools/make-signing-key.sh --no-passphrase", work, env)
+    sh("git add -A && git commit -q -m clé", work)
+    pubfile = os.path.join(work, "data", "update-pubkey.pem")
+    old_pub = open(pubfile).read()
+    old_bytes = open(old_key, "rb").read()
+    sh("tools/rotate-signing-key.sh --no-passphrase", work, env)
+    new_pub = open(pubfile).read()
+    assert new_pub != old_pub and open(old_key, "rb").read() == old_bytes                                              # l'ancienne clé n'est pas touchée
+    assert open(os.path.join(keydir, "previous-pubkey.pem")).read() == old_pub and os.path.exists(os.path.join(keydir, "next", "signing.key"))
+    assert stat.S_IMODE(os.stat(os.path.join(keydir, "next", "signing.key")).st_mode) == 0o600
+    assert "déjà préparée" in sh("tools/rotate-signing-key.sh --no-passphrase", work, env, ok=False).stdout           # jamais d'écrasement
+    sh("git add -A && git commit -q -m rotation", work)
+    _bump(work, "9.9.9")
+    r = sh("tools/release.sh --dry-run --skip-tests", work, env, ok=False)
+    assert "ne correspond PAS" in r.stdout                                                                               # sans --rotation, l'ancienne clé ne signe plus un dépôt qui porte la nouvelle
+    assert "Rotation : indiquez" in sh("tools/release.sh --dry-run --skip-tests --rotation", work, env, ok=False).stdout
+    prev = os.path.join(keydir, "previous-pubkey.pem")
+    assert "--rotation" in sh("tools/release.sh --dry-run --skip-tests", work, dict(env, MINTMAIL_VERIFY_PUBKEY=prev), ok=False).stdout
+    assert "pas une rotation" in sh("tools/release.sh --dry-run --skip-tests --rotation", work, dict(env, MINTMAIL_VERIFY_PUBKEY=pubfile), ok=False).stdout
+    r = sh("tools/release.sh --skip-tests --rotation", work, dict(env, MINTMAIL_SIGNING_KEY=old_key, MINTMAIL_VERIFY_PUBKEY=prev))
+    assert "ROTATION" in r.stdout and "Publié" in r.stdout and "Rotation de la clé de signature" in open(log, encoding="utf-8").read()
+    deb = os.path.join(work, "dist", "mintmail_9.9.9_all.deb")
+    sig = deb + ".sig"
+    embedded = os.path.join(tmpd, "embedded.pem")
+    open(embedded, "w").write(subprocess.run("dpkg-deb --fsys-tarfile %s | tar -xO ./usr/share/mintmail/update-pubkey.pem" % deb, shell=True, capture_output=True, text=True).stdout)
+    assert open(embedded).read() == new_pub                                                                              # le paquet de transition porte la NOUVELLE clé publique
+    assert _verifies(prev, sig, deb) and not _verifies(pubfile, sig, deb)                                               # …mais est signé avec l'ANCIENNE : les machines installées l'acceptent
+    sh("tools/rotate-signing-key.sh --finish", work, env)
+    (retired,) = glob.glob(os.path.join(keydir, "retired-*"))
+    assert open(os.path.join(retired, "signing.key"), "rb").read() == old_bytes and not os.path.exists(os.path.join(keydir, "next"))
+    derived = subprocess.run(["openssl", "pkey", "-in", old_key, "-pubout"], capture_output=True, text=True).stdout
+    assert derived == new_pub                                                                                            # la clé courante est maintenant la nouvelle
+    assert "Aucune rotation" in sh("tools/rotate-signing-key.sh --finish", work, env, ok=False).stdout
+    _bump(work, "9.9.10")
+    sh("tools/release.sh --skip-tests", work, env)                                                                       # la version suivante se signe normalement, avec la nouvelle clé
+    deb2 = os.path.join(work, "dist", "mintmail_9.9.10_all.deb")
+    assert _verifies(embedded, deb2 + ".sig", deb2) and not _verifies(prev, deb2 + ".sig", deb2)                         # vérifiable avec la clé que la machine tient désormais du paquet de transition
+
+
+def test_the_key_recovery_guide_names_only_tools_and_options_that_exist():
+    doc = open(os.path.join(ROOT, "docs", "KEY-RECOVERY.md"), encoding="utf-8").read()
+    for tool in ("tools/backup-signing-key.sh", "tools/rotate-signing-key.sh", "tools/release.sh --rotation", "tools/make-signing-key.sh", "tools/bump-version.sh", "--finish", "--verify"):
+        assert tool in doc, tool
+    for f in ("tools/backup-signing-key.sh", "tools/rotate-signing-key.sh", "tools/review_translations.py"):
+        assert os.path.exists(os.path.join(ROOT, f)) and os.access(os.path.join(ROOT, f), os.X_OK), f              # présents ET exécutables
+    assert "KEY-RECOVERY.md" in open(os.path.join(ROOT, "SECURITY.md"), encoding="utf-8").read() and "KEY-RECOVERY.md" in open(os.path.join(ROOT, "docs", "RELEASING.md"), encoding="utf-8").read()
+    assert "review_translations.py" in open(os.path.join(ROOT, "docs", "I18N.md"), encoding="utf-8").read()

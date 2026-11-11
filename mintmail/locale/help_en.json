@@ -70,7 +70,7 @@
    "items": [
     [
      "“Today” page (T key)",
-     "T key, ☰ menu → Today, or the palette. A single window to start your day:\n• 📅 Today's calendar (Google Calendar, if enabled: Settings → Calendar).\n• ⚡ To handle first: your UNREAD messages that AI sorting judges important (click = opens the message). Without AI, sorting is limited to simple clues.\n• ☑ Open tasks, overdue first (tick to finish, ✉ to open the original message) and a field to add one.\n• ⏳ Awaiting a reply: your scheduled follow-ups (“Remind me if no reply”).\n• ✨ Draft replies prepared by the AI, to review (see below)."
+     "T key, ☰ menu → Today, or the palette. A single window to start your day:\n• 📅 Today's calendar (Google Calendar, if enabled: Settings → Calendar). Option: Settings → Appearance → “Open the Today page at launch”.\n• ⚡ To handle first: your UNREAD messages that AI sorting judges important (click = opens the message). Without AI, sorting is limited to simple clues.\n• ☑ Open tasks, overdue first (tick to finish, ✉ to open the original message) and a field to add one.\n• ⏳ Awaiting a reply: your scheduled follow-ups (“Remind me if no reply”).\n• ✨ Draft replies prepared by the AI, to review (see below)."
     ],
     [
      "Tasks and due dates",
@@ -308,7 +308,7 @@
    "items": [
     [
      "How it works",
-     "MintMail looks for a new version on GitHub (repository set in Settings → Updates) at most ONCE A DAY and tells you about it. Only one anonymous request is sent, with no personal data. Can be turned off in Settings → Updates; palette → “Check for updates” to check right away. When a version is available, a BANNER appears at the top of the window as soon as it opens (“Install now”, “Release notes”, “Later”) and a “⬆ Update X” chip stays in the side panel. “Later” hides the banner for 24 h for that version; ✕ hides it until the next launch."
+     "MintMail looks for a new version on GitHub (repository set in Settings → Updates) at most ONCE A DAY and tells you about it. Only one anonymous request is sent, with no personal data. Can be turned off in Settings → Updates; palette → “Check for updates” to check right away. When a version is available, a BANNER appears at the top of the window as soon as it opens (“Install now”, “Release notes”, “Later”) and a “⬆ Update X” chip stays in the side panel. “Later” hides the banner for 24 h for that version; ✕ hides it until the next launch. If the window is not in the foreground, a desktop notification also announces the new version (once). If the update is already installed, the banner simply offers “Restart now”. “mintmail --check-update” gives the details in a terminal."
     ],
     [
      "Install in one click",
@@ -549,6 +549,10 @@
   [
    "mintmail --send-due",
    "Sends, without any interface, the scheduled or waiting messages whose time has come (called every minute by the mintmail-outbox user timer)."
+  ],
+  [
+   "mintmail --check-update",
+   "Checks for an update and prints the detailed result (version, repository, signature, cause of an error): no interface, nothing installed. Exit code: 0 up to date, 10 update available, 1 error."
   ]
  ]
 }

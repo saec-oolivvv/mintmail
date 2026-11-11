@@ -12,6 +12,10 @@ installation en un clic avec votre mot de passe administrateur). Ce document exp
   avec **Relancer maintenant** (relance la fenêtre via une commande fixe). En cas d'échec : le motif exact et **Réessayer**.
 - La mise à jour détectée est **mémorisée** (réglages locaux, jamais synchronisés) : elle s'affiche immédiatement au lancement suivant, sans attendre le réseau. Cette mémoire est **revalidée à chaque lecture** (versions, hôtes GitHub) :
   un fichier de réglages modifié ne peut pas faire apparaître une fausse mise à jour pointant ailleurs, et la signature reste de toute façon vérifiée avant toute installation.
+- **Déjà installée** : si la mise à jour a été installée entre-temps (ou depuis une autre fenêtre), le bandeau ne la propose pas une seconde fois : il affiche « installé » avec **Relancer maintenant**.
+- **Notification de bureau** (une fois par version) si la fenêtre n'est pas au premier plan ; désactivable avec les notifications.
+- **Diagnostic** : `mintmail --check-update` affiche la version, le dépôt, la présence de la clé de vérification, le résultat de la recherche et la cause exacte d'une erreur (sans interface, sans rien installer).
+  Code de sortie : 0 à jour, 10 mise à jour disponible, 1 erreur. Le dernier résultat est aussi inscrit dans le journal et rappelé dans Paramètres → Mises à jour.
 - La recherche se fait 8 secondes après le démarrage, puis au plus une fois par jour (désactivable).
 
 ## Principe de sécurité

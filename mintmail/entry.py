@@ -187,6 +187,40 @@ def _init_language() -> str:
     return i18n.init_from_config(value if isinstance(value, str) else "auto")
 
 
+def check_update_cli(api=None, allow_loopback=False, out=print) -> int:
+    """`mintmail --check-update` : cherche une mise à jour et dit EXACTEMENT où on en est, sans interface et sans rien installer.
+    Code de sortie : 0 à jour, 10 mise à jour disponible, 1 erreur."""
+    import time
+    from . import updater
+    from .store import Config
+    from .update_text import explain
+    cfg = Config()
+    repo = cfg.get("update_repo") or updater.DEFAULT_REPO
+    out("%s %s (%s)" % (APP_NAME, __version__, tr("version en cours d'exécution")))
+    pend = updater.restart_pending()
+    if pend:
+        out(tr("Version installée sur le disque : %s — relancez MintMail pour l'utiliser.") % pend)
+    out(tr("Dépôt consulté : %s") % repo)
+    ok, why = updater.can_install()
+    out(tr("Installation automatique : prête (clé de vérification présente).") if ok else
+        tr("Installation automatique désactivée : %s Vous serez seulement informé des nouvelles versions.") % explain(why))
+    last = cfg.get("update_last_check", 0)
+    if last:
+        out(tr("Dernière vérification enregistrée : %s") % time.strftime("%Y-%m-%d %H:%M", time.localtime(last)))
+    res = updater.check(repo, api=api or updater.API, allow_loopback=allow_loopback)
+    if res.state == "available":
+        out(tr("⬆ La version %s est disponible.") % res.update.version)
+        out(tr("Nouveautés : %s") % updater.short_notes(res.update.notes) if updater.short_notes(res.update.notes) else tr("(pas de notes de version)"))
+        out(tr("Page de la version : %s") % (res.update.page or "—"))
+        out(tr("Signature publiée : %s") % (tr("oui") if res.update.sig_url else tr("NON (la version sera refusée)")))
+        return 10
+    if res.state == "uptodate":
+        out(tr("MintMail est à jour (version %s).") % __version__)
+        return 0
+    out(tr("Erreur : %s") % explain(res.code) + " (%s)" % res.code)
+    return 1
+
+
 def main(argv=None) -> int:
     argv = list(argv if argv is not None else sys.argv)
     _init_language()
@@ -209,6 +243,8 @@ def main(argv=None) -> int:
         return reset_data()
     if "--send-due" in argv:
         return send_due()
+    if "--check-update" in argv:
+        return check_update_cli()
     from .store import harden_permissions
     harden_permissions()                    # dossiers 0700 / fichiers 0600, même pour les anciennes installations
     install_hook()

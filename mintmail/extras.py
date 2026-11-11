@@ -520,6 +520,11 @@ class ExtrasMixin:
         start = datetime.datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
         return gcal.list_events(self._gcal_token(), start, start + datetime.timedelta(days=1))
 
+    def open_today_at_start(self):
+        """Option « Ouvrir la page Aujourd'hui au lancement » (Paramètres → Apparence)."""
+        if self.config.get("open_today_on_start"):
+            GLib.timeout_add(1200, lambda: (self.show_today(), False)[1])
+
     def show_today(self):
         if self._gcal_cfg():
             self.run_bg(self.agenda_today, lambda res, err: self._today_dialog(res if res else (False, str(err))))

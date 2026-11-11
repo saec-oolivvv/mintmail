@@ -176,3 +176,4 @@ Installer maintenant
 Relancer maintenant
 Notes de version
 Plus tard
+oui

@@ -122,6 +122,7 @@ class MainWindow(UpdateMixin, ExtrasMixin, OfflineMixin, ListMixin, AIMixin, Fol
         GLib.timeout_add_seconds(3, lambda: (self._start_push(), False)[1])
         GLib.timeout_add_seconds(1, self._tick)
         self._init_updates()
+        self.open_today_at_start()
 
     # ------------------------------------------------------------------ UI
     def _build(self):

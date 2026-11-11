@@ -9,6 +9,8 @@ et une Release GitHub **signée**. MintMail compare son numéro à celui de la d
 - `Y` (mineur) : nouvelle fonction. `Z` (correctif) : correction sans nouvelle fonction (dont les correctifs de sécurité).
 - Toutes les machines synchronisées doivent avoir la même version de protocole (`PROTOCOL` dans `mintmail/p2p.py`) : changez-le seulement si l'échange change.
 
+> **Clé de signature** : sauvegarde (`tools/backup-signing-key.sh`), perte, vol et rotation sans réinstallation : [KEY-RECOVERY.md](KEY-RECOVERY.md).
+
 ## Étapes
 
 ```

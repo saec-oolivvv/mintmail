@@ -267,7 +267,8 @@ def test_every_shipped_language_catalog_is_complete_valid_and_free_of_french():
 def test_translated_catalogs_declare_honestly_that_they_were_machine_translated_and_not_reviewed():
     for lang in ("nl", "de", "es"):
         st = json.load(open(os.path.join(LOCALE, lang + ".status.json"), encoding="utf-8"))
-        assert st["machine_translated"] is True and st["reviewed_by_human"] is False and st["complete"] is True and st["strings"] == st["of"] == len(code_msgids()), (lang, st)
+        assert st["machine_translated"] is True and st["complete"] is True and st["strings"] == st["of"] == len(code_msgids()), (lang, st)
+        assert st["reviewed_by_human"] is False or (st["reviewed_by_human"] is True and str(st.get("reviewed_by", "")).strip() and st.get("reviewed_on")), (lang, st)   # « relue » exige un nom et une date
 
 
 def test_each_new_language_works_end_to_end_with_native_dates_tasks_and_a_clean_ui_start():

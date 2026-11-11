@@ -492,6 +492,12 @@ class SettingsPage(OAuthMixin, Gtk.Box):
         langc.set_halign(Gtk.Align.START)
         grid.attach(Gtk.Label(label=tr("Langue de l'interface"), xalign=1), 0, 11, 1, 1)
         grid.attach(langc, 1, 11, 1, 1)
+        today = Gtk.Switch()
+        today.set_active(bool(self.cfg.get("open_today_on_start", False)))
+        today.set_halign(Gtk.Align.START)
+        today.connect("notify::active", lambda s, _p: self._set("open_today_on_start", s.get_active()))
+        grid.attach(Gtk.Label(label=tr("Ouvrir la page Aujourd'hui au lancement"), xalign=1), 0, 12, 1, 1)
+        grid.attach(today, 1, 12, 1, 1)
         return grid
 
     def _clear_cache(self, *_):

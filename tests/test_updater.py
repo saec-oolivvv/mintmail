@@ -846,3 +846,211 @@ def test_updater_never_reads_the_verification_key_or_repo_from_untrusted_places(
     assert "environ.get" not in src and "update_pubkey" not in src and "config" not in src.lower().replace("configuration", "")   # ni réglage, ni variable d'environnement ne désigne la clé
     ui = open(os.path.join(ROOT, "mintmail", "updates_ui.py"), encoding="utf-8").read()
     assert "shell=True" not in src + ui and "os.system" not in src + ui and "eval(" not in src + ui
+
+
+# ======================================================================= 1.13.1 : déjà installée, notification, diagnostic, option « Aujourd'hui »
+def test_restart_is_pending_only_when_the_installed_version_is_strictly_newer_than_the_running_one():
+    old = U.disk_version
+    try:
+        for disk, running, expected in (("1.99.0", "1.13.0", "1.99.0"), ("1.13.0", "1.13.0", ""), ("1.12.0", "1.13.0", ""), ("", "1.13.0", ""), ("n'importe quoi", "1.13.0", "")):
+            U.disk_version = lambda d=disk: d
+            assert U.restart_pending(running) == expected, (disk, running)
+    finally:
+        U.disk_version = old
+    assert U.disk_version() == open(os.path.join(ROOT, "mintmail", "VERSION")).read().strip()                  # lit bien le fichier VERSION installé
+
+
+def test_an_update_already_installed_on_disk_shows_restart_not_an_announcement():
+    old = U.restart_pending
+    try:
+        U.restart_pending = lambda current=None: "1.99.0"
+        w = make_win(banner=True, update_available=U.update_to_dict(avail("1.99.0").update))
+        w._update = avail("1.99.0").update
+        w.update_chip.visible = True
+        w._refresh_update_ui()
+        assert w.update_banner.log[-1] == ("done", "1.99.0") and w._update is None and not w.update_chip.visible and w.config["update_available"] is None
+        U.restart_pending = lambda current=None: "1.98.0"                                                       # disque plus ancien que l'annonce : annonce normale
+        w = make_win(banner=True)
+        w._update = avail("1.99.0").update
+        w._refresh_update_ui()
+        assert w.update_banner.log[-1][:2] == ("available", "1.99.0") and w.update_chip.visible
+        U.restart_pending = lambda current=None: "1.99.0"                                                       # pendant une installation : le bandeau n'est pas écrasé
+        w = make_win(banner=True)
+        w._update = avail("1.99.0").update
+        w.update_banner.state = "progress"
+        w._refresh_update_ui()
+        assert w.update_banner.state == "progress"
+        w = make_win(banner=True)                                                                               # au lancement (état enregistré) : « relancer » directement
+        w.config["update_available"] = U.update_to_dict(avail("1.99.0").update)
+        UI.GLib.timeout_add_seconds = lambda *a, **k: 1
+        w._init_updates()
+        assert w.update_banner.log[-1] == ("done", "1.99.0")
+    finally:
+        U.restart_pending = old
+
+
+def test_installing_something_already_installed_never_downloads_and_a_not_newer_refusal_becomes_a_restart():
+    old_rp, sv = U.restart_pending, with_patches(can_install=lambda *a, **k: (True, ""), fetch=lambda *a, **k: (_ for _ in ()).throw(AssertionError("rien à télécharger")))
+    try:
+        U.restart_pending = lambda current=None: "1.99.0"
+        w = make_win(banner=True)
+        w._update = avail("1.99.0").update
+        w.install_update(confirm=False)
+        assert w.update_banner.log[-1] == ("done", "1.99.0") and w._update is None                              # plus de message trompeur : on propose de relancer
+        # le programme administrateur répond « pas plus récente » alors que le disque est maintenant à jour : même issue
+        calls = {"n": 0}
+
+        def rp(current=None):
+            calls["n"] += 1
+            return "" if calls["n"] == 1 else "1.99.0"
+        U.restart_pending = rp
+        deb, sg = os.path.join(tmp, "d.deb"), os.path.join(tmp, "d.sig")
+        U.fetch = lambda up, d, **k: (deb, sg)
+        U.check_signature = lambda d, s, **k: ""
+        U.install = lambda d, s, **k: (False, "not_newer", "1.99.0 <= 1.99.0")
+        old_idle = UI.GLib.idle_add
+        UI.GLib.idle_add = lambda f, *a: f(*a)
+        try:
+            w = make_win(banner=True)
+            w._update = avail("1.99.0").update
+            w.install_update(confirm=False)
+        finally:
+            UI.GLib.idle_add = old_idle
+        assert w.update_banner.log[-1] == ("done", "1.99.0") and w._update is None
+        U.restart_pending = lambda current=None: ""                                                              # disque pas à jour : c'est une vraie erreur, expliquée
+        calls["n"] = 0
+        w = make_win(banner=True)
+        w._update = avail("1.99.0").update
+        UI.GLib.idle_add = lambda f, *a: f(*a)
+        try:
+            w.install_update(confirm=False)
+        finally:
+            UI.GLib.idle_add = old_idle
+        assert w.update_banner.log[-1][0] == "error" and w._update is not None
+    finally:
+        U.restart_pending = old_rp
+        restore(sv)
+
+
+def test_a_desktop_notification_announces_each_new_version_once_only_when_the_window_is_not_in_front():
+    sent = []
+
+    class N:
+        def __init__(self, title):
+            self.title, self.body = title, ""
+
+        @staticmethod
+        def new(title):
+            return N(title)
+
+        def set_body(self, b):
+            self.body = b
+    old_gio = UI.Gio
+    UI.Gio = types.SimpleNamespace(Notification=N)
+    sv = with_patches(check=lambda repo, etag="": avail("1.99.0"))
+    try:
+        def win(active=False, notifications=True):
+            w = make_win(banner=True, notifications=notifications)
+            w.is_active = lambda: active
+            w.get_application = lambda: types.SimpleNamespace(send_notification=lambda ident, n: sent.append((ident, n.title, n.body)))
+            return w
+        w = win()
+        w.check_updates()
+        assert len(sent) == 1 and sent[0][0] == "update-available" and "1.99.0" in sent[0][1] and "Notes de version" in sent[0][2] or sent[0][2]
+        w.config["update_last_check"] = 0
+        w.check_updates()
+        assert len(sent) == 1                                                                                   # même version : pas de seconde notification
+        sent.clear()
+        w = win(active=True)
+        w.check_updates()
+        assert sent == []                                                                                       # fenêtre au premier plan : le bandeau suffit
+        w = win(notifications=False)
+        w.check_updates()
+        assert sent == []                                                                                       # notifications désactivées : respecté
+        w = win()
+        w.check_updates(manual=True)
+        assert sent == []                                                                                       # demande explicite : pas de notification
+    finally:
+        UI.Gio = old_gio
+        restore(sv)
+
+
+def test_the_last_result_is_remembered_logged_and_errors_are_explained_on_the_updates_page():
+    import mintmail.log as L
+    lines = []
+    old_log = L.log
+    L.log = lambda m: lines.append(m)
+    try:
+        for res, expected in ((avail("1.99.0"), "available:1.99.0"), (U.Result("uptodate"), "uptodate"), (U.Result("error", code="ratelimit"), "error:ratelimit")):
+            sv = with_patches(check=lambda repo, etag="", r=res: r)
+            try:
+                w = make_win(banner=True)
+                w.check_updates(manual=True)
+                assert w.config["update_last_result"] == expected
+            finally:
+                restore(sv)
+        assert len(lines) == 3 and "manuelle" in lines[0] and "error:ratelimit" in lines[2]
+        w = make_win(banner=True, update_last_result="error:ratelimit")
+        page = UI.updates_page(w)                                                                                # la page se construit avec un dernier résultat en erreur
+        assert page is not None
+    finally:
+        L.log = old_log
+
+
+def test_check_update_cli_reports_exactly_where_things_stand_without_installing_anything():
+    from mintmail import entry
+    srv, base = start_server()
+    try:
+        def run_cli():
+            lines = []
+            code = entry.check_update_cli(api=base, allow_loopback=True, out=lines.append)
+            return code, "\n".join(lines)
+        Gh.status, Gh.redirect_to = 200, None
+        Gh.release = release(base, "99.0.0")
+        code, text = run_cli()
+        assert code == 10 and "99.0.0" in text and "saec-oolivvv/mintmail" in text and "Nouveautés" in text and ("oui" in text or "yes" in text.lower()), text
+        Gh.release = release(base, "99.0.0", with_sig=False)
+        code, text = run_cli()
+        assert code == 10 and ("NON" in text or "NO " in text)                                                  # une version sans signature est signalée comme refusée
+        Gh.release = release(base, "0.0.1")
+        code, text = run_cli()
+        assert code == 0 and ("à jour" in text or "up to date" in text)
+        Gh.status = 404
+        code, text = run_cli()
+        assert code == 1 and "norelease" in text
+        Gh.status = 403
+        assert run_cli()[0] == 1 and "ratelimit" in run_cli()[1]
+    finally:
+        Gh.status = 200
+        srv.shutdown()
+    seen = []
+    old = entry.check_update_cli
+    entry.check_update_cli = lambda *a, **k: (seen.append(1), 10)[1]
+    try:
+        assert entry.main(["mintmail", "--check-update"]) == 10 and seen == [1]                                 # l'option est bien branchée sur la ligne de commande
+    finally:
+        entry.check_update_cli = old
+
+
+def test_open_today_at_launch_is_an_off_by_default_option_wired_from_the_settings():
+    from mintmail import extras
+    from mintmail.store import DEFAULTS
+    assert DEFAULTS["open_today_on_start"] is False
+    shown, scheduled = [], []
+    old = extras.GLib.timeout_add
+    extras.GLib.timeout_add = lambda ms, f: (scheduled.append(ms), f())
+    try:
+        class W:
+            config = {"open_today_on_start": True}
+            show_today = lambda self: shown.append(1)
+        extras.ExtrasMixin.open_today_at_start(W())
+        assert shown == [1] and scheduled == [1200]
+        W.config = {"open_today_on_start": False}
+        extras.ExtrasMixin.open_today_at_start(W())
+        assert shown == [1] and scheduled == [1200]                                                              # désactivé : rien n'est programmé
+    finally:
+        extras.GLib.timeout_add = old
+    src = open(os.path.join(ROOT, "mintmail", "window.py"), encoding="utf-8").read()
+    assert "self.open_today_at_start()" in src and src.index("self._init_updates()") < src.index("self.open_today_at_start()")
+    st = open(os.path.join(ROOT, "mintmail", "settings.py"), encoding="utf-8").read()
+    assert 'open_today_on_start' in st and "Ouvrir la page Aujourd'hui au lancement" in st

@@ -177,6 +177,21 @@ def check(repo, current=__version__, etag="", api=API, allow_loopback=False) -> 
                                       sums["browser_download_url"] if sums else "", str(data.get("body") or "")[:2000], page))
 
 
+def disk_version() -> str:
+    """Version du programme INSTALLÉ sur le disque (peut être plus récente que celle qui tourne encore en mémoire après une mise à jour)."""
+    try:
+        with open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "VERSION"), encoding="utf-8") as f:
+            return f.read().strip()
+    except OSError:
+        return ""
+
+
+def restart_pending(current=__version__) -> str:
+    """Version installée si elle est plus récente que celle en cours d'exécution (il suffit alors de relancer MintMail), sinon ''."""
+    d = disk_version()
+    return d if d and is_newer(d, current) else ""
+
+
 def update_to_dict(up: Update) -> dict:
     """Forme enregistrable (réglages) d'une mise à jour détectée : permet d'afficher le bandeau dès le lancement suivant."""
     return {"version": up.version, "deb_url": up.deb_url, "deb_size": up.deb_size, "sig_url": up.sig_url, "sums_url": up.sums_url,

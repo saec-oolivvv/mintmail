@@ -30,6 +30,8 @@ CLI_OPTIONS: List[Tuple[str, str]] = [
                                         "dans ~/mintmail-sauvegarde-<date>/. À lancer avec le chemin complet : /usr/bin/mintmail."),
     ("mintmail --send-due", "Envoie, sans interface, les messages programmés ou en attente dont l'heure est venue "
                             "(appelé chaque minute par la minuterie utilisateur mintmail-outbox)."),
+    ("mintmail --check-update", "Cherche une mise à jour et affiche le résultat détaillé (version, dépôt, signature, cause d'une erreur) : sans interface, sans rien installer. "
+                                "Code de sortie : 0 à jour, 10 mise à jour disponible, 1 erreur."),
 ]
 
 SECTIONS: List[Dict] = [
@@ -117,7 +119,7 @@ SECTIONS: List[Dict] = [
     {"id": "today", "title": "Aujourd'hui, tâches et créneaux", "items": [
         ("Page « Aujourd'hui » (touche T)",
          "Touche T, menu ☰ → Aujourd'hui, ou palette. Une seule fenêtre pour démarrer la journée :\n"
-         "• 📅 Agenda du jour (Google Agenda, si activé : Paramètres → Agenda).\n"
+         "• 📅 Agenda du jour (Google Agenda, si activé : Paramètres → Agenda). Option : Paramètres → Apparence → « Ouvrir la page Aujourd'hui au lancement ».\n"
          "• ⚡ À traiter en priorité : vos messages NON LUS que le tri IA juge importants (clic = ouvre le message). Sans IA, le tri se limite à des indices simples.\n"
          "• ☑ Tâches ouvertes, en retard d'abord (cochez pour terminer, ✉ pour ouvrir le message d'origine) et un champ pour en ajouter une.\n"
          "• ⏳ En attente de réponse : vos relances programmées (« Me rappeler si pas de réponse »).\n"
@@ -352,7 +354,7 @@ SECTIONS: List[Dict] = [
     {"id": "updates", "title": "Mises à jour automatiques", "items": [
         ("Comment ça marche",
          "MintMail cherche une nouvelle version sur GitHub (dépôt réglé dans Paramètres → Mises à jour) au plus UNE FOIS PAR JOUR et vous l'annonce. "
-         "Une seule requête anonyme est envoyée, sans aucune donnée personnelle. Désactivable dans Paramètres → Mises à jour ; palette → « Rechercher les mises à jour » pour vérifier tout de suite. Quand une version est disponible, un BANDEAU apparaît en haut de la fenêtre dès l'ouverture (« Installer maintenant », « Notes de version », « Plus tard ») et une pastille « ⬆ Mise à jour X » reste dans la barre latérale. « Plus tard » repousse le bandeau de 24 h pour cette version ; ✕ le masque jusqu'au prochain lancement."),
+         "Une seule requête anonyme est envoyée, sans aucune donnée personnelle. Désactivable dans Paramètres → Mises à jour ; palette → « Rechercher les mises à jour » pour vérifier tout de suite. Quand une version est disponible, un BANDEAU apparaît en haut de la fenêtre dès l'ouverture (« Installer maintenant », « Notes de version », « Plus tard ») et une pastille « ⬆ Mise à jour X » reste dans la barre latérale. « Plus tard » repousse le bandeau de 24 h pour cette version ; ✕ le masque jusqu'au prochain lancement. Si la fenêtre n'est pas au premier plan, une notification de bureau annonce aussi la nouvelle version (une fois). Si la mise à jour est déjà installée, le bandeau propose simplement « Relancer maintenant ». « mintmail --check-update » donne le détail dans un terminal."),
         ("Installer en un clic",
          "Paramètres → Mises à jour → « Installer la mise à jour » (ou « Installer maintenant » dans le bandeau) : le paquet est téléchargé avec une barre de progression, sa signature est vérifiée, puis le système demande votre mot de passe "
          "administrateur. Le bandeau passe à « installé » avec un bouton « Relancer maintenant ». Rien ne s'installe sans votre accord."),

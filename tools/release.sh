@@ -1,12 +1,21 @@
 #!/bin/sh
 # Publie une version SIGNÉE : vérifie, teste, construit, signe, étiquette vX.Y.Z et crée la « Release » GitHub que consultent les MintMail installés.
-# Usage : tools/release.sh [--dry-run] [--skip-tests]       (--dry-run : tout sauf l'étiquette, l'envoi et la Release)
+# Usage : tools/release.sh [--dry-run] [--skip-tests] [--rotation]       (--dry-run : tout sauf l'étiquette, l'envoi et la Release)
+#   --rotation : change de clé de signature (voir docs/KEY-RECOVERY.md et tools/rotate-signing-key.sh)
 set -e
 cd "$(dirname "$0")/.."
-DRY=""; SKIP=""
+DRY=""; SKIP=""; ROT=""
 for a in "$@"; do
-    case "$a" in --dry-run) DRY=1 ;; --skip-tests) SKIP=1 ;; *) echo "Option inconnue : $a"; exit 1 ;; esac
+    case "$a" in --dry-run) DRY=1 ;; --skip-tests) SKIP=1 ;; --rotation) ROT=1 ;; *) echo "Option inconnue : $a"; exit 1 ;; esac
 done
+if [ -n "$ROT" ]; then
+    [ -n "$MINTMAIL_VERIFY_PUBKEY" ] && [ -f "$MINTMAIL_VERIFY_PUBKEY" ] && [ -n "$MINTMAIL_SIGNING_KEY" ] || {
+        echo "Rotation : indiquez l'ANCIENNE clé privée (MINTMAIL_SIGNING_KEY=…) et l'ANCIENNE clé publique, celle que vos machines utilisent encore (MINTMAIL_VERIFY_PUBKEY=…)."; exit 1; }
+    ! cmp -s "$MINTMAIL_VERIFY_PUBKEY" data/update-pubkey.pem 2>/dev/null || { echo "Rotation : data/update-pubkey.pem est identique à l'ancienne clé publique : ce n'est pas une rotation (tools/rotate-signing-key.sh)."; exit 1; }
+    echo "ROTATION DE CLÉ : ce paquet est signé avec l'ANCIENNE clé et contient la NOUVELLE clé publique ; les machines qui l'installeront feront ensuite confiance à la nouvelle clé."
+else
+    [ -z "$MINTMAIL_VERIFY_PUBKEY" ] || { echo "MINTMAIL_VERIFY_PUBKEY ne sert qu'à une rotation : relancez avec --rotation (ou retirez cette variable)."; exit 1; }
+fi
 KEY="${MINTMAIL_SIGNING_KEY:-$HOME/.config/mintmail-release/signing.key}"
 python3 tools/check-version.py
 VERSION="$(cat VERSION)"
@@ -28,6 +37,8 @@ if [ -n "$DRY" ]; then
     exit 0
 fi
 NOTES="$(awk -v v="$VERSION" '$0 == "## " v {on=1; next} /^## / {on=0} on && /^- / {print}' CHANGELOG.md)"
+[ -z "$ROT" ] || NOTES="$NOTES
+- Rotation de la clé de signature : la nouvelle clé publique est incluse dans ce paquet"
 git tag -a "v$VERSION" -m "MintMail $VERSION"
 git push origin HEAD "v$VERSION"
 gh release create "v$VERSION" "$DEB" "$DEB.sig" dist/SHA256SUMS --title "MintMail $VERSION" --notes "$NOTES"

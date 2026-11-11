@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.13.1
+- Mise à jour déjà installée : le bandeau propose « Relancer maintenant » ; notification de bureau ; dernier résultat dans Paramètres → Mises à jour ; commande mintmail --check-update
+- Option « Ouvrir la page Aujourd'hui au lancement » (Paramètres → Apparence)
+- Clé de signature : sauvegarde contrôlée (tools/backup-signing-key.sh), rotation sans réinstallation (tools/rotate-signing-key.sh, release.sh --rotation), guide docs/KEY-RECOVERY.md
+- Relecture des traductions par un locuteur : tools/review_translations.py (export / import CSV validé)
+
 ## 1.13.0
 - Bandeau de mise à jour visible dès le lancement (installer maintenant, plus tard, notes de version, progression, relance) et pastille dans la barre latérale
 

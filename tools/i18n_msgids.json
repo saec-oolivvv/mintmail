@@ -149,6 +149,9 @@
  "%s — aucun message concerné": [
   "ai_features.py"
  ],
+ "(pas de notes de version)": [
+  "entry.py"
+ ],
  "(sans titre)": [
   "gcal.py"
  ],
@@ -258,7 +261,7 @@
   "extras.py"
  ],
  "Adresse de téléchargement refusée (hôte non autorisé).": [
-  "updates_ui.py"
+  "update_text.py"
  ],
  "Adresse du calendrier": [
   "settings_more.py"
@@ -395,7 +398,7 @@
   "settings.py"
  ],
  "Appel invalide du programme d'installation.": [
-  "updates_ui.py"
+  "update_text.py"
  ],
  "Appliquer": [
   "settings_extra.py"
@@ -502,7 +505,7 @@
   "extras.py"
  ],
  "Aucune version publiée dans ce dépôt.": [
-  "updates_ui.py"
+  "update_text.py"
  ],
  "Aujourd'hui": [
   "util.py"
@@ -523,7 +526,7 @@
   "style.py"
  ],
  "Authentification annulée : rien n'a été installé.": [
-  "updates_ui.py"
+  "update_text.py"
  ],
  "Automatique (langue du système)": [
   "settings.py"
@@ -631,7 +634,7 @@
   "settings.py"
  ],
  "Ce fichier n'est pas un paquet MintMail valide : refusé.": [
-  "updates_ui.py"
+  "update_text.py"
  ],
  "Ce message ne propose pas de lien de désabonnement.": [
   "extras.py"
@@ -658,7 +661,7 @@
   "extras.py"
  ],
  "Cette version n'est pas plus récente que celle installée : refusée.": [
-  "updates_ui.py"
+  "update_text.py"
  ],
  "Chaque version est signée par SAEC. MintMail refuse tout paquet dont la signature ne correspond pas à la clé de vérification installée avec le programme (GitHub ne sert que de transport), refuse de revenir à une ancienne version, et demande votre mot de passe administrateur pour installer. Seule une requête anonyme est envoyée à GitHub ; désactivez la recherche automatique si vous préférez ne rien envoyer.": [
   "updates_ui.py"
@@ -710,7 +713,7 @@
   "ai_service.py"
  ],
  "Clé de vérification absente : installation automatique désactivée.": [
-  "updates_ui.py"
+  "update_text.py"
  ],
  "Clé enregistrée dans le trousseau.": [
   "settings.py"
@@ -941,6 +944,9 @@
  "Derniers non lus (données non fiables) :": [
   "ai_features.py"
  ],
+ "Dernière vérification enregistrée : %s": [
+  "entry.py"
+ ],
  "Diagnostic réseau": [
   "settings_extra.py"
  ],
@@ -983,7 +989,7 @@
   "ai_features.py"
  ],
  "Droits administrateur requis.": [
-  "updates_ui.py"
+  "update_text.py"
  ],
  "Durée (minutes)": [
   "extras.py"
@@ -1028,8 +1034,11 @@
  "Dépôt GitHub des versions, au format propriétaire/nom": [
   "updates_ui.py"
  ],
+ "Dépôt consulté : %s": [
+  "entry.py"
+ ],
  "Dépôt invalide : écrivez « propriétaire/nom ».": [
-  "updates_ui.py"
+  "update_text.py"
  ],
  "Désabonnement en cours…": [
   "extras.py"
@@ -1149,6 +1158,9 @@
   "folders.py",
   "window.py"
  ],
+ "Erreur : %s": [
+  "entry.py"
+ ],
  "Erreur HTTP %d (%s). %s": [
   "ai_service.py"
  ],
@@ -1158,16 +1170,16 @@
   "extras.py"
  ],
  "Erreur de mise à jour (%s).": [
-  "updates_ui.py"
+  "update_text.py"
  ],
  "Erreur du serveur de téléchargement.": [
-  "updates_ui.py"
+  "update_text.py"
  ],
  "Erreur interne : %s (menu ☰ → Journal d'erreurs)": [
   "app.py"
  ],
  "Erreur interne pendant la mise à jour.": [
-  "updates_ui.py"
+  "update_text.py"
  ],
  "Español": [
   "settings.py"
@@ -1217,13 +1229,13 @@
   "assistant.py"
  ],
  "Fichier de mise à jour invalide : refusé.": [
-  "updates_ui.py"
+  "update_text.py"
  ],
  "Fichier potentiellement dangereux": [
   "reader.py"
  ],
  "Fichier trop volumineux : refusé.": [
-  "updates_ui.py"
+  "update_text.py"
  ],
  "Filtres & blocage": [
   "settings.py"
@@ -1244,7 +1256,7 @@
   "window.py"
  ],
  "GitHub limite les requêtes : réessayez plus tard.": [
-  "updates_ui.py"
+  "update_text.py"
  ],
  "Glisser vers la droite": [
   "settings_extra.py"
@@ -1379,7 +1391,7 @@
   "settings_extra.py"
  ],
  "Impossible de joindre GitHub (réseau).": [
-  "updates_ui.py"
+  "update_text.py"
  ],
  "Impossible de relancer automatiquement : fermez puis relancez MintMail.": [
   "updates_ui.py"
@@ -1391,13 +1403,15 @@
   "settings_extra.py"
  ],
  "Installation automatique : prête (clé de vérification présente).": [
+  "entry.py",
   "updates_ui.py"
  ],
  "Installation automatique désactivée : %s Vous serez seulement informé des nouvelles versions.": [
+  "entry.py",
   "updates_ui.py"
  ],
  "Installation automatique indisponible sur cette machine (pkexec ou programme d'installation absent).": [
-  "updates_ui.py"
+  "update_text.py"
  ],
  "Installations de MintMail hors paquet .deb (le paquet installé est la version %s) :": [
   "entry.py"
@@ -1490,19 +1504,19 @@
   "settings_extra.py"
  ],
  "L'installation a échoué (le détail est dans le journal).": [
-  "updates_ui.py"
+  "update_text.py"
  ],
  "L'objet contient": [
   "settings_extra.py"
  ],
  "La clé de vérification installée n'est pas protégée : refusé.": [
-  "updates_ui.py"
+  "update_text.py"
  ],
  "La mise à jour a échoué": [
   "updates_ui.py"
  ],
  "La version publiée ne contient pas le paquet attendu.": [
-  "updates_ui.py"
+  "update_text.py"
  ],
  "Langue de l'IA": [
   "settings.py"
@@ -1688,6 +1702,7 @@
   "extras.py"
  ],
  "MintMail est à jour (version %s).": [
+  "entry.py",
   "updates_ui.py"
  ],
  "MintMail n'a pas pu démarrer": [
@@ -1749,6 +1764,9 @@
  ],
  "Mot de passe requis.": [
   "settings.py"
+ ],
+ "NON (la version sera refusée)": [
+  "entry.py"
  ],
  "Neutre et poli": [
   "settings.py"
@@ -1818,6 +1836,7 @@
   "folders.py"
  ],
  "Nouveautés : %s": [
+  "entry.py",
   "updates_ui.py"
  ],
  "Nouvel événement": [
@@ -1842,7 +1861,7 @@
   "window.py"
  ],
  "Numéro de version illisible.": [
-  "updates_ui.py"
+  "update_text.py"
  ],
  "OK, bien reçu 👍": [
   "reader.py"
@@ -1886,6 +1905,9 @@
  "Ouvrir la page": [
   "updates_ui.py"
  ],
+ "Ouvrir la page Aujourd'hui au lancement": [
+  "settings.py"
+ ],
  "Ouvrir le message d'origine": [
   "extras.py"
  ],
@@ -1903,6 +1925,9 @@
  ],
  "Ouvrir ↗": [
   "settings_more.py"
+ ],
+ "Page de la version : %s": [
+  "entry.py"
  ],
  "Pairs détectés": [
   "settings_extra.py"
@@ -2241,7 +2266,7 @@
   "extras.py"
  ],
  "Réponse illisible de GitHub.": [
-  "updates_ui.py"
+  "update_text.py"
  ],
  "Réponse illisible du service IA.": [
   "ai_service.py"
@@ -2280,7 +2305,7 @@
   "settings.py"
  ],
  "SIGNATURE INVALIDE : paquet refusé (il ne vient pas de SAEC ou a été modifié).": [
-  "updates_ui.py"
+  "update_text.py"
  ],
  "Saisissez d'abord une recherche (compte réel requis).": [
   "extras.py"
@@ -2339,6 +2364,9 @@
  "Signature enregistrée": [
   "settings.py"
  ],
+ "Signature publiée : %s": [
+  "entry.py"
+ ],
  "Signatures": [
   "settings.py"
  ],
@@ -2349,7 +2377,7 @@
   "settings.py"
  ],
  "Somme de contrôle incorrecte : téléchargement corrompu, refusé.": [
-  "updates_ui.py"
+  "update_text.py"
  ],
  "Sonde le réseau local (utile si la détection automatique est bloquée par la box ou un VPN)": [
   "settings_extra.py"
@@ -2575,7 +2603,7 @@
   "extras.py"
  ],
  "Téléchargement incomplet.": [
-  "updates_ui.py"
+  "update_text.py"
  ],
  "Téléchargement…": [
   "updates_ui.py"
@@ -2604,8 +2632,11 @@
  "Version installée : %s": [
   "updates_ui.py"
  ],
+ "Version installée sur le disque : %s — relancez MintMail pour l'utiliser.": [
+  "entry.py"
+ ],
  "Version non signée : refusée par sécurité.": [
-  "updates_ui.py"
+  "update_text.py"
  ],
  "Vert": [
   "style.py"
@@ -2920,6 +2951,9 @@
  "octobre": [
   "slots.py"
  ],
+ "oui": [
+  "entry.py"
+ ],
  "pièce jointe": [
   "backend.py"
  ],
@@ -2991,6 +3025,9 @@
  ],
  "vendredi": [
   "slots.py"
+ ],
+ "version en cours d'exécution": [
+  "entry.py"
  ],
  "« %s » est un programme ou un script : MintMail ne l'ouvre pas. Si vous êtes certain de sa provenance, enregistrez-le (clic droit → Enregistrer sous…) et vérifiez-le avant de l'exécuter.": [
   "reader.py"
@@ -3265,6 +3302,9 @@
  ],
  "⬆ La version %s est disponible (dernière vérification : %s).": [
   "updates_ui.py"
+ ],
+ "⬆ La version %s est disponible.": [
+  "entry.py"
  ],
  "⬆ Mise à jour %s": [
   "updates_ui.py"

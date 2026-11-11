@@ -6,43 +6,14 @@ import time
 import gi
 
 gi.require_version("Gtk", "3.0")
-from gi.repository import GLib, Gtk
+from gi.repository import Gio, GLib, Gtk
 
 from . import __version__, updater
 from .i18n import tr
 from .reader import open_uri
 
 
-def explain(code, detail=""):
-    """Texte (traduit) d'un code d'erreur de mise à jour."""
-    table = {
-        "network": tr("Impossible de joindre GitHub (réseau)."),
-        "ratelimit": tr("GitHub limite les requêtes : réessayez plus tard."),
-        "norelease": tr("Aucune version publiée dans ce dépôt."),
-        "badrepo": tr("Dépôt invalide : écrivez « propriétaire/nom »."),
-        "badjson": tr("Réponse illisible de GitHub."),
-        "badversion": tr("Numéro de version illisible."),
-        "noasset": tr("La version publiée ne contient pas le paquet attendu."),
-        "badurl": tr("Adresse de téléchargement refusée (hôte non autorisé)."),
-        "toobig": tr("Fichier trop volumineux : refusé."),
-        "badsize": tr("Téléchargement incomplet."),
-        "checksum": tr("Somme de contrôle incorrecte : téléchargement corrompu, refusé."),
-        "http": tr("Erreur du serveur de téléchargement."),
-        "nokey": tr("Clé de vérification absente : installation automatique désactivée."),
-        "unsigned": tr("Version non signée : refusée par sécurité."),
-        "bad_signature": tr("SIGNATURE INVALIDE : paquet refusé (il ne vient pas de SAEC ou a été modifié)."),
-        "bad_package": tr("Ce fichier n'est pas un paquet MintMail valide : refusé."),
-        "not_newer": tr("Cette version n'est pas plus récente que celle installée : refusée."),
-        "bad_file": tr("Fichier de mise à jour invalide : refusé."),
-        "key_untrusted": tr("La clé de vérification installée n'est pas protégée : refusé."),
-        "install_failed": tr("L'installation a échoué (le détail est dans le journal)."),
-        "cancelled": tr("Authentification annulée : rien n'a été installé."),
-        "nohelper": tr("Installation automatique indisponible sur cette machine (pkexec ou programme d'installation absent)."),
-        "not_root": tr("Droits administrateur requis."),
-        "usage": tr("Appel invalide du programme d'installation."),
-        "internal": tr("Erreur interne pendant la mise à jour."),
-    }
-    return table.get(code, tr("Erreur de mise à jour (%s).") % code)
+from .update_text import explain  # noqa: E402,F401  (réexporté : l'interface et les tests l'utilisent ici)
 
 
 class UpdateBanner(Gtk.Revealer):
@@ -206,6 +177,19 @@ class UpdateMixin:
     def _refresh_update_ui(self, force=False):
         up = self._update
         chip, banner = getattr(self, "update_chip", None), getattr(self, "update_banner", None)
+        pend = updater.restart_pending()
+        if pend and (up is None or not updater.is_newer(up.version, pend)):
+            # La mise à jour est DÉJÀ installée sur le disque (cette fenêtre tourne encore avec l'ancienne version) : il ne reste qu'à relancer.
+            self._update = None
+            if self.config.get("update_available"):
+                self.config["update_available"] = None
+                self.config.save()
+            if chip is not None:
+                chip.set_visible(False)
+            if banner is not None and not self._update_busy and banner.state != "progress":
+                banner.show_done(pend)
+            self._update_changed()
+            return
         if chip is not None:
             chip.set_visible(up is not None)
             if up is not None:
@@ -261,13 +245,19 @@ class UpdateMixin:
                     self.toast.popup(explain("network"), timeout=6)
                 self._update_changed()
                 return
+            from .log import log
+            cfg["update_last_result"] = ("available:" + res.update.version) if res.state == "available" else ("error:" + res.code) if res.state == "error" else "uptodate"
+            log("Mises à jour (%s) : %s" % ("manuelle" if manual else "automatique", cfg["update_last_result"]))
             if res.state != "error":
                 cfg["update_last_check"] = time.time()
                 cfg["update_etag"] = res.etag if res.state == "uptodate" else ""
             if res.state == "available":
+                is_new = cfg.get("update_seen") != res.update.version
                 self._update = res.update
                 cfg["update_available"] = updater.update_to_dict(res.update)
                 cfg["update_seen"] = res.update.version
+                if is_new and not manual:
+                    self._notify_update(res.update)
                 if manual:
                     cfg["update_snooze_until"] = 0                 # demande explicite : on montre le bandeau même s'il avait été repoussé
                 cfg.save()
@@ -283,6 +273,17 @@ class UpdateMixin:
             cfg.save()
             self._refresh_update_ui()
         self.run_bg(lambda: updater.check(repo, etag=etag), done)
+
+    def _notify_update(self, up):
+        """Notification de bureau (une fois par version) quand la fenêtre n'est pas au premier plan : réduite, cachée ou sur un autre bureau."""
+        try:
+            if not self.config.get("notifications", True) or self.is_active():
+                return
+            n = Gio.Notification.new(tr("MintMail %s est disponible") % up.version)
+            n.set_body(updater.short_notes(up.notes) or tr("Cliquez pour voir la mise à jour de MintMail %s") % up.version)
+            self.get_application().send_notification("update-available", n)
+        except Exception:
+            pass
 
     # ------------------------------------------------------------------ installation
     def _stage(self, version, text, fraction=None):
@@ -301,6 +302,11 @@ class UpdateMixin:
     def install_update(self, confirm=True):
         up = self._update
         if up is None or self._update_busy:
+            return
+        pend = updater.restart_pending()
+        if pend and not updater.is_newer(up.version, pend):                  # déjà installée sur le disque : on propose simplement de relancer
+            self._update = None
+            self._refresh_update_ui()
             return
         ok, why = updater.can_install()
         if not ok:
@@ -354,7 +360,16 @@ class UpdateMixin:
                 else:
                     from .log import log
                     log("Mise à jour refusée / échouée : %s %s" % (code, detail))
-                    self._update_failed(explain(code), up)
+                    pend2 = updater.restart_pending()
+                    if code == "not_newer" and pend2 and not updater.is_newer(up.version, pend2):
+                        self._update = None                                   # « pas plus récente » = elle est déjà installée : relancer suffit
+                        self.config["update_available"] = None
+                        self.config.save()
+                        if getattr(self, "update_banner", None) is not None:
+                            self.update_banner.hide()                         # sort de l'état « installation » pour laisser place à « relancer »
+                        self._refresh_update_ui()
+                    else:
+                        self._update_failed(explain(code), up)
             self._update_changed()
         self.run_bg(work, done)
 
@@ -439,6 +454,9 @@ def updates_page(win):
             status.set_text(tr("⬆ La version %s est disponible (dernière vérification : %s).") % (up.version, when))
         else:
             status.set_text(tr("Aucune mise à jour connue (dernière vérification : %s).") % when)
+        last_result = str(cfg.get("update_last_result") or "")
+        if last_result.startswith("error:") and not win._update_busy:
+            status.set_text(status.get_text() + "\n" + explain(last_result[6:]))
         ok, why = updater.can_install()
         inst.set_visible(up is not None)
         inst.set_sensitive(not win._update_busy)
