@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.12.0
+- Nouvelles langues de l'interface : néerlandais, allemand et espagnol (traduction par IA, non relue par des locuteurs natifs : signalez les défauts) ; l'aide intégrée (F1) retombe sur l'anglais pour ces langues
+
 ## 1.11.0
 - Mises à jour automatiques depuis GitHub (Paramètres → Mises à jour) : recherche une fois par jour (désactivable), annonce, installation en un clic ; chaque paquet doit porter une signature RSA vérifiée avec une clé publique intégrée au programme, retour en arrière refusé, mot de passe administrateur demandé (polkit)
 - Dépôt versionné : numéro de version unique contrôlé, tools/bump-version.sh, tools/make-signing-key.sh, tools/release.sh (publie une Release signée), docs/UPDATES.md et docs/RELEASING.md

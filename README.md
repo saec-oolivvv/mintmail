@@ -39,12 +39,12 @@ Les captures seront ajoutées dans [`docs/screenshots/`](docs/screenshots/README
 
 ## Langues / Languages
 
-L'interface, l'aide (F1) et la ligne de commande existent en **français et en anglais** : Paramètres → Apparence → « Langue de l'interface »
-(Automatique = langue du système ; redémarrage nécessaire). D'autres langues (néerlandais, allemand, espagnol…) peuvent être pré-traduites avec
-`tools/translate_catalog.py` puis relues. Détails, limites et mode d'emploi : [docs/I18N.md](docs/I18N.md).
+L'interface existe en **français, anglais, néerlandais, allemand et espagnol** : Paramètres → Apparence → « Langue de l'interface » (Automatique = langue du système ; redémarrage nécessaire).
+L'aide (F1) et la ligne de commande existent en français et en anglais (anglais pour les autres langues). **Néerlandais, allemand et espagnol : traductions par IA, non relues par des locuteurs natifs** — signalez les
+défauts. D'autres langues peuvent être pré-traduites avec `tools/translate_catalog.py`. Détails et limites : [docs/I18N.md](docs/I18N.md).
 
-*The interface, the built-in help (F1) and the command line are available in **French and English**: Settings → Appearance → “Interface language”
-(Automatic = system language; restart required). More languages can be pre-translated with `tools/translate_catalog.py`, then reviewed. See docs/I18N.md.*
+*The interface is available in **French, English, Dutch, German and Spanish** (Settings → Appearance → “Interface language”; Automatic = system language; restart required). Help (F1) and the command line are in French
+and English (English for the other languages). **Dutch, German and Spanish are AI translations not reviewed by native speakers** — please report defects. See docs/I18N.md.*
 
 ## Mises à jour
 

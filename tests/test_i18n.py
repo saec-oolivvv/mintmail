@@ -26,7 +26,8 @@ def code_msgids():
 
 
 def catalogs():
-    return {os.path.basename(p)[:-5]: json.load(open(p, encoding="utf-8")) for p in glob.glob(os.path.join(LOCALE, "*.json")) if not os.path.basename(p).startswith("help_")}
+    """Catalogues d'interface (xx.json) — ni les aides (help_xx.json) ni les fichiers d'état (xx.status.json)."""
+    return {os.path.basename(p)[:-5]: json.load(open(p, encoding="utf-8")) for p in glob.glob(os.path.join(LOCALE, "*.json")) if re.fullmatch(r"[a-z]{2,3}\.json", os.path.basename(p))}
 
 
 def run(code, lang="en"):
@@ -232,3 +233,78 @@ def test_wrapping_tool_finds_nothing_to_wrap_or_unwrap_and_no_identifier_is_tran
 def test_settings_page_offers_the_language_choice():
     src = open(os.path.join(PKG, "settings.py"), encoding="utf-8").read()
     assert "ui_lang" in src and "i18n.available()" in src and "redémarrez MintMail" in src
+
+
+# ======================================================================= langues livrées : néerlandais, allemand, espagnol
+FRENCH_ONLY_CHARS = {"en": "àâçèêîôûùœ", "nl": "àâçèêîôûùœ", "de": "àâçèêîôûùœé", "es": "àâçèêîôûùœë"}
+FRENCH_WORDS = re.compile(r"\b(vous|votre|vos|pour|avec|dans|cette|ces|sans|aucun|aucune|nouveau|nouvelle|boîte|dossier|message(s)? (?:non|envoy)|réglages|paramètres)\b", re.I)
+
+
+def test_available_languages_are_exactly_the_shipped_catalogs():
+    assert i18n.available() == ["fr", "de", "en", "es", "nl"], i18n.available()                    # pas de « help_en », pas de « de.status »
+    for code in i18n.available():
+        assert code in i18n.NAMES, code                                                           # chaque langue a son nom dans le sélecteur
+
+
+def test_every_shipped_language_catalog_is_complete_valid_and_free_of_french():
+    ids = code_msgids()
+    cats = catalogs()
+    assert set(cats) == {"en", "nl", "de", "es"}, set(cats)
+    for lang, cat in cats.items():
+        assert set(cat) == ids, (lang, sorted(ids - set(cat))[:5], sorted(set(cat) - ids)[:5])
+        bad = [(k[:50], i18n.check_entry(k, v)) for k, v in cat.items() if i18n.check_entry(k, v)]
+        assert not bad, (lang, bad[:4])
+        leftovers = []
+        for fr, tr_ in cat.items():
+            plain = re.sub(r"<[^>]+>|%\([^)]*\)[sd]|%[sdr.\d]+s?|https?://\S+", " ", tr_)
+            if any(ch in plain for ch in FRENCH_ONLY_CHARS[lang]) or FRENCH_WORDS.search(plain):
+                leftovers.append((fr[:40], tr_[:70]))
+        assert not leftovers, (lang, leftovers[:5])
+        same = [k for k, v in cat.items() if k == v and len(re.sub(r"[^A-Za-zÀ-ÿ]", "", k)) > 10]
+        assert len(same) <= 6, (lang, same[:10])                                                  # quasi rien ne doit rester identique au français (hors noms propres)
+
+
+def test_translated_catalogs_declare_honestly_that_they_were_machine_translated_and_not_reviewed():
+    for lang in ("nl", "de", "es"):
+        st = json.load(open(os.path.join(LOCALE, lang + ".status.json"), encoding="utf-8"))
+        assert st["machine_translated"] is True and st["reviewed_by_human"] is False and st["complete"] is True and st["strings"] == st["of"] == len(code_msgids()), (lang, st)
+
+
+def test_each_new_language_works_end_to_end_with_native_dates_tasks_and_a_clean_ui_start():
+    expected = {"nl": ("Ik stel de volgende tijdsloten voor:", "donderdag 12 november", "vandaag", "morgen", "1 d te laat"),
+                "de": ("Ich schlage die folgenden Zeitfenster vor:", "Donnerstag 12 November", "heute", "morgen", "1 T. überfällig"),
+                "es": ("Te propongo las siguientes franjas horarias:", "jueves 12 de noviembre", "hoy", "mañana", "1 d de retraso")}
+    code = """
+import json, datetime, sys
+sys.path.insert(0, 'tests')
+import gtkstub
+from mintmail import i18n
+lang = i18n.init_from_config('auto')
+from mintmail import slots, tasks
+d = datetime.date(2026, 11, 10)
+print(json.dumps({'lang': lang, 'slots': slots.proposal_text([(datetime.datetime(2026, 11, 12, 9, 0), datetime.datetime(2026, 11, 12, 10, 30))]),
+                  'due': [tasks.due_label({'due': x}, d) for x in ('2026-11-09', '2026-11-10', '2026-11-11')]}))
+"""
+    for lang, (intro, day, today, tomorrow, late) in expected.items():
+        out = json.loads(run(code, lang=lang))
+        assert out["lang"] == lang and out["slots"].startswith(intro) and day in out["slots"], out
+        assert out["due"] == [late, today, tomorrow], out["due"]
+        assert "SMOKE OK" in run("import sys, runpy; sys.path.insert(0, 'tests'); runpy.run_path('tests/stub_smoke.py', run_name='__main__')", lang=lang), lang
+        cli = subprocess.run([sys.executable, "-m", "mintmail", "--help"], capture_output=True, text=True, cwd=ROOT, timeout=60, env=dict(os.environ, MINTMAIL_LANG=lang, PYTHONPATH=ROOT)).stdout
+        assert "Starts the application." in cli, lang                                                 # l'aide en ligne de commande retombe sur l'anglais (pas de traduction dédiée)
+
+
+def test_languages_without_dedicated_help_get_the_english_help_not_the_french_one():
+    for lang in ("nl", "de", "es"):
+        title = json.loads(run("""
+import json
+from mintmail import i18n, help_content as H
+i18n.init_from_config('auto')
+print(json.dumps(H.sections({'version': '1', 'config': 'c', 'data': 'd', 'log': 'l'})[0]['title']))
+""", lang=lang))
+        assert title == "Getting started", (lang, title)
+
+
+def test_the_french_german_style_slip_is_fixed_recipients_are_addressed_consistently():
+    de = catalogs()["de"]
+    assert de["\nDites-moi celui qui vous convient."] == "\nSagen Sie mir bitte, welcher Ihnen passt."    # message adressé à un tiers : vouvoiement cohérent avec le reste de l'interface allemande

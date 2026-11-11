@@ -22,7 +22,7 @@ _catalog: Dict[str, str] = {}
 
 def available() -> List[str]:
     """Langues utilisables : le français (source) + celles qui ont un catalogue."""
-    found = {p.stem for p in LOCALE_DIR.glob("*.json")} if LOCALE_DIR.is_dir() else set()
+    found = {p.stem for p in LOCALE_DIR.glob("*.json") if re.fullmatch(r"[a-z]{2,3}", p.stem)} if LOCALE_DIR.is_dir() else set()      # ni help_xx.json ni xx.status.json
     return ["fr"] + sorted(l for l in found if l != "fr")
 
 

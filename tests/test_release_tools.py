@@ -135,5 +135,8 @@ def test_real_release_tags_pushes_and_creates_a_github_release_with_signed_asset
     assert text.count("release create ") == 1 and text.startswith("release create v%s " % version), text[:200]
     head = text.split("--notes")[0]
     assert "mintmail_%s_all.deb" % version in head and ".deb.sig" in head and "SHA256SUMS" in head                                   # les 3 fichiers attendus par MintMail
-    assert "--title MintMail %s" % version in head and "Mises à jour automatiques" in text.split("--notes", 1)[1]                    # notes = section du CHANGELOG
+    import re
+    section = re.search(r"^## %s\s*\n((?:- .+\n)+)" % re.escape(version), open(os.path.join(work, "CHANGELOG.md"), encoding="utf-8").read(), re.M).group(1)
+    first_bullet = section.splitlines()[0][2:40]
+    assert "--title MintMail %s" % version in head and first_bullet in text.split("--notes", 1)[1]                                   # notes = section du CHANGELOG de CETTE version
     sh("tools/release.sh --skip-tests", work, env, ok=False)                                                                         # on ne republie pas la même version

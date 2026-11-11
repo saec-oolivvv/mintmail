@@ -342,7 +342,7 @@ SECTIONS: List[Dict] = [
          "sombre (ou selon le système), couleur d'accent, densité de la liste (compacte, confortable, aérée), zoom du texte des messages. "
          "☰ → « Basculer clair / sombre » pour changer en un clic."),
         ("Autres réglages",
-         "• Charger les images distantes (non recommandé) · notifications de bureau · fréquence d'actualisation · délai d'annulation d'envoi · langue de l'interface (redémarrage nécessaire).\n"
+         "• Charger les images distantes (non recommandé) · notifications de bureau · fréquence d'actualisation · délai d'annulation d'envoi · langue de l'interface (redémarrage nécessaire). Langues : français, anglais, néerlandais, allemand, espagnol — les trois dernières sont des traductions par IA non relues par des locuteurs natifs, et l'aide F1 reste en anglais pour elles.\n"
          "• Gestes & disposition : disposition, gestes de balayage, inversion pavé tactile, conversations.\n"
          "• Paramètres → Raccourcis : liste des touches. « Réinitialiser l'apparence » remet les valeurs par défaut."),
         ("Pages de paramètres",
