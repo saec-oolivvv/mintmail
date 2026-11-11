@@ -554,5 +554,115 @@
    "mintmail --check-update",
    "Checks for an update and prints the detailed result (version, repository, signature, cause of an error): no interface, nothing installed. Exit code: 0 up to date, 10 update available, 1 error."
   ]
- ]
+ ],
+ "meta": {
+  "start": [
+   "🚀",
+   "Add your account and find your bearings in a few minutes."
+  ],
+  "read": [
+   "📬",
+   "Read fast and sort effortlessly: conversations, categories, favorites, search."
+  ],
+  "today": [
+   "📅",
+   "Your day at a glance: calendar, priorities, tasks and time slots."
+  ],
+  "context": [
+   "⌨",
+   "Right-click, command palette and every keyboard shortcut."
+  ],
+  "write": [
+   "✍",
+   "Write, reply, schedule sending; signatures, aliases, templates and AI writing help."
+  ],
+  "ai": [
+   "✨",
+   "Summaries, assistant, sorting, drafts: a discreet AI that always stays under your control."
+  ],
+  "filters": [
+   "🛡",
+   "Spam, blocking, automatic rules and one-click unsubscribe."
+  ],
+  "attach": [
+   "📎",
+   "Attachments, invitations, contacts and calendars."
+  ],
+  "sync": [
+   "🔄",
+   "Find everything, identical, on your other computers."
+  ],
+  "offline": [
+   "📶",
+   "Work without a network: nothing is lost, everything is sent when you are back online."
+  ],
+  "look": [
+   "🎨",
+   "Aurora, Paper and Terminal styles, light or dark theme, list density."
+  ],
+  "updates": [
+   "⬆",
+   "Signed updates, announced by a banner, installed in one click."
+  ],
+  "security": [
+   "🔒",
+   "Where your data lives, what protects it, how to report a flaw."
+  ],
+  "cli": [
+   "🧰",
+   "The mintmail command options and fixes for common problems."
+  ],
+  "about": [
+   "💙",
+   "Who builds MintMail, license and credits."
+  ]
+ },
+ "home": {
+  "welcome": [
+   "Welcome to MintMail",
+   "A fast, polished mail client for Linux Mint, with a discreet AI that saves you time. Your mail, your keys and your settings stay with you."
+  ],
+  "steps": [
+   [
+    "Add your account",
+    "Settings (Ctrl+,) → Accounts → “＋ Add an account”. Gmail and Outlook: OAuth sign-in, no password.",
+    "start"
+   ],
+   [
+    "Get to know your inbox",
+    "Click a message to read it; E archives, S stars, P pins, T opens “Today”.",
+    "read"
+   ],
+   [
+    "Turn on the AI, if you like",
+    "Settings → ✨ Artificial intelligence: summaries, drafts, assistant (Ctrl+J), sorting. Entirely optional.",
+    "ai"
+   ],
+   [
+    "Find everything on your other computers",
+    "Settings → P2P sync: accounts, signatures and settings follow you from one computer to the next.",
+    "sync"
+   ]
+  ],
+  "tips": [
+   "Ctrl+K opens the command palette: almost every action is there, just type a few letters.",
+   "T opens “Today”: your calendar, priorities and tasks on a single page.",
+   "Start a search with ? to ask the AI a question, for example “? March invoices”.",
+   "H snoozes the message until tomorrow 8 am.",
+   "X turns on selection mode: tick several messages, then archive, delete or sort them in one go.",
+   "J and K move to the next or previous message without leaving the keyboard.",
+   "\\\\ switches between columns and list only: handy on a small screen.",
+   "Ctrl+J opens the AI assistant.",
+   "P pins a message; on servers that accept it, the pin follows you to your other computers.",
+   "Settings → Appearance: pick Aurora, Paper or Terminal, light or dark.",
+   "“mintmail --check-update”, in a terminal, tells you whether a new version is waiting.",
+   "When a new version exists, a banner appears at every launch; “Later” hides it for 24 h.",
+   "F1 opens this help at any time; the search accepts a word or part of a word, accents optional."
+  ]
+ },
+ "callouts": {
+  "start:3": "Tip: Ctrl+K opens the command palette; type a few letters to find any action.",
+  "read:5": "Tip: start the search with ? to ask the AI a question (for example “? March invoices”).",
+  "read:6": "Tip: X turns on selection mode, Ctrl+A selects everything."
+ }
 }

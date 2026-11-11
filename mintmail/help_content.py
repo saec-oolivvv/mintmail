@@ -427,6 +427,103 @@ SECTIONS: List[Dict] = [
 ]
 
 
+# ----------------------------------------------------------------------------------------------- présentation (page d'accueil, icônes, astuces)
+# Pour chaque section : (icône, accroche d'une phrase). L'anglais est dans locale/help_en.json (« meta », « home », « callouts »).
+SECTION_META: Dict[str, Tuple[str, str]] = {
+    "start": ("🚀", "Ajoutez votre compte et prenez vos repères en quelques minutes."),
+    "read": ("📬", "Lire vite, trier sans effort : conversations, catégories, favoris, recherche."),
+    "today": ("📅", "Votre journée d'un coup d'œil : agenda, priorités, tâches et créneaux."),
+    "context": ("⌨", "Clic droit, palette de commandes et tous les raccourcis clavier."),
+    "write": ("✍", "Rédiger, répondre, programmer l'envoi ; signatures, alias, modèles et aide de l'IA."),
+    "ai": ("✨", "Résumés, assistant, classement, brouillons : une IA discrète, toujours sous votre contrôle."),
+    "filters": ("🛡", "Spam, blocage, règles automatiques et désabonnement en un clic."),
+    "attach": ("📎", "Pièces jointes, invitations, contacts et agendas."),
+    "sync": ("🔄", "Retrouvez tout, à l'identique, sur vos autres machines."),
+    "offline": ("📶", "Travaillez sans réseau : rien n'est perdu, tout part au retour du réseau."),
+    "look": ("🎨", "Styles Aurora, Papier et Terminal, thème clair ou sombre, densité de la liste."),
+    "updates": ("⬆", "Mises à jour signées, annoncées par un bandeau, installées en un clic."),
+    "security": ("🔒", "Où sont vos données, ce qui les protège, comment signaler une faille."),
+    "cli": ("🧰", "Options de la commande mintmail et solutions aux problèmes courants."),
+    "about": ("💙", "Qui développe MintMail, licence et crédits."),
+}
+
+HOME: Dict = {
+    "welcome": ("Bienvenue dans MintMail",
+                "Un client mail rapide et soigné pour Linux Mint, avec une IA discrète qui vous fait gagner du temps. "
+                "Vos mails, vos clés et vos réglages restent chez vous."),
+    # (titre, texte, section ouverte au clic)
+    "steps": [
+        ("Ajoutez votre compte", "Paramètres (Ctrl+,) → Comptes → « ＋ Ajouter un compte ». Gmail et Outlook : connexion OAuth, sans mot de passe.", "start"),
+        ("Prenez la boîte en main", "Cliquez un message pour le lire ; E archive, S met en favori, P épingle, T ouvre « Aujourd'hui ».", "read"),
+        ("Activez l'IA, si vous le souhaitez", "Paramètres → ✨ Intelligence artificielle : résumés, brouillons, assistant (Ctrl+J), classement. Entièrement facultatif.", "ai"),
+        ("Retrouvez tout sur vos autres machines", "Paramètres → Synchronisation P2P : comptes, signatures et réglages suivent d'un poste à l'autre.", "sync"),
+    ],
+    "tips": [
+        "Ctrl+K ouvre la palette de commandes : presque toutes les actions s'y trouvent, il suffit de taper quelques lettres.",
+        "T ouvre « Aujourd'hui » : votre agenda, vos priorités et vos tâches sur une seule page.",
+        "Commencez une recherche par ? pour poser une question à l'IA, par exemple « ? factures de mars ».",
+        "H reporte le message à demain 8 h.",
+        "X active le mode sélection : cochez plusieurs messages, puis archivez, supprimez ou classez en une fois.",
+        "J et K passent au message suivant ou précédent sans quitter le clavier.",
+        "\\ bascule entre les colonnes et la liste seule : pratique sur un petit écran.",
+        "Ctrl+J ouvre l'assistant IA.",
+        "P épingle un message ; sur les serveurs qui l'acceptent, l'épingle suit vos autres postes.",
+        "Paramètres → Apparence : choisissez Aurora, Papier ou Terminal, en clair ou en sombre.",
+        "« mintmail --check-update », dans un terminal, indique si une nouvelle version vous attend.",
+        "Quand une nouvelle version existe, un bandeau s'affiche à chaque démarrage ; « Plus tard » le cache 24 h.",
+        "F1 ouvre cette aide à tout moment ; la recherche accepte un mot ou un bout de mot, sans accent.",
+    ],
+}
+
+# Encadrés ajoutés à la fin d'une rubrique : (id de section, numéro de rubrique) -> texte
+CALLOUTS: Dict[Tuple[str, int], str] = {
+    ("start", 3): "Astuce : Ctrl+K ouvre la palette de commandes ; tapez quelques lettres pour trouver n'importe quelle action.",
+    ("read", 5): "Astuce : commencez la recherche par ? pour poser une question à l'IA (par exemple « ? factures de mars »).",
+    ("read", 6): "Astuce : X active le mode sélection, Ctrl+A sélectionne tout.",
+}
+
+
+def _lang_json():
+    """Aide dans la langue de l'interface (dict) ou None pour le français (source dans ce fichier) ; sans aide dédiée : l'anglais."""
+    import json
+    from . import i18n
+    lang = i18n.current()
+    if lang == "fr":
+        return None
+    for code in (lang, "en"):
+        try:
+            with open(i18n.LOCALE_DIR / ("help_%s.json" % code), encoding="utf-8") as f:
+                return json.load(f)
+        except (OSError, ValueError):
+            continue
+    return None
+
+
+def meta() -> Dict[str, Dict[str, str]]:
+    """{id de section: {icon, tagline}} dans la langue de l'interface."""
+    d = _lang_json()
+    raw = d.get("meta") if d and d.get("meta") else SECTION_META
+    return {k: {"icon": v[0], "tagline": v[1]} for k, v in raw.items()}
+
+
+def home() -> Dict:
+    """Accueil de l'aide : {welcome: (titre, texte), steps: [(titre, texte, section)], tips: [texte]}."""
+    d = _lang_json()
+    h = d.get("home") if d and d.get("home") else HOME
+    return {"welcome": tuple(h["welcome"]), "steps": [tuple(s) for s in h["steps"]], "tips": list(h["tips"])}
+
+
+def _callouts() -> Dict[Tuple[str, int], str]:
+    d = _lang_json()
+    if d and d.get("callouts"):
+        out = {}
+        for k, v in d["callouts"].items():
+            sid, _, idx = k.partition(":")
+            out[(sid, int(idx))] = v
+        return out
+    return CALLOUTS
+
+
 def _data():
     """(sections, raccourcis, options) dans la langue de l'interface. Le français est la source ; une langue sans aide dédiée
     (locale/help_<langue>.json) retombe sur l'anglais, plus largement compris que le français."""
@@ -460,14 +557,28 @@ def cli_text(ctx: Dict[str, str]) -> str:
 
 def sections(ctx: Dict[str, str]) -> List[Dict]:
     """Sections prêtes à afficher : espaces réservés remplacés, tableaux de raccourcis et d'options développés."""
-    out = []
+    out, m, callouts = [], meta(), _callouts()
     for s in _data()[0]:
-        items = []
-        for title, body in s["items"]:
+        items, kinds = [], []
+        for n, (title, body) in enumerate(s["items"]):
+            kinds.append("shortcuts" if body == "@SHORTCUTS@" else "cli" if body == "@CLI@" else "text")
             body = shortcuts_text() if body == "@SHORTCUTS@" else cli_text(ctx) if body == "@CLI@" else _fill(body, ctx)
+            if (s["id"], n) in callouts:
+                body = body + "\n" + _fill(callouts[(s["id"], n)], ctx)
             items.append((_fill(title, ctx), body))
-        out.append({"id": s["id"], "title": s["title"], "items": items})
+        info = m.get(s["id"], {"icon": "•", "tagline": ""})
+        out.append({"id": s["id"], "title": s["title"], "items": items, "kinds": kinds, "icon": info["icon"], "tagline": info["tagline"]})
     return out
+
+
+def shortcuts() -> List[Tuple[str, str]]:
+    """Raccourcis [(touches, action)] dans la langue de l'interface."""
+    return list(_data()[1])
+
+
+def cli_options(ctx: Dict[str, str]) -> List[Tuple[str, str]]:
+    """Options de la commande [(commande, description)] avec les espaces réservés remplacés."""
+    return [(c, _fill(d, ctx)) for c, d in _data()[2]]
 
 
 def _norm(s: str) -> str:
@@ -475,8 +586,8 @@ def _norm(s: str) -> str:
     return "".join(c for c in unicodedata.normalize("NFD", s.lower()) if unicodedata.category(c) != "Mn")
 
 
-def search(query: str, ctx: Dict[str, str]) -> List[Tuple[str, str, str]]:
-    """Entrées contenant tous les mots de la recherche (sans accents ni casse) : [(section, titre, texte)]."""
+def search_full(query: str, ctx: Dict[str, str]) -> List[Dict]:
+    """Entrées contenant tous les mots de la recherche (sans accents ni casse) : [{sid, section, title, body}]."""
     words = [w for w in re.split(r"\s+", _norm(query).strip()) if w]
     if not words:
         return []
@@ -485,8 +596,13 @@ def search(query: str, ctx: Dict[str, str]) -> List[Tuple[str, str, str]]:
         for title, body in s["items"]:
             blob = _norm(title + " " + body + " " + s["title"])
             if all(w in blob for w in words):
-                hits.append((s["title"], title, body))
+                hits.append({"sid": s["id"], "section": s["title"], "title": title, "body": body})
     return hits
+
+
+def search(query: str, ctx: Dict[str, str]) -> List[Tuple[str, str, str]]:
+    """Entrées contenant tous les mots de la recherche (sans accents ni casse) : [(section, titre, texte)]."""
+    return [(h["section"], h["title"], h["body"]) for h in search_full(query, ctx)]
 
 
 def full_text(ctx: Dict[str, str]) -> str:

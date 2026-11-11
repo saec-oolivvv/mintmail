@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.14.0
+- Aide intégrée entièrement refondue : page d'accueil (démarrage en 4 étapes, astuce du jour, cartes vers chaque section), navigation avec icônes, sections illustrées avec accroche, touches de clavier, noms d'écrans en gras, encadrés d'astuces, commandes en blocs, raccourcis en tableau de touches
+- Recherche dans l'aide : résultats en cartes, extrait surligné et bouton « Ouvrir la section »
+- Style de l'aide adapté aux trois styles (Aurora, Papier, Terminal), en clair comme en sombre
+
 ## 1.13.3
 - Épingles enregistrées SUR LA BOÎTE (mot-clé IMAP) : visibles sur vos autres postes ; vérification au premier essai et avertissement pour les serveurs qui refusent (Gmail, Outlook.com) ; anciennes épingles envoyées une fois ; commande « Envoyer mes épingles vers la boîte »
 - Script de mise à jour du dépôt depuis un correctif (tools/mintmail-maj.sh) : ignore les fichiers non suivis, n'enregistre que ce que le correctif touche, choisit la version la plus haute ; la publication n'est plus bloquée par des fichiers à la racine du dépôt

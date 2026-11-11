@@ -120,7 +120,7 @@
   "settings_extra.py"
  ],
  "%d résultat%s pour « %s »": [
-  "settings_extra.py"
+  "help_view.py"
  ],
  "%d sélectionné%s": [
   "listing.py"
@@ -222,6 +222,9 @@
  "Accepté": [
   "ical.py"
  ],
+ "Accueil": [
+  "help_view.py"
+ ],
  "Active — appareil %s — %d pair(s)": [
   "p2p.py"
  ],
@@ -321,7 +324,7 @@
   "window.py"
  ],
  "Aide — %s %s": [
-  "settings_extra.py"
+  "help_view.py"
  ],
  "Ajout à Google Agenda…": [
   "extras.py"
@@ -447,6 +450,9 @@
  "Assistant IA — non configuré (Ctrl+J)": [
   "ai_features.py"
  ],
+ "Astuce du jour": [
+  "help_view.py"
+ ],
  "Aucun compte Gmail (OAuth).": [
   "settings_more.py"
  ],
@@ -487,7 +493,7 @@
   "listing.py"
  ],
  "Aucun résultat : essayez un autre mot (sans accent, une partie de mot suffit).": [
-  "settings_extra.py"
+  "help_view.py"
  ],
  "Aucune action": [
   "widgets.py"
@@ -549,6 +555,9 @@
  "Autre (manuel)": [
   "settings.py"
  ],
+ "Autre astuce": [
+  "help_view.py"
+ ],
  "Autre service compatible OpenAI": [
   "ai_service.py"
  ],
@@ -575,6 +584,9 @@
  ],
  "Basculer thème clair / sombre": [
   "window.py"
+ ],
+ "Bien démarrer en 4 étapes": [
+  "help_view.py"
  ],
  "Bloquer %s": [
   "listing.py"
@@ -1890,9 +1902,6 @@
  "Optionnel : les invitations acceptées et les rendez-vous détectés par l'IA sont ajoutés directement à ce calendrier CalDAV (Nextcloud, Radicale, Fastmail, iCloud…). Sans CalDAV, MintMail ouvre le fichier .ics dans l'agenda de votre système (Thunderbird, GNOME Agenda…). Les réponses aux invitations (accepter / refuser) sont toujours envoyées par e-mail.": [
   "settings_more.py"
  ],
- "Options de la commande mintmail": [
-  "settings_extra.py"
- ],
  "Opération en cours…": [
   "updates_ui.py"
  ],
@@ -1922,6 +1931,9 @@
  ],
  "Ouvrir la page Aujourd'hui au lancement": [
   "settings.py"
+ ],
+ "Ouvrir la section": [
+  "help_view.py"
  ],
  "Ouvrir le message d'origine": [
   "extras.py"
@@ -1969,6 +1981,9 @@
  ],
  "Paramètres de MintMail": [
   "window.py"
+ ],
+ "Parcourir l'aide": [
+  "help_view.py"
  ],
  "Pare-feu : autoriser UDP 54321 et TCP 54322 entre les machines (ex. sudo ufw allow from 192.168.1.0/24 to any port 54322 proto tcp). Les échanges sont chiffrés et authentifiés par le code de jumelage.": [
   "settings_extra.py"
@@ -2055,6 +2070,9 @@
  "Raccourcis": [
   "settings.py"
  ],
+ "Raccourcis essentiels": [
+  "help_view.py"
+ ],
  "Ranger": [
   "ai_features.py"
  ],
@@ -2093,7 +2111,7 @@
   "updates_ui.py"
  ],
  "Rechercher dans l'aide (ex. OAuth, spam, hors ligne, raccourcis)": [
-  "settings_extra.py"
+  "help_view.py"
  ],
  "Rechercher les mises à jour": [
   "window.py"
@@ -2553,8 +2571,8 @@
  "Tous les comptes": [
   "folders.py"
  ],
- "Tous les raccourcis clavier": [
-  "settings_extra.py"
+ "Tous les raccourcis →": [
+  "help_view.py"
  ],
  "Tout": [
   "window.py"

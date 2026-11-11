@@ -1,4 +1,4 @@
-# Aide de MintMail 1.13.1
+# Aide de MintMail 1.13.3
 _Généré par `make docs` depuis l'aide intégrée (touche F1 dans l'application)._
 
 ## Premiers pas
@@ -32,7 +32,8 @@ Sans compte configuré, MintMail affiche des messages d'exemple pour essayer l'i
 • Liste des messages au centre, lecteur à droite. Les séparateurs se déplacent à la souris et la position est retenue.  
 • Un clic ouvre toujours le message. Le mode sélection (touche X ou bouton) affiche des cases à cocher pour agir sur plusieurs messages.  
 • Menu ☰ : palette de commandes, paramètres (aussi en fenêtre séparée), clair / sombre, tout marquer comme lu, journal d'erreurs, à propos.  
-• Fenêtre étroite : la barre latérale se replie et le lecteur passe en pleine largeur (bouton Retour). F11 : plein écran.
+• Fenêtre étroite : la barre latérale se replie et le lecteur passe en pleine largeur (bouton Retour). F11 : plein écran.  
+Astuce : Ctrl+K ouvre la palette de commandes ; tapez quelques lettres pour trouver n'importe quelle action.
 
 ### Disposition de la liste et du lecteur
 
@@ -72,11 +73,13 @@ Ctrl+F ou / : la recherche est instantanée sur l'objet, l'expéditeur, les dest
 Opérateurs combinables : from:marie · is:unread · is:starred · has:attachment (ex. « from:marie facture is:unread »).  
 • « 🔎 Chercher aussi sur le serveur » (sous la recherche, ou palette) interroge tout le serveur, même les messages jamais téléchargés, et ajoute les résultats à la liste.  
 • Recherche en langage naturel : commencez par « ? » (ex. « ? les mails non lus de Marie cette semaine ») — l'IA traduit votre phrase en critères.  
-• « Enregistrer la recherche » en fait une vue permanente dans la barre latérale.
+• « Enregistrer la recherche » en fait une vue permanente dans la barre latérale.  
+Astuce : commencez la recherche par ? pour poser une question à l'IA (par exemple « ? factures de mars »).
 
 ### Actions sur plusieurs messages
 
-Mode sélection (X) → cochez ou Ctrl+A, puis archiver (E), supprimer, marquer, déplacer (V), spam (!)… Une barre d'actions groupées s'affiche. Les actions sont instantanées ; un bandeau « Annuler » reste disponible quelques secondes.
+Mode sélection (X) → cochez ou Ctrl+A, puis archiver (E), supprimer, marquer, déplacer (V), spam (!)… Une barre d'actions groupées s'affiche. Les actions sont instantanées ; un bandeau « Annuler » reste disponible quelques secondes.  
+Astuce : X active le mode sélection, Ctrl+A sélectionne tout.
 
 ### Gestes de balayage (swipe)
 
@@ -479,7 +482,7 @@ Mise à jour : sudo apt install ./mintmail_X.Y.Z_all.deb (vos réglages et votre
 
 ## À propos et crédits
 
-### MintMail 1.13.1
+### MintMail 1.13.3
 
 Le client mail pour Linux Mint dont l'IA est l'ADN : il lit, trie, résume, classe, rédige et agit avec vous — toujours avec votre accord.  
 Développé par SAEC — https://saec.me · Logiciel libre sous licence MIT (© 2026 SAEC) : vous pouvez l'utiliser, le modifier et le redistribuer. Application GTK3 / Python, sans service cloud imposé : vos mails, vos clés et vos réglages restent chez vous.

@@ -152,6 +152,42 @@ button.ai-btn:hover { opacity: 0.9; }
 .ai-text { font-size: 14px; }
 .ai-warn { background: rgba(239,68,68,0.14); border: 1px solid #ef4444; color: #ef4444; border-radius: %(rs)dpx; padding: 6px 10px; }
 .digest-card { background: %(card)s; border: 1px solid @ai1; border-radius: %(r)dpx; margin: 6px 12px 4px 12px; padding: 10px 14px; }
+.help-top { padding: 14px 18px 6px 18px; }
+.help-title { font-size: 20px; font-weight: 800; }
+.help-search { border-radius: %(rp)dpx; padding: 9px 16px; font-size: 14px; }
+.help-nav { background: transparent; }
+.help-nav-row { border-radius: %(rs)dpx; margin: 2px 8px; }
+.help-nav-row:hover { background: %(hover)s; }
+.help-nav-row:selected, .help-nav-row:selected:hover { background: %(hover)s; border-left: 3px solid @accent; }
+.help-nav-icon { font-size: 17px; min-width: 24px; }
+.help-nav-title { font-weight: 600; }
+.help-nav-row:selected .help-nav-title { color: @accent; font-weight: 800; }
+.help-welcome { background: %(card)s; border: 1px solid @accent; border-radius: %(r)dpx; padding: 22px 26px; }
+.help-hero { background: %(card)s; border: 1px solid %(line)s; border-radius: %(r)dpx; padding: 18px 24px; }
+.help-hero-icon { font-size: 38px; }
+.help-hero-title { font-size: 24px; font-weight: 800; }
+.help-hero-sub { color: %(dim)s; font-size: 14px; }
+.help-section-title { font-size: 12px; font-weight: 800; letter-spacing: 1px; color: @accent; }
+.help-card { background: %(card)s; border: 1px solid %(line)s; border-radius: %(r)dpx; padding: 16px 20px; }
+.help-card-title { font-size: 16px; font-weight: 800; }
+.help-body { font-size: 14px; }
+.help-bullet-dot { color: @accent; font-weight: 800; }
+.help-tip { background: %(hover)s; border-left: 4px solid @ai1; border-radius: %(rs)dpx; padding: 9px 13px; }
+.help-warn { background: rgba(239,68,68,0.12); border-left: 4px solid #ef4444; border-radius: %(rs)dpx; padding: 9px 13px; }
+.help-code { font-family: monospace; font-size: 13px; background: %(hover)s; border: 1px solid %(line)s; border-radius: %(rs)dpx; padding: 6px 10px; }
+.help-key { font-family: monospace; font-size: 12px; font-weight: 800; background: %(hover)s; border: 1px solid %(line)s; border-bottom: 2px solid %(line)s;
+            border-radius: %(rs)dpx; padding: 2px 9px; }
+.help-step { background: %(card)s; border: 1px solid %(line)s; border-radius: %(r)dpx; padding: 12px 16px; }
+.help-step-num { background: @accent; color: %(on)s; border-radius: 999px; min-width: 28px; min-height: 28px; font-weight: 800; }
+.help-step-small { min-width: 22px; min-height: 22px; font-size: 12px; }
+.help-tile { background-image: none; background: %(card)s; border: 1px solid %(line)s; border-radius: %(r)dpx; padding: 14px 16px; box-shadow: none; }
+.help-tile:hover { border-color: @accent; }
+.help-tile-icon { font-size: 22px; }
+.help-tile-title { font-weight: 800; font-size: 15px; }
+.help-tile-sub { color: %(dim)s; font-size: 12px; }
+.help-chip { color: @accent; font-size: 11px; font-weight: 800; letter-spacing: 1px; }
+.help-tipday { background: %(hover)s; border: 1px dashed @ai1; border-radius: %(r)dpx; padding: 14px 18px; }
+.help-open { color: @accent; font-weight: 700; background-image: none; background: transparent; border: none; box-shadow: none; }
 .update-banner { background: %(card)s; border: 1px solid @accent; border-radius: %(r)dpx; margin: 10px 14px 0 14px; padding: 12px 16px; }
 .update-icon { color: @accent; font-size: 26px; font-weight: 800; }
 .update-title { font-size: 15px; font-weight: 800; }
@@ -223,10 +259,15 @@ window, .mm-root { font-size: 15px; }
 .ai-card, .digest-card { border-radius: 0; border-left: 4px solid @ai1; border-top: none; border-right: none; border-bottom: 1px solid %(line)s; }
 .update-banner { border-radius: 0; border-top: none; border-right: none; border-bottom: 1px solid %(line)s; border-left: 4px solid @accent; margin: 0 14px; }
 .update-title { font-family: %(head)s; font-size: 17px; }
+.help-welcome, .help-hero, .help-card, .help-step, .help-tile, .help-tipday { border-radius: 0; }
+.help-welcome, .help-hero { border-top: none; border-right: none; border-left: 4px solid @accent; }
+.help-hero-title, .help-card-title, .help-title { font-family: %(head)s; }
+.help-card-title { font-size: 18px; }
 .compose-btn { margin: 8px 14px 4px 14px; }
 """,
     "terminal": """
 window, .mm-root { font-size: 13px; }
+.help-title, .help-hero-title, .help-card-title, .help-section-title, .help-tile-title { font-family: monospace; }
 .msg-row { background: transparent; border: none; border-left: 2px solid %(line)s; border-radius: 0; margin: 1px 10px; }
 .msg-row:hover { background: %(hover)s; border-left-color: @accent; }
 .msg-row:selected, .msg-row:selected:hover { background: %(hover)s; border-left: 2px solid @accent; }
@@ -257,6 +298,14 @@ button.ai-btn { background-image: linear-gradient(to bottom right, @ai1, @ai2); 
 .update-banner button.update-install, .update-chip { background-image: linear-gradient(to bottom right, shade(@accent, 1.25), @accent);
                                                     box-shadow: 0 4px 14px alpha(@accent, 0.5); }
 .update-icon { text-shadow: 0 0 14px alpha(@accent, 0.8); }
+.help-welcome { background-image: linear-gradient(to bottom right, alpha(@accent, 0.22), alpha(@ai1, 0.14), alpha(@ai2, 0.10));
+                border-color: alpha(@accent, 0.6); box-shadow: 0 12px 34px alpha(@accent, 0.22); }
+.help-hero { background-image: linear-gradient(to right, alpha(@accent, 0.18), alpha(@ai1, 0.08)); border-color: alpha(@accent, 0.4); box-shadow: 0 8px 26px alpha(@accent, 0.16); }
+.help-card, .help-step { box-shadow: 0 4px 16px rgba(0, 0, 0, 0.16); }
+.help-tile:hover { box-shadow: 0 8px 24px alpha(@accent, 0.28); }
+.help-step-num { background-image: linear-gradient(to bottom right, shade(@accent, 1.25), @accent); box-shadow: 0 3px 10px alpha(@accent, 0.5); }
+.help-tipday { border-color: alpha(@ai1, 0.6); background-image: linear-gradient(to right, alpha(@ai1, 0.12), alpha(@ai2, 0.05)); }
+.help-nav-row:selected, .help-nav-row:selected:hover { background-image: linear-gradient(to right, alpha(@accent, 0.22), alpha(@accent, 0)); }
 .digest-card { background-image: linear-gradient(to bottom right, alpha(@ai1, 0.12), alpha(@ai2, 0.06));
                border-color: alpha(@ai1, 0.5); }
 .msg-row { box-shadow: 0 1px 2px rgba(0, 0, 0, 0.18); }
@@ -276,6 +325,7 @@ button.ai-btn { background-image: linear-gradient(to bottom right, @ai1, @ai2); 
     "papier": """
 .ai-card { background-image: none; }
 .update-banner button.update-install, .update-chip { box-shadow: 0 2px 0 shade(@accent, 0.75); }
+.help-step-num { box-shadow: 0 2px 0 shade(@accent, 0.75); }
 .compose-btn { box-shadow: 0 2px 0 shade(@accent, 0.75); }
 """,
     "terminal": """
@@ -284,6 +334,9 @@ button.ai-btn { background-image: linear-gradient(to bottom right, @ai1, @ai2); 
 .wm-dot { text-shadow: 0 0 8px alpha(@accent, 0.9); }
 .ai-card { box-shadow: 0 0 14px alpha(@ai1, 0.2); }
 .update-banner { box-shadow: 0 0 16px alpha(@accent, 0.35); }
+.help-welcome, .help-hero { box-shadow: 0 0 16px alpha(@accent, 0.30); }
+.help-step-num { box-shadow: 0 0 10px alpha(@accent, 0.6); }
+.help-tile:hover { box-shadow: 0 0 14px alpha(@accent, 0.4); }
 .update-banner button.update-install, .update-chip { box-shadow: 0 0 12px alpha(@accent, 0.5); }
 """,
 }
