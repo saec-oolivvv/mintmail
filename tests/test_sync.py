@@ -159,8 +159,9 @@ def test_two_engines_sync_automatically_and_encrypted():
         assert b.start() and a.start()
         # 1) AUCUN clic : le compte, sa signature, le mot de passe, la clé IA, les modèles arrivent seuls
         assert wait_for(lambda: cb["accounts"] and cb.password("acc1234") == "s3cret-pass"), "compte non synchronisé"
-        assert cb["accounts"][0]["signature_html"] == "<b>Moi</b>" and cb.password("ai:nvidia") == "nvapi-secret-key"
-        assert cb["templates"][-1]["name"] == "Merci" and cb["ai_model"] == "mon-modele" and cb["theme"] == "light"
+        assert wait_for(lambda: cb["accounts"][0]["signature_html"] == "<b>Moi</b>" and cb.password("ai:nvidia") == "nvapi-secret-key"
+                        and cb["templates"][-1]["name"] == "Merci" and cb["ai_model"] == "mon-modele" and cb["theme"] == "light"), \
+            "synchro incomplète : signature=%r modèles=%r ia=%r thème=%r" % (cb["accounts"][0]["signature_html"], [t["name"] for t in cb["templates"]], cb["ai_model"], cb["theme"])
         # 2) rien d'intelligible sur le réseau
         blob = b"".join(sent)
         for secret in (b"s3cret-pass", b"nvapi-secret", b"imap.exemple.be", b"moi@exemple.be", b"Merci"):

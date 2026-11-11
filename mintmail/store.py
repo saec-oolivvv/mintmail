@@ -162,6 +162,8 @@ class Config:
 
 def _keyring(op, *args, timeout=4):
     """Appelle le trousseau dans un thread : un trousseau verrouillé ne gèle plus l'interface."""
+    if os.environ.get("MINTMAIL_NO_KEYRING") == "1":      # tests : ne jamais toucher au trousseau réel de l'utilisateur
+        return None
     box = {}
 
     def run():

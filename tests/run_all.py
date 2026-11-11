@@ -8,6 +8,10 @@ import sys
 import traceback
 
 HERE = os.path.dirname(os.path.abspath(__file__))
+# Isolation TOTALE : les tests n'utilisent jamais le trousseau, le dossier personnel, les réglages ni le cache réels de la personne qui les lance.
+import tempfile
+os.environ["MINTMAIL_NO_KEYRING"] = "1"
+os.environ["HOME"] = os.environ["XDG_DATA_HOME"] = os.environ["XDG_CONFIG_HOME"] = tempfile.mkdtemp(prefix="mintmail-tests-")
 os.environ["MINTMAIL_LANG"] = os.environ.get("MINTMAIL_TEST_LANG", "fr")   # les tests attendent le français ; les tests anglais fixent leur propre langue
 sys.path.insert(0, HERE)
 sys.path.insert(0, os.path.dirname(HERE))

@@ -3,6 +3,8 @@ import os, sys, tempfile, types, time
 tmp = tempfile.mkdtemp()
 os.environ["XDG_DATA_HOME"] = tmp
 os.environ["XDG_CONFIG_HOME"] = tmp
+os.environ["MINTMAIL_NO_KEYRING"] = "1"       # les tests ne touchent JAMAIS au trousseau réel (clés d'API, mots de passe de l'utilisateur)
+os.environ["HOME"] = tmp                      # ni à son dossier personnel
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 

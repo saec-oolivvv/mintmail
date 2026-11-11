@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.12.1
+- Correctif des tests : ils n'utilisent plus jamais le trousseau, le dossier personnel ni les réglages réels (sur une machine avec trousseau, la batterie écrasait la clé d'API enregistrée) ; la variable MINTMAIL_NO_KEYRING=1 désactive l'accès au trousseau
+- Test de synchronisation plus robuste (attend la fin de l'échange et affiche les valeurs reçues en cas d'échec)
+
 ## 1.12.0
 - Nouvelles langues de l'interface : néerlandais, allemand et espagnol (traduction par IA, non relue par des locuteurs natifs : signalez les défauts) ; l'aide intégrée (F1) retombe sur l'anglais pour ces langues
 
