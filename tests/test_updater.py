@@ -1054,3 +1054,84 @@ def test_open_today_at_launch_is_an_off_by_default_option_wired_from_the_setting
     assert "self.open_today_at_start()" in src and src.index("self._init_updates()") < src.index("self.open_today_at_start()")
     st = open(os.path.join(ROOT, "mintmail", "settings.py"), encoding="utf-8").read()
     assert 'open_today_on_start' in st and "Ouvrir la page Aujourd'hui au lancement" in st
+
+
+# ======================================================================= 1.13.3 : recherche à CHAQUE démarrage
+def test_the_check_runs_at_every_launch_even_if_one_was_made_minutes_ago_and_a_release_published_meanwhile_shows_the_banner():
+    import time
+    seen = []
+    sv = with_patches(check=lambda repo, etag="": (seen.append(etag), avail("1.99.0"))[1])
+    scheduled = []
+    old_timer = UI.GLib.timeout_add_seconds
+    UI.GLib.timeout_add_seconds = lambda secs, fn: scheduled.append((secs, fn)) or 1
+    try:
+        # le scénario signalé : « Vérifier maintenant » ce matin (à jour), puis publication, puis relance
+        w = make_win(banner=True, update_last_check=time.time() - 60, update_etag='W/"abc"')
+        w._init_updates()
+        assert [s for s, _ in scheduled] == [8, 3600]                                                         # démarrage + minuterie horaire
+        scheduled[1][1]()                                                                                      # la minuterie horaire respecte la règle « due » : vérifié il y a 1 min → rien
+        assert seen == [] and w.update_banner.state == "hidden"
+        scheduled[0][1]()                                                                                      # le démarrage, lui, cherche TOUJOURS
+        assert seen == ['W/"abc"'] and w.update_banner.log[-1][:2] == ("available", "1.99.0") and w.update_chip.visible    # requête conditionnelle (ETag) + bandeau
+        assert w.config["update_available"]["version"] == "1.99.0"
+        # désactivée dans les réglages : même au démarrage, aucun accès réseau
+        seen.clear()
+        w2 = make_win(banner=True, update_check=False)
+        scheduled.clear()
+        w2._init_updates()
+        scheduled[0][1]()
+        assert seen == [] and w2.update_banner.log == [("hide",)] or seen == []
+        # sans mise à jour connue l'ETag est envoyé ; AVEC une mise à jour déjà connue on le retire pour recevoir son contenu complet
+        w3 = make_win(banner=True, update_etag='W/"xyz"')
+        w3._update = avail("1.99.0").update
+        w3.check_updates(startup=True)
+        assert seen[-1] == ""
+    finally:
+        UI.GLib.timeout_add_seconds = old_timer
+        restore(sv)
+
+
+def test_the_periodic_interval_is_six_hours_and_the_texts_say_so():
+    import time
+    assert U.CHECK_INTERVAL == 6 * 3600
+    now = time.time()
+    assert not U.due(now, now - 3600) and not U.due(now, now - 5 * 3600) and U.due(now, now - 6 * 3600 - 1) and U.due(now, 0) and U.due(now, now + 7200)
+    docs = open(os.path.join(ROOT, "docs", "UPDATES.md"), encoding="utf-8").read()
+    assert "chaque** démarrage" in docs and "6 heures" in docs and "une fois par jour" not in docs
+    src = open(os.path.join(ROOT, "mintmail", "updates_ui.py"), encoding="utf-8").read()
+    assert "Rechercher automatiquement (au démarrage, puis toutes les 6 heures)" in src and "une fois par jour\")" not in src
+
+
+def test_check_update_cli_says_why_the_banner_is_or_is_not_shown():
+    import time
+    from mintmail import entry
+    from mintmail.store import Config
+    srv, base = start_server()
+    cfg = Config()
+    keys = ("update_available", "update_snooze_until", "update_snooze_version")
+    saved = {k: cfg.get(k) for k in keys}
+
+    def line():
+        lines = []
+        entry.check_update_cli(api=base, allow_loopback=True, out=lines.append)
+        return [l for l in lines if "Bandeau" in l or "banner" in l.lower()][0]
+    try:
+        Gh.status, Gh.redirect_to, Gh.release = 200, None, release(base, "0.0.1")
+        cfg["update_available"], cfg["update_snooze_until"], cfg["update_snooze_version"] = None, 0, ""
+        cfg.save()
+        assert "aucune mise à jour mémorisée" in line()
+        cfg["update_available"] = U.update_to_dict(avail("99.0.0").update)
+        cfg.save()
+        assert "99.0.0" in line() and "s'affiche au lancement" in line()
+        cfg["update_snooze_version"], cfg["update_snooze_until"] = "99.0.0", time.time() + 3600
+        cfg.save()
+        assert "repoussée jusqu'à" in line() and "99.0.0" in line()
+        cfg["update_available"] = dict(U.update_to_dict(avail("99.0.0").update), deb_url="https://evil.example/x.deb")      # état falsifié : pas de bandeau, et le diagnostic le dit
+        cfg.save()
+        assert "aucune mise à jour mémorisée" in line()
+    finally:
+        for k, v in saved.items():
+            cfg[k] = v
+        cfg.save()
+        Gh.status = 200
+        srv.shutdown()

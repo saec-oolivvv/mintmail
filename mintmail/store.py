@@ -59,7 +59,7 @@ DEFAULTS = {
     "density": "comfortable", "load_images": False, "notifications": True,
     "refresh_minutes": 5, "undo_seconds": 6, "width": 1280, "height": 800,
     "folders": {}, "collapsed_folders": [], "style": "aurora", "design_v2": False,
-    "ui_lang": "auto", "update_check": True, "update_repo": "saec-oolivvv/mintmail", "update_last_check": 0, "update_etag": "", "update_seen": "", "update_available": None, "update_snooze_until": 0, "update_snooze_version": "", "update_last_result": "", "open_today_on_start": False, "threads": True, "tasks": [], "ai_prepare_drafts": False, "gcal": {}, "ai_provider": "nvidia", "oauth_clients": {}, "caldav": {}, "identities": [], "contacts": {},
+    "ui_lang": "auto", "update_check": True, "update_repo": "saec-oolivvv/mintmail", "update_last_check": 0, "update_etag": "", "update_seen": "", "update_available": None, "update_snooze_until": 0, "update_snooze_version": "", "update_last_result": "", "open_today_on_start": False, "pins_pushed": [], "threads": True, "tasks": [], "ai_prepare_drafts": False, "gcal": {}, "ai_provider": "nvidia", "oauth_clients": {}, "caldav": {}, "identities": [], "contacts": {},
     "last_view": "inbox", "layout": "columns", "pos_cols": 420, "pos_bottom": 300,
     "side_width": 230, "zoom": 1.0,
     "swipe": {"right": "archive", "right_long": "trash", "left": "snooze", "left_long": "read"},
@@ -314,6 +314,13 @@ class Cache:
         with self.lock:
             r = self.db.execute(self._SEL % ("COALESCE(meta,data)", "1") + "WHERE id=?", (mid,)).fetchone()
         return self._build(*r[:7], light=True) if r else None
+
+    def pinned_messages(self, account=None):
+        """Messages épinglés (légers) d'un compte ou de tous : sert à envoyer vers la boîte les épingles faites avant la 1.13.2."""
+        sql = self._SEL % ("COALESCE(meta,data)", "1") + "WHERE pinned=1 AND uid>0" + (" AND account=?" if account else "")
+        with self.lock:
+            rows = self.db.execute(sql, (account,) if account else ()).fetchall()
+        return [self._build(*r[:7], light=True) for r in rows]
 
     def update(self, mid, **fields):
         self.update_many([mid], **fields)

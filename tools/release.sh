@@ -22,7 +22,10 @@ VERSION="$(cat VERSION)"
 [ -f data/update-pubkey.pem ] || { echo "data/update-pubkey.pem absente : lancez d'abord tools/make-signing-key.sh (puis git add / git commit)"; exit 1; }
 [ -f "$KEY" ] || { echo "Clé de signature introuvable : $KEY"; exit 1; }
 git ls-files --error-unmatch data/update-pubkey.pem >/dev/null 2>&1 || { echo "data/update-pubkey.pem n'est pas enregistrée dans git : git add data/update-pubkey.pem && git commit"; exit 1; }
-[ -z "$(git status --porcelain)" ] || { echo "Le dépôt contient des modifications non enregistrées : faites d'abord un git commit."; exit 1; }
+[ -z "$(git status --porcelain --untracked-files=no)" ] || { echo "Le dépôt contient des modifications non enregistrées : faites d'abord un git commit."; git status --short --untracked-files=no; exit 1; }
+# Des fichiers à la racine (un .patch, un script, des notes) ne sont pas livrés : ils ne bloquent pas. Mais le paquet embarque ces dossiers tels qu'ils sont sur le disque.
+STRAY="$(git ls-files --others --exclude-standard -- mintmail data docs packaging)"
+[ -z "$STRAY" ] || { echo "Fichiers non suivis dans un dossier embarqué dans le paquet (ils seraient livrés) : ajoutez-les (git add) ou retirez-les :"; echo "$STRAY"; exit 1; }
 if git rev-parse "v$VERSION" >/dev/null 2>&1; then
     echo "L'étiquette v$VERSION existe déjà : changez le numéro de version (tools/bump-version.sh X.Y.Z)."
     exit 1
@@ -42,4 +45,4 @@ NOTES="$(awk -v v="$VERSION" '$0 == "## " v {on=1; next} /^## / {on=0} on && /^-
 git tag -a "v$VERSION" -m "MintMail $VERSION"
 git push origin HEAD "v$VERSION"
 gh release create "v$VERSION" "$DEB" "$DEB.sig" dist/SHA256SUMS --title "MintMail $VERSION" --notes "$NOTES"
-echo "Publié : v$VERSION. Les MintMail installés la proposeront d'ici 24 h (ou tout de suite via « Rechercher les mises à jour »)."
+echo "Publié : v$VERSION. Les MintMail installés la proposeront à leur prochain démarrage (ou tout de suite via « Rechercher les mises à jour »)."

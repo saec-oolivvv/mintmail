@@ -97,7 +97,9 @@ SECTIONS: List[Dict] = [
          "• Créer, renommer, supprimer un dossier ou un sous-dossier : clic droit sur un dossier ou un compte.\n"
          "• Les dossiers spéciaux (Envoyés, Brouillons, Archives, Spam, Corbeille) sont reconnus quelle que soit la langue du serveur."),
         ("Favoris, épingles, reports, relances",
-         "• Favori (S) : étoile synchronisée avec le serveur. Épingle (P) : garde le message en haut de la liste.\n"
+         "• Favori (S) : étoile synchronisée avec le serveur. Épingle (P) : garde le message en haut de la liste ; elle est AUSSI enregistrée sur la boîte (mot-clé IMAP), donc visible sur vos autres postes à leur prochaine synchronisation. "
+         "Certains serveurs (Gmail, Outlook.com) refusent ce mot-clé : MintMail le vérifie au premier essai et vous prévient, l'épingle reste alors sur ce poste seulement. "
+         "Palette → « Envoyer mes épingles vers la boîte » envoie celles faites avant la 1.13.2.\n"
          "• Reporter (H = demain 8 h, ou clic droit → Reporter) : le message disparaît puis revient en haut de la boîte à l'heure choisie "
          "(plus tard aujourd'hui, demain, ce week-end, lundi, la semaine prochaine…).\n"
          "• « Me rappeler si pas de réponse » (menu ⋯ du lecteur ou clic droit) : MintMail vous prévient si le destinataire n'a pas répondu après 3 jours."),

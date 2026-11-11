@@ -131,6 +131,9 @@
  "%d élément(s) reçu(s) — %s": [
   "settings_extra.py"
  ],
+ "%d épingle(s) envoyée(s) vers la boîte : les autres postes les verront.": [
+  "window.py"
+ ],
  "%s\n\nDétails : %s\nDiagnostic : /usr/bin/mintmail --diagnose\n\nSi le problème vient de vos données, vous pouvez les mettre de côté (rien n'est supprimé) et relancer.": [
   "app.py"
  ],
@@ -465,6 +468,9 @@
  "Aucun message à classer ici.": [
   "ai_features.py"
  ],
+ "Aucun message épinglé à envoyer.": [
+  "window.py"
+ ],
  "Aucun modèle (voir Paramètres)": [
   "compose.py"
  ],
@@ -548,6 +554,9 @@
  ],
  "Aérée": [
   "settings.py"
+ ],
+ "Bandeau de mise à jour : %s": [
+  "entry.py"
  ],
  "Barre latérale : réduire / étendre": [
   "window.py"
@@ -644,6 +653,9 @@
  ],
  "Ce que ça apporte : les invitations acceptées et les rendez-vous détectés par l'IA arrivent directement dans Google Agenda (sans doublon) ; « Agenda » dans la palette affiche vos 14 prochains jours et permet de créer un événement ; à la réception d'une invitation, MintMail prévient si le créneau est déjà pris.\n\nMise en place (une seule fois) :\n1. Connectez d'abord votre compte Gmail avec le fournisseur « OAuth » (Paramètres → Comptes).\n2. Console Google Cloud (le même projet que pour Gmail) → API et services → Bibliothèque → « Google Calendar API » → Activer.\n3. Ici : « Autoriser Google Agenda » (une page Google s'ouvre ; l'autorisation « calendar.events » est AJOUTÉE à celle de Gmail).\nImportant : tant que l'écran de consentement est en mode « Test », Google fait expirer le jeton au bout de 7 jours (il faut alors ré-autoriser). Pour un usage personnel durable, passez l'application en « En production » (écran « application non validée » à accepter une fois ; jusqu'à 100 utilisateurs).": [
   "settings_more.py"
+ ],
+ "Ce serveur ne mémorise pas les épingles (Gmail, Outlook.com… refusent les mots-clés personnalisés) : l'épingle reste sur ce poste seulement.": [
+  "backend.py"
  ],
  "Ce week-end (samedi 9 h)": [
   "window.py"
@@ -1150,6 +1162,9 @@
  ],
  "Envoyer maintenant": [
   "extras.py"
+ ],
+ "Envoyer mes épingles vers la boîte": [
+  "window.py"
  ],
  "Envoyer plus tard": [
   "compose.py"
@@ -2074,7 +2089,7 @@
   "settings.py",
   "window.py"
  ],
- "Rechercher automatiquement (une fois par jour)": [
+ "Rechercher automatiquement (au démarrage, puis toutes les 6 heures)": [
   "updates_ui.py"
  ],
  "Rechercher dans l'aide (ex. OAuth, spam, hors ligne, raccourcis)": [
@@ -2725,6 +2740,9 @@
  "aucune machine vue": [
   "p2p.py"
  ],
+ "aucune mise à jour mémorisée": [
+  "entry.py"
+ ],
  "aujourd'hui": [
   "tasks.py"
  ],
@@ -3025,6 +3043,12 @@
  ],
  "vendredi": [
   "slots.py"
+ ],
+ "version %s mémorisée : le bandeau s'affiche au lancement": [
+  "entry.py"
+ ],
+ "version %s mémorisée, repoussée jusqu'à %s": [
+  "entry.py"
  ],
  "version en cours d'exécution": [
   "entry.py"

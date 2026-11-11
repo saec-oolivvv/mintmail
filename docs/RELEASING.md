@@ -11,6 +11,20 @@ et une Release GitHub **signée**. MintMail compare son numéro à celui de la d
 
 > **Clé de signature** : sauvegarde (`tools/backup-signing-key.sh`), perte, vol et rotation sans réinstallation : [KEY-RECOVERY.md](KEY-RECOVERY.md).
 
+## Mettre à jour le dépôt depuis un correctif (`tools/mintmail-maj.sh`)
+
+Quand une nouvelle version est livrée sous forme de fichier `mintmail-X.Y.Z….patch`, un seul script fait toute la procédure :
+
+```
+sh tools/mintmail-maj.sh --dry-run     # vérifie tout sans rien modifier
+sh tools/mintmail-maj.sh               # trouve le bon correctif (Téléchargements…), l'applique, change la version, complète le journal, enregistre, publie
+```
+
+- Il lit l'en-tête du correctif (`# mintmail-patch`, `# version:`, `# base:` = versions auxquelles il s'applique, `# note:` = lignes du journal des changements) et choisit **le bon fichier d'après votre version actuelle**, pas d'après son nom.
+- Il refuse un dépôt non propre, un correctif prévu pour une autre version, un GitHub en avance sur votre dépôt ; il reconnaît un correctif déjà appliqué.
+- Si une étape échoue **avant l'enregistrement**, tout est annulé (le dépôt revient exactement à son état d'avant). Si la publication échoue, votre code reste enregistré : corrigez la cause puis `tools/release.sh`.
+- Un `.patch` oublié dans le dépôt est rangé dans Téléchargements (il n'entre jamais dans un commit). Options : `--no-release`, `--yes`, `--repo DOSSIER`, `--version X.Y.Z --note "…"` (correctif sans en-tête).
+
 ## Étapes
 
 ```

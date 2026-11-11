@@ -1,4 +1,4 @@
-"""Interface des mises à jour : recherche automatique (une fois par jour), bandeau d'annonce visible dès le lancement, installation en un clic."""
+"""Interface des mises à jour : recherche automatique (à chaque démarrage puis toutes les 6 h), bandeau d'annonce visible dès le lancement, installation en un clic."""
 import os
 import subprocess
 import time
@@ -158,8 +158,8 @@ class UpdateMixin:
         self._update_busy = False
         self._update_views = []          # fonctions à rappeler quand l'état change (page de réglages ouverte)
         self._restore_update()           # une mise à jour déjà connue s'affiche TOUT DE SUITE, sans attendre le réseau
-        GLib.timeout_add_seconds(8, lambda: (self.check_updates(), False)[1])          # 8 s après le démarrage (au plus une fois par jour)
-        GLib.timeout_add_seconds(3600, lambda: (self.check_updates(), True)[1])        # puis chaque heure : GitHub n'est contacté qu'une fois par jour
+        GLib.timeout_add_seconds(8, lambda: (self.check_updates(startup=True), False)[1])      # 8 s après CHAQUE démarrage (même si une vérification date de ce matin)
+        GLib.timeout_add_seconds(3600, lambda: (self.check_updates(), True)[1])                # puis toutes les 6 h (le test est horaire, la règle « due » décide)
 
     def _restore_update(self):
         cfg = self.config
@@ -228,11 +228,15 @@ class UpdateMixin:
         if up is not None and up.page:
             open_uri(self, up.page)
 
-    def check_updates(self, manual=False):
+    def check_updates(self, manual=False, startup=False):
+        """manual : demande explicite. startup : première recherche après le lancement, faite À CHAQUE FOIS (sinon une version publiée après la
+        dernière vérification n'était annoncée que le lendemain). Dans tous les cas automatiques, le réglage « rechercher automatiquement » est respecté."""
         cfg = self.config
         if self._update_busy:
             return
-        if not manual and not (cfg.get("update_check", True) and updater.due(time.time(), cfg.get("update_last_check", 0))):
+        if not manual and not cfg.get("update_check", True):
+            return
+        if not manual and not startup and not updater.due(time.time(), cfg.get("update_last_check", 0)):
             return
         self._update_busy = True
         repo = cfg.get("update_repo") or updater.DEFAULT_REPO
@@ -411,7 +415,7 @@ def updates_page(win):
     auto.set_active(bool(cfg.get("update_check", True)))
     auto.set_halign(Gtk.Align.START)
     auto.connect("notify::active", lambda s, _p: (cfg.__setitem__("update_check", s.get_active()), cfg.save()))
-    grid.attach(Gtk.Label(label=tr("Rechercher automatiquement (une fois par jour)"), xalign=1), 0, 2, 1, 1)
+    grid.attach(Gtk.Label(label=tr("Rechercher automatiquement (au démarrage, puis toutes les 6 heures)"), xalign=1), 0, 2, 1, 1)
     grid.attach(auto, 1, 2, 1, 1)
     repo = Gtk.Entry(text=cfg.get("update_repo") or updater.DEFAULT_REPO)
     repo.set_width_chars(34)

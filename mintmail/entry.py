@@ -204,6 +204,15 @@ def check_update_cli(api=None, allow_loopback=False, out=print) -> int:
     ok, why = updater.can_install()
     out(tr("Installation automatique : prête (clé de vérification présente).") if ok else
         tr("Installation automatique désactivée : %s Vous serez seulement informé des nouvelles versions.") % explain(why))
+    stored = updater.update_from_dict(cfg.get("update_available"), __version__)
+    until = float(cfg.get("update_snooze_until") or 0)
+    if stored is None:
+        banner = tr("aucune mise à jour mémorisée")
+    elif cfg.get("update_snooze_version") == stored.version and time.time() < until:
+        banner = tr("version %s mémorisée, repoussée jusqu'à %s") % (stored.version, time.strftime("%Y-%m-%d %H:%M", time.localtime(until)))
+    else:
+        banner = tr("version %s mémorisée : le bandeau s'affiche au lancement") % stored.version
+    out(tr("Bandeau de mise à jour : %s") % banner)
     last = cfg.get("update_last_check", 0)
     if last:
         out(tr("Dernière vérification enregistrée : %s") % time.strftime("%Y-%m-%d %H:%M", time.localtime(last)))

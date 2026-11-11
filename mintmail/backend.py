@@ -198,7 +198,7 @@ def parse_message(raw, account, logical, real_folder, uid, flags):
         subject=subject, date=ts, snippet=re.sub(r"\s+", " ", text_body)[:160].strip(),
         text=text_body, html=html_body,
         unread=("\\seen" not in flags) and logical != "drafts",
-        starred="\\flagged" in flags, category=classify(addr, em), attachments=atts,
+        starred="\\flagged" in flags, pinned=PIN_KEYWORD_LOW in flags, category=classify(addr, em), attachments=atts,
         message_id=message_id, references=references, unsubscribe=str(em.get("List-Unsubscribe", "") or ""),
         unsub_post="one-click" in str(em.get("List-Unsubscribe-Post", "") or "").lower(),
         thread_id=thread_key(message_id, references, subject), invite=invite)
@@ -230,6 +230,18 @@ def build_imap_search(text):
     return args or ["ALL"]
 
 
+PIN_KEYWORD = "$MintMailPinned"          # mot-clé IMAP (insensible à la casse) : l'épingle est enregistrée SUR LA BOÎTE, comme le favori (\Flagged)
+PIN_KEYWORD_LOW = PIN_KEYWORD.lower()
+
+
+class PinUnsupported(Exception):
+    """Le serveur n'a pas conservé le mot-clé d'épingle (Gmail, Outlook.com… n'acceptent pas les mots-clés personnalisés)."""
+    retryable = False
+
+    def __init__(self):
+        super().__init__(tr("Ce serveur ne mémorise pas les épingles (Gmail, Outlook.com… refusent les mots-clés personnalisés) : l'épingle reste sur ce poste seulement."))
+
+
 UID_RE = re.compile(rb"UID (\d+)")
 FLAGS_RE = re.compile(rb"FLAGS \(([^)]*)\)")
 
@@ -255,6 +267,7 @@ class IMAPBackend:
         self._folders_cache = None
         self._conns = {"sync": _Conn(), "act": _Conn(), "meta": _Conn()}
         self._tree_cache = None
+        self._pin_dirty = False
 
     # -- connexion
     def _connect(self):
@@ -460,6 +473,7 @@ class IMAPBackend:
             window = uids[-limit:]
             flags = {}
             old = [u for u in window if u in known]
+            proven = self.acc.get("pin_server") is True            # capacité connue AVANT cette lecture : seule elle autorise à désépingler à distance
             for chunk in _chunks(old, 100):
                 typ, d = imap.uid("FETCH", ",".join(map(str, chunk)), "(UID FLAGS)")
                 for item in d or []:
@@ -467,11 +481,15 @@ class IMAPBackend:
                         mu = UID_RE.search(item)
                         if mu:
                             fl = _flagset(item)
-                            flags[int(mu.group(1))] = ("\\seen" not in fl, "\\flagged" in fl)
+                            if PIN_KEYWORD_LOW in fl:
+                                self._pin_state(True)
+                            flags[int(mu.group(1))] = ("\\seen" not in fl, "\\flagged" in fl, True if PIN_KEYWORD_LOW in fl else (False if proven else None))
             msgs = []
             new = sorted((u for u in window if u not in known), reverse=True)
             for chunk in _chunks(new, 10):
                 batch = self._fetch_batch(imap, chunk, logical, real)
+                if any(m.pinned for m in batch):
+                    self._pin_state(True)                         # une épingle vue sur la boîte : ce serveur sait les garder
                 msgs += batch
                 if on_batch and batch:
                     on_batch(batch)
@@ -518,16 +536,29 @@ class IMAPBackend:
             return found
         return self._run("sync", fn)
 
-    def set_flags(self, msg, seen=None, flagged=None):
-        self.set_flags_many([msg], seen, flagged)
+    def _pin_state(self, ok):
+        """Mémorise (dans le compte, localement) si ce serveur garde les épingles ; `_pin_dirty` demande à la fenêtre d'enregistrer."""
+        if self.acc.get("pin_server") is not ok:
+            self.acc["pin_server"] = ok
+            self._pin_dirty = True
 
-    def set_flags_many(self, msgs, seen=None, flagged=None):
+    def set_flags(self, msg, seen=None, flagged=None, pinned=None):
+        self.set_flags_many([msg], seen, flagged, pinned)
+
+    def set_flags_many(self, msgs, seen=None, flagged=None, pinned=None, probe=False):
+        """pinned : épingle = mot-clé IMAP. Au premier essai, la relecture PROUVE que le serveur l'a gardé ; sinon PinUnsupported (rien n'est affirmé à tort).
+        probe=True : refait l'essai même si le serveur avait déjà été jugé incapable (commande « Envoyer mes épingles vers la boîte »)."""
         by = {}
         for m in msgs:
             if m.uid > 0 and m.real_folder:
                 by.setdefault(m.real_folder, []).append(m.uid)
         if not by:
             return
+        if probe:
+            self.acc.pop("pin_server", None)
+        if pinned is True and self.acc.get("pin_server") is False:
+            raise PinUnsupported()                                      # déjà constaté : inutile de réessayer à chaque clic
+        failed = []
 
         def fn(conn):
             for real, uids in by.items():
@@ -537,7 +568,23 @@ class IMAPBackend:
                     conn.imap.uid("STORE", ids, "+FLAGS" if seen else "-FLAGS", "(\\Seen)")
                 if flagged is not None:
                     conn.imap.uid("STORE", ids, "+FLAGS" if flagged else "-FLAGS", "(\\Flagged)")
+                if pinned is not None:
+                    conn.imap.uid("STORE", ids, "+FLAGS" if pinned else "-FLAGS", "(%s)" % PIN_KEYWORD)
+                    if pinned and self.acc.get("pin_server") is not True:        # première fois : le serveur l'a-t-il VRAIMENT gardé ?
+                        typ, d = conn.imap.uid("FETCH", ids, "(UID FLAGS)")
+                        kept = set()
+                        for item in d or []:
+                            if isinstance(item, bytes):
+                                mu = UID_RE.search(item)
+                                if mu and PIN_KEYWORD_LOW in _flagset(item):
+                                    kept.add(int(mu.group(1)))
+                        failed.extend(u for u in uids if u not in kept)
         self._run("act", fn)
+        if pinned is True:
+            if failed:
+                self._pin_state(False)
+                raise PinUnsupported()
+            self._pin_state(True)
 
     def move(self, msg, dest):
         return self.move_many([msg], dest)
@@ -832,7 +879,7 @@ class DemoBackend:
                     date=now - mins * 60, snippet=b[:150], text=b, html=_card(s, b), unread=un, category="people"))
         return msgs, {}, None, 0
 
-    def set_flags(self, msg, seen=None, flagged=None):
+    def set_flags(self, msg, seen=None, flagged=None, pinned=None):
         pass
 
     def move(self, msg, dest):
@@ -844,7 +891,7 @@ class DemoBackend:
     def search_server(self, text, logicals, known_by_folder, limit=40):
         return []
 
-    def set_flags_many(self, msgs, seen=None, flagged=None):
+    def set_flags_many(self, msgs, seen=None, flagged=None, pinned=None, probe=False):
         pass
 
     def delete_forever(self, msg):

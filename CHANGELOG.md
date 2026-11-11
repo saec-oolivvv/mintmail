@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.13.3
+- Épingles enregistrées SUR LA BOÎTE (mot-clé IMAP) : visibles sur vos autres postes ; vérification au premier essai et avertissement pour les serveurs qui refusent (Gmail, Outlook.com) ; anciennes épingles envoyées une fois ; commande « Envoyer mes épingles vers la boîte »
+- Script de mise à jour du dépôt depuis un correctif (tools/mintmail-maj.sh) : ignore les fichiers non suivis, n'enregistre que ce que le correctif touche, choisit la version la plus haute ; la publication n'est plus bloquée par des fichiers à la racine du dépôt
+- Recherche de mise à jour à CHAQUE démarrage (même si une vérification date de moins de 24 h) puis toutes les 6 heures : une version publiée entre-temps est annoncée tout de suite par le bandeau
+- Diagnostic : mintmail --check-update indique si une mise à jour est mémorisée pour le bandeau ou repoussée
+
 ## 1.13.1
 - Mise à jour déjà installée : le bandeau propose « Relancer maintenant » ; notification de bureau ; dernier résultat dans Paramètres → Mises à jour ; commande mintmail --check-update
 - Option « Ouvrir la page Aujourd'hui au lancement » (Paramètres → Apparence)

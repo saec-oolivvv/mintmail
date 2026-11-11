@@ -33,7 +33,12 @@ class OfflineMixin:
         if op["kind"] == "move":
             be.move_many(items, p["dest"])
         elif op["kind"] == "flags":
-            be.set_flags_many(items, seen=p.get("seen"), flagged=p.get("flagged"))
+            extra = {}
+            if "pinned" in p:                                   # anciennes actions en file (sans épingle) : appel inchangé
+                extra["pinned"] = p["pinned"]
+                if p.get("probe"):
+                    extra["probe"] = True
+            be.set_flags_many(items, seen=p.get("seen"), flagged=p.get("flagged"), **extra)
         elif op["kind"] == "delete":
             be.delete_many(items)
 

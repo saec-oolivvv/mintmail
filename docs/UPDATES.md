@@ -1,6 +1,6 @@
 # Mises à jour automatiques
 
-MintMail se met à jour depuis les **Releases** de son dépôt GitHub. Résumé pour l'utilisateur : Paramètres → **Mises à jour** (recherche automatique une fois par jour,
+MintMail se met à jour depuis les **Releases** de son dépôt GitHub. Résumé pour l'utilisateur : Paramètres → **Mises à jour** (recherche automatique à chaque démarrage puis toutes les 6 heures,
 installation en un clic avec votre mot de passe administrateur). Ce document explique le fonctionnement et la **sécurité**, puis comment mettre le système en route.
 
 ## Ce que voit l'utilisateur
@@ -16,7 +16,7 @@ installation en un clic avec votre mot de passe administrateur). Ce document exp
 - **Notification de bureau** (une fois par version) si la fenêtre n'est pas au premier plan ; désactivable avec les notifications.
 - **Diagnostic** : `mintmail --check-update` affiche la version, le dépôt, la présence de la clé de vérification, le résultat de la recherche et la cause exacte d'une erreur (sans interface, sans rien installer).
   Code de sortie : 0 à jour, 10 mise à jour disponible, 1 erreur. Le dernier résultat est aussi inscrit dans le journal et rappelé dans Paramètres → Mises à jour.
-- La recherche se fait 8 secondes après le démarrage, puis au plus une fois par jour (désactivable).
+- La recherche se fait 8 secondes après **chaque** démarrage (même si une vérification date de ce matin : une version publiée entre-temps est annoncée tout de suite), puis toutes les 6 heures tant que MintMail tourne. Désactivable. Les requêtes sont conditionnelles (ETag : réponse « 304 », très légère).
 
 ## Principe de sécurité
 
@@ -34,7 +34,7 @@ Refusés : signature absente ou invalide, signature d'une autre clé, paquet mod
 téléchargement corrompu (somme de contrôle) ou trop gros, hôte autre que GitHub, redirection vers un hôte étranger, Release en brouillon ou préversion.
 **Sans clé publique installée, MintMail annonce seulement les nouvelles versions** (aucune installation automatique).
 
-Confidentialité : une seule requête GET anonyme à `api.github.com` (agent « MintMail/<version> »), au plus une fois par jour, désactivable.
+Confidentialité : une seule requête GET anonyme à `api.github.com` (agent « MintMail/<version> »), au démarrage puis toutes les 6 heures, désactivable (requête conditionnelle, sans donnée personnelle).
 
 ## Mise en route (une seule fois)
 

@@ -17,10 +17,24 @@ def sh(cmd, cwd, env=None, ok=True, input=None):
     return r
 
 
+def copy_tracked_tree(dest):
+    """Copie du dépôt SANS les fichiers non suivis (un .patch, un script, des notes… déposés à la racine par l'utilisateur) : les tests ne dépendent jamais de ce qui traîne chez lui.
+    Hors git (archive sans .git) : copie complète comme avant."""
+    r = subprocess.run(["git", "ls-files", "-z"], cwd=ROOT, capture_output=True)
+    if r.returncode != 0 or not r.stdout:
+        shutil.copytree(ROOT, dest, ignore=shutil.ignore_patterns(".git", "dist", "__pycache__", "*.pyc", "build"))
+        return
+    for rel in r.stdout.decode("utf-8").split("\0"):
+        src = os.path.join(ROOT, rel)
+        if rel and os.path.isfile(src):
+            os.makedirs(os.path.dirname(os.path.join(dest, rel)), exist_ok=True)
+            shutil.copy2(src, os.path.join(dest, rel))
+
+
 def make_repo():
     d = tempfile.mkdtemp()
     work = os.path.join(d, "repo")
-    shutil.copytree(ROOT, work, ignore=shutil.ignore_patterns(".git", "dist", "__pycache__", "*.pyc", "build"))
+    copy_tracked_tree(work)
     for stale in ("data/update-pubkey.pem",):
         if os.path.exists(os.path.join(work, stale)):
             os.unlink(os.path.join(work, stale))

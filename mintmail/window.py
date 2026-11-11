@@ -382,6 +382,64 @@ class MainWindow(UpdateMixin, ExtrasMixin, OfflineMixin, ListMixin, AIMixin, Fol
         return self._backends[aid]
 
 
+    def _apply_server_flags(self, kn, flags):
+        """Applique au cache les drapeaux lus sur la boîte : lu / favori / épinglé. L'épingle n'est touchée que si le serveur est PROUVÉ capable
+        (None sinon) et jamais pour un message dont l'épingle locale attend encore d'être envoyée."""
+        ups, pending_pins = {}, self._pending_pin_ids()
+        for uid, fl in flags.items():
+            mid = kn.get(uid)
+            if mid:
+                pinned = fl[2] if len(fl) > 2 and mid not in pending_pins else None
+                ups.setdefault((fl[0], fl[1], pinned), []).append(mid)
+        for (unread, starred, pinned), ids in ups.items():
+            fields = {"unread": unread, "starred": starred}
+            if pinned is not None:
+                fields["pinned"] = pinned
+            self.cache.update_many(ids, **fields)
+
+    def _pending_pin_ids(self):
+        """Messages dont une épingle / désépingle attend encore d'être envoyée (hors ligne) : la boîte ne doit pas l'écraser."""
+        ids = set()
+        try:
+            for op in self.cache.ops_pending():
+                if op["kind"] == "flags" and "pinned" in op["payload"]:
+                    ids.update(i["id"] for i in op["payload"]["items"])
+        except Exception:
+            pass
+        return ids
+
+    def _save_pin_states(self):
+        """Enregistre ce que le serveur a PROUVÉ (garde / ne garde pas les épingles) et, une fois par compte, envoie vers la boîte les épingles locales."""
+        changed, to_push = False, []
+        for aid, be in list(self._backends.items()):
+            if getattr(be, "_pin_dirty", False):
+                be._pin_dirty = False
+                changed = True
+            if getattr(be, "acc", {}).get("pin_server") is True and aid not in self.config.get("pins_pushed", []):
+                to_push.append(aid)
+        if to_push:
+            self.config["pins_pushed"] = list(self.config.get("pins_pushed", [])) + to_push
+            changed = True
+        if changed:
+            self.config.save()
+        for aid in to_push:
+            self.push_local_pins(aid, quiet=True)
+
+    def push_local_pins(self, aid=None, quiet=False):
+        """Envoie vers la boîte les épingles faites sur ce poste (avant la 1.13.2 elles restaient locales) : les autres postes les verront."""
+        accounts = [aid] if aid else [a["id"] for a in self.accounts() if not a.get("demo")]
+        total = [0]
+        for a in accounts:
+            msgs = self.cache.pinned_messages(a)
+            if not msgs:
+                continue
+            total[0] += len(msgs)
+            self._flag_remote_many(msgs, pinned=True, probe=not quiet, after=None if quiet else (
+                lambda res, err, n: self.toast.popup(tr("%d épingle(s) envoyée(s) vers la boîte : les autres postes les verront.") % n, timeout=6)
+                if res and not res[1] and not err else None))
+        if not total[0] and not quiet:
+            self.toast.popup(tr("Aucun message épinglé à envoyer."), timeout=4)
+
     def accounts_changed(self):
         self._stop_push()
         for be in list(self._backends.values()):
@@ -1201,13 +1259,7 @@ class MainWindow(UpdateMixin, ExtrasMixin, OfflineMixin, ListMixin, AIMixin, Fol
             msgs, flags, present, minuid = data
             self.cache.upsert_many([m for m in msgs if m.id not in self._partial_ids])
             kn = known[(aid, f)]
-            ups = {}
-            for uid, (unread, starred) in flags.items():
-                mid = kn.get(uid)
-                if mid:
-                    ups.setdefault((unread, starred), []).append(mid)
-            for (unread, starred), ids in ups.items():
-                self.cache.update_many(ids, unread=unread, starred=starred)
+            self._apply_server_flags(kn, flags)
             if present is not None:
                 gone = [mid for uid, mid in kn.items() if uid >= minuid and uid not in present]
                 if gone:
@@ -1217,6 +1269,7 @@ class MainWindow(UpdateMixin, ExtrasMixin, OfflineMixin, ListMixin, AIMixin, Fol
                 routed_inbox += keep
                 if kn:
                     fresh += [m for m in keep if m.unread]
+        self._save_pin_states()
         self._last_sync = time.time()
         self._net_error = bool(errors) and any(net_flags)
         if not errors:
@@ -1421,6 +1474,7 @@ class MainWindow(UpdateMixin, ExtrasMixin, OfflineMixin, ListMixin, AIMixin, Fol
             (tr("Paramètres (Ctrl+,)"), self.show_settings),
             (tr("Paramètres dans une fenêtre séparée"), lambda: self.show_settings(window=True)),
             (tr("Réglages de l'IA"), lambda: self.show_settings("ai")),
+            (tr("Envoyer mes épingles vers la boîte"), lambda: self.push_local_pins()),
             (tr("Rechercher les mises à jour"), lambda: self.check_updates(manual=True)), (tr("Mises à jour"), lambda: self.show_settings("updates")),
             (tr("Journal d'erreurs"), self.show_log), (tr("Gestes de swipe (réglages)"), lambda: self.show_settings("gestures")),
             (tr("Basculer thème clair / sombre"), self.toggle_theme), (tr("Plein écran (F11)"), self.toggle_fullscreen),

@@ -17,6 +17,8 @@ FOLDER_VERBS = {"archive": tr("archivé"), "trash": tr("supprimé"), "spam": tr(
 
 
 class ListMixin:
+    _pin_warned = False          # l'avertissement « ce serveur ne garde pas les épingles » n'est donné qu'une fois par session
+
     # ---------------------------------------------------------------- construction
     def _row_height(self):
         return {"compact": 64, "comfortable": 72, "spacious": 80}.get(self.config["density"], 72)
@@ -354,7 +356,14 @@ class ListMixin:
     def _flag_remote(self, m, seen=None, flagged=None):
         self._flag_remote_many([m], seen, flagged)
 
-    def _flag_remote_many(self, msgs, seen=None, flagged=None):
+    def _warn_pin(self, errors):
+        """Un serveur qui refuse les mots-clés (Gmail, Outlook.com…) : on le dit UNE fois par session, au lieu de laisser croire que l'épingle est partagée."""
+        from .backend import PinUnsupported
+        if not getattr(self, "_pin_warned", False) and any(str(e) == str(PinUnsupported()) for e in errors):
+            self._pin_warned = True
+            self.toast.popup(str(PinUnsupported()), timeout=10)
+
+    def _flag_remote_many(self, msgs, seen=None, flagged=None, pinned=None, probe=False, after=None):
         by = {}
         for m in msgs:
             by.setdefault(m.account, []).append(m)
@@ -364,10 +373,19 @@ class ListMixin:
             except Exception:
                 continue
             if not be.demo:
-                kw = {k: v for k, v in (("seen", seen), ("flagged", flagged)) if v is not None}
+                kw = {k: v for k, v in (("seen", seen), ("flagged", flagged), ("pinned", pinned)) if v is not None}
+                if probe:
+                    kw["probe"] = True
                 op_ids = self.op_enqueue("flags", lst, **kw)
-                self.run_bg(lambda ids=op_ids: self.op_run([o for o in self.cache.ops_pending() if o["id"] in ids]),
-                            lambda res, err: self._set_offline(res[2]) if res else None)
+
+                def finished(res, err, n=len(lst)):
+                    if res:
+                        self._set_offline(res[2])
+                        self._warn_pin(res[1])
+                    self._save_pin_states()
+                    if after:
+                        after(res, err, n)
+                self.run_bg(lambda ids=op_ids: self.op_run([o for o in self.cache.ops_pending() if o["id"] in ids]), finished)
 
     def set_unread(self, msgs, unread, reload=True):
         ids = [m.id for m in msgs]
@@ -395,6 +413,7 @@ class ListMixin:
         if field == "starred":
             self._flag_remote_many(msgs, flagged=value)
         if field == "pinned":
+            self._flag_remote_many(msgs, pinned=value)                 # l'épingle est enregistrée SUR LA BOÎTE : les autres postes la voient
             self.listbox.invalidate_sort()
             self.listbox.invalidate_headers()
         if not value and ((field == "starred" and self.view == "starred") or (field == "pinned" and self.view == "pinned")):
