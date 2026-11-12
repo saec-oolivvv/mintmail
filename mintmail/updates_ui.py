@@ -1,4 +1,4 @@
-"""Interface des mises à jour : recherche automatique (à chaque démarrage puis toutes les 6 h), bandeau d'annonce visible dès le lancement, installation en un clic."""
+"""Interface des mises à jour : recherche automatique (à chaque démarrage puis toutes les heures), bandeau d'annonce visible dès le lancement, installation en un clic."""
 import os
 import subprocess
 import time
@@ -159,7 +159,7 @@ class UpdateMixin:
         self._update_views = []          # fonctions à rappeler quand l'état change (page de réglages ouverte)
         self._restore_update()           # une mise à jour déjà connue s'affiche TOUT DE SUITE, sans attendre le réseau
         GLib.timeout_add_seconds(8, lambda: (self.check_updates(startup=True), False)[1])      # 8 s après CHAQUE démarrage (même si une vérification date de ce matin)
-        GLib.timeout_add_seconds(3600, lambda: (self.check_updates(), True)[1])                # puis toutes les 6 h (le test est horaire, la règle « due » décide)
+        GLib.timeout_add_seconds(3600, lambda: (self.check_updates(), True)[1])                # puis TOUTES LES HEURES (règle « due » : 55 min, pour que la minuterie ne tombe jamais un peu trop tôt)
 
     def _restore_update(self):
         cfg = self.config
@@ -415,7 +415,7 @@ def updates_page(win):
     auto.set_active(bool(cfg.get("update_check", True)))
     auto.set_halign(Gtk.Align.START)
     auto.connect("notify::active", lambda s, _p: (cfg.__setitem__("update_check", s.get_active()), cfg.save()))
-    grid.attach(Gtk.Label(label=tr("Rechercher automatiquement (au démarrage, puis toutes les 6 heures)"), xalign=1), 0, 2, 1, 1)
+    grid.attach(Gtk.Label(label=tr("Rechercher automatiquement (au démarrage, puis toutes les heures)"), xalign=1), 0, 2, 1, 1)
     grid.attach(auto, 1, 2, 1, 1)
     repo = Gtk.Entry(text=cfg.get("update_repo") or updater.DEFAULT_REPO)
     repo.set_width_chars(34)
@@ -437,8 +437,12 @@ def updates_page(win):
     inst = Gtk.Button(label=tr("Installer la mise à jour"))
     inst.get_style_context().add_class("suggested-action")
     inst.connect("clicked", lambda *_: win.install_update())
+    relaunch = Gtk.Button(label=tr("Relancer maintenant"))                      # après l'installation : comme sur le bandeau
+    relaunch.get_style_context().add_class("suggested-action")
+    relaunch.connect("clicked", lambda *_: win.restart_app())
     btns.pack_start(check, False, False, 0)
     btns.pack_start(inst, False, False, 0)
+    btns.pack_start(relaunch, False, False, 0)
     grid.attach(btns, 0, 5, 2, 1)
     keyline = note("", dim=True)
     grid.attach(keyline, 0, 6, 2, 1)
@@ -450,10 +454,13 @@ def updates_page(win):
         if not alive["v"]:
             return
         up = win._update
+        pend = updater.restart_pending()                    # version déjà installée sur le disque, mais pas encore celle qui tourne
         last = cfg.get("update_last_check", 0)
         when = time.strftime("%Y-%m-%d %H:%M", time.localtime(last)) if last else tr("jamais")
         if win._update_busy:
             status.set_text(tr("Opération en cours…"))
+        elif pend:
+            status.set_text("✔ " + tr("MintMail %s est installé") % pend + " — " + tr("Relancez MintMail pour profiter de la nouvelle version."))
         elif up is not None:
             status.set_text(tr("⬆ La version %s est disponible (dernière vérification : %s).") % (up.version, when))
         else:
@@ -462,8 +469,9 @@ def updates_page(win):
         if last_result.startswith("error:") and not win._update_busy:
             status.set_text(status.get_text() + "\n" + explain(last_result[6:]))
         ok, why = updater.can_install()
-        inst.set_visible(up is not None)
+        inst.set_visible(up is not None and not pend)
         inst.set_sensitive(not win._update_busy)
+        relaunch.set_visible(bool(pend) and not win._update_busy)
         keyline.set_text(tr("Installation automatique : prête (clé de vérification présente).") if ok else
                          tr("Installation automatique désactivée : %s Vous serez seulement informé des nouvelles versions.") % explain(why))
         check.set_sensitive(not win._update_busy)
@@ -471,5 +479,4 @@ def updates_page(win):
     grid.connect("destroy", lambda *_: alive.update(v=False))
     grid.show_all()
     refresh()
-    inst.set_visible(win._update is not None)
     return grid

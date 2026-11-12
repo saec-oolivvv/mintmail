@@ -1091,15 +1091,38 @@ def test_the_check_runs_at_every_launch_even_if_one_was_made_minutes_ago_and_a_r
         restore(sv)
 
 
-def test_the_periodic_interval_is_six_hours_and_the_texts_say_so():
+def test_the_periodic_interval_is_one_hour_not_two_and_the_texts_say_so():
     import time
-    assert U.CHECK_INTERVAL == 6 * 3600
+    assert U.CHECK_INTERVAL == 55 * 60
     now = time.time()
-    assert not U.due(now, now - 3600) and not U.due(now, now - 5 * 3600) and U.due(now, now - 6 * 3600 - 1) and U.due(now, 0) and U.due(now, now + 7200)
+    assert not U.due(now, now - 600) and not U.due(now, now - 3000) and U.due(now, now - 3592) and U.due(now, now - 3600) and U.due(now, 0) and U.due(now, now + 7200)
+    # la minuterie tourne toutes les heures depuis le lancement ; le démarrage a cherché 8 s après le lancement : la 1re minuterie doit AUSSI chercher
+    calls = []
+    sv = with_patches(check=lambda repo, etag="": (calls.append(1), U.Result("uptodate", etag="e"))[1])
+    clock = {"t": 1_000_000.0}
+    old_time = UI.time.time
+    UI.time.time = lambda: clock["t"]
+    try:
+        w = make_win(banner=True)
+        clock["t"] += 8
+        w.check_updates(startup=True)
+        assert len(calls) == 1
+        clock["t"] += 600
+        w.check_updates()
+        assert len(calls) == 1                                                                              # 10 min plus tard : trop tôt
+        clock["t"] = 1_000_000.0 + 3600                                                                      # 1re minuterie horaire (3 592 s après la recherche du démarrage)
+        w.check_updates()
+        assert len(calls) == 2
+        clock["t"] = 1_000_000.0 + 7200
+        w.check_updates()
+        assert len(calls) == 3                                                                              # puis chaque heure, pas toutes les deux heures
+    finally:
+        UI.time.time = old_time
+        restore(sv)
     docs = open(os.path.join(ROOT, "docs", "UPDATES.md"), encoding="utf-8").read()
-    assert "chaque** démarrage" in docs and "6 heures" in docs and "une fois par jour" not in docs
+    assert "chaque** démarrage" in docs and "toutes les heures" in docs and "6 heures" not in docs and "une fois par jour" not in docs
     src = open(os.path.join(ROOT, "mintmail", "updates_ui.py"), encoding="utf-8").read()
-    assert "Rechercher automatiquement (au démarrage, puis toutes les 6 heures)" in src and "une fois par jour\")" not in src
+    assert "Rechercher automatiquement (au démarrage, puis toutes les heures)" in src and "6 heures" not in src and "une fois par jour\")" not in src
 
 
 def test_check_update_cli_says_why_the_banner_is_or_is_not_shown():
@@ -1135,3 +1158,72 @@ def test_check_update_cli_says_why_the_banner_is_or_is_not_shown():
         cfg.save()
         Gh.status = 200
         srv.shutdown()
+
+
+
+class Rec:
+    """Faux bouton / étiquette qui retient son texte, sa visibilité et ses clics (pour vérifier la page des paramètres sans écran)."""
+    made = []
+
+    def __init__(self, label="", **k):
+        self.text, self.visible, self.sensitive, self.clicks = label, True, True, []
+        Rec.made.append(self)
+
+    def set_text(self, t): self.text = t
+    def get_text(self): return self.text
+    def set_label(self, t): self.text = t
+    def set_visible(self, v): self.visible = bool(v)
+    def set_sensitive(self, v): self.sensitive = bool(v)
+    def get_style_context(self): return types.SimpleNamespace(add_class=lambda c: None)
+
+    def connect(self, sig, cb):
+        if sig == "clicked":
+            self.clicks.append(cb)
+
+    def __getattr__(self, name):
+        return lambda *a, **k: None
+
+
+def test_the_updates_page_offers_relaunch_after_the_install_like_the_banner_and_hides_install():
+    old_btn, old_lab, old_rp = UI.Gtk.Button, UI.Gtk.Label, U.restart_pending
+    UI.Gtk.Button = UI.Gtk.Label = Rec
+    Rec.made = []
+    restarted = []
+    installed = {"v": False}
+    deb, sg = os.path.join(tmp, "e.deb"), os.path.join(tmp, "e.sig")
+    sv = with_patches(can_install=lambda *a, **k: (True, ""), fetch=lambda up, d, **k: (deb, sg), check_signature=lambda d, s, **k: "",
+                      install=lambda d, s, **k: (installed.__setitem__("v", True), (True, "", "1.99.0"))[1], cleanup=lambda *a, **k: None)
+    old_idle = UI.GLib.idle_add
+    UI.GLib.idle_add = lambda f, *a: f(*a)
+    U.restart_pending = lambda current=None: "1.99.0" if installed["v"] else ""
+    try:
+        w = make_win(banner=True)
+        w.restart_app = lambda: restarted.append(1)
+        UI.updates_page(w)
+        button = lambda label: [b for b in Rec.made if b.text == label][0]
+        status = lambda: [b for b in Rec.made if b.text.startswith(("Aucune mise à jour connue", "⬆", "✔", "Opération"))][-1].text
+        inst, relaunch = button("Installer la mise à jour"), button("Relancer maintenant")
+        assert not inst.visible and not relaunch.visible and status().startswith("Aucune mise à jour connue")
+        w._update = avail().update
+        w._update_changed()
+        assert inst.visible and not relaunch.visible and status().startswith("⬆ La version 1.99.0")
+        w._update_busy = True
+        w._update_changed()
+        assert status() == "Opération en cours…" and not relaunch.visible and not inst.sensitive
+        w._update_busy = False
+        w.install_update(confirm=False)                                                                     # l'installation réussit depuis la fenêtre / le bandeau
+        assert installed["v"] and relaunch.visible and not inst.visible                                      # la page propose maintenant « Relancer maintenant »
+        assert status() == "✔ MintMail 1.99.0 est installé — Relancez MintMail pour profiter de la nouvelle version."
+        relaunch.clicks[0]()
+        assert restarted == [1]                                                                              # le bouton relance vraiment l'application
+        w._update_busy = True
+        w._update_changed()
+        assert not relaunch.visible                                                                          # pas de relance pendant une opération
+        # au retour sur la page (nouvelle construction) alors que le disque est déjà à jour : le bouton est là dès l'ouverture
+        w._update_busy = False
+        Rec.made = []
+        UI.updates_page(w)
+        assert button("Relancer maintenant").visible and not button("Installer la mise à jour").visible
+    finally:
+        UI.Gtk.Button, UI.Gtk.Label, U.restart_pending, UI.GLib.idle_add = old_btn, old_lab, old_rp, old_idle
+        restore(sv)

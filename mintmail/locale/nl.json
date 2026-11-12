@@ -684,7 +684,7 @@
 "Recherche serveur : %s": "Zoeken op de server: %s",
 "Recherche sur le serveur…": "Zoeken op de server…",
 "Rechercher": "Zoeken",
-"Rechercher automatiquement (au démarrage, puis toutes les 6 heures)": "Automatisch zoeken (bij het opstarten, daarna elke 6 uur)",
+"Rechercher automatiquement (au démarrage, puis toutes les heures)": "Automatisch zoeken (bij het opstarten, daarna elk uur)",
 "Rechercher dans l'aide (ex. OAuth, spam, hors ligne, raccourcis)": "Zoeken in de help (bijv. OAuth, spam, offline, sneltoetsen)",
 "Rechercher les mises à jour": "Naar updates zoeken",
 "Rechercher un contact": "Een contact zoeken",

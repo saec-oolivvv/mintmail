@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.14.2
+- Page Paramètres → Mises à jour : bouton « Relancer maintenant » après l'installation (comme sur le bandeau) ; l'état affiche « installé » tant que l'ancienne version tourne encore
+- Recherche de mise à jour toutes les heures (et à chaque démarrage) au lieu de toutes les 6 heures
+
 ## 1.14.1
 - Épingles sur Gmail : étiquette « MintMail-Epingles » (visible dans Gmail, web et mobile) et vue par vos autres postes ; autres serveurs IMAP : mot-clé IMAP ; l'étiquette technique est masquée dans la liste de dossiers
 - Nouvelle commande « mintmail --check-pins » : verdict réel du serveur pour chaque compte (connexion, nombre de messages épinglés, essai réversible sur le message le plus récent ; --no-test = lecture seule)

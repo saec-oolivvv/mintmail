@@ -684,7 +684,7 @@
 "Recherche serveur : %s": "Búsqueda en el servidor: %s",
 "Recherche sur le serveur…": "Buscando en el servidor…",
 "Rechercher": "Buscar",
-"Rechercher automatiquement (au démarrage, puis toutes les 6 heures)": "Buscar automáticamente (al iniciar y luego cada 6 horas)",
+"Rechercher automatiquement (au démarrage, puis toutes les heures)": "Buscar automáticamente (al iniciar y luego cada hora)",
 "Rechercher dans l'aide (ex. OAuth, spam, hors ligne, raccourcis)": "Buscar en la ayuda (p. ej. OAuth, spam, sin conexión, atajos)",
 "Rechercher les mises à jour": "Buscar actualizaciones",
 "Rechercher un contact": "Buscar un contacto",

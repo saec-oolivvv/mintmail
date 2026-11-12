@@ -32,7 +32,7 @@ DEFAULT_REPO = "saec-oolivvv/mintmail"
 API = "https://api.github.com"
 HELPER = "/usr/lib/mintmail/apply-update"
 DOWNLOAD_HOSTS = ("github.com", "githubusercontent.com")
-CHECK_INTERVAL = 6 * 3600          # pendant que MintMail tourne ; au DÉMARRAGE la recherche a lieu à chaque fois (requête conditionnelle ETag : 304, quasi gratuite)
+CHECK_INTERVAL = 55 * 60          # « toutes les heures » : un peu moins d'une heure, pour absorber le décalage entre la recherche du démarrage et la minuterie horaire ; pendant que MintMail tourne ; au DÉMARRAGE la recherche a lieu à chaque fois (requête conditionnelle ETag : 304, quasi gratuite)
 MAX_JSON, MAX_DEB, MAX_SIG, MAX_SUMS = 2_000_000, 150_000_000, 8192, 65536
 _REPO = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]{0,99}/[A-Za-z0-9._-]{1,100}")
 

@@ -312,7 +312,7 @@
     ],
     [
      "Install in one click",
-     "Settings → Updates → “Install the update” (or “Install now” in the banner): the package is downloaded with a progress bar, its signature is checked, then the system asks for your administrator password. The banner then switches to “installed” with a “Restart now” button. Nothing is installed without your approval."
+     "Settings → Updates → “Install the update” (or “Install now” in the banner): the package is downloaded with a progress bar, its signature is checked, then the system asks for your administrator password. The banner then switches to “installed” with a “Restart now” button, which also appears in Settings → Updates. Nothing is installed without your approval."
     ],
     [
      "Update security",

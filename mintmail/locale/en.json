@@ -684,7 +684,7 @@
 "Recherche serveur : %s": "Server search: %s",
 "Recherche sur le serveur…": "Searching the server…",
 "Rechercher": "Search",
-"Rechercher automatiquement (au démarrage, puis toutes les 6 heures)": "Check automatically (at startup, then every 6 hours)",
+"Rechercher automatiquement (au démarrage, puis toutes les heures)": "Check automatically (at startup, then every hour)",
 "Rechercher dans l'aide (ex. OAuth, spam, hors ligne, raccourcis)": "Search the help (e.g. OAuth, spam, offline, shortcuts)",
 "Rechercher les mises à jour": "Check for updates",
 "Rechercher un contact": "Search for a contact",

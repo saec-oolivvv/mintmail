@@ -2129,7 +2129,7 @@
   "settings.py",
   "window.py"
  ],
- "Rechercher automatiquement (au démarrage, puis toutes les 6 heures)": [
+ "Rechercher automatiquement (au démarrage, puis toutes les heures)": [
   "updates_ui.py"
  ],
  "Rechercher dans l'aide (ex. OAuth, spam, hors ligne, raccourcis)": [
