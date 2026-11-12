@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.14.1
+- Épingles sur Gmail : étiquette « MintMail-Epingles » (visible dans Gmail, web et mobile) et vue par vos autres postes ; autres serveurs IMAP : mot-clé IMAP ; l'étiquette technique est masquée dans la liste de dossiers
+- Nouvelle commande « mintmail --check-pins » : verdict réel du serveur pour chaque compte (connexion, nombre de messages épinglés, essai réversible sur le message le plus récent ; --no-test = lecture seule)
+
 ## 1.14.0
 - Aide intégrée entièrement refondue : page d'accueil (démarrage en 4 étapes, astuce du jour, cartes vers chaque section), navigation avec icônes, sections illustrées avec accroche, touches de clavier, noms d'écrans en gras, encadrés d'astuces, commandes en blocs, raccourcis en tableau de touches
 - Recherche dans l'aide : résultats en cartes, extrait surligné et bouton « Ouvrir la section »

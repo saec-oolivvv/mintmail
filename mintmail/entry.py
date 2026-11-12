@@ -230,6 +230,54 @@ def check_update_cli(api=None, allow_loopback=False, out=print) -> int:
     return 1
 
 
+def check_pins_cli(test=True, out=print, cfg=None, factory=None) -> int:
+    """`mintmail --check-pins` : pour chaque compte, dit si le serveur GARDE les épingles (étiquette Gmail ou mot-clé IMAP), par un essai réversible.
+    --no-test : lecture seule. Code de sortie : 0 tout va bien, 1 un compte ne garde pas les épingles ou n'est pas joignable."""
+    from .backend import PIN_LABEL, make_backend
+    from .store import Config
+    cfg = cfg or Config()
+    accounts = [a for a in cfg["accounts"] if not a.get("demo")]
+    if not accounts:
+        out(tr("Aucun compte configuré : rien à vérifier."))
+        return 1
+    bad = 0
+    for acc in accounts:
+        out("")
+        out("== %s" % (acc.get("email") or acc.get("id")))
+        be = (factory or make_backend)(dict(acc), cfg)
+        try:
+            d = be.pin_diagnostic(test)
+        finally:
+            try:
+                be.close()
+            except Exception:
+                pass
+        if not d["connected"]:
+            out(tr("Connexion impossible : %s") % (d["error"] or "?"))
+            bad += 1
+            continue
+        out(tr("Connexion : OK"))
+        if d["mode"] == "gmail":
+            out(tr("Type de serveur : Gmail — l'épingle est l'étiquette « %s », visible dans Gmail (web et mobile).") % PIN_LABEL)
+        else:
+            out(tr("Type de serveur : IMAP standard — l'épingle est un mot-clé IMAP (invisible dans la plupart des messageries web, vu par vos autres postes MintMail)."))
+        if d["count"] is not None:
+            out(tr("Messages épinglés sur le serveur (boîte de réception) : %d") % d["count"])
+        if d["tested"]:
+            if d["supported"]:
+                out(tr("Essai réversible sur le message le plus récent : RÉUSSI — ce serveur garde les épingles."))
+            else:
+                out(tr("Essai réversible sur le message le plus récent : ÉCHEC — ce serveur ne garde pas les épingles : elles restent sur chaque poste."))
+                bad += 1
+        elif test:
+            out(tr("Aucun message dans la boîte de réception : essai impossible."))
+        else:
+            out(tr("Lecture seule : aucun essai effectué."))
+        if d["error"]:
+            out(tr("Remarque : %s") % d["error"])
+    return 1 if bad else 0
+
+
 def main(argv=None) -> int:
     argv = list(argv if argv is not None else sys.argv)
     _init_language()
@@ -254,6 +302,8 @@ def main(argv=None) -> int:
         return send_due()
     if "--check-update" in argv:
         return check_update_cli()
+    if "--check-pins" in argv:
+        return check_pins_cli(test="--no-test" not in argv)
     from .store import harden_permissions
     harden_permissions()                    # dossiers 0700 / fichiers 0600, même pour les anciennes installations
     install_hook()

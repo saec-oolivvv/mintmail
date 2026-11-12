@@ -30,6 +30,8 @@ CLI_OPTIONS: List[Tuple[str, str]] = [
                                         "dans ~/mintmail-sauvegarde-<date>/. À lancer avec le chemin complet : /usr/bin/mintmail."),
     ("mintmail --send-due", "Envoie, sans interface, les messages programmés ou en attente dont l'heure est venue "
                             "(appelé chaque minute par la minuterie utilisateur mintmail-outbox)."),
+    ("mintmail --check-pins", "Vérifie, pour chaque compte, si le serveur GARDE les épingles (étiquette Gmail ou mot-clé IMAP) : connexion, nombre de messages épinglés et essai réversible sur le message le plus récent. "
+                              "Avec --no-test : lecture seule."),
     ("mintmail --check-update", "Cherche une mise à jour et affiche le résultat détaillé (version, dépôt, signature, cause d'une erreur) : sans interface, sans rien installer. "
                                 "Code de sortie : 0 à jour, 10 mise à jour disponible, 1 erreur."),
 ]
@@ -98,7 +100,7 @@ SECTIONS: List[Dict] = [
          "• Les dossiers spéciaux (Envoyés, Brouillons, Archives, Spam, Corbeille) sont reconnus quelle que soit la langue du serveur."),
         ("Favoris, épingles, reports, relances",
          "• Favori (S) : étoile synchronisée avec le serveur. Épingle (P) : garde le message en haut de la liste ; elle est AUSSI enregistrée sur la boîte (mot-clé IMAP), donc visible sur vos autres postes à leur prochaine synchronisation. "
-         "Certains serveurs (Gmail, Outlook.com) refusent ce mot-clé : MintMail le vérifie au premier essai et vous prévient, l'épingle reste alors sur ce poste seulement. "
+         "Sur Gmail, c'est une ÉTIQUETTE « MintMail-Epingles », visible dans Gmail (web et mobile) ; sur un serveur IMAP standard, un mot-clé IMAP, invisible dans la plupart des messageries web mais vu par vos autres postes MintMail. Si le serveur ne peut pas la garder, MintMail vous prévient au premier essai et l'épingle reste sur ce poste seulement ; « mintmail --check-pins » donne le verdict exact. "
          "Palette → « Envoyer mes épingles vers la boîte » envoie celles faites avant la 1.13.2.\n"
          "• Reporter (H = demain 8 h, ou clic droit → Reporter) : le message disparaît puis revient en haut de la boîte à l'heure choisie "
          "(plus tard aujourd'hui, demain, ce week-end, lundi, la semaine prochaine…).\n"

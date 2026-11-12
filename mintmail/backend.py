@@ -11,6 +11,7 @@ import socket
 import ssl
 import threading
 import time
+import types
 import uuid
 from email import policy
 from email.message import EmailMessage
@@ -232,6 +233,8 @@ def build_imap_search(text):
 
 PIN_KEYWORD = "$MintMailPinned"          # mot-clé IMAP (insensible à la casse) : l'épingle est enregistrée SUR LA BOÎTE, comme le favori (\Flagged)
 PIN_KEYWORD_LOW = PIN_KEYWORD.lower()
+PIN_LABEL = "MintMail-Epingles"           # Gmail : l'épingle est une ÉTIQUETTE (extension X-GM-LABELS), visible dans Gmail web et mobile
+PIN_LABEL_LOW = PIN_LABEL.lower()
 
 
 class PinUnsupported(Exception):
@@ -239,16 +242,58 @@ class PinUnsupported(Exception):
     retryable = False
 
     def __init__(self):
-        super().__init__(tr("Ce serveur ne mémorise pas les épingles (Gmail, Outlook.com… refusent les mots-clés personnalisés) : l'épingle reste sur ce poste seulement."))
+        super().__init__(tr("Ce serveur ne mémorise pas les épingles : l'épingle reste sur ce poste seulement. Commande « mintmail --check-pins » pour le vérifier."))
 
 
 UID_RE = re.compile(rb"UID (\d+)")
 FLAGS_RE = re.compile(rb"FLAGS \(([^)]*)\)")
 
 
+def _gm_labels(b):
+    """Étiquettes Gmail d'une réponse FETCH (« X-GM-LABELS ("\\\\Inbox" "Travail (ancien)" MintMail-Epingles) »), guillemets et parenthèses compris."""
+    s = (b or b"").decode("utf-8", "replace")
+    i = s.find("X-GM-LABELS (")
+    if i < 0:
+        return []
+    out, cur, quoted, esc = [], "", False, False
+    for c in s[i + len("X-GM-LABELS ("):]:
+        if quoted:
+            if esc:
+                cur, esc = cur + c, False
+            elif c == "\\":
+                esc = True
+            elif c == '"':
+                quoted = False
+                out.append(cur)
+                cur = ""
+            else:
+                cur += c
+        elif c == '"':
+            quoted, cur = True, ""
+        elif c == ")":
+            if cur:
+                out.append(cur)
+            break
+        elif c == " ":
+            if cur:
+                out.append(cur)
+            cur = ""
+        else:
+            cur += c
+    return out
+
+
+def _has_gm(imap):
+    """Serveur Gmail (extension X-GM-EXT-1) : l'épingle y est une étiquette, pas un mot-clé IMAP."""
+    return "X-GM-EXT-1" in (getattr(imap, "capabilities", None) or ())
+
+
 def _flagset(b):
     m = FLAGS_RE.search(b or b"")
-    return set(m.group(1).decode().lower().split()) if m else set()
+    s = set(m.group(1).decode().lower().split()) if m else set()
+    if PIN_LABEL_LOW in [x.lower() for x in _gm_labels(b)]:
+        s.add(PIN_KEYWORD_LOW)                                  # l'étiquette Gmail « MintMail-Epingles » vaut épingle pour tout le reste du code
+    return s
 
 
 class _Conn:
@@ -268,6 +313,7 @@ class IMAPBackend:
         self._conns = {"sync": _Conn(), "act": _Conn(), "meta": _Conn()}
         self._tree_cache = None
         self._pin_dirty = False
+        self._gm_seen = False
 
     # -- connexion
     def _connect(self):
@@ -307,6 +353,8 @@ class IMAPBackend:
             dtxt = m.group("d").decode().strip('"')
             delim = "/" if dtxt.upper() == "NIL" else dtxt
             flags = set(m.group("f").decode().lower().split())
+            if (utf7_decode(name).split(delim)[-1] if delim else name).lower() == PIN_LABEL_LOW:
+                continue                                               # étiquette Gmail technique des épingles : visible dans Gmail, pas dans la liste de dossiers
             special = "inbox" if name.upper() == "INBOX" else ""
             for fl in flags:
                 if fl in SPECIAL and not special:
@@ -475,7 +523,7 @@ class IMAPBackend:
             old = [u for u in window if u in known]
             proven = self.acc.get("pin_server") is True            # capacité connue AVANT cette lecture : seule elle autorise à désépingler à distance
             for chunk in _chunks(old, 100):
-                typ, d = imap.uid("FETCH", ",".join(map(str, chunk)), "(UID FLAGS)")
+                typ, d = imap.uid("FETCH", ",".join(map(str, chunk)), "(UID FLAGS%s)" % (" X-GM-LABELS" if _has_gm(imap) else ""))
                 for item in d or []:
                     if isinstance(item, bytes):
                         mu = UID_RE.search(item)
@@ -498,7 +546,7 @@ class IMAPBackend:
 
     def _fetch_batch(self, imap, chunk, logical, real):
         """Télécharge et analyse un lot de messages (UID)."""
-        typ, d = imap.uid("FETCH", ",".join(map(str, chunk)), "(UID FLAGS BODY.PEEK[])")
+        typ, d = imap.uid("FETCH", ",".join(map(str, chunk)), "(UID FLAGS%s BODY.PEEK[])" % (" X-GM-LABELS" if _has_gm(imap) else ""))
         items, batch = list(d or []), []
         for i, item in enumerate(items):
             if not isinstance(item, tuple):
@@ -507,9 +555,7 @@ class IMAPBackend:
             mu = UID_RE.search(meta)
             if not mu:
                 continue
-            fl = _flagset(meta)
-            if not fl and i + 1 < len(items) and isinstance(items[i + 1], bytes):
-                fl = _flagset(items[i + 1])
+            fl = _flagset(meta) | (_flagset(items[i + 1]) if i + 1 < len(items) and isinstance(items[i + 1], bytes) else set())    # drapeaux avant ou après le corps
             try:
                 batch.append(parse_message(raw, self.acc["id"], logical, real, int(mu.group(1)), fl))
             except Exception:
@@ -536,10 +582,13 @@ class IMAPBackend:
             return found
         return self._run("sync", fn)
 
-    def _pin_state(self, ok):
-        """Mémorise (dans le compte, localement) si ce serveur garde les épingles ; `_pin_dirty` demande à la fenêtre d'enregistrer."""
+    def _pin_state(self, ok, mode=None):
+        """Mémorise (dans le compte, localement) si ce serveur garde les épingles et comment ; `_pin_dirty` demande à la fenêtre d'enregistrer."""
         if self.acc.get("pin_server") is not ok:
             self.acc["pin_server"] = ok
+            self._pin_dirty = True
+        if mode and self.acc.get("pin_mode") != mode:
+            self.acc["pin_mode"] = mode
             self._pin_dirty = True
 
     def set_flags(self, msg, seen=None, flagged=None, pinned=None):
@@ -569,9 +618,14 @@ class IMAPBackend:
                 if flagged is not None:
                     conn.imap.uid("STORE", ids, "+FLAGS" if flagged else "-FLAGS", "(\\Flagged)")
                 if pinned is not None:
-                    conn.imap.uid("STORE", ids, "+FLAGS" if pinned else "-FLAGS", "(%s)" % PIN_KEYWORD)
+                    gm = _has_gm(conn.imap)
+                    self._gm_seen = gm
+                    if gm:
+                        conn.imap.uid("STORE", ids, "+X-GM-LABELS" if pinned else "-X-GM-LABELS", "(%s)" % PIN_LABEL)
+                    else:
+                        conn.imap.uid("STORE", ids, "+FLAGS" if pinned else "-FLAGS", "(%s)" % PIN_KEYWORD)
                     if pinned and self.acc.get("pin_server") is not True:        # première fois : le serveur l'a-t-il VRAIMENT gardé ?
-                        typ, d = conn.imap.uid("FETCH", ids, "(UID FLAGS)")
+                        typ, d = conn.imap.uid("FETCH", ids, "(UID FLAGS%s)" % (" X-GM-LABELS" if gm else ""))
                         kept = set()
                         for item in d or []:
                             if isinstance(item, bytes):
@@ -584,7 +638,47 @@ class IMAPBackend:
             if failed:
                 self._pin_state(False)
                 raise PinUnsupported()
-            self._pin_state(True)
+            self._pin_state(True, "gmail" if self._gm_seen else "keyword")
+
+    def pin_diagnostic(self, test=True):
+        """Verdict RÉEL sur ce serveur (utilisé par « mintmail --check-pins »). test=True : essai réversible sur le message le plus récent de la boîte de
+        réception (épingle puis retrait, retrait garanti même en cas d'erreur) ; test=False : lecture seule (aucune modification)."""
+        out = {"connected": False, "mode": "", "count": None, "tested": False, "supported": None, "error": ""}
+        probe = []
+
+        def fn(conn):
+            imap = conn.imap
+            out["connected"] = True
+            gm = _has_gm(imap)
+            out["mode"] = "gmail" if gm else "keyword"
+            real = self._resolve(imap, "inbox") or "INBOX"
+            self._select(conn, real, readonly=not test)
+            try:
+                typ, d = (imap.uid("SEARCH", None, "X-GM-RAW", '"label:%s"' % PIN_LABEL_LOW) if gm else imap.uid("SEARCH", None, "KEYWORD", PIN_KEYWORD))
+                out["count"] = len(d[0].split()) if typ == "OK" and d and d[0] else 0
+            except imaplib.IMAP4.error:
+                out["count"] = None
+            typ, d = imap.uid("SEARCH", None, "ALL")
+            uids = [int(x) for x in d[0].split()] if typ == "OK" and d and d[0] else []
+            if uids:
+                probe.append(types.SimpleNamespace(uid=uids[-1], real_folder=real))
+        try:
+            self._run("meta", fn)
+            if test and probe:
+                out["tested"] = True
+                try:
+                    self.set_flags_many(probe, pinned=True, probe=True)
+                    out["supported"] = True
+                except PinUnsupported:
+                    out["supported"] = False
+                finally:
+                    try:
+                        self.set_flags_many(probe, pinned=False)
+                    except Exception as e:                            # le retrait ne doit jamais masquer le verdict
+                        out["error"] = str(e)
+        except Exception as e:
+            out["error"] = str(e)
+        return out
 
     def move(self, msg, dest):
         return self.move_many([msg], dest)

@@ -182,3 +182,5 @@ Autre astuce
 Parcourir l aide
 Raccourcis essentiels
 Parcourir l'aide
+Connexion : OK
+Remarque : %s

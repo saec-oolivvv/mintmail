@@ -456,6 +456,9 @@
  "Aucun compte Gmail (OAuth).": [
   "settings_more.py"
  ],
+ "Aucun compte configuré : rien à vérifier.": [
+  "entry.py"
+ ],
  "Aucun créneau libre trouvé dans les 15 prochains jours.": [
   "extras.py"
  ],
@@ -464,6 +467,9 @@
  ],
  "Aucun message": [
   "window.py"
+ ],
+ "Aucun message dans la boîte de réception : essai impossible.": [
+  "entry.py"
  ],
  "Aucun message en attente.": [
   "extras.py"
@@ -666,7 +672,7 @@
  "Ce que ça apporte : les invitations acceptées et les rendez-vous détectés par l'IA arrivent directement dans Google Agenda (sans doublon) ; « Agenda » dans la palette affiche vos 14 prochains jours et permet de créer un événement ; à la réception d'une invitation, MintMail prévient si le créneau est déjà pris.\n\nMise en place (une seule fois) :\n1. Connectez d'abord votre compte Gmail avec le fournisseur « OAuth » (Paramètres → Comptes).\n2. Console Google Cloud (le même projet que pour Gmail) → API et services → Bibliothèque → « Google Calendar API » → Activer.\n3. Ici : « Autoriser Google Agenda » (une page Google s'ouvre ; l'autorisation « calendar.events » est AJOUTÉE à celle de Gmail).\nImportant : tant que l'écran de consentement est en mode « Test », Google fait expirer le jeton au bout de 7 jours (il faut alors ré-autoriser). Pour un usage personnel durable, passez l'application en « En production » (écran « application non validée » à accepter une fois ; jusqu'à 100 utilisateurs).": [
   "settings_more.py"
  ],
- "Ce serveur ne mémorise pas les épingles (Gmail, Outlook.com… refusent les mots-clés personnalisés) : l'épingle reste sur ce poste seulement.": [
+ "Ce serveur ne mémorise pas les épingles : l'épingle reste sur ce poste seulement. Commande « mintmail --check-pins » pour le vérifier.": [
   "backend.py"
  ],
  "Ce week-end (samedi 9 h)": [
@@ -800,6 +806,9 @@
  "Connecté ✔ — cliquez sur « Enregistrer ».": [
   "settings_more.py"
  ],
+ "Connexion : OK": [
+  "entry.py"
+ ],
  "Connexion IMAP impossible : %s": [
   "backend.py"
  ],
@@ -820,7 +829,8 @@
   "settings_more.py"
  ],
  "Connexion impossible : %s": [
-  "ai_service.py"
+  "ai_service.py",
+  "entry.py"
  ],
  "Connexion refusée": [
   "oauth.py"
@@ -1211,6 +1221,12 @@
  "Español": [
   "settings.py"
  ],
+ "Essai réversible sur le message le plus récent : RÉUSSI — ce serveur garde les épingles.": [
+  "entry.py"
+ ],
+ "Essai réversible sur le message le plus récent : ÉCHEC — ce serveur ne garde pas les épingles : elles restent sur chaque poste.": [
+  "entry.py"
+ ],
  "Exporter": [
   "settings_more.py"
  ],
@@ -1576,6 +1592,9 @@
  "Lecture impossible : %s": [
   "settings_more.py"
  ],
+ "Lecture seule : aucun essai effectué.": [
+  "entry.py"
+ ],
  "Les destinataires contiennent": [
   "settings_extra.py"
  ],
@@ -1680,6 +1699,9 @@
  ],
  "Messages non lus (boîte de réception) : %d": [
   "ai_features.py"
+ ],
+ "Messages épinglés sur le serveur (boîte de réception) : %d": [
+  "entry.py"
  ],
  "Mets en spam les mails promotionnels": [
   "assistant.py"
@@ -2148,6 +2170,9 @@
  ],
  "Relancez MintMail pour profiter de la nouvelle version.": [
   "updates_ui.py"
+ ],
+ "Remarque : %s": [
+  "entry.py"
  ],
  "Rendez-vous": [
   "ai_engine.py",
@@ -2628,6 +2653,12 @@
  ],
  "Très courte": [
   "ai_features.py"
+ ],
+ "Type de serveur : Gmail — l'épingle est l'étiquette « %s », visible dans Gmail (web et mobile).": [
+  "entry.py"
+ ],
+ "Type de serveur : IMAP standard — l'épingle est un mot-clé IMAP (invisible dans la plupart des messageries web, vu par vos autres postes MintMail).": [
+  "entry.py"
  ],
  "Tâche": [
   "extras.py"

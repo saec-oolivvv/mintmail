@@ -1,4 +1,4 @@
-# Aide de MintMail 1.13.3
+# Aide de MintMail 1.14.0
 _Généré par `make docs` depuis l'aide intégrée (touche F1 dans l'application)._
 
 ## Premiers pas
@@ -63,7 +63,7 @@ Tous les dossiers IMAP de chaque compte sont visibles dans la barre latérale (a
 
 ### Favoris, épingles, reports, relances
 
-• Favori (S) : étoile synchronisée avec le serveur. Épingle (P) : garde le message en haut de la liste ; elle est AUSSI enregistrée sur la boîte (mot-clé IMAP), donc visible sur vos autres postes à leur prochaine synchronisation. Certains serveurs (Gmail, Outlook.com) refusent ce mot-clé : MintMail le vérifie au premier essai et vous prévient, l'épingle reste alors sur ce poste seulement. Palette → « Envoyer mes épingles vers la boîte » envoie celles faites avant la 1.13.2.  
+• Favori (S) : étoile synchronisée avec le serveur. Épingle (P) : garde le message en haut de la liste ; elle est AUSSI enregistrée sur la boîte (mot-clé IMAP), donc visible sur vos autres postes à leur prochaine synchronisation. Sur Gmail, c'est une ÉTIQUETTE « MintMail-Epingles », visible dans Gmail (web et mobile) ; sur un serveur IMAP standard, un mot-clé IMAP, invisible dans la plupart des messageries web mais vu par vos autres postes MintMail. Si le serveur ne peut pas la garder, MintMail vous prévient au premier essai et l'épingle reste sur ce poste seulement ; « mintmail --check-pins » donne le verdict exact. Palette → « Envoyer mes épingles vers la boîte » envoie celles faites avant la 1.13.2.  
 • Reporter (H = demain 8 h, ou clic droit → Reporter) : le message disparaît puis revient en haut de la boîte à l'heure choisie (plus tard aujourd'hui, demain, ce week-end, lundi, la semaine prochaine…).  
 • « Me rappeler si pas de réponse » (menu ⋯ du lecteur ou clic droit) : MintMail vous prévient si le destinataire n'a pas répondu après 3 jours.
 
@@ -448,6 +448,8 @@ mintmail --remove-local-install
     Liste les anciennes installations qui masquent le paquet ; avec --yes, les met de côté dans ~/mintmail-sauvegarde-<date>/. À lancer avec le chemin complet : /usr/bin/mintmail.
 mintmail --send-due
     Envoie, sans interface, les messages programmés ou en attente dont l'heure est venue (appelé chaque minute par la minuterie utilisateur mintmail-outbox).
+mintmail --check-pins
+    Vérifie, pour chaque compte, si le serveur GARDE les épingles (étiquette Gmail ou mot-clé IMAP) : connexion, nombre de messages épinglés et essai réversible sur le message le plus récent. Avec --no-test : lecture seule.
 mintmail --check-update
     Cherche une mise à jour et affiche le résultat détaillé (version, dépôt, signature, cause d'une erreur) : sans interface, sans rien installer. Code de sortie : 0 à jour, 10 mise à jour disponible, 1 erreur.
 ```
@@ -482,7 +484,7 @@ Mise à jour : sudo apt install ./mintmail_X.Y.Z_all.deb (vos réglages et votre
 
 ## À propos et crédits
 
-### MintMail 1.13.3
+### MintMail 1.14.0
 
 Le client mail pour Linux Mint dont l'IA est l'ADN : il lit, trie, résume, classe, rédige et agit avec vous — toujours avec votre accord.  
 Développé par SAEC — https://saec.me · Logiciel libre sous licence MIT (© 2026 SAEC) : vous pouvez l'utiliser, le modifier et le redistribuer. Application GTK3 / Python, sans service cloud imposé : vos mails, vos clés et vos réglages restent chez vous.
