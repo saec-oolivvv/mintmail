@@ -17,7 +17,7 @@ La CI (`.github/workflows/portable.yml`) exécute `tests/run_core.py` sur Ubuntu
 ## Étapes
 
 1. **Moteur isolé, couche système, CI trois systèmes** — fait (1.17.0). Rien ne change pour l'utilisateur Linux.
-2. **Socle Qt** : fenêtre à trois volets (dossiers, liste, lecteur), liste avec modèle/vue, lecteur HTML (QtWebEngine), synchronisation branchée sur le moteur.
+2. **Socle Qt** — fait (1.18.0) : `mintmail --qt` ouvre la fenêtre PySide6 (dossiers, liste, lecteur QtWebEngine sans JavaScript, synchronisation en fond, message marqué lu sur le serveur). Reste à vérifier sur de vraies machines. Prévu à l'origine : fenêtre à trois volets (dossiers, liste, lecteur), liste avec modèle/vue, lecteur HTML (QtWebEngine), synchronisation branchée sur le moteur.
 3. **Fonctions** : rédaction, paramètres, assistant IA, aide, bandeau de mise à jour, rangement, règles, « Non lus », épingles.
 4. **Emballage et mises à jour par système** : Windows (PyInstaller + installeur signé), macOS (`.app` + `.dmg` signé et notarisé, compte Apple Developer), Linux (`.deb` inchangé). L'installation automatique des mises à jour est aujourd'hui propre à Linux (polkit) : sur les autres systèmes, MintMail annonce la version et ouvre la page de téléchargement.
 5. **Bascule** : quand l'interface Qt égale l'interface GTK, GTK est retiré.

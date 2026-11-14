@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.18.0
+- Interface Qt (expérimentale) : « mintmail --qt » ouvre une fenêtre PySide6 avec dossiers, liste des messages et lecteur (HTML assaini, JavaScript coupé, liens filtrés), synchronisation en arrière-plan et message marqué lu sur le serveur ; l'interface habituelle ne change pas, et la CI teste aussi la fenêtre Qt sur Linux, Windows et macOS
+
 ## 1.17.0
 - Préparation du portage Windows et macOS (interface Qt) : le moteur (courrier, synchro, IA, règles) est isolé de l'interface Linux et vérifié par des tests, les dossiers et notifications passent par une couche système, et une intégration continue teste le moteur sur Linux, Windows et macOS ; rien ne change à l'usage sous Linux
 

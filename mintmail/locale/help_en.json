@@ -559,6 +559,10 @@
    "Checks, for each account, whether the server KEEPS pins (Gmail label or IMAP keyword): connection, number of pinned messages and a reversible test on the most recent message. With --no-test: read-only."
   ],
   [
+   "mintmail --qt",
+   "Opens the Qt interface (experimental, a step towards Windows and macOS): folders, message list, reader. Needs PySide6 (pip install PySide6); the usual interface remains the reference."
+  ],
+  [
    "mintmail --check-update",
    "Checks for an update and prints the detailed result (version, repository, signature, cause of an error): no interface, nothing installed. Exit code: 0 up to date, 10 update available, 1 error."
   ]

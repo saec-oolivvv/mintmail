@@ -14,7 +14,7 @@ os.environ["MINTMAIL_LANG"] = os.environ.get("MINTMAIL_TEST_LANG", "fr")
 sys.path.insert(0, HERE)
 sys.path.insert(0, os.path.dirname(HERE))
 CORE_TESTS = {"test_core_portable", "test_sysdeps", "test_store2", "test_backend", "test_backend2", "test_ai", "test_ai2", "test_sync", "test_tasks_slots",
-              "test_p2p_discovery", "test_security", "test_hermetic", "test_senddue", "test_folder_replication"}
+              "test_p2p_discovery", "test_security", "test_hermetic", "test_senddue", "test_folder_replication", "test_qt_viewmodel", "test_qt_window"}
 ok = bad = 0
 for path in sorted(glob.glob(os.path.join(HERE, "test_*.py"))):
     name = os.path.basename(path)[:-3]

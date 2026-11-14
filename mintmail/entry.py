@@ -301,6 +301,13 @@ def main(argv=None) -> int:
         return check_update_cli()
     if "--check-pins" in argv:
         return check_pins_cli(test="--no-test" not in argv)
+    if "--qt" in argv:                      # interface Qt (expérimentale, étape 2 du portage) : liste des messages + lecteur
+        try:
+            from .qt.window import run as run_qt
+        except ImportError as e:
+            sys.stderr.write("L'interface Qt demande PySide6 (pip install PySide6) : %s\n" % e)
+            return 1
+        return run_qt([a for a in argv if a != "--qt"])
     from .store import harden_permissions
     harden_permissions()                    # dossiers 0700 / fichiers 0600, même pour les anciennes installations
     install_hook()

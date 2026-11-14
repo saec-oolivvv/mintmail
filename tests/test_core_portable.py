@@ -39,3 +39,20 @@ def test_every_module_is_classified_so_a_new_one_cannot_slip_through():
     known = set(CORE) | set(UI) | {"__init__", "__main__", "entry", "diagnose", "apply_update", "help_content"}
     present = {f[:-3] for f in os.listdir(os.path.join(ROOT, "mintmail")) if f.endswith(".py")}
     assert present <= known, "Module non classé (moteur ou interface ?) : %s" % sorted(present - known)
+
+
+def test_qt_view_logic_is_toolkit_free_and_only_window_imports_qt():
+    """mintmail/qt/viewmodel.py (testé sur les trois systèmes sans Qt) ne doit importer ni Qt ni GTK ; seul qt/window.py importe PySide6."""
+    import ast
+    d = os.path.join(ROOT, "mintmail", "qt")
+    for f in sorted(os.listdir(d)):
+        if not f.endswith(".py"):
+            continue
+        tree = ast.parse(open(os.path.join(d, f), encoding="utf-8").read())
+        tops = set()
+        for node in ast.walk(tree):
+            mods = [a.name for a in node.names] if isinstance(node, ast.Import) else [node.module or ""] if isinstance(node, ast.ImportFrom) and not node.level else []
+            tops |= {m.split(".")[0] for m in mods}
+        assert "gi" not in tops, f
+        if f != "window.py":
+            assert not tops & {"PySide6", "PyQt6", "PyQt5"}, f
