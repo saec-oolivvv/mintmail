@@ -717,7 +717,7 @@ class MainWindow(UpdateMixin, ExtrasMixin, OfflineMixin, ListMixin, AIMixin, Fol
 
     def update_counts(self):
         c = self.cache.counts(self.account)
-        for key, val in (("inbox", c["inbox"]), ("unread", c["inbox"]), ("drafts", c["drafts"]),
+        for key, val in (("inbox", c["inbox"]), ("unread", c["unread"]), ("drafts", c["drafts"]),
                          ("snoozed", c["snoozed"])):
             b = self.badges[key]
             b.set_text(str(val))
@@ -730,6 +730,8 @@ class MainWindow(UpdateMixin, ExtrasMixin, OfflineMixin, ListMixin, AIMixin, Fol
         self.process_outbox()
         if self._ticks % 10 == 0:
             self.flush_ops()
+        if self._ticks % 3 == 0:
+            self._drain_sync_wanted()
         if self._ticks % 3 == 0 and hasattr(self, "p2p_lbl"):
             eng = self.sync_engine
             short = 0 < len(str(self.config.get("p2p_secret") or "")) < P2P_MIN_SECRET
@@ -1221,6 +1223,7 @@ class MainWindow(UpdateMixin, ExtrasMixin, OfflineMixin, ListMixin, AIMixin, Fol
         if self._sync_busy or self._pending:
             if manual:
                 self.toast.popup(tr("Synchronisation déjà en cours…"), timeout=2)
+            self.__dict__.setdefault("_sync_wanted", set()).update(folders)       # demande gardée : refaite dès que la synchro en cours est finie (un dossier de rangement n'attend plus la prochaine minuterie)
             return
         self._sync_busy = True
         if not quiet:
@@ -1294,6 +1297,78 @@ class MainWindow(UpdateMixin, ExtrasMixin, OfflineMixin, ListMixin, AIMixin, Fol
         self._notify(fresh)
         self.ai_triage(routed_inbox)
         self.refresh_folder_counts()
+        GLib.timeout_add(300, lambda: (self._drain_sync_wanted(), False)[1])
+
+    def _unread_jobs(self):
+        """{compte: [dossiers]} à resynchroniser pour la vue « Non lus » : dossiers de rangement / archives où le serveur annonce des non lus,
+        ou où le cache en garde (ils ont pu être lus ailleurs). Jamais Spam, Corbeille, Envoyés, Brouillons ni la boîte de réception (déjà synchronisée)."""
+        cached, jobs = self.cache.folders_with_unread(), {}
+        for a in self.accounts():
+            if a.get("demo"):
+                continue
+            for e in self.tree_of(a["id"]):
+                if not e["selectable"] or e["special"] in ("inbox", "sent", "drafts", "trash", "spam"):
+                    continue
+                dest = dest_of(e)
+                if self.folder_unread.get((a["id"], e["name"]), 0) or (a["id"], dest) in cached:
+                    jobs.setdefault(a["id"], []).append(dest)
+        return jobs
+
+    def sync_other_unread(self):
+        """Va chercher les messages NON LUS rangés dans vos dossiers (règles, IA, rangement manuel, filtres du serveur) pour que la vue « Non lus »
+        les montre tous : sans cela un message important rangé dans un dossier passerait inaperçu."""
+        if self.__dict__.get("_other_busy"):
+            return
+        jobs = self._unread_jobs()
+        if not jobs:
+            return
+        self._other_busy = True
+        known = {(aid, f): self.cache.uids(aid, f) for aid, fs in jobs.items() for f in fs}
+
+        def work():
+            out = []
+            for aid, fs in jobs.items():
+                try:
+                    be = self.backend(aid)
+                except Exception:
+                    continue
+                for f in fs:
+                    try:
+                        out.append((aid, f, be.sync(f, known[(aid, f)], limit=60, unseen=True), None))
+                    except Exception as e:
+                        out.append((aid, f, None, e))
+            return out
+
+        def done(res, err):
+            self._other_busy = False
+            changed, fresh = False, []
+            for aid, f, data, e in res or []:
+                if e or not data:
+                    continue
+                msgs, flags, present, minuid = data
+                kn = known[(aid, f)]
+                self.cache.upsert_many(msgs)
+                self._apply_server_flags(kn, flags)
+                if present is not None:
+                    gone = [mid for uid, mid in kn.items() if uid >= minuid and uid not in present]
+                    if gone:
+                        self.cache.delete_many(gone)
+                        changed = True
+                changed = changed or bool(msgs or flags)
+                if kn:                                           # dossier déjà connu : ce qui arrive est vraiment nouveau (pas le premier remplissage)
+                    fresh += [m for m in msgs if m.unread and time.time() - m.date < 86400]
+            if changed:
+                self.reload_list()
+                self.update_counts()
+            self._notify(fresh)
+        self.run_bg(work, done)
+
+    def _drain_sync_wanted(self):
+        """Refait la synchronisation demandée pendant qu'une autre tournait (ex. le dossier où l'on vient de ranger des messages)."""
+        wanted = self.__dict__.get("_sync_wanted")
+        if wanted and not self._sync_busy and not self._pending:
+            todo, self._sync_wanted = tuple(sorted(wanted)), set()
+            self.sync(False, todo, quiet=True)
 
     # ----------------------------------------------------- push (IMAP IDLE)
     def _start_push(self):
@@ -1356,6 +1431,7 @@ class MainWindow(UpdateMixin, ExtrasMixin, OfflineMixin, ListMixin, AIMixin, Fol
                 self.sync(folders=("inbox", dest), quiet=True)
             self.reload_list()
             self.update_counts()
+            self._drain_sync_wanted()
         self.run_bg(work, done)
 
     # ------------------------------------------------------------ rédaction

@@ -71,6 +71,9 @@ SECTIONS: List[Dict] = [
         ("Découvrir la fenêtre",
          "• Barre latérale : vues intelligentes (Boîte de réception, Non lus, Favoris, Épinglés, Reportés, Brouillons), comptes et leurs dossiers, "
          "recherches enregistrées, voyant de synchronisation entre machines (⇄) en pied.\n"
+         "• « Non lus » réunit les messages non lus de la boîte de réception ET de tous vos dossiers de rangement et archives (règles, IA, rangement manuel), "
+         "sauf Spam, Corbeille, Envoyés et Brouillons : un message important rangé dans un dossier ne passe pas inaperçu. MintMail relit ces dossiers "
+         "en arrière-plan, environ chaque minute, sans télécharger ce qui est déjà lu.\n"
          "• Liste des messages au centre, lecteur à droite. Les séparateurs se déplacent à la souris et la position est retenue.\n"
          "• Un clic ouvre toujours le message. Le mode sélection (touche X ou bouton) affiche des cases à cocher pour agir sur plusieurs messages.\n"
          "• Menu ☰ : palette de commandes, paramètres (aussi en fenêtre séparée), clair / sombre, tout marquer comme lu, journal d'erreurs, à propos.\n"

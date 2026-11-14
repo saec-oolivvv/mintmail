@@ -108,6 +108,23 @@ LIST_RE = re.compile(rb'\((?P<f>[^)]*)\)\s+(?P<d>"(?:[^"\\]|\\.)*"|NIL)\s+(?P<n>
 TOP_RANK = {"inbox": 0, "drafts": 1, "sent": 2, "archive": 3, "spam": 4, "trash": 5}
 
 
+def _ok(res, what):
+    """Une commande IMAP refusée (NO / BAD) ne lève pas d'exception avec imaplib : on la transforme en erreur, pour ne JAMAIS enchaîner une suppression après un échec."""
+    if isinstance(res, tuple) and res and res[0] != "OK":
+        detail = res[1][0].decode("utf-8", "replace") if len(res) > 1 and res[1] and isinstance(res[1][0], bytes) else ""
+        raise BackendError("%s %s" % (what, detail[:100]))
+    return res
+
+
+def _expunge(imap, ids):
+    """Efface seulement les messages visés (UID EXPUNGE) quand le serveur le permet ; sinon l'effacement classique."""
+    if "UIDPLUS" in getattr(imap, "capabilities", ()):
+        r = imap.uid("EXPUNGE", ids)
+        if not (isinstance(r, tuple) and r and r[0] != "OK"):
+            return
+    imap.expunge()
+
+
 def _q(name):
     if re.search(r"[\x00-\x1f\x7f]", name or ""):                 # CR / LF / NUL : injection de commande IMAP
         raise BackendError(tr("Nom de dossier invalide (caractères de contrôle)"))
@@ -507,9 +524,10 @@ class IMAPBackend:
         except Exception as e:
             return "SMTP : %s" % e
 
-    def sync(self, logical, known, limit=60, on_batch=None):
+    def sync(self, logical, known, limit=60, on_batch=None, unseen=False):
         """Retourne (nouveaux messages, {uid: (non lu, favori)}, uids présents, uid minimum).
-        Les nouveaux messages arrivent par lots, les plus récents d'abord (on_batch)."""
+        Les nouveaux messages arrivent par lots, les plus récents d'abord (on_batch).
+        unseen=True (dossiers de rangement) : ne télécharge que les NON LUS pas encore connus ; l'état des messages connus est relu."""
         def fn(conn):
             imap = conn.imap
             real = self._resolve(imap, logical)
@@ -519,8 +537,12 @@ class IMAPBackend:
             typ, data = imap.uid("SEARCH", None, "ALL")
             uids = [int(x) for x in data[0].split()] if data and data[0] else []
             window = uids[-limit:]
+            if unseen:
+                typ, du = imap.uid("SEARCH", None, "UNSEEN")
+                un = {int(x) for x in du[0].split()} if du and du[0] else set()
+                window = sorted(set(window) | un)
             flags = {}
-            old = [u for u in window if u in known]
+            old = [u for u in (uids[-300:] if unseen else window) if u in known]       # unseen : état relu pour tous les messages connus (lu ailleurs ?)
             proven = self.acc.get("pin_server") is True            # capacité connue AVANT cette lecture : seule elle autorise à désépingler à distance
             for chunk in _chunks(old, 100):
                 typ, d = imap.uid("FETCH", ",".join(map(str, chunk)), "(UID FLAGS%s)" % (" X-GM-LABELS" if _has_gm(imap) else ""))
@@ -533,7 +555,7 @@ class IMAPBackend:
                                 self._pin_state(True)
                             flags[int(mu.group(1))] = ("\\seen" not in fl, "\\flagged" in fl, True if PIN_KEYWORD_LOW in fl else (False if proven else None))
             msgs = []
-            new = sorted((u for u in window if u not in known), reverse=True)
+            new = sorted((u for u in (un if unseen else window) if u not in known), reverse=True)
             for chunk in _chunks(new, 10):
                 batch = self._fetch_batch(imap, chunk, logical, real)
                 if any(m.pinned for m in batch):
@@ -541,6 +563,8 @@ class IMAPBackend:
                 msgs += batch
                 if on_batch and batch:
                     on_batch(batch)
+            if unseen:
+                return msgs, flags, set(uids), 0                   # liste COMPLÈTE : un message supprimé ou déplacé ailleurs disparaît du cache
             return msgs, flags, set(window), (window[0] if window else 0)
         return self._run("sync", fn)
 
@@ -711,11 +735,11 @@ class IMAPBackend:
                             pass
                 if target and target != real:
                     if "MOVE" in getattr(imap, "capabilities", ()):
-                        imap.uid("MOVE", ids, _q(target))
+                        _ok(imap.uid("MOVE", ids, _q(target)), tr("Déplacement refusé par le serveur"))
                         continue
-                    imap.uid("COPY", ids, _q(target))
-                imap.uid("STORE", ids, "+FLAGS", "(\\Deleted)")
-                imap.expunge()
+                    _ok(imap.uid("COPY", ids, _q(target)), tr("Copie refusée par le serveur : le message n'est PAS supprimé"))
+                _ok(imap.uid("STORE", ids, "+FLAGS", "(\\Deleted)"), tr("Marquage refusé par le serveur"))
+                _expunge(imap, ids)
         self._run("act", fn)
         return None
 
@@ -731,8 +755,9 @@ class IMAPBackend:
         def fn(conn):
             for real, uids in by.items():
                 self._select(conn, real)
-                conn.imap.uid("STORE", ",".join(str(u) for u in uids), "+FLAGS", "(\\Deleted)")
-                conn.imap.expunge()
+                ids = ",".join(str(u) for u in uids)
+                _ok(conn.imap.uid("STORE", ids, "+FLAGS", "(\\Deleted)"), tr("Suppression refusée par le serveur"))
+                _expunge(conn.imap, ids)
         if by:
             self._run("act", fn)
 
@@ -949,7 +974,7 @@ class DemoBackend:
     def test(self):
         return None
 
-    def sync(self, logical, known, limit=60, on_batch=None):
+    def sync(self, logical, known, limit=60, on_batch=None, unseen=False):
         msgs = []
         marker = DATA_DIR / "demo_seeded"
         if logical == "inbox" and not known and not marker.exists():

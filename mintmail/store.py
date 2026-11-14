@@ -199,6 +199,9 @@ def parse_search(q):
     return terms, flt
 
 
+# Vue « Non lus » : tout sauf ces dossiers (un message rangé par une règle ou à la main ne doit pas passer inaperçu)
+UNREAD_EXCLUDED = "('trash','spam','sent','drafts')"
+
 class Cache:
     """Cache SQLite. La liste lit des « méta » légères (sans corps) ; les corps sont chargés à l'ouverture.
     Les indicateurs (dossier, lu, favori…) vivent dans des colonnes : une mise à jour = un UPDATE."""
@@ -386,6 +389,11 @@ class Cache:
             self.db.execute("DELETE FROM messages WHERE account=?", (account,))
             self.db.commit()
 
+    def folders_with_unread(self):
+        """{(compte, dossier)} où le cache connaît au moins un message non lu (à resynchroniser : il a pu être lu ailleurs)."""
+        with self.lock:
+            return {(a, f) for a, f in self.db.execute("SELECT DISTINCT account, folder FROM messages WHERE unread=1").fetchall()}
+
     def uids(self, account, folder):
         with self.lock:
             rows = self.db.execute(
@@ -430,7 +438,7 @@ class Cache:
             where.append("folder='inbox' AND snoozed<=?")
             args.append(now)
         elif view == "unread":
-            where.append("unread=1 AND folder='inbox' AND snoozed<=?")
+            where.append("unread=1 AND folder NOT IN %s AND snoozed<=?" % UNREAD_EXCLUDED)
             args.append(now)
         elif view == "starred":
             where.append("starred=1 AND folder NOT IN ('trash','spam')")
@@ -607,6 +615,7 @@ class Cache:
             q = lambda s, x: self.db.execute(s, x).fetchone()[0]
             return {
                 "inbox": q("SELECT COUNT(*) FROM messages WHERE folder='inbox' AND unread=1 AND snoozed<=?" + acc, [now] + a),
+                "unread": q("SELECT COUNT(*) FROM messages WHERE unread=1 AND folder NOT IN %s AND snoozed<=?%s" % (UNREAD_EXCLUDED, acc), [now] + a),
                 "drafts": q("SELECT COUNT(*) FROM messages WHERE folder='drafts'" + acc, a),
                 "snoozed": q("SELECT COUNT(*) FROM messages WHERE snoozed>?" + acc, [now] + a),
             }

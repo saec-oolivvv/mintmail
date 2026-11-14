@@ -64,7 +64,7 @@ def test_server_gets_notjunk_flags_then_the_message_leaves_spam():
 
     class Imap:
         capabilities = ("MOVE",)
-        def uid(self, *a): log.append(a)
+        def uid(self, *a): log.append(a); return ("OK", [b"done"])
     conn = types.SimpleNamespace(imap=Imap())
     be._run = lambda kind, fn: fn(conn)
     be._resolve = lambda imap, dest: "INBOX"

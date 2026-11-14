@@ -105,3 +105,54 @@ def test_idle_wakes_up_on_flag_changes_made_by_another_machine():
     stop = types.SimpleNamespace(is_set=lambda: False)
     assert B.IMAPBackend._idle_once(imap, stop, max_wait=5) is True
     assert imap.sock.out[-1] == b"DONE\r\n"
+
+
+def _be_with(responses, caps=()):
+    log = []
+
+    class Imap:
+        capabilities = caps
+        def uid(self, *a):
+            log.append(a[:2] if a[0] in ("MOVE", "COPY", "EXPUNGE") else a[:1] + (a[2],))
+            return responses.get(a[0], ("OK", [b"ok"]))
+        def expunge(self): log.append(("EXPUNGE-ALL",)); return ("OK", [])
+    be = B.IMAPBackend({"id": "a", "email": "a@b.c"}, "")
+    be._run = lambda kind, fn: fn(types.SimpleNamespace(imap=Imap()))
+    be._resolve = lambda imap, dest: "LTD"
+    be._select = lambda c, real: None
+    return be, log
+
+
+def test_a_refused_copy_never_deletes_the_original():
+    be, log = _be_with({"COPY": ("NO", [b"[TRYCREATE] Mailbox doesn't exist"])})
+    try:
+        be.move_many([types.SimpleNamespace(uid=3, real_folder="INBOX")], "f:LTD")
+        raise AssertionError("une copie refusée doit être une erreur")
+    except B.BackendError as e:
+        assert "PAS supprimé" in str(e)
+    assert not any(x[0] in ("STORE", "EXPUNGE-ALL", "EXPUNGE") for x in log), log      # ni marquage \Deleted ni effacement
+
+
+def test_a_refused_move_is_reported_and_expunge_is_targeted_when_possible():
+    be, log = _be_with({"MOVE": ("NO", [b"nope"])}, caps=("MOVE",))
+    try:
+        be.move_many([types.SimpleNamespace(uid=3, real_folder="INBOX")], "f:LTD")
+        raise AssertionError("un déplacement refusé doit être une erreur")
+    except B.BackendError:
+        pass
+    be, log = _be_with({}, caps=("UIDPLUS",))
+    be.move_many([types.SimpleNamespace(uid=3, real_folder="INBOX"), types.SimpleNamespace(uid=4, real_folder="INBOX")], "f:LTD")
+    assert ("EXPUNGE", "3,4") in log and ("EXPUNGE-ALL",) not in log, log                # seuls ces messages, pas tout le dossier
+
+
+def test_sync_requested_while_busy_is_replayed_afterwards():
+    w, srv = _win(8)
+    calls = []
+    w._sync_busy, w._pending = True, 0
+    w.sync(False, ("inbox", "f:LTD"), quiet=True)
+    assert w._sync_wanted == {"inbox", "f:LTD"} and not calls
+    w._sync_busy = False
+    w.accounts = lambda: []
+    w.run_bg = lambda fn, done=None: calls.append(("bg", done))
+    w._drain_sync_wanted()
+    assert calls and w._sync_wanted == set() and w._sync_busy                          # le dossier de rangement est resynchronisé sans attendre la minuterie

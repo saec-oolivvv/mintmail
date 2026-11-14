@@ -463,6 +463,7 @@ class FolderMixin:
                 for name, (_n, unseen) in st.items():
                     self.folder_unread[(aid, name)] = unseen
             self._update_folder_badges()
+            self.sync_other_unread()                    # les non lus rangés dans un dossier rejoignent la vue « Non lus »
         self.run_bg(work, done)
 
     # ------------------------------------------------ déplacer vers un dossier

@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.16.0
+- Vue « Non lus » : elle réunit maintenant les messages non lus de la boîte de réception ET de tous vos dossiers de rangement et archives (règles, IA, rangement manuel), sauf Spam, Corbeille, Envoyés et Brouillons ; le badge compte tout. MintMail relit ces dossiers en arrière-plan (environ chaque minute) sans télécharger ce qui est déjà lu, et notifie les non lus récents qui y arrivent
+- Sécurité du déplacement côté serveur : une copie ou un déplacement refusé par le serveur est maintenant une erreur franche et ne supprime plus jamais le message d'origine (avant, le refus n'était pas lu) ; l'effacement ne touche que les messages visés (UID EXPUNGE) et plus tout le dossier
+- Un dossier où l'on vient de ranger des messages (ex. LTD) est resynchronisé sans attendre : la demande faite pendant une autre synchronisation est conservée et rejouée
+
 ## 1.15.1
 - Correction : « ranger tous les messages de X dans le dossier Y » créait le dossier mais ne déplaçait rien quand « créer le dossier » et « déplacer » étaient validés d'un coup (double création refusée par le serveur, déplacement abandonné sans message) ; la création est désormais unique, tolère « existe déjà », et le dossier sert immédiatement
 - Réplication entre postes : la liste des dossiers est relue toutes les minutes environ (elle ne l'était qu'au démarrage) et aussitôt après un changement signalé par le serveur ; la boîte de réception est resynchronisée chaque minute (épingles, lu, favoris posés sur un autre poste)
