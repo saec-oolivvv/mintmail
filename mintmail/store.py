@@ -2,6 +2,7 @@ import copy
 import json
 import os
 import sqlite3
+import subprocess
 import sys
 import threading
 import time
@@ -162,6 +163,37 @@ class Config:
             self.data.setdefault("passwords", {})[account_id] = pw
 
 
+MAC_SERVICE = "MintMail"       # service du trousseau macOS : DISTINCT de l'ancien « mintmail » (python-keyring), dont l'autorisation est liée à un autre programme
+
+
+def _q(x: str) -> str:
+    return '"' + str(x).replace("\\", "\\\\").replace('"', '\\"') + '"'
+
+
+def mac_keychain(op, *args, run=subprocess.run):
+    """Trousseau macOS via l'outil Apple « security » (signature stable) : l'élément est créé avec « -T /usr/bin/security », donc relu SANS fenêtre
+    d'autorisation. Avec python-keyring, l'autorisation était liée à l'application elle-même (signature « ad hoc » qui change à chaque construction) :
+    fenêtre de mot de passe sans TouchID, qui revenait sans fin. Le mot de passe passe par l'entrée standard, jamais par la ligne de commande."""
+    account = str(args[1]) if len(args) > 1 else ""
+    try:
+        if op == "get_password":
+            r = run(["/usr/bin/security", "find-generic-password", "-a", account, "-s", MAC_SERVICE, "-w"], capture_output=True, text=True, timeout=60)
+            return r.stdout.rstrip("\n") if r.returncode == 0 and r.stdout.strip() else None
+        if op == "set_password":
+            pw = str(args[2])
+            if "\n" in pw or "\r" in pw or "\0" in pw:
+                return False
+            cmd = "add-generic-password -U -a %s -s %s -w %s -T /usr/bin/security\n" % (_q(account), _q(MAC_SERVICE), _q(pw))
+            r = run(["/usr/bin/security", "-i"], input=cmd, capture_output=True, text=True, timeout=60)
+            return r.returncode == 0 and "error" not in (r.stderr or "").lower()
+        if op == "delete_password":
+            run(["/usr/bin/security", "delete-generic-password", "-a", account, "-s", MAC_SERVICE], capture_output=True, text=True, timeout=60)
+            return True
+    except Exception:
+        return None
+    return None
+
+
 _inflight = {}                 # (op, service, compte) -> (fil, boîte) : un appel au trousseau encore en attente (fenêtre de mot de passe ouverte)
 _inflight_lock = threading.Lock()
 
@@ -194,6 +226,10 @@ def _keyring(op, *args, timeout=None):
 
             def run(box=box):
                 try:
+                    if sys.platform == "darwin" and os.environ.get("MINTMAIL_MAC_KEYRING_LIB") != "1":
+                        box["v"] = mac_keychain(op, *args)
+                        box["done"] = True
+                        return
                     import keyring
                     if op == "set_password":
                         keyring.set_password(*args)

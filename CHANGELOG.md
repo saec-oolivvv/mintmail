@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.35.6
+- Mac : le trousseau passe par l'outil Apple security (plus de fenêtre sans TouchID en boucle) ; saisir à nouveau les mots de passe des comptes
+
 ## 1.35.5
 - Mac : le trousseau ne redemande plus le mot de passe en boucle (attente de la réponse au lieu d'abandonner après 4 s)
 
