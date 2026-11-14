@@ -37,6 +37,7 @@ class ListMixin:
         grouped = self.threads_on() and not self._effective_search() and self.view not in ("drafts", "outbox")
         msgs = self.cache.query(self.view, self.account, self.category if self.view == "inbox" else None,
                                 self.unread_only, self.att_only, self._effective_search(), limit=self._limit, threads=grouped)
+        msgs = self._with_kept_unread(msgs)
         self.srv_btn.set_visible(bool(self._effective_search()) and any(not a.get("demo") for a in self.accounts()))
         ai = self.cache.ai_meta([m.id for m in msgs])
         sel = self.listbox.get_selected_row()
@@ -75,6 +76,36 @@ class ListMixin:
         unread = sum(1 for r in self.rows.values() if r.msg.unread)
         n = len(self.rows)
         self.count_lbl.set_text(tr("%d message%s · %d non lu%s") % (n, "s" if n > 1 else "", unread, "s" if unread > 1 else ""))
+
+    def _with_kept_unread(self, msgs):
+        """Vue « Non lus » : le message ouvert (donc lu) reste dans la liste, et dans le lecteur, tant qu'on ne passe pas à un autre ;
+        il n'en sort qu'à ce moment-là, ou si on agit dessus (archiver, supprimer, marquer comme lu…)."""
+        if self.view != "unread" or self._effective_search():
+            self.__dict__["_unread_keep"] = set()
+            return msgs
+        kept = self.__dict__.get("_unread_keep") or set()
+        have = {m.id for m in msgs}
+        extra = [x for i in kept if i not in have for x in [self.cache.get(i)] if x is not None and x.folder not in ("trash", "spam")]
+        return sorted(msgs + extra, key=lambda m: -m.date) if extra else msgs
+
+    def _keep_open_unread(self, msg, was_unread):
+        """Dans « Non lus » : retient le message qu'on vient d'ouvrir et laisse partir le précédent (lu), maintenant qu'on est passé au suivant."""
+        if self.view != "unread" or self._effective_search():
+            return
+        old = self.__dict__.get("_unread_keep") or set()
+        self._unread_keep = {msg.id} if (was_unread or msg.id in old) else set()
+        gone = [i for i in old if i != msg.id and i in self.rows and not self.rows[i].msg.unread]
+        if gone:
+            self.remove_rows(gone, select_next=False)
+
+    def _drop_kept_unread(self):
+        """Plus aucun message sélectionné : celui qu'on gardait (déjà lu) quitte la vue « Non lus »."""
+        old = self.__dict__.get("_unread_keep") or set()
+        if self.view == "unread" and old:
+            gone = [i for i in old if i in self.rows and not self.rows[i].msg.unread]
+            self._unread_keep = set()
+            if gone:
+                self.remove_rows(gone, select_next=False)
 
     def _sync_reader(self):
         """Aligne le lecteur sur la sélection après une mise à jour de la liste."""
@@ -120,7 +151,10 @@ class ListMixin:
 
     def _on_row_selected(self, lb, row):
         """Un clic sur une ligne l'ouvre, que le lecteur soit vide ou non."""
-        if self._loading or self.select_mode or row is None:
+        if self._loading or self.select_mode:
+            return
+        if row is None:
+            self._drop_kept_unread()
             return
         self.open_message(row.msg)
 
@@ -150,6 +184,7 @@ class ListMixin:
                 self.reader_open = True
                 self._layout()
             return
+        self._keep_open_unread(msg, bool(msg.unread))
         self.reader.show_message(full, self.config["load_images"])
         if self.single:
             self.reader_open = True
@@ -268,6 +303,7 @@ class ListMixin:
 
     # ------------------------------------------------------------------ actions
     def remove_rows(self, ids, select_next=True):
+        self.__dict__.get("_unread_keep", set()).difference_update(ids)
         ids = [i for i in ids if i in self.rows]
         sel = self.listbox.get_selected_row()
         idx = sel.get_index() if sel is not None else None

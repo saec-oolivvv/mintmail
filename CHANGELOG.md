@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.16.1
+- Vue « Non lus » : le message que vous ouvrez y reste affiché (liste et lecteur) tant que vous ne passez pas à un autre ; il n'en sort qu'à ce moment-là, ou si vous agissez dessus (archiver, supprimer…), au lieu de disparaître dès son ouverture
+
 ## 1.16.0
 - Vue « Non lus » : elle réunit maintenant les messages non lus de la boîte de réception ET de tous vos dossiers de rangement et archives (règles, IA, rangement manuel), sauf Spam, Corbeille, Envoyés et Brouillons ; le badge compte tout. MintMail relit ces dossiers en arrière-plan (environ chaque minute) sans télécharger ce qui est déjà lu, et notifie les non lus récents qui y arrivent
 - Sécurité du déplacement côté serveur : une copie ou un déplacement refusé par le serveur est maintenant une erreur franche et ne supprime plus jamais le message d'origine (avant, le refus n'était pas lu) ; l'effacement ne touche que les messages visés (UID EXPUNGE) et plus tout le dossier
