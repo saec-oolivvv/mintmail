@@ -901,3 +901,23 @@ def test_swipe_effects_toggle_flags_and_target_the_right_things():
     assert GS.effect("snooze", m, 99.0) == {"snooze": 99.0} and GS.effect("block", _m(4, sender_email="A@B.be"), 5) == {"block": "a@b.be"}
     assert GS.effect("none", m, 5) == {}
     assert set(GS.DEFAULT_SWIPE.values()) <= set(GS.SWIPE_ACTIONS)
+
+
+# ------------------------------------------------------------------ clic droit et palette
+from mintmail.qt import menus as MN
+
+
+def test_context_menu_labels_follow_the_message_state_and_palette_search_matches_every_word():
+    items = MN.context_items(_m(1, unread=True, starred=False, pinned=True, folder="inbox"))
+    labels = {k: v for k, v in (i for i in items if i)}
+    assert labels["read"].endswith("lu") and labels["star"] == "Ajouter aux favoris" and labels["pin"] == "Désépingler" and "notspam" not in labels
+    assert None in items and items[0][0] == "reply"
+    spam = {k for k, _ in (i for i in MN.context_items(_m(2, folder="spam")) if i)}
+    assert "notspam" in spam
+    assert "Débloquer" in dict(i for i in MN.context_items(_m(3, sender_email="x@y.be"), blocked=True) if i)["block"]
+    cmds = MN.palette_commands(_m(4, sender_email="bob@acme.be"))
+    assert ("Bloquer le domaine — @acme.be", "block_domain") in cmds and ("Aller à : Non lus", "goto:unread") in cmds
+    assert [k for _l, k in MN.search(cmds, "domaine acme")] == ["spam_domain", "block_domain"]
+    assert MN.search(cmds, "") == cmds and MN.search(cmds, "zzzz") == []
+    assert MN.wants_ai("range mes factures", []) and not MN.wants_ai("ab", []) and not MN.wants_ai("archiver", [("a", "b")])
+    assert all(k != "reply" for _l, k in MN.palette_commands(None))                      # sans message : pas d'actions de message

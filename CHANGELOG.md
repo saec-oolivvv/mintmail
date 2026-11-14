@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.27.0
+- Interface Qt (expérimentale, mintmail --qt) : clic droit sur un message comme dans la version GTK — répondre, transférer, archiver, supprimer, lu / non lu, favori, épingle, spam, bloquer ou débloquer l'expéditeur, voir tous ses messages, résumer / traduire / répondre avec l'IA, reporter, déplacer vers un dossier ; il agit sur la sélection
+- Interface Qt : palette de commandes (Ctrl+K) — actions sur le message courant, aller à un dossier ou à une vue, déplacer vers un dossier, dispositions, réglages, aide, mises à jour ; un texte sans commande correspondante est confié à l'assistant IA
+
 ## 1.26.0
 - Interface Qt (expérimentale, mintmail --qt) : dossiers repliables comme dans la version GTK — chevrons pour plier / déplier chaque dossier (état mémorisé), une section par compte quand il y en a plusieurs, compteur de non lus par dossier ; les sous-dossiers ne sont plus tous dépliés
 - Interface Qt : gestes de balayage sur la liste des messages (souris ou deux doigts sur le pavé tactile) avec fond coloré et libellé de l'action, glissement court ou long, mêmes actions et seuils que la version GTK ; disposition colonnes / lecture en bas / liste seule (touche « \ », Échap pour revenir à la liste) ; onglet « Gestes & disposition » des réglages (actions, inversion au pavé tactile, conversations)

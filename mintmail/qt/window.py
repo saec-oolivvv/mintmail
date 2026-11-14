@@ -30,6 +30,8 @@ from .ui_assistant import AssistantPanel
 from .ui_readercard import QuickReply, ReaderCard
 from . import navtree as NT
 from . import gestures as GS
+from . import menus as MN
+from .ui_palette import Palette
 from .ui_widgets import (AccountRole, AvatarWidget, CountRole, DepthRole, FoldedRole, InfoRole, KeyRole, KindRole, LabelRole, MessageDelegate, MessageList, NameRole,
                          NavDelegate, NavList, ToggleRole)
 
@@ -186,6 +188,8 @@ class MainWindow(QMainWindow):
         self.delegate = MessageDelegate(self.t, T.row_height(self.config.get("density") or "comfortable"))
         self.list = MessageList(self.delegate, lambda: (GS.settings(self.config), bool(self.config.get("swipe_invert"))))
         self.list.swiped.connect(self._swiped)
+        self.list.setContextMenuPolicy(Qt.CustomContextMenu)
+        self.list.customContextMenuRequested.connect(self._context_menu)
         self.list.setModel(self.model)
         self.list.setMouseTracking(True)
         self.list.setFrameShape(QFrame.NoFrame)
@@ -360,6 +364,7 @@ class MainWindow(QMainWindow):
         self.apply_theme()
         self.set_layout(self.config.get("layout") or "columns")
         self._act(None, "", "Escape", self._back_to_list)
+        self._act(None, "", "Ctrl+K", self.show_palette)
         self._act(None, "", "\\", self.cycle_layout)
         self.reload()
         QTimer.singleShot(300, lambda: self.sync(quiet=True))
@@ -1003,6 +1008,88 @@ class MainWindow(QMainWindow):
 
     def open_draft(self, msg):
         self.compose(**C.draft_args(msg))
+
+    # ------------------------------------------------------------ clic droit et palette
+    def _context_menu(self, pos):
+        idx = self.list.indexAt(pos)
+        if not idx.isValid():
+            return
+        if not self.list.selectionModel().isRowSelected(idx.row(), QModelIndex()):
+            self.list.setCurrentIndex(idx)
+        msgs = self.selected_msgs()
+        if not msgs:
+            return
+        m = msgs[0]
+        menu = QMenu(self)
+        for it in MN.context_items(m, m.sender_email.lower() in {x.lower() for x in self.config["blocked"]}):
+            if it is None:
+                menu.addSeparator()
+            else:
+                menu.addAction(it[1], lambda k=it[0]: self._run_cmd(k, m))
+        sn = menu.addMenu(tr("Reporter"))
+        for key, label in MN.SNOOZES:
+            sn.addAction(label, lambda k=key: self._run_cmd(k, m))
+        mv = menu.addMenu(tr("Déplacer vers un dossier"))
+        for dest, label in self.engine.move_targets(m.account):
+            mv.addAction(label, lambda d=dest: self._run_cmd("move:" + d, m))
+        menu.exec(self.list.viewport().mapToGlobal(pos))
+
+    def show_palette(self):
+        sel = self.selected_msgs()
+        m = getattr(self, "shown", None) or (sel[0] if sel else None)
+        dlg = Palette(self, MN.palette_commands(m, self.engine))
+        dlg.chosen.connect(lambda k: QTimer.singleShot(0, lambda: self._run_cmd(k, m)))
+        dlg.asked.connect(lambda t: QTimer.singleShot(0, lambda: (self.toggle_assistant(True), self.assistant_ask(t))))
+        dlg.exec()
+
+    def _run_cmd(self, key, m):
+        """Exécute une commande du clic droit ou de la palette (même chemin que les boutons : cache d'abord, serveur ensuite)."""
+        head, _, arg = key.partition(":")
+        if m is not None:
+            if key == "reply" or key == "reply_all" or key == "forward":
+                return {"reply": self.reply, "reply_all": lambda: self.reply(True), "forward": self.forward}[key]()
+            if key in ("archive", "trash", "spam"):
+                return self.move_selected(key)
+            if key in ("read", "star", "pin"):
+                return self.toggle_flag({"read": "unread", "star": "starred", "pin": "pinned"}[key])
+            if key == "notspam":
+                return self.not_spam_selected()
+            if key in ("spam_sender", "spam_domain"):
+                keyv = AU.sender_key(m, key == "spam_domain")
+                msgs, dest = AU.filter_sender(self.engine, keyv, "spam_senders", m)
+                self.status.setText("Spam : " + keyv)
+                return self.move_messages(msgs, dest)
+            if key in ("block", "block_domain"):
+                keyv = AU.sender_key(m, key == "block_domain")
+                if keyv in {x.lower() for x in self.config["blocked"]}:
+                    AU.unfilter_sender(self.engine, "blocked", keyv)
+                    self.status.setText(tr("Débloqué : ") + keyv)
+                    return
+                return self.block_sender(keyv, m)
+            if key == "from":
+                self.search.setText(m.sender_email)
+                return
+            if key in ("summarize", "translate", "ai_reply"):
+                if getattr(self, "shown", None) is None or self.shown.id != m.id:
+                    self._show(self.cache.get(m.id) or m)
+                return self._on_ai_action({"summarize": "analyze", "translate": "translate", "ai_reply": "reply_ai"}[key], "")
+            if key in ("snooze_tomorrow", "snooze_monday"):
+                msgs = self.selected_msgs() or [m]
+                self.engine.snooze(msgs, C.at(1, 8) if key == "snooze_tomorrow" else C.next_monday())
+                return self._after_action(msgs, [], "ops", lambda: ([], [], False))
+            if head == "move":
+                return self.move_selected(arg)
+        if head == "goto":
+            self.select_view(arg)
+            return self._view_changed(next((i for i in range(self.folders.count()) if self.folders.item(i).data(KeyRole) == arg), -1))
+        if head == "layout":
+            return self.set_layout(arg)
+        if head == "settings":
+            return self.show_settings(page=arg or None)
+        simple = {"assistant": lambda: self.toggle_assistant(True), "compose": self.compose, "sync": lambda: self.sync(False), "help": self.show_help,
+                  "apply_rules": self.apply_rules_now, "updates": lambda: self.check_updates(manual=True), "search": self.search.setFocus}
+        if key in simple:
+            simple[key]()
 
     def _swiped(self, row, act):
         """Applique l'action d'un geste à la ligne balayée (même chemin que les boutons : cache d'abord, serveur ensuite)."""
