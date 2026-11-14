@@ -13,6 +13,7 @@ from ..style import ACCENTS, STYLES
 from . import accounts as A
 from . import assistant as AS
 from . import automation as AU
+from .. import __version__, updater
 
 
 class _Signals(QObject):
@@ -39,6 +40,7 @@ class SettingsDialog(QDialog):
         tabs.addTab(self._look_tab(), tr("Apparence"))
         tabs.addTab(self._filters_tab(), tr("Filtres & blocage"))
         tabs.addTab(self._ai_tab(), "✨ IA")
+        tabs.addTab(self._updates_tab(), tr("Mises à jour"))
         self.tabs = tabs
         close = QPushButton(tr("Fermer"))
         close.clicked.connect(self.accept)
@@ -52,7 +54,7 @@ class SettingsDialog(QDialog):
 
     def open_page(self, page):
         """Ouvre l'onglet demandé (par l'assistant ou « réglages de l'IA ») : accounts, look, filters ou ai."""
-        idx = {"accounts": 0, "look": 1, "appearance": 1, "filters": 2, "ai": 3}.get(page)
+        idx = {"accounts": 0, "look": 1, "appearance": 1, "filters": 2, "ai": 3, "updates": 4}.get(page)
         if idx is not None:
             self.tabs.setCurrentIndex(idx)
 
@@ -435,6 +437,66 @@ class SettingsDialog(QDialog):
 
     def _apply_rules_now(self):
         self.main.apply_rules_now()
+
+    # ------------------------------------------------------------ mises à jour
+    def _updates_tab(self):
+        w = QWidget()
+        form = QFormLayout(w)
+        form.addRow(QLabel(tr("Version installée : %s") % __version__))
+        auto = QCheckBox(tr("Rechercher automatiquement (au démarrage, puis toutes les heures)"))
+        auto.setChecked(bool(self.cfg.get("update_check", True)))
+        auto.toggled.connect(lambda v: self._set("update_check", bool(v)))
+        form.addRow("", auto)
+        repo = QLineEdit(self.cfg.get("update_repo") or updater.DEFAULT_REPO)
+        repo.setToolTip(tr("Dépôt GitHub des versions, au format propriétaire/nom"))
+
+        def repo_changed(text):
+            v = text.strip()
+            if updater.valid_repo(v):
+                self.cfg["update_repo"], self.cfg["update_etag"] = v, ""
+                self.cfg.save()
+        repo.textChanged.connect(repo_changed)
+        form.addRow(tr("Dépôt GitHub"), repo)
+        self._up_status = QLabel()
+        self._up_status.setWordWrap(True)
+        form.addRow(self._up_status)
+        row = QHBoxLayout()
+        self._up_check = QPushButton(tr("Vérifier maintenant"))
+        self._up_install = QPushButton(tr("Installer la mise à jour"))
+        self._up_install.setObjectName("primary")
+        self._up_restart = QPushButton(tr("Relancer maintenant"))
+        self._up_restart.setObjectName("primary")
+        self._up_check.clicked.connect(lambda: self.main.check_updates(manual=True))
+        self._up_install.clicked.connect(lambda: self.main.install_update())
+        self._up_restart.clicked.connect(lambda: self.main.restart_app())
+        for b in (self._up_check, self._up_install, self._up_restart):
+            row.addWidget(b)
+        row.addStretch(1)
+        form.addRow(row)
+        self._up_key = QLabel()
+        self._up_key.setObjectName("dim")
+        self._up_key.setWordWrap(True)
+        form.addRow(self._up_key)
+        note = QLabel(tr("Chaque version est signée par SAEC. MintMail refuse tout paquet dont la signature ne correspond pas à la clé de vérification installée avec le programme "
+                         "(GitHub ne sert que de transport), refuse de revenir à une ancienne version, et demande votre mot de passe administrateur pour installer. "
+                         "Seule une requête anonyme est envoyée à GitHub ; désactivez la recherche automatique si vous préférez ne rien envoyer."))
+        note.setObjectName("dim")
+        note.setWordWrap(True)
+        form.addRow(note)
+        self.main.update_views.append(self._updates_refresh)
+        self.destroyed.connect(lambda *_: self._updates_refresh in self.main.update_views and self.main.update_views.remove(self._updates_refresh))
+        self._updates_refresh()
+        return w
+
+    def _updates_refresh(self):
+        st = self.main.updates
+        self._up_status.setText("\n".join(st.status_lines()))
+        pend = updater.restart_pending()
+        self._up_install.setVisible(st.update is not None and not pend)
+        self._up_install.setEnabled(not st.busy)
+        self._up_restart.setVisible(bool(pend) and not st.busy)
+        self._up_key.setText(st.key_line())
+        self._up_check.setEnabled(not st.busy)
 
     # ------------------------------------------------------------ intelligence artificielle
     def _ai_tab(self):

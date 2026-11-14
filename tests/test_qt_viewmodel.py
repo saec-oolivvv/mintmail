@@ -588,3 +588,233 @@ def test_ai_settings_logic_provider_key_and_endpoint_rules():
     assert AS.save_endpoint(cfg, "http://localhost:11434/v1") is None and AS.save_endpoint(cfg, "") is None and cfg["nvidia_api_base"] == ""
     assert {k for k, _l, _d in AS.AI_SWITCHES} <= set(__import__("mintmail.store", fromlist=["DEFAULTS"]).DEFAULTS)
     assert {k for k, _l, _d, _o in AS.AI_CHOICES} <= set(__import__("mintmail.store", fromlist=["DEFAULTS"]).DEFAULTS)
+
+
+# ------------------------------------------------------------------ carte IA du lecteur
+from mintmail.qt import readerai as RA
+
+
+class _FakeAI2(_FakeAI):
+    lang = "fr"
+
+    def __init__(self, on=True):
+        super().__init__()
+        self.on, self.calls = on, []
+
+    def enabled(self):
+        return self.on
+
+    def analyze(self, msg, force=False):
+        self.calls.append(("analyze", msg.id, force))
+        return {"summary": "Résumé", "priority": 3, "suspicious": False, "points": [], "tasks": [], "folder": "Factures"}
+
+    def translate_message(self, msg):
+        return "traduit"
+
+    def ask(self, msg, q):
+        return "réponse à " + q
+
+    def write_from_prompt(self, idea, subject="", to="", context=""):
+        self.calls.append(("write", idea, subject, to))
+        return "Bonjour,\nmerci."
+
+    def _msg_block(self, msg, limit=None):
+        return "<message>%s</message>" % msg.subject
+
+
+def test_reader_card_state_follows_the_gtk_decision_tree():
+    eng, cache, _b = _eng_as()
+    eng.ai = _FakeAI2(on=False)
+    m = _m(1)
+    cache.upsert(m)
+    st, res = RA.state(eng, m)
+    assert st == "cta" and res["local"]                                                   # IA non configurée : résumé local + invitation
+    eng.ai.on = True
+    eng.config["ai_auto"] = False
+    assert RA.state(eng, m) == ("idle", None)
+    eng.config["ai_auto"] = True
+    assert RA.state(eng, m) == ("load", None)
+    out = RA.fetch(eng, m, force=True)
+    assert out["summary"] == "Résumé" and eng.ai.calls[-1] == ("analyze", "m1", True) and eng.ai.folder_names
+    cache.ai_set("m1", "analysis", out)
+    assert RA.state(eng, m)[0] == "ready"                                                 # cache : affichage immédiat
+    assert RA.title(out).endswith("URGENT") and RA.title({"local": True}).startswith("✨ RÉSUMÉ (local)")
+    assert RA.warning({"suspicious": True, "why": "lien"}).startswith("⚠") and RA.warning({}) == ""
+
+
+def test_reader_card_spam_suggestion_translate_ask_and_draft():
+    eng, cache, _b = _eng_as()
+    eng.ai = _FakeAI2()
+    sp = _m(2, folder="spam")
+    txt, btns = RA.spam_suggestion(sp, {"folder": "Factures"})
+    assert [b[1] for b in btns] == ["not_spam", "not_spam_file"] and btns[1][2] == "Factures"
+    assert RA.spam_suggestion(sp, {"suspicious": True}) is None and RA.spam_suggestion(_m(3), {}) is None
+    assert RA.spam_suggestion(sp, {"local": True}) is None and RA.spam_suggestion(sp, {"error": "x"}) is None
+    assert RA.translate(eng, sp) == "traduit" and RA.ask(eng, sp, "quand ?") == "réponse à quand ?"
+    assert RA.draft(eng, sp) == "Bonjour,\nmerci." and eng.ai.calls[-1][2:] == ("Re: Sujet 2", "s2@x.be")
+
+
+def test_quick_reply_goes_to_the_sender_with_the_alias_signature():
+    from mintmail.qt import composing as C
+    acc = dict(A, signature_html="<b>Sig</b>")
+    cfg = {"identities": []}
+    m = _m(1, reply_to="reply@x.be", message_id="<id@x>", references="<r@x>", subject="Re: Question")
+    out = C.quick_reply_outgoing(cfg, [acc], m, "Merci !\nA+", "a1")
+    assert out.to == "reply@x.be" and out.subject == "Re: Question" and out.in_reply_to == "<id@x>" and out.account == "a1"
+    assert "Merci !" in out.html and "<b>Sig</b>" in out.html and out.html.index("Merci") < out.html.index("Sig")
+
+
+def test_missing_keyring_password_gives_a_clear_error_instead_of_a_bad_login():
+    class Cfg(dict):
+        def password(self, aid): return ""
+    acc = {"id": "p1", "email": "moi@x.be", "host": "h", "user": "u"}
+    eng = V.Engine(Cfg(accounts=[acc]), Cache(os.path.join(tempfile.mkdtemp(), "c.db")))
+    try:
+        eng.backend("p1")
+        raise AssertionError("une connexion sans mot de passe ne doit pas être tentée")
+    except RuntimeError as e:
+        assert "moi@x.be" in str(e) and "keyring" in str(e)
+    _fx, errors = eng.sync()
+    assert errors and "keyring" in errors[0]                                              # l'erreur remonte telle quelle dans la barre d'état
+    eng2 = V.Engine(Cfg(accounts=[dict(acc, id="o1", auth="oauth2")]), Cache(os.path.join(tempfile.mkdtemp(), "c.db")))
+    assert eng2.backend("o1") is not None                                                  # OAuth : pas de mot de passe à chercher
+
+
+# ------------------------------------------------------------------ aide intégrée (F1)
+from mintmail.qt import helpdoc as HD
+
+
+def test_help_pages_render_for_every_section_search_and_links_safely():
+    t = TH.resolve({"theme": "light"}, False)
+    nav = HD.nav()
+    assert nav[0][0] == "home" and len(nav) > 8
+    for sid, _i, _title in nav:
+        page = HD.page_html("sec:" + sid, t)
+        assert len(page) > 300 and "<script" not in page.lower() and "{version}" not in page and "{config}" not in page
+    home = HD.home_html(t, ordinal=100)
+    assert "sec:" in home and "tip:1" in home and HD.home_html(t, ordinal=100, tip_offset=1) != home          # « Autre astuce » fait défiler
+    assert HD.page_html("tip:3", t).count("tip:4") == 1
+    hits = HD.page_html("spam", t)
+    assert "résultat" in hits and "sec:" in hits and "zzzqqq" not in hits
+    assert "Aucun résultat" in HD.results_html("zzzqqqxx", t)
+    assert HD.page_html("sec:inexistant", t) == HD.home_html(t)                                           # section inconnue → accueil
+
+
+def test_help_inline_text_is_escaped_and_only_http_links_are_clickable():
+    t = TH.resolve({"theme": "light"}, False)
+    out = HD.inline("<img src=x onerror=1> voir https://saec.me/doc, javascript:alert(1) « Paramètres » (S) Ctrl+K `x`", t)
+    assert "<img" not in out and "&lt;img" in out
+    assert 'href="https://saec.me/doc"' in out and "href=\"javascript" not in out and out.count("<a ") == 1
+    assert "<b>«" in out and out.count("font-family:monospace") >= 2
+    body = "Astuce : un conseil\nAttention : danger\n• a\n• b\n1. étape\nmintmail --reset\ntexte"
+    html_ = HD.blocks_html(body, t)
+    assert html_.count("<li>") == 2 and "💡" in html_ and "⚠" in html_ and "<pre" in html_ and "étape" in html_
+    assert HD.F_keys("# / Suppr") == ["#", "Suppr"] and HD.F_keys("? … (recherche)") == ["?"]
+
+
+# ------------------------------------------------------------------ mises à jour
+from types import SimpleNamespace as NS
+from mintmail.qt import updating as UP
+
+
+class _Up:
+    DEFAULT_REPO = "o/r"
+    def __init__(self, pend="", can=(True, ""), res=None, check_code=""):
+        self.pend, self.can, self.res, self.check_code, self.calls = pend, can, res, check_code, []
+    def update_from_dict(self, d, cur):
+        return NS(**d) if d and d["version"] > cur else None
+    def update_to_dict(self, up): return dict(vars(up))
+    def restart_pending(self, cur): return self.pend
+    def is_newer(self, a, b): return a > b
+    def short_notes(self, n): return n[:20]
+    def due(self, now, last): return now - last > 3300
+    def can_install(self): return self.can
+    def fetch(self, up, d, progress=None):
+        progress(50, 100); progress(100, 100); self.calls.append("fetch"); return "x.deb", "x.sig"
+    def downloads_dir(self): return "/tmp"
+    def check_signature(self, deb, sig): return self.check_code
+    def install(self, deb, sig): self.calls.append("install"); return self.res or (True, "", "1.9.0")
+    def cleanup(self): self.calls.append("cleanup")
+
+
+def _up(version="1.0.0", **kw):
+    cfg = _CfgAU(update_check=True, update_repo="", update_etag="", update_last_check=0, update_available=None,
+                 update_snooze_version="", update_snooze_until=0, update_seen="", update_last_result="")
+    return UP.UpdateState(cfg, _Up(**kw), version, now=lambda: 10000.0), cfg
+
+
+def _avail(v="1.9.0"):
+    return NS(version=v, deb_url="", deb_size=1, sig_url="", sums_url="", notes="Nouveautés " * 5, page="https://p")
+
+
+def test_update_check_announces_once_snoozes_and_respects_the_automatic_setting():
+    st, cfg = _up()
+    assert st.banner["state"] == "hidden" and st.chip == ""
+    assert st.should_check(startup=True) and not st.should_check() or True
+    repo, etag = st.begin_check()
+    assert repo == "o/r" and st.busy and not st.should_check(manual=True)                      # une seule recherche à la fois
+    out = st.finish_check(NS(state="available", update=_avail(), code="", etag="E"), None)
+    assert out["notify"].version == "1.9.0" and st.banner["state"] == "available" and "1.9.0" in st.chip
+    assert st.banner["buttons"] == ["install", "notes", "later", "close"] and cfg["update_available"]["version"] == "1.9.0"
+    st.begin_check()
+    assert st.finish_check(NS(state="available", update=_avail(), code="", etag=""), None)["notify"] is None   # annoncée une seule fois
+    st.snooze()
+    assert st.banner["state"] == "hidden" and st.chip                                              # la pastille reste
+    st.refresh()
+    assert st.banner["state"] == "hidden"                                                          # repoussée 24 h
+    st.refresh(force=True)
+    assert st.banner["state"] == "available"
+    cfg["update_check"] = False
+    assert not st.should_check(startup=True) and st.should_check(manual=True)
+
+
+def test_update_check_results_errors_uptodate_and_restore_from_config():
+    st, cfg = _up()
+    st.begin_check()
+    assert "à jour" in st.finish_check(NS(state="uptodate", update=None, code="", etag="E"), None, manual=True)["toast"] and cfg["update_etag"] == "E"
+    st.begin_check()
+    assert st.finish_check(None, RuntimeError("x"), manual=True)["toast"] and not st.busy
+    assert st.finish_check(NS(state="error", update=None, code="ratelimit", etag=""), None, manual=True)["toast"]
+    assert cfg["update_last_result"] == "error:ratelimit" and any("limite" in l for l in st.status_lines())
+    st2, cfg2 = UP.UpdateState(_CfgAU(update_available=dict(vars(_avail())), update_snooze_version="", update_snooze_until=0, update_last_check=0,
+                                      update_last_result=""), _Up(), "1.0.0", now=lambda: 1.0), None
+    assert st2.banner["state"] == "available"                                                      # affichée dès le lancement, sans réseau
+    st3 = UP.UpdateState(_CfgAU(update_available=dict(vars(_avail("0.5.0"))), update_snooze_version="", update_snooze_until=0, update_last_check=0,
+                                update_last_result=""), _Up(), "1.0.0", now=lambda: 1.0)
+    assert st3.update is None and st3.config["update_available"] is None                          # déjà dépassée : oubliée
+
+
+def test_update_install_flow_progress_success_and_every_failure_path():
+    st, cfg = _up()
+    cfg["update_available"] = dict(vars(_avail()))
+    st.restore()
+    stages = []
+    assert st.start_install() is None and st.busy and st.banner["state"] == "progress"
+    res = st.install_work(lambda v, t, f: stages.append((t, f)))
+    assert res == (True, "", "1.9.0") and st.upd.calls == ["fetch", "install"] and stages[0][1] == 0.5 and "signature" in stages[2][0]
+    assert st.finish_install(res, None) == "" and st.banner["state"] == "done" and st.update is None and "cleanup" in st.upd.calls
+    assert st.banner["buttons"] == ["restart", "close"] and cfg["update_available"] is None
+    # signature refusée : rien n'est installé
+    st, cfg = _up(check_code="bad_signature")
+    cfg["update_available"] = dict(vars(_avail()))
+    st.restore()
+    st.start_install()
+    r = st.install_work(lambda *a: None)
+    assert r == (False, "bad_signature", "") and "install" not in st.upd.calls
+    assert "SIGNATURE" in st.finish_install(r, None) and st.banner["state"] == "error" and "retry" in st.banner["buttons"] and not st.busy
+    # erreur réseau levée pendant le téléchargement
+    st.restore()
+    st.start_install()
+    assert st.finish_install(None, NS(code="network")) and st.banner["state"] == "error"
+    # installation automatique impossible : message clair, rien de lancé
+    st, cfg = _up(can=(False, "nohelper"))
+    cfg["update_available"] = dict(vars(_avail()))
+    st.restore()
+    assert "indisponible" in st.start_install() and not st.busy and st.banner["state"] == "error"
+    # déjà installée sur le disque : il ne reste qu'à relancer
+    st, cfg = _up(pend="1.9.0")
+    cfg["update_available"] = dict(vars(_avail()))
+    st.restore()
+    assert st.banner["state"] == "done" and st.chip == "" and st.start_install() == "" and any("installé" in l for l in st.status_lines())
+    assert UP.restart_command()[1:] == ["-m", "mintmail", "--qt"]
+    assert "disponible" in _up()[0].key_line() or "prête" in _up()[0].key_line()

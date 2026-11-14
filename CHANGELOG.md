@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.25.0
+- Interface Qt (expérimentale, mintmail --qt) : carte IA du lecteur comme dans la version GTK — résumé, points clés, tâches, alerte d'hameçonnage, suggestion « Ce n'est pas du spam » (avec rangement), traduction, question sur le message, bouton « ✨ Répondre » qui rédige une réponse à relire ; barre « Réponse rapide » avec réponses toutes faites, envoi immédiat avec la signature du bon compte ou alias, et développement du texte par l'IA
+- Interface Qt : connexion IMAP « bad login » corrigée à la source — l'interface Qt tournait dans un venv sans le module « keyring », donc sans accès au mot de passe enregistré dans le trousseau ; MintMail le signale désormais clairement (message dans la barre d'état et dans le terminal, avec la commande d'installation) au lieu de tenter une connexion sans mot de passe, et lit le trousseau en fond dès l'ouverture ; le test des traductions couvre maintenant aussi le paquet Qt
+- Interface Qt (expérimentale, mintmail --qt) : aide intégrée (F1 ou bouton « ? ») avec accueil, sections, recherche et astuce du jour, même contenu que la version GTK ; mises à jour comme dans la version GTK — bandeau « MintMail X est disponible » (installer, notes, plus tard), pastille dans la barre latérale, recherche 8 s après chaque démarrage puis toutes les heures, installation avec vérification de la signature, relance de MintMail, onglet « Mises à jour » des réglages
+
 ## 1.23.0
 - Interface Qt (expérimentale, mintmail --qt) : assistant IA comme dans la version GTK — panneau Ctrl+J avec suggestions, plans d'actions à valider un par un ou d'un coup (archiver, supprimer, spam, ranger, créer un dossier ou une règle, bloquer un expéditeur, reporter, rédiger, résumer la boîte, rechercher), classement des messages par l'IA avec création des dossiers seulement après votre accord ; onglet « IA » des réglages (fournisseur NVIDIA / Ollama / autre, clé dans le trousseau, modèle, test de connexion, confidentialité, langue, ton)
 

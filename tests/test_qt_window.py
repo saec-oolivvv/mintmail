@@ -159,3 +159,59 @@ def test_assistant_panel_toggles_and_unconfigured_ai_offers_settings():
     d = SettingsDialog(w)
     d.open_page("ai")
     assert d.tabs.currentIndex() == 3
+
+
+def test_reader_card_and_quick_reply():
+    if _qt() is None:
+        return
+    os.environ["MINTMAIL_QT_NO_WEBENGINE"] = "1"
+    w = _window()
+    w.show()
+    w.list.setCurrentIndex(w.model.index(w.model.row_of("q1")))
+    assert w.ai_card.isVisible() and not w.ai_card.cta.isHidden()                          # IA non configurée : résumé local + invitation
+    assert "Sujet 1" in w.head.text() and w.quick.isVisible()
+    sent = []
+    w.queue_send = lambda out, delay=0, scheduled=False: sent.append(out)
+    w.quick.send.emit("Merci !")
+    assert sent and sent[0].to == "e1@x.be" and sent[0].subject == "Re: Sujet 1"
+    w.select_view("trash")
+    assert not w.ai_card.isVisible() and not w.quick.isVisible()
+
+
+def test_help_dialog_opens_navigates_and_searches():
+    if _qt() is None:
+        return
+    os.environ["MINTMAIL_QT_NO_WEBENGINE"] = "1"
+    w = _window()
+    w.show_help()
+    h = w._help
+    assert h.isVisible() and h.nav.count() > 8 and "Aide" in h.windowTitle()
+    h.goto("sec:" + h.nav.item(1).data(0x0100))
+    assert len(h.page.toPlainText()) > 100
+    h.search.setText("spam")
+    assert "spam" in h.page.toPlainText().lower()
+    h.search.setText("")
+    assert h.page.toPlainText()
+
+
+def test_update_banner_chip_and_settings_tab():
+    if _qt() is None:
+        return
+    os.environ["MINTMAIL_QT_NO_WEBENGINE"] = "1"
+    w = _window()
+    w.show()
+    assert not w.update_banner.isVisible() and not w.update_chip.isVisible()
+    w.updates.update = type("U", (), dict(version="99.0.0", notes="Nouveautés", page="https://x"))()
+    w.updates.refresh(force=True)
+    w._render_updates()
+    assert w.update_banner.isVisible() and "99.0.0" in w.update_banner.title.text() and w.update_chip.isVisible()
+    assert w.update_banner.buttons["install"].isVisible() and not w.update_banner.buttons["restart"].isVisible()
+    w._update_action("later")
+    assert not w.update_banner.isVisible() and w.update_chip.isVisible()                # repoussée : la pastille reste
+    w.updates.show_progress("99.0.0", "Téléchargement…", 0.4)
+    w._render_updates()
+    assert w.update_banner.bar.isVisible() and w.update_banner.bar.value() == 40
+    from mintmail.qt.settings_window import SettingsDialog
+    d = SettingsDialog(w)
+    d.open_page("updates")
+    assert d.tabs.currentIndex() == 4 and "99.0.0" not in d._up_key.text()

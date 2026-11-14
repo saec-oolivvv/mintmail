@@ -138,3 +138,14 @@ def body_of_qt_html(doc_html: str) -> str:
     """Corps d'un document HTML produit par Qt (QTextEdit.toHtml) : contenu de <body> sans les styles internes de Qt."""
     m = re.search(r"<body[^>]*>(.*)</body>", doc_html, re.S | re.I)
     return (m.group(1) if m else doc_html).strip()
+
+
+def quick_reply_outgoing(config, accounts, msg, text, default_account="") -> Outgoing:
+    """« Réponse rapide » du lecteur : réponse immédiate à l'expéditeur, avec la signature du compte ou de l'alias qui a reçu le message."""
+    acc = next((a for a in accounts if a["id"] == default_account), accounts[0])
+    ident = addressed_identity(config, msg)
+    sig = signature_html(acc, ident)
+    body = text_to_html(text) + ("<br><br>" + sig if sig else "")
+    return Outgoing(account=acc["id"], to=(msg.reply_to or msg.sender_email), subject="Re: " + normalize_subject(msg.subject), html=body,
+                    from_email=ident["email"] if ident else "", from_name=ident.get("name", "") if ident else "",
+                    in_reply_to=msg.message_id, references=msg.references)

@@ -586,6 +586,7 @@
 "Modèles de réponse": "Antwoordsjablonen",
 "Mot de passe": "Wachtwoord",
 "Mot de passe (ou mot de passe d'application)": "Wachtwoord (of app-wachtwoord)",
+"Mot de passe du compte « %s » introuvable : le trousseau est inaccessible depuis cet environnement (installez « keyring » dans le venv, ou créez-le avec --system-site-packages).": "Wachtwoord van account “%s” niet gevonden: de sleutelhanger is niet bereikbaar vanuit deze omgeving (installeer “keyring” in de venv of maak die aan met --system-site-packages).",
 "Mot de passe requis.": "Wachtwoord vereist.",
 "NON (la version sera refusée)": "NEE (de versie wordt geweigerd)",
 "Neutre et poli": "Neutraal en beleefd",

@@ -14,14 +14,20 @@ from .. import APP_NAME, __version__
 from ..htmlsafe import safe_to_open
 from ..i18n import tr
 from ..store import Cache, Config
+from .. import updater
 from . import assistant as AS
 from . import automation as AU
 from . import composing as C
+from . import readerai as RA
 from . import theme as T
 from . import viewmodel as vm
 from .compose_window import ComposeWindow
 from .settings_window import SettingsDialog
+from .help_window import HelpDialog
+from .updating import UpdateState, restart_command
+from .ui_updates import UpdateBanner
 from .ui_assistant import AssistantPanel
+from .ui_readercard import QuickReply, ReaderCard
 from .ui_widgets import AvatarWidget, CountRole, InfoRole, KeyRole, KindRole, LabelRole, MessageDelegate, NavDelegate
 
 IdRole = Qt.UserRole + 1
@@ -96,6 +102,7 @@ def _make_reader(on_link):
 
 class _Bridge(QObject):
     done = Signal(object)          # résultat d'une tâche de fond, remis dans le fil de l'interface
+    progress = Signal(object)      # avancement d'une mise à jour (version, texte, fraction)
 
 
 class MainWindow(QMainWindow):
@@ -158,6 +165,16 @@ class MainWindow(QMainWindow):
         self.settings_btn.setToolTip(tr("Paramètres") + "  (Ctrl+,)")
         self.settings_btn.clicked.connect(lambda: self.show_settings())
         foot.addWidget(self.settings_btn)
+        self.help_btn = QPushButton("?")
+        self.help_btn.setObjectName("flat")
+        self.help_btn.setToolTip(tr("Aide") + "  (F1)")
+        self.help_btn.clicked.connect(lambda: self.show_help())
+        foot.addWidget(self.help_btn)
+        self.update_chip = QPushButton()
+        self.update_chip.setObjectName("chip")
+        self.update_chip.clicked.connect(lambda: self.show_settings(page="updates"))
+        self.update_chip.hide()
+        foot.insertWidget(0, self.update_chip)
         sl.addLayout(foot)
 
         # -- colonne liste : recherche, actions, messages
@@ -254,7 +271,17 @@ class MainWindow(QMainWindow):
         ib.addWidget(self.images_btn)
         ib.addStretch(1)
         rl.addLayout(ib)
+        self.ai_card = ReaderCard()
+        self.ai_card.action.connect(self._on_ai_action)
+        rl.addWidget(self.ai_card)
         rl.addWidget(self.reader, 1)
+        self.quick = QuickReply()
+        self.quick.send.connect(self.quick_reply)
+        self.quick.ai.connect(lambda: self._on_ai_action("reply_ai", ""))
+        self.quick.expand.connect(lambda t: self._on_ai_action("quick_expand", t))
+        self.quick.hide()
+        rl.addWidget(self.quick)
+        self._ai_token = 0
 
         split = QSplitter()
         split.setHandleWidth(1)
@@ -276,7 +303,18 @@ class MainWindow(QMainWindow):
         self.assistant.asked.connect(self.assistant_ask)
         self.assistant.closed.connect(lambda: self.toggle_assistant(False))
         rh.addWidget(self.assistant)
-        self.setCentralWidget(root)
+        self.update_banner = UpdateBanner()
+        self.update_banner.action.connect(self._update_action)
+        outer = QWidget()
+        ov = QVBoxLayout(outer)
+        ov.setContentsMargins(0, 0, 0, 0)
+        ov.setSpacing(0)
+        ov.addWidget(self.update_banner)
+        ov.addWidget(root, 1)
+        self.setCentralWidget(outer)
+        self.update_views = []
+        self.updates = UpdateState(self.config)
+        self._render_updates()
 
         # -- actions sur les messages (boutons de la colonne liste + raccourcis)
         self._tool("🗄", tr("Archiver"), "E", lambda: self.move_selected("archive"), self_layout=self.actions_row)
@@ -296,12 +334,16 @@ class MainWindow(QMainWindow):
         self._act(None, tr("Nouveau message"), "C", lambda: self.compose())
         self._act(None, tr("Paramètres"), "Ctrl+,", lambda: self.show_settings())
         self._act(None, tr("Rechercher"), "/", lambda: self.search.setFocus())
+        self._act(None, tr("Aide"), "F1", self.show_help)
         self._act(None, "", "H", self.snooze_tomorrow)
         self._act(None, "", "J", lambda: self._step(1))
         self._act(None, "", "K", lambda: self._step(-1))
 
         self.bridge = _Bridge()
+        threading.Thread(target=self.config.preload_passwords, daemon=True).start()      # trousseau lu une fois, hors du fil de l'interface
         self.bridge.done.connect(self._task_done)
+        self.update_progress = self.bridge.progress
+        self.bridge.progress.connect(self._stage)
         self.timer = QTimer(self)
         self.timer.timeout.connect(self._on_timer)
         self.timer.start(60_000)
@@ -311,6 +353,10 @@ class MainWindow(QMainWindow):
         self.apply_theme()
         self.reload()
         QTimer.singleShot(300, lambda: self.sync(quiet=True))
+        QTimer.singleShot(8000, lambda: self.check_updates(startup=True))               # 8 s après CHAQUE démarrage…
+        self.update_timer = QTimer(self)
+        self.update_timer.timeout.connect(lambda: self.check_updates())                 # …puis toutes les heures (règle « due » : 55 min)
+        self.update_timer.start(3600 * 1000)
         QTimer.singleShot(600, self._refresh_folders)
 
     def _tool(self, glyph, text, shortcut, fn, self_layout=None, label=False):
@@ -541,6 +587,110 @@ class MainWindow(QMainWindow):
         self.status.setText(tr("Bloqué : ") + key)
         self.move_messages(msgs, dest)
 
+    # ------------------------------------------------------------ carte IA du lecteur
+    def _same(self, msg):
+        return getattr(self, "shown", None) is not None and self.shown.id == msg.id
+
+    def ai_open(self, msg):
+        """Carte IA : cache tout de suite, sinon analyse légèrement temporisée (pas un appel par message quand on parcourt la liste)."""
+        st, res = RA.state(self.engine, msg)
+        if st in ("ready", "cta"):
+            self.ai_card.result(res, msg, cta=(st == "cta"))
+        elif st == "idle":
+            self.ai_card.idle()
+        else:
+            self.ai_card.loading()
+            self._ai_token += 1
+            token = self._ai_token
+            QTimer.singleShot(350, lambda: self.ai_fetch(msg) if token == self._ai_token and self._same(msg) else None)
+
+    def ai_fetch(self, msg, force=False):
+        self.ai_card.loading()
+
+        def done(res, err):
+            if not self._same(msg):
+                return
+            if err:
+                from ..ai_engine import local_analysis
+                self.ai_card.result(local_analysis(msg, AS.ai_engine(self.engine).lang), msg, error=str(err)[:120])
+            else:
+                self.ai_card.result(res, msg)
+                self.reload()
+        self.run_bg(lambda: RA.fetch(self.engine, msg, force=force), done)
+
+    def _ai_text(self, msg, title, fn, working):
+        self.ai_card.working(working)
+
+        def done(t, err):
+            if self._same(msg):
+                self.ai_card.text(title, (tr("Erreur IA : %s") % str(err)[:100]) if err else t)
+        self.run_bg(fn, done)
+
+    def _on_ai_action(self, act, payload):
+        msg = getattr(self, "shown", None)
+        if act == "enable_ai":
+            self.show_settings(page="ai")
+        elif msg is None:
+            return
+        elif act in ("analyze", "regen"):
+            self.ai_fetch(msg, force=(act == "regen"))
+        elif act == "translate":
+            self._ai_text(msg, tr("Traduction"), lambda: RA.translate(self.engine, msg), tr("Traduction…"))
+        elif act == "ask":
+            self._ai_text(msg, payload[:60], lambda: RA.ask(self.engine, msg, payload), tr("Réflexion…"))
+        elif act == "reply_ai":
+            self.ai_reply(msg)
+        elif act == "quick_expand":
+            self.ai_card.working(tr("Rédaction de votre réponse…"))
+
+            def done(t, err):
+                if not self._same(msg):
+                    return
+                if err:
+                    self.status.setText(tr("Erreur IA : %s") % str(err)[:90])
+                else:
+                    self.quick.entry.setText(t.replace("\n", " ").strip())
+                    self.quick.entry.setFocus()
+                self.ai_card.answer.hide()
+            self.run_bg(lambda: RA.draft(self.engine, msg, payload, 1200), done)
+        elif act in ("not_spam", "not_spam_file"):
+            back = AU.not_spam(self.engine, msg)
+            if act == "not_spam_file" and payload:
+                self._file_into_folder(back or [msg], msg.account, payload)
+            else:
+                self.move_messages(back or [msg], "inbox")
+
+    def _file_into_folder(self, msgs, aid, folder):
+        def done(n, err):
+            if err:
+                self.status.setText("⚠ " + str(err)[:120])
+            else:
+                self.reload()
+                self._build_sidebar(self.view_key)
+        self.run_bg(lambda: AS.apply_group(self.engine, aid, folder, msgs), done)
+
+    def ai_reply(self, msg):
+        """Rédige une réponse avec l'IA puis ouvre le composeur prérempli (à relire avant envoi)."""
+        if not AS.ai_engine(self.engine).enabled():
+            self.show_settings(page="ai")
+            return
+        self.status.setText(tr("✨ Rédaction de la réponse…"))
+        full = self.cache.get(msg.id) or msg
+
+        def done(text, err):
+            if err:
+                self.status.setText(tr("Erreur IA : %s") % str(err)[:90])
+            else:
+                self.compose(**dict(C.reply_args(self.config, self.engine.accounts(), full, False, self.engine.default_account(full, self.account)),
+                                    ai_suggested_text=text))
+        self.run_bg(lambda: RA.draft(self.engine, full), done)
+
+    def quick_reply(self, text):
+        msg = getattr(self, "shown", None)
+        if msg is not None:
+            self.queue_send(C.quick_reply_outgoing(self.config, self.engine.accounts(), msg, text,
+                                                   self.engine.default_account(msg, self.account)), 0)
+
     # ------------------------------------------------------------ assistant IA
     def toggle_assistant(self, show=None):
         show = (not self.assistant.isVisible()) if show is None else show
@@ -654,6 +804,111 @@ class MainWindow(QMainWindow):
             dlg._add_account()
         dlg.exec()
 
+    # ------------------------------------------------------------ mises à jour
+    def _render_updates(self):
+        st = self.updates
+        self.update_banner.render(st.banner)
+        self.update_chip.setVisible(bool(st.chip))
+        self.update_chip.setText(st.chip)
+        self.update_chip.setToolTip(tr("Cliquez pour voir la mise à jour de MintMail %s") % st.update.version if st.update else "")
+        for f in list(self.update_views):
+            try:
+                f()
+            except RuntimeError:                          # page de réglages fermée entre-temps
+                self.update_views.remove(f)
+
+    def _update_action(self, key):
+        up = self.updates.update
+        if key == "install":
+            self.install_update()
+        elif key == "later":
+            self.updates.snooze()
+        elif key == "close":
+            self.updates.hide()
+        elif key == "retry":
+            self.updates.banner = {"state": "hidden"}
+            self.updates.refresh(force=True)
+            self.install_update(confirm=False)
+        elif key == "restart":
+            self.restart_app()
+        elif key == "notes" and up is not None and up.page:
+            self._open_link(up.page)
+        self._render_updates()
+
+    def check_updates(self, manual=False, startup=False):
+        st = self.updates
+        if not st.should_check(manual, startup):
+            return
+        repo, etag = st.begin_check()
+        self._render_updates()
+
+        def done(res, err):
+            out = st.finish_check(res, err, manual)
+            if out["toast"]:
+                self.status.setText(out["toast"])
+            self._render_updates()
+            if out["notify"] is not None and not self.isActiveWindow() and self.config.get("notifications", True):
+                from .. import sysdeps
+                sysdeps.notify(tr("MintMail %s est disponible") % out["notify"].version,
+                               updater.short_notes(out["notify"].notes) or tr("Cliquez pour voir la mise à jour de MintMail %s") % out["notify"].version)
+        self.run_bg(lambda: updater.check(repo, etag=etag), done)
+
+    def install_update(self, confirm=True):
+        st = self.updates
+        up = st.update
+        if up is None or st.busy:
+            return
+        if confirm and updater.can_install()[0]:
+            notes = (up.notes.strip()[:600] + "\n\n") if up.notes.strip() else ""
+            if QMessageBox.question(self, APP_NAME, tr("Installer MintMail %s ?") % up.version + "\n\n" + notes + tr(
+                    "Le paquet est téléchargé depuis GitHub, sa signature est vérifiée avec la clé de SAEC intégrée à MintMail, puis votre mot de passe "
+                    "administrateur est demandé pour l'installer. Fermez et relancez MintMail ensuite.")) != QMessageBox.Yes:
+                return
+        msg = st.start_install()
+        self._render_updates()
+        if msg is not None:
+            if msg:
+                self.status.setText(msg)
+            return
+        bridge = self.update_progress
+
+        def stage(version, text, fraction=None):
+            bridge.emit((version, text, fraction))
+
+        def done(res, err):
+            text = st.finish_install(res, err)
+            if text:
+                self.status.setText(text)
+            self._render_updates()
+        self.run_bg(lambda: st.install_work(stage), done)
+
+    def _stage(self, payload):
+        version, text, fraction = payload
+        self.updates.show_progress(version, text, fraction)
+        self._render_updates()
+
+    def restart_app(self):
+        """Relance MintMail : une commande FIXE, lancée dans une session détachée après la fermeture de cette fenêtre."""
+        import subprocess
+        quiet = dict(close_fds=True, stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        if sys.platform == "win32":
+            subprocess.Popen(restart_command(), creationflags=0x00000008, **quiet)            # DETACHED_PROCESS
+        else:
+            subprocess.Popen(["/bin/sh", "-c", 'sleep 2; cd /; exec "$0" "$@"'] + restart_command(), start_new_session=True, **quiet)
+        self.close()
+        app = QApplication.instance()
+        if app is not None:
+            app.quit()
+
+    def show_help(self):
+        """Aide intégrée (F1) : une seule fenêtre, non bloquante."""
+        if getattr(self, "_help", None) is None:
+            self._help = HelpDialog(self)
+        self._help.goto("sec:home")
+        self._help.show()
+        self._help.raise_()
+        self._help.activateWindow()
+
     def accounts_changed(self):
         """Comptes ajoutés, modifiés ou retirés : on repart sur des serveurs neufs, on sort du mode démo et on resynchronise."""
         for be in list(self.engine._backends.values()):
@@ -758,6 +1013,8 @@ class MainWindow(QMainWindow):
             self.head.setText("")
             self.avatar.set_sender("", "")
             self.images_btn.hide()
+            self.ai_card.idle()
+            self.quick.hide()
             self.reader.show_html("<html><body></body></html>")
             return
         h = vm.header_lines(msg)
@@ -772,6 +1029,10 @@ class MainWindow(QMainWindow):
         from ..util import has_remote_content
         self.images_btn.setVisible(bool(msg.html) and has_remote_content(msg.html) and not self.load_images)
         self.reader.show_html(vm.render_html(msg, self.load_images, self.is_dark()))
+        self.quick.show()
+        self.quick.set_ai(AS.ai_engine(self.engine).enabled())
+        if msg.folder != "drafts":
+            self.ai_open(msg)
 
     def _load_images(self):
         self.load_images = True
@@ -843,7 +1104,17 @@ class MainWindow(QMainWindow):
         self.reload()
 
 
+def _keyring_hint():
+    """Le mot de passe des comptes vit dans le trousseau du système : sans le module « keyring » (venv isolé), la connexion échoue."""
+    try:
+        import keyring  # noqa: F401
+    except Exception:
+        sys.stderr.write("MintMail : module « keyring » absent de cet environnement Python — les mots de passe enregistrés (trousseau) "
+                         "sont introuvables. Installez-le : pip install keyring (ou recréez le venv avec --system-site-packages).\n")
+
+
 def run(argv=None):
+    _keyring_hint()
     app = QApplication.instance() or QApplication(list(argv if argv is not None else sys.argv))
     app.setApplicationName(APP_NAME)
     win = MainWindow()

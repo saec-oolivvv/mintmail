@@ -15,7 +15,7 @@ LOCALE = os.path.join(PKG, "locale")
 
 def code_msgids():
     ids = set()
-    for f in glob.glob(os.path.join(PKG, "*.py")):
+    for f in glob.glob(os.path.join(PKG, "*.py")) + glob.glob(os.path.join(PKG, "qt", "*.py")):
         if os.path.basename(f) == "i18n.py":
             continue
         for n in ast.walk(ast.parse(open(f, encoding="utf-8").read())):

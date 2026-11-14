@@ -88,6 +88,8 @@ class Engine(OfflineMixin):
             acc = next((a for a in self.accounts() if a["id"] == aid), None)
             if acc is None:
                 raise RuntimeError("compte introuvable")
+            if not acc.get("demo") and acc.get("auth") != "oauth2" and not self.config.password(aid):
+                raise RuntimeError(tr("Mot de passe du compte « %s » introuvable : le trousseau est inaccessible depuis cet environnement (installez « keyring » dans le venv, ou créez-le avec --system-site-packages).") % (acc.get("email") or aid))
             self._backends[aid] = make_backend(acc, self.config)
         return self._backends[aid]
 

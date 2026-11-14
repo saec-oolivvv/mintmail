@@ -65,6 +65,11 @@ QLabel { background: transparent; }
 #dim { color: %(dim)s; }
 #subject { font-size: 18px; font-weight: %(hw)s; }
 #footer { color: %(dim)s; font-size: 12px; }
+#updatebanner { background: %(card)s; border-bottom: 1px solid %(line)s; }
+QProgressBar { background: %(line)s; border: none; border-radius: 3px; }
+QProgressBar::chunk { background: %(accent)s; border-radius: 3px; }
+#aicard { background: %(card)s; border: 1px solid %(line)s; border-radius: %(rs)dpx; margin: 6px 16px 0 16px; }
+#aiwarn { color: #dc2626; font-weight: 700; }
 #assistant { background: %(panel)s; border-left: 1px solid %(line)s; }
 #assistanthead { border-bottom: 1px solid %(line)s; }
 #bubble_user { background: %(accent)s; color: %(on)s; border-radius: 14px; padding: 9px 13px; }
