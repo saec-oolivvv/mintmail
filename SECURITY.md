@@ -1,76 +1,64 @@
-# Sécurité de MintMail
+# MintMail security
 
-## Signaler une faille
+> 🇫🇷 Version française : [SECURITY.fr.md](SECURITY.fr.md)
 
-Écrivez à **contact@saec.me** : description, étapes pour reproduire, version (`mintmail --version`). Merci de ne pas publier le problème avant
-qu'un correctif soit disponible. Seule la **dernière version** est maintenue.
+## Reporting a vulnerability
 
-## Ce que MintMail protège (modèle de menaces)
+Write to **contact@saec.me** with a description, steps to reproduce and the version (`mintmail --version`). Please do not publish the problem before a fix is available. Only the **latest version** is maintained.
 
-| Menace | Protection |
+## What MintMail protects (threat model)
+
+| Threat | Protection |
 |---|---|
-| E-mail piégé (HTML actif, pistage, hameçonnage technique) | HTML reconstruit par liste blanche, politique de sécurité de contenu (CSP), JavaScript désactivé dans le lecteur, images distantes bloquées, WebKit durci, contexte éphémère |
-| Lien ou pièce jointe malveillants | Seuls http / https / mailto s'ouvrent ; programmes et scripts jamais ouverts ; fichiers à risque : confirmation |
-| Autres comptes de la machine | Dossiers `0700`, fichiers `0600` (courrier, pièces jointes, réglages, journal) |
-| Écoute / intrusion sur le réseau local | Synchronisation chiffrée + authentifiée, limitée au réseau local, délais et tables bornés, codes faibles refusés |
-| Contenu hostile envoyé à l'IA | Aucune action sans validation, rendu échappé, brouillons jamais envoyés (mais un modèle peut être trompé : voir R4) |
-| Serveurs mail | TLS avec vérification des certificats, STARTTLS obligatoire, OAuth avec PKCE |
-| Mise à jour piégée (GitHub piraté, réseau hostile, paquet modifié) | Signature RSA / SHA-256 vérifiée avec une clé publique installée avec MintMail ; retour en arrière refusé ; installation par un programme administrateur minimal, mot de passe demandé (voir `docs/UPDATES.md`) |
+| Booby-trapped e-mail (active HTML, tracking, technical phishing) | HTML rebuilt from an allow-list, content security policy (CSP), JavaScript disabled in the reader, remote images blocked, hardened web view, ephemeral context |
+| Malicious link or attachment | Only http / https / mailto open; programs and scripts are never opened; risky files ask for confirmation |
+| Other accounts on the machine | Folders `0700`, files `0600` (mail, attachments, settings, log) |
+| Eavesdropping / intrusion on the local network | Encrypted + authenticated sync, limited to the local network, bounded timeouts and tables, weak codes refused |
+| Hostile content sent to the AI | No action without approval, escaped rendering, drafts never sent (but a model can be fooled: see R4) |
+| Mail servers | TLS with certificate verification, mandatory STARTTLS, OAuth with PKCE |
+| Booby-trapped update (hacked GitHub, hostile network, modified package) | RSA / SHA-256 signature checked with a public key installed with MintMail; downgrades refused; installation by a minimal administrator program, password asked (see `docs/UPDATES.md`) |
 
-## Rapport d'audit — version 1.10.2
+## Audit report — version 1.10.2
 
-**Méthode.** Revue manuelle du code (~15 000 lignes Python) selon les risques réels d'un client mail : HTML hostile, liens et fichiers, stockage
-des secrets, réseau (synchronisation, désabonnement, OAuth, agenda), exécution de commandes, SQL, fichiers temporaires, installation. Chaque faille
-trouvée a été corrigée **et** couverte par un test de régression (`tests/test_security.py` : 19 tests, dont 3 000 HTML aléatoires et 11 entrées
-pathologiques, plus ~70 charges d'attaque classiques).
-**Limites de l'audit** : pas de test d'intrusion sur de vrais systèmes, pas de fuzzing de l'analyse MIME / IMAP, pas d'audit des bibliothèques
-tierces (GTK, WebKit, GdkPixbuf, Python), pas d'expertise cryptographique indépendante, interface Qt non testée automatiquement sur vrai écran.
-**Cet audit ne prouve pas l'absence de faille.**
+**Method.** Manual code review (~15,000 lines of Python) against the real risks of a mail client: hostile HTML, links and files, secret storage, network (sync, unsubscribe, OAuth, calendar), command execution, SQL, temporary files, installation. Every flaw found was fixed **and** covered by a regression test (`tests/test_security.py`: 19 tests, including 3,000 random HTML documents and 11 pathological inputs, plus ~70 classic attack payloads).
+**Limits of the audit**: no penetration test on real systems, no fuzzing of MIME / IMAP parsing, no audit of third-party libraries (Qt, QtWebEngine, Python), no independent cryptographic review, Qt interface not tested automatically on a real screen. **This audit does not prove the absence of flaws.** The audit was carried out on version 1.10.2 (GTK / WebKit interface); the reader has since moved to QtWebEngine and has not been re-audited (see R7).
 
-### Failles trouvées et corrigées
+### Flaws found and fixed
 
-| # | Gravité | Problème | Correction |
+| # | Severity | Problem | Fix |
 |---|---|---|---|
-| S1 | Élevée | Le nettoyeur HTML (expressions régulières) se contournait (`<scr<script>ipt>`, `<img/src=x/onerror=…>`, schémas obfusqués) ; la fenêtre de **rédaction exécute du JavaScript** : répondre à un message piégé pouvait exécuter du code et exfiltrer le texte écrit | Nettoyeur à **liste blanche** reconstruit par analyseur (`htmlsafe.py`), CSP de l'éditeur (seul son script, par empreinte), vue éphémère, liens validés |
-| S2 | Élevée | Le lecteur affichait le HTML non nettoyé ; formulaires, redirections, cadres, `<base>`, `ping` : pistage et contournement du blocage des images | Nettoyage + CSP, politique de navigation (tout refusé sauf notre chargement), réglages WebKit durcis |
-| S3 | Moyenne | Un lien cliqué ouvrait n'importe quel schéma (`file:`, `smb:`, gestionnaires d'applications) | http / https / mailto uniquement, adresse nettoyée des caractères de contrôle |
-| S4 | Moyenne | Courrier (`cache.db`), pièces jointes, journal créés avec les droits par défaut (lisibles par les autres comptes) ; `config.json` passé en 0600 *après* écriture | Création directe en 0600 / 0700, remise en ordre au démarrage (anciennes installations comprises), état affiché par `--diagnose` |
-| S5 | Moyenne | **Détournement par le dossier courant** : lancé depuis un dossier contenant un répertoire `mintmail/`, le programme exécutait ce code (démontré) | Lanceurs en mode isolé (`python3 -I`) |
-| S6 | Moyenne | Synchronisation : connexions acceptées de toute adresse, pas de délai total (monopolisation des emplacements), ports d'annonce et tables non bornés, code faible accepté ; la première correction du délai ne coupait pas réellement la lecture bloquée (trouvé par test) | Réseau local / VPN / bouclage uniquement, délai total effectif (`shutdown`), ports 1024-65535, 64 pairs maximum, codes faibles refusés, nouveau générateur (~120 bits) |
-| S7 | Moyenne | Désabonnement : requête vers n'importe quel hôte https (réseau interne, métadonnées cloud) et suivi des redirections ; `mailto:` multi-destinataires / Cc / Bcc issus de l'en-tête du message | Refus des adresses non publiques (y compris redirections), adresse mailto unique et valide |
-| S8 | Moyenne | Pièces jointes : ouverture directe de scripts, exécutables, `.desktop`, SVG / HTML actifs ; astuces d'extension (double extension, point final, caractères bidirectionnels) | Programmes et scripts : enregistrement seulement ; fichiers à risque : confirmation ; SVG sans aperçu intégré ; images > 15 Mo sans aperçu |
-| S9 | Faible | Noms de dossiers IMAP : caractères de contrôle non refusés (injection de commande) | Refus |
-| S10 | Faible | Estimation de force du code : 2,9 % des codes produits par l'ancien bouton « Générer » étaient refusés (défaut de ma propre correction, trouvé par test) | Estimation ajustée, nouveau générateur toujours accepté ; ~0,5 % des anciens codes aléatoires déclenchent un avertissement (non bloquant) |
+| S1 | High | The HTML sanitizer (regular expressions) could be bypassed (`<scr<script>ipt>`, `<img/src=x/onerror=…>`, obfuscated schemes); the **composer ran JavaScript**: replying to a booby-trapped message could run code and exfiltrate the text being written | **Allow-list** sanitizer rebuilt with a parser (`htmlsafe.py`), editor CSP (only its own script, by hash), ephemeral view, validated links |
+| S2 | High | The reader displayed unsanitized HTML; forms, redirects, frames, `<base>`, `ping`: tracking and bypass of remote-image blocking | Sanitizing + CSP, navigation policy (everything refused except our own load), hardened web view settings |
+| S3 | Medium | A clicked link opened any scheme (`file:`, `smb:`, application handlers) | http / https / mailto only, address stripped of control characters |
+| S4 | Medium | Mail (`cache.db`), attachments, log created with default permissions (readable by other accounts); `config.json` set to 0600 *after* being written | Created directly as 0600 / 0700, fixed at startup (older installations included), state shown by `--diagnose` |
+| S5 | Medium | **Hijacking through the current directory**: launched from a folder containing a `mintmail/` directory, the program ran that code (demonstrated) | Launchers in isolated mode (`python3 -I`) |
+| S6 | Medium | Sync: connections accepted from any address, no overall timeout (slot hogging), unbounded announcement ports and tables, weak code accepted; the first timeout fix did not really cut a blocked read (found by test) | Local network / VPN / loopback only, effective overall timeout (`shutdown`), ports 1024-65535, 64 peers maximum, weak codes refused, new generator (~120 bits) |
+| S7 | Medium | Unsubscribe: request to any https host (internal network, cloud metadata) and redirect following; multi-recipient / Cc / Bcc `mailto:` taken from the message header | Non-public addresses refused (redirects included), single valid mailto address |
+| S8 | Medium | Attachments: direct opening of scripts, executables, `.desktop`, active SVG / HTML; extension tricks (double extension, trailing dot, bidirectional characters) | Programs and scripts: save only; risky files: confirmation; no inline SVG preview; images > 15 MB not previewed |
+| S9 | Low | IMAP folder names: control characters not refused (command injection) | Refused |
+| S10 | Low | Code-strength estimate: 2.9% of the codes produced by the old “Generate” button were refused (defect of my own fix, found by test) | Estimate adjusted, new generator always accepted; ~0.5% of old random codes trigger a (non-blocking) warning |
 
-### Examiné, aucune faille trouvée
+### Examined, no flaw found
 
-Requêtes SQL (paramétrées ; seules des constantes sont concaténées) · exécution de commandes (listes d'arguments, jamais de shell) ·
-désérialisation (JSON uniquement, ni `pickle` ni `eval`) · TLS (vérification par défaut, STARTTLS obligatoire, pas de repli en clair) ·
-comparaisons HMAC en temps constant · nonces, liaison de session et numéros de séquence de la synchronisation (octet altéré, mauvais code, rejeu :
-rejetés) · OAuth (PKCE, état, boucle locale 127.0.0.1, HTTPS exigé) · noms de fichiers des pièces jointes (aucune traversée de dossier) ·
-fichiers temporaires (`mkstemp`, 0600).
+SQL queries (parameterized; only constants are concatenated) · command execution (argument lists, never a shell) · deserialization (JSON only, no `pickle` or `eval`) · TLS (verification by default, mandatory STARTTLS, no plaintext fallback) · constant-time HMAC comparisons · sync nonces, session binding and sequence numbers (altered byte, wrong code, replay: rejected) · OAuth (PKCE, state, 127.0.0.1 loopback, HTTPS required) · attachment file names (no directory traversal) · temporary files (`mkstemp`, 0600).
 
-### Risques restants (non corrigés)
+### Remaining risks (not fixed)
 
-- **R1 — Cryptographie de la synchronisation « maison »** (HMAC-SHA256 en mode compteur) : aucun audit externe, pas de confidentialité persistante ;
-  un code faible permet une attaque hors ligne sur un échange capturé. *Recommandation : audit cryptographique indépendant, ou remplacement par un
-  protocole éprouvé (TLS-PSK, Noise, PAKE). N'utilisez la synchronisation que sur un réseau de confiance, avec le code généré.*
-- **R2 — Confiance totale entre machines jumelées** : un pair compromis peut pousser des comptes, des adresses de serveur, la clé d'IA.
-- **R3 — Secrets en clair dans `config.json` (0600)** quand aucun trousseau système n'est disponible (`--diagnose` le signale).
-- **R4 — Injection de prompt** : un e-mail peut tromper un modèle (résumé, tri, classement faussés). Atténué : validation obligatoire, brouillons jamais envoyés.
-- **R5 — DNS rebinding** (désabonnement) : l'adresse est vérifiée avant la requête, pas entre la résolution et la connexion.
-- **R6 — Bibliothèques système** (Qt / QtWebEngine, Python) : surface héritée ; gardez le système à jour.
-- **R7 — Lecteur QtWebEngine non testé sur écran par la batterie automatique** : JavaScript coupé, navigation interdite, liens filtrés ; l'HTML est de toute façon reconstruit par liste blanche. En cas de comportement inattendu, merci de le signaler.
-- **R8 — Hameçonnage visuel** : MintMail n'avertit pas quand le texte d'un lien affiche une adresse différente de sa destination, et ne détecte pas
-  les domaines imitant ceux d'un correspondant.
-- **R9 — Hors périmètre** : un administrateur de la machine ou un logiciel malveillant du même compte lisent tout.
+- **R1 — “Home-made” sync cryptography** (HMAC-SHA256 in counter mode): no external audit, no forward secrecy; a weak code allows an offline attack on a captured exchange. *Recommendation: independent cryptographic review, or replacement by a proven protocol (TLS-PSK, Noise, PAKE). Use sync only on a trusted network, with the generated code.*
+- **R2 — Total trust between paired machines**: a compromised peer can push accounts, server addresses, the AI key.
+- **R3 — Secrets in clear in `config.json` (0600)** when no system keyring is available (`--diagnose` reports it). On macOS the Keychain is used through Apple's `security` tool.
+- **R4 — Prompt injection**: an e-mail can fool a model (distorted summary, sorting, filing). Mitigated: mandatory approval, drafts never sent.
+- **R5 — DNS rebinding** (unsubscribe): the address is checked before the request, not between resolution and connection.
+- **R6 — System libraries** (Qt / QtWebEngine, Python): inherited surface; keep the system up to date.
+- **R7 — QtWebEngine reader not screen-tested by the automatic suite**: JavaScript off, navigation forbidden, links filtered; the HTML is rebuilt from an allow-list anyway. Please report unexpected behavior.
+- **R8 — Visual phishing**: MintMail does not warn when a link's text shows an address different from its destination, and does not detect domains imitating a correspondent's.
+- **R9 — Out of scope**: an administrator of the machine or malware running as the same user reads everything.
 
-### Mises à jour automatiques (ajoutées en 1.11.0) — conception et risques propres
+### Automatic updates (added in 1.11.0) — own design and risks
 
-Voir `docs/UPDATES.md`. Contrôles testés (`tests/test_updater.py`, avec un faux GitHub local et de vraies signatures openssl) : signature d'une autre clé, paquet modifié d'un octet, signature d'un autre fichier,
-signature vide ou absente, paquet qui n'est pas MintMail, version identique ou plus ancienne, lien symbolique ou fichier spécial à la place du paquet, fichier remplacé après vérification (l'installation utilise la
-copie vérifiée), hôte ou redirection hors GitHub, brouillons et préversions, plafonds de taille, somme de contrôle fausse, clé de vérification modifiable par un non-administrateur.
+See `docs/UPDATES.md`. Checks tested (`tests/test_updater.py`, with a fake local GitHub and real openssl signatures): signature from another key, package modified by one byte, signature of another file, empty or missing signature, package that is not MintMail, same or older version, symbolic link or special file instead of the package, file swapped after verification (installation uses the verified copy), host or redirect outside GitHub, drafts and prereleases, size caps, wrong checksum, verification key writable by a non-administrator.
 
-- **R10 — Clé privée de signature** : sa compromission permettrait d'installer n'importe quel programme sur toutes les machines. Protégée par une phrase secrète, hors dépôt, jamais confiée à la CI. Un attaquant doit AUSSI avoir l'accès en écriture au dépôt GitHub pour publier. Sauvegarde contrôlée (`tools/backup-signing-key.sh`) et rotation planifiée sans réinstallation (`tools/rotate-signing-key.sh`, `tools/release.sh --rotation`) : voir docs/KEY-RECOVERY.md. Pas de révocation automatique (volontaire : elle ouvrirait un autre risque).
-- **R11 — Attaque par gel** non détectée (empêcher d'apprendre une nouvelle version) ; une version intermédiaire authentique mais plus ancienne que la dernière peut être rejouée.
-- **R12 — Non testé de bout en bout** sur un vrai GitHub ni avec une vraie fenêtre d'authentification polkit (testé : faux GitHub, vraies signatures, vrai `dpkg`).
+- **R10 — Private signing key**: its compromise would allow installing any program on all machines. Protected by a passphrase, kept out of the repository, never given to CI. An attacker must ALSO have write access to the GitHub repository to publish. Checked backup (`tools/backup-signing-key.sh`) and planned rotation without reinstallation (`tools/rotate-signing-key.sh`, `tools/release.sh --rotation`): see docs/KEY-RECOVERY.md. No automatic revocation (deliberate: it would open another risk).
+- **R11 — Freeze attack** not detected (preventing learning of a new version); an authentic intermediate version older than the latest can be replayed.
+- **R12 — Not tested end to end** against a real GitHub nor with a real polkit authentication window (tested: fake GitHub, real signatures, real `dpkg`).
+- **R13 — macOS**: the `.dmg` is not signed or notarized by Apple and updates download the `.dmg` over HTTPS from github.com and check a SHA-256 published next to it, but there is no SAEC signature on that path (a compromised GitHub account could replace both).

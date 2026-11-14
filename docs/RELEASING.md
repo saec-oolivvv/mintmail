@@ -1,41 +1,38 @@
-# Publier une version
+# Publishing a version
 
-Le dépôt est **versionné** : un numéro unique `X.Y.Z` (fichier `VERSION`, copié dans `mintmail/VERSION`), un journal `CHANGELOG.md`, une étiquette git `vX.Y.Z`
-et une Release GitHub **signée**. MintMail compare son numéro à celui de la dernière Release.
+The repository is **versioned**: a single number `X.Y.Z` (`VERSION` file, copied to `mintmail/VERSION`), a `CHANGELOG.md` journal, a git tag `vX.Y.Z` and a **signed** GitHub Release. MintMail compares its number with that of the latest Release.
 
-## Règles de numérotation (SemVer)
+## Numbering rules (SemVer)
 
-- `X` (majeur) : changement qui casse la compatibilité (formats de données, protocole de synchronisation entre machines).
-- `Y` (mineur) : nouvelle fonction. `Z` (correctif) : correction sans nouvelle fonction (dont les correctifs de sécurité).
-- Toutes les machines synchronisées doivent avoir la même version de protocole (`PROTOCOL` dans `mintmail/p2p.py`) : changez-le seulement si l'échange change.
+- `X` (major): a breaking change (data formats, machine-to-machine sync protocol).
+- `Y` (minor): a new feature. `Z` (patch): a fix without new features (security fixes included).
+- All synced machines must share the same protocol version (`PROTOCOL` in `mintmail/p2p.py`): change it only if the exchange changes.
 
-> **Clé de signature** : sauvegarde (`tools/backup-signing-key.sh`), perte, vol et rotation sans réinstallation : [KEY-RECOVERY.md](KEY-RECOVERY.md).
+> **Signing key**: backup (`tools/backup-signing-key.sh`), loss, theft and rotation without reinstallation: [KEY-RECOVERY.md](KEY-RECOVERY.md).
 
-## Mettre à jour le dépôt depuis un correctif (`tools/mintmail-maj.sh`)
+## Updating the repository from a patch (`tools/mintmail-maj.sh`)
 
-Quand une nouvelle version est livrée sous forme de fichier `mintmail-X.Y.Z….patch`, un seul script fait toute la procédure :
-
-```
-sh tools/mintmail-maj.sh --dry-run     # vérifie tout sans rien modifier
-sh tools/mintmail-maj.sh               # trouve le bon correctif (Téléchargements…), l'applique, change la version, complète le journal, enregistre, publie
-```
-
-- Il lit l'en-tête du correctif (`# mintmail-patch`, `# version:`, `# base:` = versions auxquelles il s'applique, `# note:` = lignes du journal des changements) et choisit **le bon fichier d'après votre version actuelle**, pas d'après son nom.
-- Il refuse un dépôt non propre, un correctif prévu pour une autre version, un GitHub en avance sur votre dépôt ; il reconnaît un correctif déjà appliqué.
-- Si une étape échoue **avant l'enregistrement**, tout est annulé (le dépôt revient exactement à son état d'avant). Si la publication échoue, votre code reste enregistré : corrigez la cause puis `tools/release.sh`.
-- Un `.patch` oublié dans le dépôt est rangé dans Téléchargements (il n'entre jamais dans un commit). Options : `--no-release`, `--yes`, `--repo DOSSIER`, `--version X.Y.Z --note "…"` (correctif sans en-tête).
-
-## Étapes
+When a new version is delivered as a `mintmail-X.Y.Z….patch` file, a single script does the whole procedure:
 
 ```
-tools/bump-version.sh 1.12.0     # VERSION, mintmail/VERSION, nouvelle section dans CHANGELOG.md
-# ... développement, puis complétez la section « 1.12.0 » du CHANGELOG.md ...
+sh tools/mintmail-maj.sh --dry-run     # checks everything without changing anything
+sh tools/mintmail-maj.sh               # finds the right patch (Downloads…), applies it, changes the version, completes the journal, commits, publishes
+```
+
+- It reads the patch header (`# mintmail-patch`, `# version:`, `# base:` = versions it applies to, `# note:` = changelog lines) and picks **the right file from your current version**, not from its name.
+- It refuses a dirty repository, a patch meant for another version, a GitHub ahead of your repository; it recognizes an already applied patch.
+- If a step fails **before the commit**, everything is cancelled (the repository returns exactly to its previous state). If publishing fails, your code stays committed: fix the cause, then `tools/release.sh`.
+- A `.patch` forgotten in the repository is moved to Downloads (it never enters a commit). Options: `--no-release`, `--yes`, `--repo FOLDER`, `--version X.Y.Z --note "…"` (patch without header).
+
+## Steps
+
+```
+tools/bump-version.sh 1.12.0     # VERSION, mintmail/VERSION, new section in CHANGELOG.md
+# ... development, then complete the "1.12.0" section of CHANGELOG.md ...
 git add -A && git commit -m "MintMail 1.12.0"
-tools/release.sh                 # contrôle version, dépôt propre, tests, paquet, signature, étiquette v1.12.0, push, Release GitHub
+tools/release.sh                 # checks version, clean repo, tests, package, signature, tag v1.12.0, push, GitHub Release
 ```
 
-`tools/release.sh --dry-run` fait tout sauf l'étiquette, l'envoi et la Release. Il refuse : version incohérente, `CHANGELOG` vide ou « (à compléter) », dépôt non enregistré,
-étiquette déjà existante, clé publique absente ou non enregistrée, clé privée absente, tests en échec, paquet qui ne contient pas la clé publique du dépôt, signature qui ne correspond pas.
+`tools/release.sh --dry-run` does everything except the tag, the push and the Release. It refuses: inconsistent version, empty `CHANGELOG` or “(à compléter)”, unsaved repository, existing tag, missing or uncommitted public key, missing private key, failing tests, a package that does not contain the repository's public key, a signature that does not match.
 
-Première mise en route (génération de la clé) : voir `docs/UPDATES.md`. Les Releases doivent toujours venir de `tools/release.sh` : une Release sans signature est ignorée par les MintMail installés
-(ils l'annoncent mais refusent de l'installer). Le workflow GitHub Actions ne publie rien : il construit et teste, sans jamais détenir la clé privée.
+First setup (key generation): see `docs/UPDATES.md`. Releases must always come from `tools/release.sh`: a Release without a signature is ignored by installed MintMail (they announce it but refuse to install it). The GitHub Actions workflow publishes nothing itself on Linux: it builds and tests without ever holding the private key. When a Release is published, the **macOS** workflow (`.github/workflows/macos.yml`) builds the unsigned `.dmg` on a GitHub-hosted Mac and attaches it to that Release.

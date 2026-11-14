@@ -1,54 +1,47 @@
-# Mises à jour automatiques
+# Automatic updates
 
-MintMail se met à jour depuis les **Releases** de son dépôt GitHub. Résumé pour l'utilisateur : Paramètres → **Mises à jour** (recherche automatique à chaque démarrage puis toutes les heures,
-installation en un clic avec votre mot de passe administrateur). Ce document explique le fonctionnement et la **sécurité**, puis comment mettre le système en route.
+MintMail updates itself from the **Releases** of its GitHub repository (Linux `.deb`). User summary: Settings → **Updates** (automatic check at every launch and then every hour, one-click installation with your administrator password). This document explains how it works and its **security**, then how to set the system up. **macOS**: “Install” downloads the `.dmg` of the new version for your processor (`MintMail-X.Y.Z-macos-arm64.dmg` or `-x86_64.dmg`, attached to the Release by GitHub Actions), checks its SHA-256 against the `.dmg.sha256` published with it, then opens it in the Finder: you drag MintMail into Applications and relaunch. There is **no SAEC signature** on this path (the `.dmg` is built by GitHub, which never holds the private key): protection is HTTPS to github.com plus the checksum, so a compromised GitHub account could replace both. Apple signing and notarization are planned.
 
-## Ce que voit l'utilisateur
+## What the user sees
 
-- **Dès le lancement**, si une version plus récente est connue, un **bandeau** glisse sous la barre de titre : « MintMail X est disponible », la version actuelle, la première nouveauté de la Release, et trois actions —
-  **Installer maintenant**, **Notes de version** (page de la Release), **Plus tard** (repousse 24 h pour cette version ; une version encore plus récente réapparaît aussitôt). ✕ masque jusqu'au prochain lancement.
-- Une **pastille « ⬆ Mise à jour X »** reste dans le pied de la barre latérale tant que la mise à jour n'est pas installée, même si le bandeau a été repoussé ; un clic ouvre Paramètres → Mises à jour.
-- **Pendant l'installation**, le bandeau montre une barre de progression (téléchargement), puis « Vérification de la signature… », puis « Installation… (votre mot de passe administrateur est demandé) ». Ensuite : « MintMail X est installé »
-  avec **Relancer maintenant** (relance la fenêtre via une commande fixe). En cas d'échec : le motif exact et **Réessayer**.
-- La mise à jour détectée est **mémorisée** (réglages locaux, jamais synchronisés) : elle s'affiche immédiatement au lancement suivant, sans attendre le réseau. Cette mémoire est **revalidée à chaque lecture** (versions, hôtes GitHub) :
-  un fichier de réglages modifié ne peut pas faire apparaître une fausse mise à jour pointant ailleurs, et la signature reste de toute façon vérifiée avant toute installation.
-- **Déjà installée** : si la mise à jour a été installée entre-temps (ou depuis une autre fenêtre), le bandeau ne la propose pas une seconde fois : il affiche « installé » avec **Relancer maintenant**.
-- **Notification de bureau** (une fois par version) si la fenêtre n'est pas au premier plan ; désactivable avec les notifications.
-- **Diagnostic** : `mintmail --check-update` affiche la version, le dépôt, la présence de la clé de vérification, le résultat de la recherche et la cause exacte d'une erreur (sans interface, sans rien installer).
-  Code de sortie : 0 à jour, 10 mise à jour disponible, 1 erreur. Le dernier résultat est aussi inscrit dans le journal et rappelé dans Paramètres → Mises à jour.
-- La recherche se fait 8 secondes après **chaque** démarrage (même si une vérification date de ce matin : une version publiée entre-temps est annoncée tout de suite), puis toutes les heures tant que MintMail tourne. Désactivable. Les requêtes sont conditionnelles (ETag : réponse « 304 », très légère).
+- **At launch**, if a newer version is known, a **banner** slides in under the title bar: “MintMail X is available”, the current version, the first news item of the Release, and three actions — **Install now**, **Release notes** (the Release page), **Later** (postpones 24 h for that version; an even newer version reappears at once). ✕ hides it until the next launch.
+- A **“⬆ Update X” badge** stays at the bottom of the sidebar as long as the update is not installed, even if the banner was postponed; a click opens Settings → Updates.
+- **During installation** the banner shows a progress bar (download), then “Checking the signature…”, then “Installing… (your administrator password is requested)”. Then: “MintMail X is installed” with **Restart now** (restarts the window through a fixed command). On failure: the exact reason and **Retry**.
+- The detected update is **remembered** (local settings, never synced): it is shown immediately at the next launch, without waiting for the network. This memory is **revalidated on every read** (versions, GitHub hosts): a modified settings file cannot make a fake update pointing elsewhere appear, and the signature is checked anyway before any installation.
+- **Already installed**: if the update was installed in the meantime (or from another window), the banner does not offer it a second time: it shows “installed” with **Restart now**.
+- **Desktop notification** (once per version) if the window is not in the foreground; can be turned off with the notifications.
+- **Diagnostics**: `mintmail --check-update` prints the version, the repository, whether the verification key is present, the result of the check and the exact cause of an error (no interface, nothing installed). Exit code: 0 up to date, 10 update available, 1 error. The last result is also written to the log and recalled in Settings → Updates.
+- The check runs 8 seconds after **every** launch (even if a check was made this morning: a version published in the meantime is announced at once), then every hour while MintMail runs. It can be turned off. Requests are conditional (ETag: a very light “304” reply).
 
-## Principe de sécurité
+## Security principle
 
-Installer un paquet avec les droits administrateur permet de tout faire sur la machine : le système est donc conçu pour que **GitHub ne soit jamais cru sur parole**.
+Installing a package with administrator rights allows anything on the machine, so the system is designed so that **GitHub is never taken at its word**.
 
-| Élément | Rôle |
+| Element | Role |
 |---|---|
-| Clé **privée** de SAEC | Signe chaque `.deb` (RSA 3072 / SHA-256). Reste chez vous, protégée par une phrase secrète, jamais dans le dépôt. |
-| Clé **publique** (`data/update-pubkey.pem`) | Intégrée au paquet : `/usr/share/mintmail/update-pubkey.pem`, propriété de root. Aucun réglage, aucune Release, aucun compte GitHub piraté ne peut la remplacer. |
-| GitHub (Release) | Simple **transport** : `mintmail_X.Y.Z_all.deb`, `mintmail_X.Y.Z_all.deb.sig`, `SHA256SUMS`. |
-| `apply_update.py` (root, via pkexec) | Copie le paquet dans un dossier privé (sans suivre de lien symbolique), re-vérifie la signature **sur la copie**, vérifie que c'est bien `mintmail` (type `all`) et que la version est **strictement plus récente**, puis installe avec apt. |
-| polkit | `auth_admin` : mot de passe demandé à chaque installation. Jamais d'installation silencieuse. |
+| SAEC **private** key | Signs every `.deb` (RSA 3072 / SHA-256). Stays with you, protected by a passphrase, never in the repository. |
+| **Public** key (`data/update-pubkey.pem`) | Built into the package: `/usr/share/mintmail/update-pubkey.pem`, owned by root. No setting, no Release and no hacked GitHub account can replace it. |
+| GitHub (Release) | Mere **transport**: `mintmail_X.Y.Z_all.deb`, `mintmail_X.Y.Z_all.deb.sig`, `SHA256SUMS`. |
+| `apply_update.py` (root, via pkexec) | Copies the package into a private folder (without following symbolic links), re-checks the signature **on the copy**, checks it really is `mintmail` (type `all`) and that the version is **strictly newer**, then installs with apt. |
+| polkit | `auth_admin`: password asked at every installation. Never a silent installation. |
 
-Refusés : signature absente ou invalide, signature d'une autre clé, paquet modifié d'un seul octet, autre paquet que MintMail, version identique ou plus ancienne (pas de retour en arrière),
-téléchargement corrompu (somme de contrôle) ou trop gros, hôte autre que GitHub, redirection vers un hôte étranger, Release en brouillon ou préversion.
-**Sans clé publique installée, MintMail annonce seulement les nouvelles versions** (aucune installation automatique).
+Refused: missing or invalid signature, signature from another key, package modified by a single byte, package other than MintMail, same or older version (no downgrade), corrupted download (checksum) or too large, host other than GitHub, redirect to a foreign host, draft or prerelease Release.
+**Without an installed public key, MintMail only announces new versions** (no automatic installation).
 
-Confidentialité : une seule requête GET anonyme à `api.github.com` (agent « MintMail/<version> »), au démarrage puis toutes les heures, désactivable (requête conditionnelle, sans donnée personnelle).
+Privacy: a single anonymous GET request to `api.github.com` (agent “MintMail/<version>”), at launch then hourly, can be turned off.
 
-## Mise en route (une seule fois)
+## Setup (once)
 
-1. `tools/make-signing-key.sh` : crée la paire de clés (phrase secrète demandée) ; copie la clé publique dans `data/update-pubkey.pem` ; **sauvegardez la clé privée hors ligne**.
-2. `git add data/update-pubkey.pem && git commit -m "Clé publique de signature des mises à jour"`.
-3. `tools/release.sh` : teste, construit, signe, étiquette et publie la Release.
-4. Installez **une fois à la main** ce paquet signé (`sudo apt install ./dist/mintmail_X.Y.Z_all.deb`) : c'est lui qui apporte la clé publique aux machines. Dès lors, les versions suivantes
-   s'installent depuis l'application. Les machines qui n'ont pas ce paquet ne reçoivent que des annonces.
+1. `tools/make-signing-key.sh`: creates the key pair (passphrase asked); copies the public key to `data/update-pubkey.pem`; **back up the private key offline**.
+2. `git add data/update-pubkey.pem && git commit -m "Update signing public key"`.
+3. `tools/release.sh`: tests, builds, signs, tags and publishes the Release.
+4. Install this signed package **once by hand** (`sudo apt install ./dist/mintmail_X.Y.Z_all.deb`): it brings the public key to the machines. From then on, later versions install from the application. Machines without this package only receive announcements.
 
-## Limites et risques (à connaître)
+## Limits and risks (to know)
 
-- **Clé privée volée** = quiconque la possède peut faire installer n'importe quel programme sur toutes les machines. Phrase secrète, sauvegarde hors ligne, pas de CI qui la détient.
-- **Clé perdue ou remplacée** : aucun mécanisme de rotation automatique (volontairement : il constituerait une porte dérobée). Il faut réinstaller à la main un paquet contenant la nouvelle clé publique.
-- **Attaque par gel** : quelqu'un qui contrôle le réseau ou GitHub peut empêcher d'apprendre l'existence d'une nouvelle version (pas la falsifier). Ce n'est pas détecté.
-- **Retour en arrière** : refusé pour la version installée, mais une version intermédiaire plus ancienne que la dernière, signée et authentique, peut être rejouée tant qu'elle est plus récente que celle installée.
-- Le contrôle repose sur `openssl`, `dpkg` et `apt` du système (à jour de préférence) ; le dépôt à consulter est un réglage par machine (Paramètres → Mises à jour), **non synchronisé** entre machines.
-- Non testé sur un vrai GitHub ni avec une vraie fenêtre polkit : testé avec un faux serveur GitHub, de vraies signatures openssl et un vrai `dpkg` (voir `SECURITY.md`).
+- **Stolen private key** = whoever holds it can have any program installed on all machines. Passphrase, offline backup, no CI that holds it.
+- **Lost or replaced key**: no automatic rotation mechanism (deliberately: it would be a backdoor). A package containing the new public key must be reinstalled by hand.
+- **Freeze attack**: someone controlling the network or GitHub can prevent learning that a new version exists (not forge it). This is not detected.
+- **Downgrade**: refused below the installed version, but an authentic signed intermediate version older than the latest can be replayed as long as it is newer than the installed one.
+- The check relies on the system's `openssl`, `dpkg` and `apt` (preferably up to date); the repository to query is a per-machine setting (Settings → Updates), **not synchronized** between machines.
+- Not tested against a real GitHub nor with a real polkit window: tested with a fake GitHub server, real openssl signatures and a real `dpkg` (see `SECURITY.md`).

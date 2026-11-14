@@ -1,28 +1,26 @@
-# Captures d'écran
+# Screenshots
 
-**Aucune capture n'est encore incluse** : elles doivent être prises sur une vraie session graphique (le dépôt a été préparé
-sans écran). Sur Linux Mint, lance :
+**No screenshot is included yet**: they must be taken in a real graphical session (the repository was prepared without a screen). On Linux Mint, run:
 
 ```
 tools/capture-screenshots.sh
 ```
 
-Le script t'invite écran par écran, attend 5 secondes (le temps d'afficher la fenêtre voulue), puis capture la fenêtre active
-dans ce dossier. Écrans à capturer (noms de fichiers attendus) :
+The script prompts you screen by screen, waits 5 seconds (time to bring up the wanted window), then captures the active window into this folder. Screens to capture (expected file names):
 
-| Fichier | Écran |
+| File | Screen |
 |---|---|
-| `01-boite-aurora.png` | Boîte de réception, style Aurora sombre, avec dossiers et conversations |
-| `02-boite-papier.png` | Même vue, style Papier |
-| `03-boite-terminal.png` | Même vue, style Terminal |
-| `04-lecteur-resume-ia.png` | Message ouvert avec le résumé ✨ |
-| `05-clic-droit-ia.png` | Menu clic droit avec la section ✨ IA |
-| `06-assistant.png` | Assistant IA (Ctrl+J) avec un plan d'actions |
-| `07-classement-ia.png` | Proposition de classement dans des dossiers |
-| `08-aujourdhui.png` | Page « Aujourd'hui » (touche T) |
-| `09-redaction.png` | Rédaction avec menu ✨ IA et champ De (alias) |
-| `10-parametres-ia.png` | Paramètres → IA (fournisseurs dont Ollama) |
-| `11-agenda-google.png` | Paramètres → Agenda (Google / CalDAV) |
-| `12-aide.png` | Aide intégrée (F1) avec recherche |
+| `01-boite-aurora.png` | Inbox, dark Aurora style, with folders and conversations |
+| `02-boite-papier.png` | Same view, Paper style |
+| `03-boite-terminal.png` | Same view, Terminal style |
+| `04-lecteur-resume-ia.png` | Open message with the ✨ summary |
+| `05-clic-droit-ia.png` | Right-click menu with the ✨ AI section |
+| `06-assistant.png` | AI assistant (Ctrl+J) with an action plan |
+| `07-classement-ia.png` | Folder-sorting proposal |
+| `08-aujourdhui.png` | “Today” page (T key) |
+| `09-redaction.png` | Composer with ✨ AI menu and From field (alias) |
+| `10-parametres-ia.png` | Settings → AI (providers including Ollama) |
+| `11-agenda-google.png` | Settings → Calendar (Google / CalDAV) |
+| `12-aide.png` | Built-in help (F1) with search |
 
-Après la capture, ajoute les images au README (section « Captures d'écran »). Vérifie qu'aucune donnée personnelle n'est visible.
+After capturing, add the images to the README (“Screenshots” section). Check that no personal data is visible.

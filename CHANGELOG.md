@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.35.7
+- Documentation en anglais (README, SECURITY, CHANGELOG, docs) ; README.fr.md et SECURITY.fr.md conservés ; docs/ARCHITECTURE.md remplace les notes de portage GTK ; l'aide dit que la recherche de mise à jour a lieu à chaque lancement puis chaque heure
+
 ## 1.35.6
 - Mac : le trousseau passe par l'outil Apple security (plus de fenêtre sans TouchID en boucle) ; saisir à nouveau les mots de passe des comptes
 

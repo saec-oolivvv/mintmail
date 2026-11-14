@@ -312,7 +312,7 @@
    "items": [
     [
      "How it works",
-     "MintMail looks for a new version on GitHub (repository set in Settings → Updates) at most ONCE A DAY and tells you about it. Only one anonymous request is sent, with no personal data. Can be turned off in Settings → Updates; palette → “Check for updates” to check right away. When a version is available, a BANNER appears at the top of the window as soon as it opens (“Install now”, “Release notes”, “Later”) and a “⬆ Update X” chip stays in the side panel. “Later” hides the banner for 24 h for that version; ✕ hides it until the next launch. If the window is not in the foreground, a desktop notification also announces the new version (once). If the update is already installed, the banner simply offers “Restart now”. “mintmail --check-update” gives the details in a terminal."
+     "MintMail looks for a new version on GitHub (repository set in Settings → Updates) at EVERY launch, then every hour and tells you about it. Only one anonymous request is sent, with no personal data. Can be turned off in Settings → Updates; palette → “Check for updates” to check right away. When a version is available, a BANNER appears at the top of the window as soon as it opens (“Install now”, “Release notes”, “Later”) and a “⬆ Update X” chip stays in the side panel. “Later” hides the banner for 24 h for that version; ✕ hides it until the next launch. If the window is not in the foreground, a desktop notification also announces the new version (once). If the update is already installed, the banner simply offers “Restart now”. “mintmail --check-update” gives the details in a terminal."
     ],
     [
      "Install in one click",

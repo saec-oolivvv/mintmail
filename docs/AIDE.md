@@ -1,4 +1,4 @@
-# Aide de MintMail 1.34.2
+# Aide de MintMail 1.35.7
 _Généré par `make docs` depuis l'aide intégrée (touche F1 dans l'application)._
 
 ## Premiers pas
@@ -390,7 +390,7 @@ Comptes · Apparence · Filtres & blocage · ✨ IA · Mises à jour · Gestes &
 
 ### Comment ça marche
 
-MintMail cherche une nouvelle version sur GitHub (dépôt réglé dans Paramètres → Mises à jour) au plus UNE FOIS PAR JOUR et vous l'annonce. Une seule requête anonyme est envoyée, sans aucune donnée personnelle. Désactivable dans Paramètres → Mises à jour ; palette → « Rechercher les mises à jour » pour vérifier tout de suite. Quand une version est disponible, un BANDEAU apparaît en haut de la fenêtre dès l'ouverture (« Installer maintenant », « Notes de version », « Plus tard ») et une pastille « ⬆ Mise à jour X » reste dans la barre latérale. « Plus tard » repousse le bandeau de 24 h pour cette version ; ✕ le masque jusqu'au prochain lancement. Si la fenêtre n'est pas au premier plan, une notification de bureau annonce aussi la nouvelle version (une fois). Si la mise à jour est déjà installée, le bandeau propose simplement « Relancer maintenant ». « mintmail --check-update » donne le détail dans un terminal.
+MintMail cherche une nouvelle version sur GitHub (dépôt réglé dans Paramètres → Mises à jour) à CHAQUE lancement puis toutes les heures et vous l'annonce. Une seule requête anonyme est envoyée, sans aucune donnée personnelle. Désactivable dans Paramètres → Mises à jour ; palette → « Rechercher les mises à jour » pour vérifier tout de suite. Quand une version est disponible, un BANDEAU apparaît en haut de la fenêtre dès l'ouverture (« Installer maintenant », « Notes de version », « Plus tard ») et une pastille « ⬆ Mise à jour X » reste dans la barre latérale. « Plus tard » repousse le bandeau de 24 h pour cette version ; ✕ le masque jusqu'au prochain lancement. Si la fenêtre n'est pas au premier plan, une notification de bureau annonce aussi la nouvelle version (une fois). Si la mise à jour est déjà installée, le bandeau propose simplement « Relancer maintenant ». « mintmail --check-update » donne le détail dans un terminal.
 
 ### Installer en un clic
 
@@ -500,7 +500,7 @@ Mise à jour : sudo apt install ./mintmail_X.Y.Z_all.deb (vos réglages et votre
 
 ## À propos et crédits
 
-### MintMail 1.34.2
+### MintMail 1.35.7
 
 Le client mail pour Linux Mint dont l'IA est l'ADN : il lit, trie, résume, classe, rédige et agit avec vous — toujours avec votre accord.  
 Développé par SAEC — https://saec.me · Logiciel libre sous licence MIT (© 2026 SAEC) : vous pouvez l'utiliser, le modifier et le redistribuer. Application Qt (PySide6) / Python, sans service cloud imposé : vos mails, vos clés et vos réglages restent chez vous.
