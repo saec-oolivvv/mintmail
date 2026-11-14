@@ -23,8 +23,8 @@ def test_desktop_entry_matches_the_window_class_and_app_id():
     kv = dict(l.split("=", 1) for l in text.splitlines() if "=" in l and not l.startswith("["))
     assert kv["Icon"] == "mintmail" and kv["Exec"].endswith("%U") and "mailto" in kv["MimeType"]
     assert kv["StartupWMClass"] == "mintmail" and kv["Terminal"] == "false" and kv["Type"] == "Application"
-    app = open(os.path.join(ROOT, "mintmail", "app.py"), encoding="utf-8").read()
-    assert 'GLib.set_prgname("mintmail")' in app and 'Gdk.set_program_class("mintmail")' in app     # même classe que le lanceur
-    assert "set_default_icon_list" in app                                   # repli si l'icône n'est pas dans le thème
+    win = open(os.path.join(ROOT, "mintmail", "qt", "window.py"), encoding="utf-8").read()
+    assert 'setApplicationName("mintmail")' in win and "setDesktopFileName(AI.DESKTOP_ID)" in win     # même classe que le lanceur (X11 et Wayland)
+    assert "app.setWindowIcon(AI.load())" in win                            # repli si l'icône n'est pas dans le thème
     for f in ("install.sh", "uninstall.sh"):
         assert APP_ID + ".desktop" in open(os.path.join(ROOT, f), encoding="utf-8").read()

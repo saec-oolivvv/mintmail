@@ -39,6 +39,7 @@ from . import organizer as O
 from . import syncing as SY
 from .ai_window import AIMixin
 from .organizer_window import OrganizerMixin
+from .extras_window import ExtrasMixin
 from .ui_organizer import MessageExtras
 from . import organizer_window as OW
 from .. import qtdeps as QD
@@ -125,7 +126,7 @@ class _Bridge(QObject):
     p2p = Signal()                 # éléments reçus d'un autre poste à appliquer dans le fil de l'interface
 
 
-class MainWindow(OrganizerMixin, AIMixin, QMainWindow):
+class MainWindow(ExtrasMixin, OrganizerMixin, AIMixin, QMainWindow):
     def __init__(self, config=None, cache=None):
         super().__init__()
         self.config, self.cache = config or Config(), cache or Cache()
@@ -302,6 +303,16 @@ class MainWindow(OrganizerMixin, AIMixin, QMainWindow):
         sb.setContentsMargins(16, 4, 16, 2)
         sb.addWidget(self.search)
         ll.addLayout(sb)
+        self.srv_btn = QPushButton("🔎  " + tr("Chercher aussi sur le serveur"))
+        self.srv_btn.setObjectName("chip")
+        self.srv_btn.setCursor(Qt.PointingHandCursor)
+        self.srv_btn.clicked.connect(self.search_server_now)
+        self.srv_btn.hide()
+        srow = QHBoxLayout()
+        srow.setContentsMargins(16, 0, 16, 2)
+        srow.addWidget(self.srv_btn)
+        srow.addStretch(1)
+        ll.addLayout(srow)
         self.actions_row = QHBoxLayout()
         self.actions_row.setContentsMargins(14, 0, 14, 4)
         self.actions_row.setSpacing(0)
@@ -431,6 +442,7 @@ class MainWindow(OrganizerMixin, AIMixin, QMainWindow):
         self._act(None, tr("Paramètres"), "Ctrl+,", lambda: self.show_settings())
         self._act(None, tr("Rechercher"), "/", lambda: self.search.setFocus())
         self._act(None, tr("Aide"), "F1", self.show_help)
+        self._act(None, tr("Plein écran (F11)"), "F11", self.toggle_fullscreen)
         self._act(None, "", "H", self.snooze_tomorrow)
         self._act(None, "", "J", lambda: self._step(1))
         self._act(None, "", "K", lambda: self._step(-1))
@@ -519,6 +531,7 @@ class MainWindow(OrganizerMixin, AIMixin, QMainWindow):
                     msgs.append(m)
             msgs.sort(key=lambda m: m.date, reverse=True)
         self.model.set_messages(msgs, self.cache.ai_meta([m.id for m in msgs]) if msgs else None)
+        self.srv_btn.setVisible(bool(q.strip()) and not AW.is_ai_query(raw) and not any(a.get("demo") for a in self.engine.accounts()))
         self.update_digest_visibility()
         self.update_category_bar()
         self.title.setText(self._view_title())
@@ -701,6 +714,8 @@ class MainWindow(OrganizerMixin, AIMixin, QMainWindow):
 
     def _nav_menu(self, pos):
         it = self.folders.itemAt(pos)
+        if self.folder_menu(it, self.folders.viewport().mapToGlobal(pos)):           # dossier ou compte : nouveau, sous-dossier, renommer, supprimer…
+            return
         key = it.data(KeyRole) if it is not None else None
         if not key or not str(key).startswith(SS.PREFIX):
             return
@@ -1264,6 +1279,8 @@ class MainWindow(OrganizerMixin, AIMixin, QMainWindow):
             if key == "from":
                 self.search.setText(m.sender_email)
                 return
+            if key == "copy_addr":
+                return self.copy_text(m.sender_email)
             if key in ("summarize", "translate", "ai_reply"):
                 if getattr(self, "shown", None) is None or self.shown.id != m.id:
                     self._show(self.cache.get(m.id) or m)
@@ -1297,7 +1314,9 @@ class MainWindow(OrganizerMixin, AIMixin, QMainWindow):
                   "rail": self.toggle_rail, "zoom_in": lambda: self.zoom_reader(OW.ZOOM_STEP), "zoom_out": lambda: self.zoom_reader(-OW.ZOOM_STEP),
                   "zoom_reset": lambda: self.zoom_reader(0), "p2p_now": self.p2p_now, "digest": lambda: self.refresh_digest(force=True),
                   "assistant": lambda: self.toggle_assistant(True), "compose": self.compose, "sync": lambda: self.sync(False), "help": self.show_help,
-                  "apply_rules": self.apply_rules_now, "save_search": self.save_current_search, "mark_all_read": self.mark_all_read, "select_all": self.select_all, "select_mode": lambda: self.sel_btn.toggle(), "updates": lambda: self.check_updates(manual=True), "search": self.search.setFocus}
+                  "apply_rules": self.apply_rules_now, "save_search": self.save_current_search, "mark_all_read": self.mark_all_read, "select_all": self.select_all, "select_mode": lambda: self.sel_btn.toggle(), "updates": lambda: self.check_updates(manual=True), "search": self.search.setFocus,
+                  "push_pins": self.push_local_pins, "log": self.show_log, "fullscreen": self.toggle_fullscreen, "search_server": self.search_server_now,
+                  "refresh_folders": self.refresh_folder_list}
         if key in simple:
             simple[key]()
 
@@ -1505,6 +1524,7 @@ class MainWindow(OrganizerMixin, AIMixin, QMainWindow):
         self.notify_new_mail(fresh if getattr(self, "_synced_once", False) else 0)
         self._synced_once = True
         self.check_followups()
+        self.after_sync_pins()                               # mémorise si le serveur garde les épingles ; envoie une fois les épingles locales
         self.ai_after_sync()                                 # pastilles des dossiers de rangement (non lus annoncés par le serveur)
 
 

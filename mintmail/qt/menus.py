@@ -19,7 +19,7 @@ def context_items(msg, blocked: bool = False) -> List[Item]:
         *([("notspam", tr("✔ Ce n'est pas du spam"))] if msg.folder == "spam" else []),
         ("spam", tr("Signaler comme spam")), ("spam_sender", tr("Mettre l'expéditeur en spam")),
         ("block", tr("Débloquer ") + msg.sender_email if blocked else tr("Bloquer l'expéditeur")),
-        ("from", tr("Voir tous ses messages")), ("addcontact", tr("Ajouter aux contacts")), None,
+        ("from", tr("Voir tous ses messages")), ("copy_addr", tr("Copier l'adresse")), ("addcontact", tr("Ajouter aux contacts")), None,
         ("summarize", tr("✨ Résumer / analyser ce message")), ("translate", tr("✨ Traduire ce message")),
     ]
 
@@ -40,6 +40,7 @@ def palette_commands(msg, engine=None) -> List[Tuple[str, str]]:
                  (tr("Signaler comme spam (ce message)"), "spam"), (tr("Mettre l'expéditeur en spam — ") + who, "spam_sender"),
                  (tr("Mettre le domaine en spam — ") + dom, "spam_domain"), (tr("Bloquer l'expéditeur — ") + who, "block"),
                  (tr("Bloquer le domaine — ") + dom, "block_domain"), (tr("Voir tous les messages de ") + who, "from"), (tr("Ajouter aux contacts — ") + who, "addcontact"),
+                 (tr("Copier l'adresse ") + who, "copy_addr"),
                  (tr("Reporter à demain 8 h"), "snooze_tomorrow")]
     if msg is not None:
         cmds += [(tr("Créer une tâche depuis ce message"), "task_from"), (tr("Proposer des créneaux (agenda)"), "slots"),
@@ -57,7 +58,9 @@ def palette_commands(msg, engine=None) -> List[Tuple[str, str]]:
              (tr("Disposition : colonnes"), "layout:columns"), (tr("Disposition : lecture en bas"), "layout:bottom"), (tr("Disposition : liste seule"), "layout:list"),
              (tr("Paramètres (Ctrl+,)"), "settings"), (tr("Réglages de l'IA"), "settings:ai"), (tr("Rechercher les mises à jour"), "updates"),
              (tr("Mises à jour"), "settings:updates"), (tr("Gestes de swipe (réglages)"), "settings:gestures"), (tr("Rechercher"), "search"),
-             (tr("Enregistrer la recherche actuelle"), "save_search"), (tr("Tout marquer comme lu"), "mark_all_read"), (tr("Tout sélectionner"), "select_all"), (tr("Mode sélection multiple"), "select_mode")]
+             (tr("Enregistrer la recherche actuelle"), "save_search"), (tr("Tout marquer comme lu"), "mark_all_read"), (tr("Tout sélectionner"), "select_all"), (tr("Mode sélection multiple"), "select_mode"),
+             (tr("Chercher aussi sur le serveur"), "search_server"), (tr("Envoyer mes épingles vers la boîte"), "push_pins"), (tr("Journal d'erreurs"), "log"),
+             (tr("Plein écran (F11)"), "fullscreen"), (tr("Actualiser la liste des dossiers"), "refresh_folders")]
     if engine is not None:
         many = len(engine.accounts()) > 1
         for acc in engine.accounts():

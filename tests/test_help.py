@@ -1,9 +1,8 @@
 """L'aide intégrée doit rester complète et alignée sur le code : raccourcis, options, pages de paramètres, fonctions."""
 import os, re, sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-import gtkstub   # noqa: F401
+import testenv
 from mintmail import help_content as H
-from mintmail import settings as S
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 CTX = {"version": "9.9.9", "config": "/c", "data": "/d", "log": "/d/mintmail.log"}
@@ -24,16 +23,14 @@ def test_structure_and_placeholders():
     assert "au survol" not in text and "pas chiffrées" not in text                              # fonctions retirées : jamais citées
 
 
-def test_shortcuts_match_the_app_and_the_settings_page():
-    assert dict(H.SHORTCUTS_HELP) == dict(S.SHORTCUTS)                                          # même liste qu'à l'écran « Raccourcis »
-    win = src("window.py")
-    acts = re.search(r"acts = \{(.*?)\n        \}", win, re.S).group(1)
-    names = set(re.findall(r'"([A-Za-z]+)": lambda', acts))
-    show = {"numbersign": "#", "Delete": "Suppr", "slash": "/", "exclam": "!", "backslash": "\\"}
-    keys = " ".join(k.upper() for k, _ in H.SHORTCUTS_HELP)
-    for n in names:
-        shown = show.get(n, n.upper())
-        assert shown.upper() in keys, "touche non documentée : %s" % n
+def test_shortcuts_documented_match_the_ones_the_window_defines():
+    win = src("qt/window.py")
+    keys = " ".join(k.upper().replace(" ", "") for k, _ in H.SHORTCUTS_HELP)
+    defined = set(re.findall(r'self\._act\(None, [^\n]*?, "([^"]+)", ', win)) | set(re.findall(r'self\._tool\([^\n]*?, "([^"]+)", lambda', win))
+    assert len(defined) >= 10, defined
+    for k in defined:
+        norm = {"DELETE": "SUPPR", "ESCAPE": "ÉCHAP", "\\\\": "\\", "CTRL++": "CTRL++", "CTRL+=": "CTRL++", "CTRL+-": "CTRL+-"}.get(k.upper().replace(" ", ""), k.upper().replace(" ", ""))
+        assert norm in keys, "raccourci non documenté : %s" % k
     for mod in ("F1", "F11", "CTRL+K", "CTRL+J", "CTRL+F", "CTRL+R", "CTRL+N", "CTRL+,"):
         assert mod in keys, mod
 
@@ -50,7 +47,7 @@ def test_every_command_line_option_is_documented():
 
 
 def test_every_settings_page_is_described():
-    pages = re.findall(r'add_titled\([^\n]*?"(\w+)", (?:tr\()?"([^"]+)"\)', src("settings.py"))
+    pages = [("", t) for t in re.findall(r'tabs\.addTab\([^\n]*?, (?:tr\()?"([^"]+)"\)', src("qt/settings_window.py"))]
     assert len(pages) >= 12
     text = H.full_text(CTX).lower()
     for ident, title in pages:

@@ -16,7 +16,7 @@ cp -r $SRC/mintmail $ROOT/usr/lib/python3/dist-packages/mintmail
 find $ROOT -name __pycache__ -prune -exec rm -rf {} +
 cat > $ROOT/usr/bin/mintmail <<'EOT'
 #!/bin/sh
-# Interface Qt : si le paquet a installé PySide6 dans son venv privé, on l'utilise ; sinon le Python du système (qui basculera sur GTK si PySide6 manque).
+# Interface Qt : si le paquet a installé PySide6 dans son venv privé, on l'utilise ; sinon le Python du système (PySide6 y est peut-être installé par apt).
 V=/usr/lib/mintmail/venv/bin/python
 if [ -x "$V" ] && [ -z "$MINTMAIL_NO_VENV" ]; then exec "$V" -I -m mintmail "$@"; fi
 exec /usr/bin/python3 -I -m mintmail "$@"
@@ -112,19 +112,19 @@ Version: $VER
 Section: mail
 Priority: optional
 Architecture: all
-Depends: python3 (>= 3.9), python3-venv, python3-gi, gir1.2-gtk-3.0, gir1.2-webkit2-4.1 | gir1.2-webkit2-4.0, openssl, libxcb-cursor0, libxkbcommon-x11-0, libxcb-icccm4, libxcb-image0, libxcb-keysyms1, libxcb-render-util0, libxcb-xinerama0, libxcb-shape0, libxcb-xkb1, libegl1, libgl1, libfontconfig1, libdbus-1-3
-Recommends: python3-pyside6.qtwidgets, python3-pyside6.qtwebenginewidgets, python3-keyring, libnotify-bin, pkexec | policykit-1
+Depends: python3 (>= 3.9), python3-venv, python3-pip, openssl, libxcb-cursor0, libxkbcommon-x11-0, libxcb-icccm4, libxcb-image0, libxcb-keysyms1, libxcb-render-util0, libxcb-xinerama0, libxcb-shape0, libxcb-xkb1, libegl1, libgl1, libfontconfig1, libdbus-1-3
+Recommends: python3-pyside6.qtwidgets, python3-pyside6.qtsvg, python3-pyside6.qtwebenginewidgets, python3-keyring, libnotify-bin, pkexec | policykit-1
 Installed-Size: $SIZE
 Maintainer: SAEC <contact@saec.me>
 Homepage: https://saec.me
 Description: Client de messagerie moderne avec IA intégrée
- MintMail est un client mail IMAP/SMTP pour Linux (GTK3) : boîte intelligente,
+ MintMail est un client mail IMAP/SMTP pour Linux (interface Qt) : boîte intelligente,
  dossiers complets, assistant IA (résumés, réponses, tri, actions confirmées),
  envoi annulable, signatures HTML, règles, blocage, gestes de balayage et
  synchronisation chiffrée et automatique entre vos machines.
  Trois styles visuels : Aurora, Papier et Terminal. Interface en français et en anglais.
  .
- MintMail is a modern IMAP/SMTP mail client for Linux (GTK3) with built-in AI
+ MintMail is a modern IMAP/SMTP mail client for Linux (Qt interface) with built-in AI
  (summaries, replies, sorting, always-confirmed actions), undoable sending,
  HTML signatures, rules, blocking and encrypted sync between your machines.
  The interface is available in French and English.
@@ -150,7 +150,7 @@ if [ "$1" = "configure" ]; then
            && /usr/lib/mintmail/venv/bin/python -m pip install --disable-pip-version-check -q --upgrade PySide6; then
             echo "mintmail : interface Qt prête."
         else
-            echo "mintmail : PySide6 n'a pas pu être installé (réseau ?) — l'ancienne interface sera utilisée ; réessayez avec : sudo /usr/bin/python3 -m venv --system-site-packages /usr/lib/mintmail/venv && sudo /usr/lib/mintmail/venv/bin/pip install PySide6"
+            echo "mintmail : PySide6 n'a pas pu être installé (réseau ?) — MintMail ne s'ouvrira pas sans lui ; réessayez avec : sudo /usr/bin/python3 -m venv --system-site-packages /usr/lib/mintmail/venv && sudo /usr/lib/mintmail/venv/bin/pip install PySide6"
             rm -rf /usr/lib/mintmail/venv
         fi
     fi

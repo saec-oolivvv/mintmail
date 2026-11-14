@@ -24,7 +24,7 @@ des secrets, réseau (synchronisation, désabonnement, OAuth, agenda), exécutio
 trouvée a été corrigée **et** couverte par un test de régression (`tests/test_security.py` : 19 tests, dont 3 000 HTML aléatoires et 11 entrées
 pathologiques, plus ~70 charges d'attaque classiques).
 **Limites de l'audit** : pas de test d'intrusion sur de vrais systèmes, pas de fuzzing de l'analyse MIME / IMAP, pas d'audit des bibliothèques
-tierces (GTK, WebKit, GdkPixbuf, Python), pas d'expertise cryptographique indépendante, interface GTK non testée sur vrai écran.
+tierces (GTK, WebKit, GdkPixbuf, Python), pas d'expertise cryptographique indépendante, interface Qt non testée automatiquement sur vrai écran.
 **Cet audit ne prouve pas l'absence de faille.**
 
 ### Failles trouvées et corrigées
@@ -59,9 +59,8 @@ fichiers temporaires (`mkstemp`, 0600).
 - **R3 — Secrets en clair dans `config.json` (0600)** quand aucun trousseau système n'est disponible (`--diagnose` le signale).
 - **R4 — Injection de prompt** : un e-mail peut tromper un modèle (résumé, tri, classement faussés). Atténué : validation obligatoire, brouillons jamais envoyés.
 - **R5 — DNS rebinding** (désabonnement) : l'adresse est vérifiée avant la requête, pas entre la résolution et la connexion.
-- **R6 — Bibliothèques système** (WebKit, GdkPixbuf, GTK, Python) : surface héritée ; gardez le système à jour.
-- **R7 — CSP de l'éditeur non testée sur un vrai WebKit** : en cas de problème d'affichage, `MINTMAIL_EDITOR_CSP=0 mintmail` désactive la CSP
-  (uniquement pour diagnostiquer, le nettoyeur à liste blanche reste actif) — merci de le signaler.
+- **R6 — Bibliothèques système** (Qt / QtWebEngine, Python) : surface héritée ; gardez le système à jour.
+- **R7 — Lecteur QtWebEngine non testé sur écran par la batterie automatique** : JavaScript coupé, navigation interdite, liens filtrés ; l'HTML est de toute façon reconstruit par liste blanche. En cas de comportement inattendu, merci de le signaler.
 - **R8 — Hameçonnage visuel** : MintMail n'avertit pas quand le texte d'un lien affiche une adresse différente de sa destination, et ne détecte pas
   les domaines imitant ceux d'un correspondant.
 - **R9 — Hors périmètre** : un administrateur de la machine ou un logiciel malveillant du même compte lisent tout.

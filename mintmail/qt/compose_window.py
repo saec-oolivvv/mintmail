@@ -54,7 +54,11 @@ class ComposeWindow(QMainWindow):
         self._fmt_action(bar, tr("Gras"), "Ctrl+B", self._bold)
         self._fmt_action(bar, tr("Italique"), "Ctrl+I", self._italic)
         self._fmt_action(bar, tr("Souligné"), "Ctrl+U", self._underline)
+        self._fmt_action(bar, tr("Barré"), None, self._strike)
         self._fmt_action(bar, tr("Liste à puces"), None, self._bullets)
+        self._fmt_action(bar, tr("Liste numérotée"), None, self._numbered)
+        self._fmt_action(bar, tr("Citation"), None, self._quote)
+        self._fmt_action(bar, tr("Effacer la mise en forme"), None, self._clear_format)
         self._fmt_action(bar, tr("Insérer un lien"), "Ctrl+K", self._link)
         tpl = QPushButton(tr("Modèles"))
         tpl.setFlat(True)
@@ -180,10 +184,47 @@ class ComposeWindow(QMainWindow):
         from PySide6.QtGui import QTextListFormat
         self.editor.textCursor().createList(QTextListFormat.ListDisc)
 
+    def _numbered(self):
+        from PySide6.QtGui import QTextListFormat
+        self.editor.textCursor().createList(QTextListFormat.ListDecimal)
+
+    def _strike(self):
+        f = QTextCharFormat()
+        f.setFontStrikeOut(not self.editor.currentCharFormat().fontStrikeOut())
+        self._merge(f)
+
+    def _quote(self):
+        """Citation : le paragraphe (ou la sélection) est mis en retrait avec un filet à gauche ; un second clic l'enlève."""
+        cur = self.editor.textCursor()
+        cur.beginEditBlock()
+        start, end = sorted((cur.selectionStart(), cur.selectionEnd()))
+        probe = self.editor.textCursor()
+        probe.setPosition(start)
+        on = probe.blockFormat().leftMargin() >= 20
+        blk = probe
+        while True:
+            fmt = blk.blockFormat()
+            fmt.setLeftMargin(0 if on else 24)
+            blk.setBlockFormat(fmt)
+            if blk.block().position() + blk.block().length() > end or not blk.movePosition(blk.MoveOperation.NextBlock):
+                break
+        cur.endEditBlock()
+
+    def _clear_format(self):
+        """Efface gras, italique, souligné, barré… de la sélection (ou du mot sous le curseur), sans toucher au texte."""
+        cur = self.editor.textCursor()
+        if not cur.hasSelection():
+            cur.select(cur.SelectionType.WordUnderCursor)
+        plain = QTextCharFormat()
+        cur.setCharFormat(plain)
+        self.editor.setCurrentCharFormat(plain)
+
     def _link(self):
         url, ok = QInputDialog.getText(self, tr("Insérer un lien"), "URL")
         url = (url or "").strip()
-        if ok and url.lower().startswith(("http://", "https://", "mailto:")):          # jamais javascript: ni file:
+        if ok and url and not url.lower().startswith(("http://", "https://", "mailto:", "tel:")):
+            self.main.status.setText(tr("Lien refusé : seuls http, https, mailto et tel sont acceptés."))
+        if ok and url.lower().startswith(("http://", "https://", "mailto:", "tel:")):          # jamais javascript: ni file:
             cur = self.editor.textCursor()
             label = cur.selectedText() or url
             cur.insertHtml('<a href="%s">%s</a>' % (url.replace('"', "%22"), label.replace("<", "&lt;")))

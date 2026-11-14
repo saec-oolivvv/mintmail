@@ -1,4 +1,4 @@
-"""Contenu de l'aide intégrée de MintMail (données pures, sans GTK) : sections, raccourcis, options de ligne de commande,
+"""Contenu de l'aide intégrée de MintMail (données pures, sans interface) : sections, raccourcis, options de ligne de commande,
 recherche. Les tests vérifient que l'aide reste alignée sur le code (raccourcis, options, pages de paramètres)."""
 import re
 from typing import Dict, List, Tuple
@@ -15,6 +15,7 @@ SHORTCUTS_HELP: List[Tuple[str, str]] = [
     ("? … (recherche)", "Poser une question à l'IA"), ("Ctrl+,", "Ouvrir les paramètres"), ("Ctrl+R", "Actualiser"),
     ("Échap", "Annuler la sélection / la recherche"), ("V", "Déplacer vers un dossier"), ("T", "Aujourd'hui (agenda, priorités, tâches)"),
     ("Ctrl+N", "Nouveau message"), ("Ctrl+Maj+,", "Paramètres dans une fenêtre séparée"), ("F1", "Aide"),
+    ("Ctrl++ / Ctrl+-", "Agrandir / réduire le texte des messages"), ("Ctrl+0", "Taille normale du texte"), ("Ctrl+B", "Barre latérale réduite / étendue"),
 ]
 
 CLI_OPTIONS: List[Tuple[str, str]] = [
@@ -23,7 +24,7 @@ CLI_OPTIONS: List[Tuple[str, str]] = [
     ("mintmail --version", "Affiche la version installée."),
     ("mintmail --settings", "Ouvre directement les paramètres. Avec --window : dans une fenêtre séparée."),
     ("mintmail mailto:adresse@exemple.be", "Ouvre la rédaction pour cette adresse (MintMail sait gérer les liens mailto:)."),
-    ("mintmail --diagnose", "Rapport complet SANS secret (système, Python, GTK, modules, données, synchro, trousseau, journal), "
+    ("mintmail --diagnose", "Rapport complet SANS secret (système, Python, Qt, modules, données, synchro, trousseau, journal), "
                             "enregistré dans {data}/diagnostic.txt."),
     ("mintmail --reset", "Met de côté (sans rien supprimer) la configuration et le cache : MintMail repart propre."),
     ("mintmail --remove-local-install", "Liste les anciennes installations qui masquent le paquet ; avec --yes, les met de côté "
@@ -34,7 +35,6 @@ CLI_OPTIONS: List[Tuple[str, str]] = [
                               "Avec --no-test : lecture seule."),
     ("mintmail --qt", "Force l'interface Qt (c'est déjà l'interface par défaut dès que PySide6 est installé) et indique ce qui manque sinon."),
     ("mintmail --install-qt", "Installe l'interface Qt (PySide6) dans le venv privé de MintMail, sans droits administrateur, avec le détail à l'écran. Le paquet .deb le fait déjà tout seul ; sans paquet, MintMail le lance en arrière-plan au premier démarrage."),
-    ("mintmail --gtk", "Lance l'ancienne interface GTK (secours). Par défaut MintMail ouvre l'interface Qt dès que PySide6 est installé ; MINTMAIL_UI=gtk fait de même."),
     ("mintmail --check-update", "Cherche une mise à jour et affiche le résultat détaillé (version, dépôt, signature, cause d'une erreur) : sans interface, sans rien installer. "
                                 "Code de sortie : 0 à jour, 10 mise à jour disponible, 1 erreur."),
 ]
@@ -367,10 +367,10 @@ SECTIONS: List[Dict] = [
         ("Autres réglages",
          "• Charger les images distantes (non recommandé) · notifications de bureau · fréquence d'actualisation · délai d'annulation d'envoi · langue de l'interface (redémarrage nécessaire). Langues : français, anglais, néerlandais, allemand, espagnol — les trois dernières sont des traductions par IA non relues par des locuteurs natifs, et l'aide F1 reste en anglais pour elles.\n"
          "• Gestes & disposition : disposition, gestes de balayage, inversion pavé tactile, conversations.\n"
-         "• Paramètres → Raccourcis : liste des touches. « Réinitialiser l'apparence » remet les valeurs par défaut."),
+         "• Aide (F1) → Raccourcis : liste des touches. « Rétablir l'apparence et la disposition par défaut » remet les valeurs par défaut."),
         ("Pages de paramètres",
-         "Comptes · Signatures · Apparence · ✨ Intelligence artificielle · Synchronisation P2P · Gestes & disposition · Filtres & blocage · "
-         "Modèles de réponse · Contacts · Identités d'envoi · Agenda (Google / CalDAV) · Raccourcis · Mises à jour · Aide & Crédits. Échap revient à la boîte de réception."),
+         "Comptes · Apparence · Filtres & blocage · ✨ IA · Mises à jour · Gestes & disposition · Signatures · Identités d'envoi · Modèles de réponse · Contacts · Agenda · Synchronisation. "
+         "L'aide (F1) contient les raccourcis, les options en ligne de commande et les crédits. Échap ferme la fenêtre des paramètres."),
     ]},
     {"id": "updates", "title": "Mises à jour automatiques", "items": [
         ("Comment ça marche",
@@ -419,7 +419,7 @@ SECTIONS: List[Dict] = [
         ("MintMail ne démarre pas",
          "1. Lancez « /usr/bin/mintmail » dans un terminal : le message indique la cause.\n"
          "2. « /usr/bin/mintmail --diagnose » : rapport complet (copiez-le si vous demandez de l'aide).\n"
-         "3. Composant manquant : sudo apt install python3-gi gir1.2-gtk-3.0 gir1.2-webkit2-4.1.\n"
+         "3. Interface Qt absente : « mintmail --install-qt » (installe PySide6 sans droits administrateur).\n"
          "4. Données endommagées : « mintmail --reset » (sauvegarde puis repart propre ; les comptes reviennent seuls si la synchro est active).\n"
          "MintMail utilise toujours /usr/bin/python3 : un autre Python (conda, pyenv…) ne gêne pas."),
         ("Une ancienne version s'ouvre / mauvaise icône",
@@ -441,7 +441,7 @@ SECTIONS: List[Dict] = [
     {"id": "about", "title": "À propos et crédits", "items": [
         ("MintMail {version}",
          "Le client mail pour Linux Mint dont l'IA est l'ADN : il lit, trie, résume, classe, rédige et agit avec vous — toujours avec votre accord.\n"
-         "Développé par SAEC — https://saec.me · Logiciel libre sous licence MIT (© 2026 SAEC) : vous pouvez l'utiliser, le modifier et le redistribuer. Application GTK3 / Python, sans service cloud imposé : vos mails, vos clés et vos réglages restent chez vous."),
+         "Développé par SAEC — https://saec.me · Logiciel libre sous licence MIT (© 2026 SAEC) : vous pouvez l'utiliser, le modifier et le redistribuer. Application Qt (PySide6) / Python, sans service cloud imposé : vos mails, vos clés et vos réglages restent chez vous."),
     ]},
 ]
 

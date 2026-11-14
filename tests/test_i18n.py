@@ -6,7 +6,7 @@ ROOT = os.path.dirname(HERE)
 sys.path.insert(0, HERE)
 os.environ.setdefault("XDG_DATA_HOME", tempfile.mkdtemp())
 os.environ.setdefault("XDG_CONFIG_HOME", tempfile.mkdtemp())
-import gtkstub   # noqa: F401
+import testenv
 from mintmail import i18n
 
 PKG = os.path.join(ROOT, "mintmail")
@@ -111,22 +111,21 @@ def test_english_runtime_behaviour_end_to_end():
     out = json.loads(run("""
 import json, datetime, sys
 sys.path.insert(0, 'tests')
-import gtkstub
+import testenv
 from mintmail import i18n
 lang = i18n.init_from_config('auto')
 from mintmail import tasks, slots, util
 d = datetime.date(2026, 11, 10)
-from mintmail.settings import SHORTCUTS
 print(json.dumps({'lang': lang,
   'due': [tasks.due_label({'due': x}, d) for x in ('2026-11-09', '2026-11-10', '2026-11-11', '2026-11-12')],
   'slots': slots.proposal_text([(datetime.datetime(2026, 11, 12, 9, 0), datetime.datetime(2026, 11, 12, 10, 30))]),
-  'size': util.human_size(3 * 1024 * 1024), 'shortcut': SHORTCUTS[0]}))
+  'size': util.human_size(3 * 1024 * 1024), 'sc': ['C', i18n.tr('Nouveau message')]}))
 """))
     assert out["lang"] == "en"
     assert out["due"] == ["1 d overdue", "today", "tomorrow", "in 1 d (11/11)"] or out["due"][:3] == ["1 d overdue", "today", "tomorrow"], out["due"]
     assert out["slots"].startswith("I suggest the following time slots:") and "Thursday 12 November, from 9:00 to 10:30" in out["slots"] and out["slots"].endswith("suits you."), out["slots"]
     assert out["size"].endswith("MB"), out["size"]
-    assert out["shortcut"][1] == "New message", out["shortcut"]
+    assert out["sc"][1] == "New message", out["sc"]
     fr = json.loads(run("""
 import json, datetime
 from mintmail import i18n
@@ -151,12 +150,12 @@ def test_pseudo_locale_every_string_changed_nothing_breaks():
     """Toutes les chaînes traduites deviennent « «…» » : l'interface simulée doit démarrer, se construire et s'exécuter sans erreur
     (détecte une logique qui dépendrait du texte français affiché)."""
     code = ("import sys, runpy, mintmail.i18n as i; i.tr = lambda s: '«%s»' % s; sys.path.insert(0, 'tests'); "
-            "runpy.run_path('tests/stub_smoke.py', run_name='__main__')")
+            "runpy.run_path('tests/i18n_smoke.py', run_name='__main__')")
     assert "SMOKE OK" in run(code, lang="fr")
 
 
 def test_english_smoke_runs_with_the_real_catalog():
-    assert "SMOKE OK" in run("import sys, runpy; sys.path.insert(0, 'tests'); runpy.run_path('tests/stub_smoke.py', run_name='__main__')", lang="en")
+    assert "SMOKE OK" in run("import sys, runpy; sys.path.insert(0, 'tests'); runpy.run_path('tests/i18n_smoke.py', run_name='__main__')", lang="en")
 
 
 def test_help_translation_is_complete_and_parallel():
@@ -173,8 +172,8 @@ def test_help_translation_is_complete_and_parallel():
     for (_, fd), (_, ed) in zip(H.CLI_OPTIONS, d["cli"]):
         assert ph(fd) == ph(ed)
     en_cat = catalogs()["en"]
-    settings_src = open(os.path.join(PKG, "settings.py"), encoding="utf-8").read()
-    titles = re.findall(r'add_titled\([^\n]*?"\w+", (?:tr\()?"([^"]+)"\)', settings_src)
+    settings_src = open(os.path.join(PKG, "qt", "settings_window.py"), encoding="utf-8").read()
+    titles = [t for t in re.findall(r'tabs\.addTab\([^\n]*?, (?:tr\()?"([^"]+)"\)', settings_src) if re.match(r"\w", t)]
     pages = next(i for s in d["sections"] if s["id"] == "look" for i in s["items"] if i[0] == "Settings pages")[1]
     for t in titles:
         assert en_cat[t] in pages, "page de paramètres absente de l'aide anglaise : %s" % en_cat[t]
@@ -231,8 +230,8 @@ def test_wrapping_tool_finds_nothing_to_wrap_or_unwrap_and_no_identifier_is_tran
 
 
 def test_settings_page_offers_the_language_choice():
-    src = open(os.path.join(PKG, "settings.py"), encoding="utf-8").read()
-    assert "ui_lang" in src and "i18n.available()" in src and "redémarrez MintMail" in src
+    src = open(os.path.join(PKG, "qt", "settings_window.py"), encoding="utf-8").read() + open(os.path.join(PKG, "qt", "maintenance.py"), encoding="utf-8").read()
+    assert "ui_lang" in src and "i18n.available()" in src and "redémarrez MintMail" in src and "MT.languages()" in src
 
 
 # ======================================================================= langues livrées : néerlandais, allemand, espagnol
@@ -278,7 +277,7 @@ def test_each_new_language_works_end_to_end_with_native_dates_tasks_and_a_clean_
     code = """
 import json, datetime, sys
 sys.path.insert(0, 'tests')
-import gtkstub
+import testenv
 from mintmail import i18n
 lang = i18n.init_from_config('auto')
 from mintmail import slots, tasks
@@ -290,7 +289,7 @@ print(json.dumps({'lang': lang, 'slots': slots.proposal_text([(datetime.datetime
         out = json.loads(run(code, lang=lang))
         assert out["lang"] == lang and out["slots"].startswith(intro) and day in out["slots"], out
         assert out["due"] == [late, today, tomorrow], out["due"]
-        assert "SMOKE OK" in run("import sys, runpy; sys.path.insert(0, 'tests'); runpy.run_path('tests/stub_smoke.py', run_name='__main__')", lang=lang), lang
+        assert "SMOKE OK" in run("import sys, runpy; sys.path.insert(0, 'tests'); runpy.run_path('tests/i18n_smoke.py', run_name='__main__')", lang=lang), lang
         cli = subprocess.run([sys.executable, "-m", "mintmail", "--help"], capture_output=True, text=True, cwd=ROOT, timeout=60, env=dict(os.environ, MINTMAIL_LANG=lang, PYTHONPATH=ROOT)).stdout
         assert "Starts the application." in cli, lang                                                 # l'aide en ligne de commande retombe sur l'anglais (pas de traduction dédiée)
 

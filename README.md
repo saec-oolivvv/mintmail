@@ -1,8 +1,8 @@
 # MintMail
 
-**Client de messagerie moderne pour Linux Mint (et Ubuntu / Debian) — GTK3, Python — avec une IA qui lit, trie, classe, résume, rédige et agit avec vous, toujours avec votre accord.**
+**Client de messagerie moderne pour Linux Mint (et Ubuntu / Debian, macOS) — Qt, Python — avec une IA qui lit, trie, classe, résume, rédige et agit avec vous, toujours avec votre accord.**
 
-*Modern GTK3 mail client for Linux Mint / Ubuntu / Debian with built-in AI: summaries, folder sorting, smart replies, Google Calendar, offline mode, encrypted sync between your machines. Interface in French and English (see [Langues](#langues--languages)).*
+*Modern Qt mail client for Linux Mint / Ubuntu / Debian / macOS with built-in AI: summaries, folder sorting, smart replies, Google Calendar, offline mode, encrypted sync between your machines. Interface in French and English (see [Langues](#langues--languages)).*
 
 ## Télécharger / Download
 
@@ -10,7 +10,7 @@
   ```
   sudo apt install ./mintmail_X.Y.Z_all.deb
   ```
-  Les dépendances (Python 3, GTK 3, WebKit2GTK) sont installées automatiquement. Mise à jour = réinstaller le `.deb` de la nouvelle version ; vos réglages et votre cache sont conservés.
+  Les dépendances (Python 3 et l'interface Qt / PySide6, installée dans un environnement privé du paquet) sont installées automatiquement. Mise à jour = réinstaller le `.deb` de la nouvelle version ; vos réglages et votre cache sont conservés.
 - **Code source** : bouton **Code → Download ZIP**, ou `git clone`.
 - **Construire soi-même** : `make deb` (nécessite `dpkg-deb` et `python3`) → `dist/mintmail_<version>_all.deb`.
 
@@ -58,21 +58,21 @@ Un audit de sécurité complet (failles trouvées et corrigées, risques restant
 ## Développement
 
 ```
-make test    # tous les tests (GTK simulé) + test de fumée
+make test    # tous les tests (moteur et logique de l'interface ; la fenêtre Qt n'est testée que si PySide6 est installé)
 make deb     # construit dist/mintmail_<version>_all.deb
 make docs    # régénère docs/AIDE.md et docs/HELP.md depuis l'aide intégrée
 tools/bump-version.sh X.Y.Z   # nouvelle version (VERSION + CHANGELOG)
 tools/release.sh              # publie une version signée (voir docs/RELEASING.md)
 ```
 
-- `mintmail/` : application (`window.py` fenêtre, `listing.py` liste, `reader.py` lecteur, `compose.py` rédaction, `backend.py` IMAP/SMTP, `store.py` cache SQLite + réglages, `ai_*.py` IA, `syncdata.py` + `p2p.py` synchronisation, `oauth.py` / `gcal.py` / `caldav.py`, `help_content.py` aide…).
-- `tests/` : tests automatisés ; l'interface GTK est **simulée** (doublures) — voir « État du projet ».
+- `mintmail/` : application (`qt/` interface Qt — `qt/window.py` fenêtre, `qt/compose_window.py` rédaction, `qt/settings_window.py` paramètres —, `backend.py` IMAP/SMTP, `store.py` cache SQLite + réglages, `ai_*.py` IA, `syncdata.py` + `p2p.py` synchronisation, `oauth.py` / `gcal.py` / `caldav.py`, `help_content.py` aide…).
+- `tests/` : tests automatisés ; la logique de l'interface Qt est séparée de l'affichage et testée sans écran — voir « État du projet ».
 - `packaging/build-deb.sh` : construction du paquet ; `.github/workflows/` : tests (CI) et publication automatique du `.deb` à chaque étiquette `vX.Y.Z`.
 - Historique des versions : [CHANGELOG.md](CHANGELOG.md) et [docs/NOUVEAUTES.md](docs/NOUVEAUTES.md). *Les commits antérieurs à v1.10.0 sont des instantanés reconstitués à partir des livraisons successives.*
 
 ## État du projet
 
-Les tests couvrent la logique (stockage, IMAP/SMTP simulés, IA simulée, synchronisation, OAuth, agenda, aide…), mais l'**affichage GTK réel n'a pas pu être vérifié automatiquement** : signalez tout défaut visuel via les *Issues*. Google Agenda, OAuth et CalDAV ont été testés contre des serveurs simulés, pas contre les vrais services. Le chiffrement de la synchronisation est maison et **n'a pas fait l'objet d'un audit** : ne l'utilisez que sur des réseaux et avec des machines de confiance.
+Les tests couvrent la logique (stockage, IMAP/SMTP simulés, IA simulée, synchronisation, OAuth, agenda, aide…), mais l'**affichage Qt réel n'est pas vérifié automatiquement** : signalez tout défaut visuel via les *Issues*. Google Agenda, OAuth et CalDAV ont été testés contre des serveurs simulés, pas contre les vrais services. Le chiffrement de la synchronisation est maison et **n'a pas fait l'objet d'un audit** : ne l'utilisez que sur des réseaux et avec des machines de confiance.
 
 ## Licence
 

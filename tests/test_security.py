@@ -5,8 +5,9 @@ tmp = tempfile.mkdtemp()
 os.environ.setdefault("XDG_DATA_HOME", tmp)
 os.environ.setdefault("XDG_CONFIG_HOME", tmp)
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-import gtkstub   # noqa: F401
-from mintmail import backend as B, htmlsafe as H, p2p, reader as R, store, unsub, util
+import testenv
+from mintmail import backend as B, htmlsafe as H, p2p, store, unsub, util
+from mintmail.qt import organizer as OR
 from mintmail.store import Cache, Config
 
 # ======================================================================= 1. nettoyeur HTML
@@ -119,87 +120,21 @@ def test_pathological_inputs_do_not_hang():
         assert time.time() - t0 < 8, (c[:20], time.time() - t0)
 
 
-def test_reader_wrap_and_editor_template_carry_a_content_security_policy():
-    class M:
-        html = '<p onclick="x()">Salut</p><script>alert(1)</script><img src="https://track.me/p.gif"><meta http-equiv="refresh" content="0;url=https://evil">'
-        text = "Salut"
-    out = R.wrap_html(M(), False, False)
-    assert "Content-Security-Policy" in out and "default-src 'none'" in out and "img-src data: cid:;" in out and "http:" not in out.split("</head>")[0].split("img-src")[1].split(";")[0]
-    assert "<script" not in out and "onclick" not in out and "<meta http-equiv=\"refresh\"" not in out and re.search(r'(?<![\w-])src="https?://', out) is None
-    assert "img-src data: cid: http: https:" in R.wrap_html(M(), True, False)
-    import mintmail.compose as C
-    tpl = C.EDITOR_TPL
-    script = re.search(r"<script>(.*?)</script>", tpl, re.S).group(1)
-    import base64, hashlib
-    digest = base64.b64encode(hashlib.sha256(script.encode()).digest()).decode()
-    assert "sha256-" + digest in tpl and "default-src 'none'" in tpl and "unsafe-inline'; script" not in tpl.replace("style-src 'unsafe-inline'", "")
-    assert tpl.count("<script>") == 1                                                                  # un seul script, celui de l'éditeur
-    os.environ["MINTMAIL_EDITOR_CSP"] = "0"
-    try:
-        assert "Content-Security-Policy" not in importlib.reload(C).EDITOR_TPL                     # voie de secours documentée
-    finally:
-        del os.environ["MINTMAIL_EDITOR_CSP"]
-        importlib.reload(C)
-
-
 # ======================================================================= 2. liens et navigation
 def test_only_http_https_mailto_links_are_opened_and_with_clean_addresses():
-    opened = []
-    R.Gtk.show_uri_on_window = lambda win, uri, t: opened.append(uri)
     for bad in ["javascript:alert(1)", "  JaVaScRiPt:alert(1)", "java\tscript:alert(1)", "file:///etc/passwd", "FILE:///home/x", "smb://srv/share", "ssh://h", "ftp://h/x", "data:text/html,<script>alert(1)</script>",
                 "about:blank", "x-scheme-handler/steam", "steam://run/1", "ms-msdt:/id", "tel:+32", "vbscript:x", "", "https" + "x" * 5000 + "://a", "//evil/x", "/etc/passwd", "evil.com/x"]:
-        assert R.open_uri(None, bad) is False, bad
-    assert opened == []
+        assert H.safe_to_open(bad) is None, bad
     for good, want in [("https://saec.me/x?a=1", "https://saec.me/x?a=1"), ("HTTP://x.be", "HTTP://x.be"), ("mailto:a@b.be?subject=x", "mailto:a@b.be?subject=x"), ("ht\ttps://x.be", "https://x.be"), (" https://x.be\n", "https://x.be")]:
-        assert R.open_uri(None, good) is True and opened[-1] == want, (good, opened[-1])
+        assert H.safe_to_open(good) == want.strip(), (good, H.safe_to_open(good))
 
 
-class FakeDecision:
-    def __init__(self, uri, ntype):
-        self.ignored = False
-        self.nav = types.SimpleNamespace(get_request=lambda: types.SimpleNamespace(get_uri=lambda: uri), get_navigation_type=lambda: ntype)
-    def get_navigation_action(self): return self.nav
-    def ignore(self): self.ignored = True
-
-
-def test_webview_navigation_policy_blocks_everything_but_our_own_load_and_safe_clicks():
-    ns = types.SimpleNamespace(PolicyDecisionType=types.SimpleNamespace(NAVIGATION_ACTION="nav", NEW_WINDOW_ACTION="win", RESPONSE="resp"),
-                               NavigationType=types.SimpleNamespace(LINK_CLICKED="click", OTHER="other", FORM_SUBMITTED="form", RELOAD="reload"))
-    orig_wk, orig_open = R.WebKit2, R.open_uri
-    R.WebKit2 = ns
-    opened = []
-    R.open_uri = lambda owner, uri: opened.append(uri) or True
-    try:
-        d = FakeDecision("about:blank", "other")
-        assert R.navigation_policy(None, d, "nav") is False and not d.ignored                 # notre propre load_html
-        d = FakeDecision("about:blank#section", "click")
-        assert R.navigation_policy(None, d, "nav") is False and opened == []                  # ancre interne
-        d = FakeDecision("https://ok.be/x", "click")
-        assert R.navigation_policy(None, d, "nav") is True and d.ignored and opened == ["https://ok.be/x"]
-        for uri, ntype in (("https://evil/redirect", "other"), ("https://evil/post", "form"), ("javascript:alert(1)", "other"), ("file:///etc/passwd", "reload")):
-            d = FakeDecision(uri, ntype)
-            assert R.navigation_policy(None, d, "nav") is True and d.ignored, (uri, ntype)    # redirections, formulaires, cadres : refusés
-        assert opened == ["https://ok.be/x"]
-        d = FakeDecision("https://evil/", "click")
-        assert R.navigation_policy(None, d, "win") is True and d.ignored                      # nouvelle fenêtre : refusée
-        assert R.navigation_policy(None, FakeDecision("https://x", "other"), "resp") is False
-    finally:
-        R.WebKit2, R.open_uri = orig_wk, orig_open
-
-
-def test_webkit_settings_are_hardened():
-    called = {}
-
-    class S:
-        def __getattr__(self, name):
-            return lambda v: called.__setitem__(name, v)
-    R.harden_settings(S(), False)
-    for name in ("set_enable_hyperlink_auditing", "set_enable_plugins", "set_enable_webgl", "set_enable_html5_local_storage", "set_allow_modal_dialogs",
-                 "set_javascript_can_open_windows_automatically", "set_enable_developer_extras", "set_allow_file_access_from_file_urls"):
-        assert called.get(name) is False, name
-    assert called["set_enable_javascript"] is False
-    R.harden_settings(S(), True)
-    assert called["set_enable_javascript"] is True and called["set_enable_hyperlink_auditing"] is False
+def test_attachment_open_plan_never_launches_executables_and_asks_for_risky_files():
+    for name in ("setup.exe", "run.sh", "evil.desktop", "facture\u202efdp.exe"):
+        assert OR.open_plan({"filename": name, "path": "/tmp/" + name, "size": 10, "mime": ""})[0] == "block", name       # refus net, enregistrement seulement
+    assert OR.open_plan({"filename": "page.html", "path": "/tmp/page.html", "size": 10, "mime": "text/html"})[0] == "warn"   # confirmation avant ouverture
+    assert OR.open_plan({"filename": "photo.jpg", "path": "/tmp/photo.jpg", "size": 10, "mime": "image/jpeg"})[0] == "preview_image"
+    assert OR.open_plan({"filename": "huge.jpg", "path": "/tmp/huge.jpg", "size": 50_000_000, "mime": "image/jpeg"})[0] == "open"   # image énorme : pas d'aperçu en mémoire
 
 
 # ======================================================================= 3. pièces jointes
@@ -215,35 +150,6 @@ def test_attachment_risk_levels_including_tricks():
     for n in ["facture.pdf", "photo.JPG", "notes.txt", "archive.zip", "data.csv", "contrat.docx", "x.png", "tableau.xlsx"]:
         assert risk(n) == "ok", n
     assert util.attachment_kind({"filename": "a.svg"}) == "file"                                  # plus d'aperçu intégré pour les SVG
-
-
-def test_attachment_opening_never_launches_executables_and_asks_for_risky_files():
-    launched, dialogs, previews = [], [], []
-    orig = R.Gio.AppInfo.launch_default_for_uri
-    R.Gio.AppInfo.launch_default_for_uri = staticmethod(lambda uri, ctx: launched.append(uri))
-    answer = {"v": False}
-
-    def dialog(title, text, ok_label=None):
-        dialogs.append((title, ok_label))
-        return answer["v"]
-    me = types.SimpleNamespace(_warn_dialog=dialog, _preview=lambda a, k: previews.append(a["filename"]), get_toplevel=lambda: None)
-    try:
-        for name in ("setup.exe", "run.sh", "evil.desktop", "facture\u202efdp.exe"):
-            R.Reader._open_att(me, {"filename": name, "path": "/tmp/" + name, "size": 10, "mime": ""})
-        assert launched == [] and previews == [] and all(d[1] is None for d in dialogs) and len(dialogs) == 4      # refus net, enregistrement seulement
-        dialogs.clear()
-        R.Reader._open_att(me, {"filename": "page.html", "path": "/tmp/page.html", "size": 10, "mime": "text/html"})
-        assert launched == [] and dialogs and dialogs[0][1] == "Ouvrir quand même"                              # confirmation, refusée
-        answer["v"] = True
-        R.Reader._open_att(me, {"filename": "page.html", "path": "/tmp/page.html", "size": 10, "mime": "text/html"})
-        assert launched and launched[0].endswith("page.html")                                                   # confirmée : ouverte
-        launched.clear(); dialogs.clear()
-        R.Reader._open_att(me, {"filename": "photo.jpg", "path": "/tmp/photo.jpg", "size": 10, "mime": "image/jpeg"})
-        assert previews == ["photo.jpg"] and dialogs == []                                                      # fichier ordinaire : aucune question
-        R.Reader._open_att(me, {"filename": "huge.jpg", "path": "/tmp/huge.jpg", "size": 50_000_000, "mime": "image/jpeg"})
-        assert previews == ["photo.jpg"] and launched                                                          # image énorme : pas d'aperçu en mémoire
-    finally:
-        R.Gio.AppInfo.launch_default_for_uri = orig
 
 
 # ======================================================================= 4. données au repos

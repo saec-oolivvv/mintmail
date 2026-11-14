@@ -1,12 +1,10 @@
-"""Garde-fou du portage Windows / macOS : le MOTEUR (courrier, cache, IA, synchro…) ne doit jamais dépendre de GTK (ni de Qt) ;
+"""Garde-fou du portage Windows / macOS : le MOTEUR (courrier, cache, IA, synchro…) ne doit jamais dépendre d'une interface (ni GTK, ni Qt) ;
 seule l'interface en dépend. Si un module du moteur importe l'interface par erreur, ce test échoue — sur les trois systèmes."""
 import os, subprocess, sys
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 CORE = ["models", "util", "i18n", "log", "netutil", "htmlsafe", "ical", "caldav", "gcal", "contacts", "tasks", "slots", "unsub", "store", "offline",
-        "backend", "ai_service", "ai_engine", "oauth", "syncdata", "p2p", "updater", "update_text", "sysdeps", "qtsetup", "qtdeps", "help_format", "style"]
-UI = ["window", "listing", "reader", "folders", "settings", "settings_extra", "settings_more", "compose", "extras", "widgets", "assistant",
-      "updates_ui", "help_view", "ai_features", "app"]          # interface GTK : à remplacer par Qt, module par module
+        "backend", "ai_service", "ai_engine", "oauth", "syncdata", "p2p", "updater", "update_text", "sysdeps", "qtsetup", "qtdeps", "help_format", "themes"]
 
 
 def test_core_modules_import_without_any_gui_toolkit():
@@ -36,7 +34,7 @@ def test_core_sources_never_mention_a_gui_toolkit_import():
 
 
 def test_every_module_is_classified_so_a_new_one_cannot_slip_through():
-    known = set(CORE) | set(UI) | {"__init__", "__main__", "entry", "diagnose", "apply_update", "help_content"}
+    known = set(CORE) | {"__init__", "__main__", "entry", "diagnose", "apply_update", "help_content"}
     present = {f[:-3] for f in os.listdir(os.path.join(ROOT, "mintmail")) if f.endswith(".py")}
     assert present <= known, "Module non classé (moteur ou interface ?) : %s" % sorted(present - known)
 

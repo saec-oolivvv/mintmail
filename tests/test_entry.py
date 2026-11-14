@@ -11,18 +11,22 @@ def run(args, env_extra=None, home=None):
     return r, tmp
 
 
-def test_version_and_friendly_error_without_gtk():
+def test_version_and_friendly_error_without_pyside():
     r, _ = run(["--version"])
     assert r.returncode == 0 and r.stdout.startswith("MintMail ")
     try:
-        import gi
-        gi.require_version("Gtk", "3.0")
-        return   # GTK présent sur cette machine : le test ne s'applique pas
-    except (ImportError, ValueError):
+        import PySide6  # noqa: F401
+        return   # PySide6 présent sur cette machine : lancer sans option ouvrirait une vraie fenêtre, le test ne s'applique pas
+    except ImportError:
         pass
-    r, _ = run([])
+    r, _ = run([], env_extra={"MINTMAIL_NO_AUTOINSTALL": "1"})
     assert r.returncode == 1 and "Traceback" not in r.stderr          # message clair, pas une trace brute
-    assert "apt install python3-gi" in r.stderr and "--diagnose" in r.stderr and "/usr/bin/mintmail" in r.stderr
+    assert "--install-qt" in r.stderr and "--diagnose" in r.stderr and "/usr/bin/mintmail" in r.stderr
+
+
+def test_the_old_gtk_option_is_ignored_and_never_crashes():
+    r, _ = run(["--gtk", "--version"])
+    assert r.returncode == 0 and r.stdout.startswith("MintMail ")
 
 
 def test_diagnose_reports_problems_without_leaking_secrets():

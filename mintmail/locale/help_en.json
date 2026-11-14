@@ -298,11 +298,11 @@
     ],
     [
      "Other settings",
-     "• Load remote images (not recommended) · desktop notifications · refresh frequency · undo-send delay · interface language (restart required). Languages: French, English, Dutch, German, Spanish — the last three are AI translations not reviewed by native speakers, and the F1 help stays in English for them.\n• Gestures & layout: layout, swipe gestures, touchpad reversal, conversations.\n• Settings → Shortcuts: list of keys. “Reset appearance” restores the defaults."
+     "• Load remote images (not recommended) · desktop notifications · refresh frequency · undo-send delay · interface language (restart required). Languages: French, English, Dutch, German, Spanish — the last three are AI translations not reviewed by native speakers, and the F1 help stays in English for them.\n• Gestures & layout: layout, swipe gestures, touchpad reversal, conversations.\n• Help (F1) → Shortcuts: list of keys. “Restore default appearance and layout” restores the defaults."
     ],
     [
      "Settings pages",
-     "Accounts · Signatures · Appearance · ✨ Artificial intelligence · P2P sync · Gestures & layout · Filters & blocking · Reply templates · Contacts · Sending identities · Calendar (Google / CalDAV) · Shortcuts · Updates · Help & Credits. Esc goes back to the inbox."
+     "Accounts · Appearance · Filters & blocking · ✨ AI · Updates · Gestures & layout · Signatures · Sending identities · Reply templates · Contacts · Calendar · Sync. The help (F1) holds the shortcuts, the command-line options and the credits. Esc closes the settings window."
     ]
    ]
   },
@@ -364,7 +364,7 @@
     ],
     [
      "MintMail does not start",
-     "1. Run “/usr/bin/mintmail” in a terminal: the message gives the cause.\n2. “/usr/bin/mintmail --diagnose”: full report (copy it if you ask for help).\n3. Missing component: sudo apt install python3-gi gir1.2-gtk-3.0 gir1.2-webkit2-4.1.\n4. Damaged data: “mintmail --reset” (backs up, then starts clean; accounts come back by themselves if sync is on).\nMintMail always uses /usr/bin/python3: another Python (conda, pyenv…) does not get in the way."
+     "1. Run “/usr/bin/mintmail” in a terminal: the message gives the cause.\n2. “/usr/bin/mintmail --diagnose”: full report (copy it if you ask for help).\n3. Qt interface missing: “mintmail --install-qt” (installs PySide6 without administrator rights).\n4. Damaged data: “mintmail --reset” (backs up, then starts clean; accounts come back by themselves if sync is on).\nMintMail always uses /usr/bin/python3: another Python (conda, pyenv…) does not get in the way."
     ],
     [
      "An old version opens / wrong icon",
@@ -394,7 +394,7 @@
    "items": [
     [
      "MintMail {version}",
-     "The mail client for Linux Mint with AI in its DNA: it reads, sorts, summarizes, files, writes and acts with you — always with your approval.\nDeveloped by SAEC — https://saec.me · Free software under the MIT license (© 2026 SAEC): you may use, modify and redistribute it. GTK3 / Python application, with no imposed cloud service: your mail, keys and settings stay with you."
+     "The mail client for Linux Mint with AI in its DNA: it reads, sorts, summarizes, files, writes and acts with you — always with your approval.\nDeveloped by SAEC — https://saec.me · Free software under the MIT license (© 2026 SAEC): you may use, modify and redistribute it. Qt (PySide6) / Python application, with no imposed cloud service: your mail, keys and settings stay with you."
     ]
    ]
   }
@@ -515,6 +515,18 @@
   [
    "F1",
    "Help"
+  ],
+  [
+   "Ctrl++ / Ctrl+-",
+   "Enlarge / reduce the message text"
+  ],
+  [
+   "Ctrl+0",
+   "Normal text size"
+  ],
+  [
+   "Ctrl+B",
+   "Collapse / expand the sidebar"
   ]
  ],
  "cli": [
@@ -540,7 +552,7 @@
   ],
   [
    "mintmail --diagnose",
-   "Full report WITHOUT secrets (system, Python, GTK, modules, data, sync, keyring, log), saved to {data}/diagnostic.txt."
+   "Full report WITHOUT secrets (system, Python, Qt, modules, data, sync, keyring, log), saved to {data}/diagnostic.txt."
   ],
   [
    "mintmail --reset",
@@ -565,10 +577,6 @@
   [
    "mintmail --install-qt",
    "Installs the Qt interface (PySide6) in MintMail's private venv, without administrator rights, with the details on screen. The .deb package already does it by itself; without the package, MintMail starts it in the background at first launch."
-  ],
-  [
-   "mintmail --gtk",
-   "Starts the old GTK interface (fallback). By default MintMail opens the Qt interface as soon as PySide6 is installed; MINTMAIL_UI=gtk does the same."
   ],
   [
    "mintmail --check-update",

@@ -1,4 +1,4 @@
-# Aide de MintMail 1.14.1
+# Aide de MintMail 1.34.2
 _Généré par `make docs` depuis l'aide intégrée (touche F1 dans l'application)._
 
 ## Premiers pas
@@ -29,6 +29,7 @@ Sans compte configuré, MintMail affiche des messages d'exemple pour essayer l'i
 ### Découvrir la fenêtre
 
 • Barre latérale : vues intelligentes (Boîte de réception, Non lus, Favoris, Épinglés, Reportés, Brouillons), comptes et leurs dossiers, recherches enregistrées, voyant de synchronisation entre machines (⇄) en pied.  
+• « Non lus » réunit les messages non lus de la boîte de réception ET de tous vos dossiers de rangement et archives (règles, IA, rangement manuel), sauf Spam, Corbeille, Envoyés et Brouillons : un message important rangé dans un dossier ne passe pas inaperçu. MintMail relit ces dossiers en arrière-plan, environ chaque minute, sans télécharger ce qui est déjà lu. Un message que vous ouvrez dans « Non lus » y reste affiché (liste et lecteur) tant que vous ne passez pas à un autre ; il en sort seulement à ce moment-là, ou si vous agissez dessus (archiver, supprimer…).  
 • Liste des messages au centre, lecteur à droite. Les séparateurs se déplacent à la souris et la position est retenue.  
 • Un clic ouvre toujours le message. Le mode sélection (touche X ou bouton) affiche des cases à cocher pour agir sur plusieurs messages.  
 • Menu ☰ : palette de commandes, paramètres (aussi en fenêtre séparée), clair / sombre, tout marquer comme lu, journal d'erreurs, à propos.  
@@ -165,6 +166,9 @@ T                  Aujourd'hui (agenda, priorités, tâches)
 Ctrl+N             Nouveau message
 Ctrl+Maj+,         Paramètres dans une fenêtre séparée
 F1                 Aide
+Ctrl++ / Ctrl+-    Agrandir / réduire le texte des messages
+Ctrl+0             Taille normale du texte
+Ctrl+B             Barre latérale réduite / étendue
 ```
 
 ## Rédiger et envoyer
@@ -271,6 +275,14 @@ Les modèles peuvent se tromper : vérifiez les résumés, les classements et le
 • Touche B : menu Bloquer. Débloquer : menu ⋯ du lecteur ou Paramètres → Filtres & blocage. Un bandeau Annuler reste disponible.  
 • Les listes (bloqués, spam) se gèrent dans Paramètres → Filtres & blocage et se synchronisent entre vos machines.
 
+### Ce n'est pas du spam
+
+Un bon message est tombé dans Spam ? Ouvrez-le (dossier Spam) :  
+• Bouton « ✔ Pas du spam » dans le lecteur (ou menu ⋯, clic droit, Spam ▾, palette Ctrl+K) : le message retourne en boîte de réception, ainsi que TOUS les messages du dossier Spam envoyés par la même adresse (variante : tout le domaine). Un bandeau Annuler reste disponible.  
+• Le serveur est prévenu : le message perd son marquage « indésirable » ($Junk) et reçoit « non-spam » ($NotJunk), puis quitte le dossier Spam (sur Gmail, il perd l'étiquette Spam). Hors ligne, l'action est conservée et envoyée au retour du réseau.  
+• L'expéditeur sort de la liste « envoyés en spam » : ses prochains messages ne sont plus reclassés dans Spam.  
+• ✨ L'IA vous le suggère : dans le dossier Spam, quand elle juge un message légitime, la carte de résumé propose « Ce n'est pas du spam » et, si un dossier convient, « Pas du spam, ranger dans … » (tous les messages de l'expéditeur y vont alors). Elle apparaît aussi dans le clic droit, et vous pouvez écrire à l'assistant : « ce n'est pas du spam ».
+
 ### Règles automatiques
 
 Paramètres → Filtres & blocage → Règles : « Si l'expéditeur / l'objet / le destinataire contient … alors » archiver, supprimer, spam, marquer lu, favori, épingler, ou ranger dans le dossier … Elles s'appliquent aux nouveaux messages (et « Appliquer maintenant » à la boîte). Une règle peut aussi naître du clic droit (« Toujours ranger… ») ou de l'assistant.
@@ -368,11 +380,11 @@ Paramètres → Apparence : trois styles — Aurora (sombre lumineux, défaut), 
 
 • Charger les images distantes (non recommandé) · notifications de bureau · fréquence d'actualisation · délai d'annulation d'envoi · langue de l'interface (redémarrage nécessaire). Langues : français, anglais, néerlandais, allemand, espagnol — les trois dernières sont des traductions par IA non relues par des locuteurs natifs, et l'aide F1 reste en anglais pour elles.  
 • Gestes & disposition : disposition, gestes de balayage, inversion pavé tactile, conversations.  
-• Paramètres → Raccourcis : liste des touches. « Réinitialiser l'apparence » remet les valeurs par défaut.
+• Aide (F1) → Raccourcis : liste des touches. « Rétablir l'apparence et la disposition par défaut » remet les valeurs par défaut.
 
 ### Pages de paramètres
 
-Comptes · Signatures · Apparence · ✨ Intelligence artificielle · Synchronisation P2P · Gestes & disposition · Filtres & blocage · Modèles de réponse · Contacts · Identités d'envoi · Agenda (Google / CalDAV) · Raccourcis · Mises à jour · Aide & Crédits. Échap revient à la boîte de réception.
+Comptes · Apparence · Filtres & blocage · ✨ IA · Mises à jour · Gestes & disposition · Signatures · Identités d'envoi · Modèles de réponse · Contacts · Agenda · Synchronisation. L'aide (F1) contient les raccourcis, les options en ligne de commande et les crédits. Échap ferme la fenêtre des paramètres.
 
 ## Mises à jour automatiques
 
@@ -441,7 +453,7 @@ mintmail --settings
 mintmail mailto:adresse@exemple.be
     Ouvre la rédaction pour cette adresse (MintMail sait gérer les liens mailto:).
 mintmail --diagnose
-    Rapport complet SANS secret (système, Python, GTK, modules, données, synchro, trousseau, journal), enregistré dans ~/.local/share/mintmail/diagnostic.txt.
+    Rapport complet SANS secret (système, Python, Qt, modules, données, synchro, trousseau, journal), enregistré dans ~/.local/share/mintmail/diagnostic.txt.
 mintmail --reset
     Met de côté (sans rien supprimer) la configuration et le cache : MintMail repart propre.
 mintmail --remove-local-install
@@ -450,6 +462,10 @@ mintmail --send-due
     Envoie, sans interface, les messages programmés ou en attente dont l'heure est venue (appelé chaque minute par la minuterie utilisateur mintmail-outbox).
 mintmail --check-pins
     Vérifie, pour chaque compte, si le serveur GARDE les épingles (étiquette Gmail ou mot-clé IMAP) : connexion, nombre de messages épinglés et essai réversible sur le message le plus récent. Avec --no-test : lecture seule.
+mintmail --qt
+    Force l'interface Qt (c'est déjà l'interface par défaut dès que PySide6 est installé) et indique ce qui manque sinon.
+mintmail --install-qt
+    Installe l'interface Qt (PySide6) dans le venv privé de MintMail, sans droits administrateur, avec le détail à l'écran. Le paquet .deb le fait déjà tout seul ; sans paquet, MintMail le lance en arrière-plan au premier démarrage.
 mintmail --check-update
     Cherche une mise à jour et affiche le résultat détaillé (version, dépôt, signature, cause d'une erreur) : sans interface, sans rien installer. Code de sortie : 0 à jour, 10 mise à jour disponible, 1 erreur.
 ```
@@ -458,7 +474,7 @@ mintmail --check-update
 
 1. Lancez « /usr/bin/mintmail » dans un terminal : le message indique la cause.  
 2. « /usr/bin/mintmail --diagnose » : rapport complet (copiez-le si vous demandez de l'aide).  
-3. Composant manquant : sudo apt install python3-gi gir1.2-gtk-3.0 gir1.2-webkit2-4.1.  
+3. Interface Qt absente : « mintmail --install-qt » (installe PySide6 sans droits administrateur).  
 4. Données endommagées : « mintmail --reset » (sauvegarde puis repart propre ; les comptes reviennent seuls si la synchro est active).  
 MintMail utilise toujours /usr/bin/python3 : un autre Python (conda, pyenv…) ne gêne pas.
 
@@ -484,7 +500,7 @@ Mise à jour : sudo apt install ./mintmail_X.Y.Z_all.deb (vos réglages et votre
 
 ## À propos et crédits
 
-### MintMail 1.14.1
+### MintMail 1.34.2
 
 Le client mail pour Linux Mint dont l'IA est l'ADN : il lit, trie, résume, classe, rédige et agit avec vous — toujours avec votre accord.  
-Développé par SAEC — https://saec.me · Logiciel libre sous licence MIT (© 2026 SAEC) : vous pouvez l'utiliser, le modifier et le redistribuer. Application GTK3 / Python, sans service cloud imposé : vos mails, vos clés et vos réglages restent chez vous.
+Développé par SAEC — https://saec.me · Logiciel libre sous licence MIT (© 2026 SAEC) : vous pouvez l'utiliser, le modifier et le redistribuer. Application Qt (PySide6) / Python, sans service cloud imposé : vos mails, vos clés et vos réglages restent chez vous.

@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.35.0
+- MintMail n'a plus qu'une interface : Qt. L'ancienne interface GTK est retirée ; le paquet ne dépend plus de GTK ni de WebKit
+- Fonctions portées dans Qt : dossiers (nouveau, sous-dossier, renommer, supprimer), recherche aussi sur le serveur, envoi des épingles, journal d'erreurs, plein écran F11, copier l'adresse, choix de la langue, Aujourd'hui au lancement, mise en forme complète de la rédaction
+- Essai sur Mac : packaging/mac-essai.command
+
 ## 1.34.2
 - Interface Qt : la liste affiche enfin les données de l'IA — pastille Important / Suspect et résumé de l'IA à la place de l'extrait
 

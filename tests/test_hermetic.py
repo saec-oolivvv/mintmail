@@ -2,7 +2,7 @@
 (défaut corrigé en 1.12.1 : sur une machine avec trousseau, la batterie écrasait la vraie clé d'API « ai:nvidia » par « nvapi-test »)."""
 import os, sys, tempfile, types
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-import gtkstub   # noqa: F401
+import testenv
 from mintmail import store
 
 

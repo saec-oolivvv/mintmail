@@ -9,12 +9,13 @@ from PySide6.QtWidgets import (QCheckBox, QComboBox, QDialog, QDialogButtonBox, 
 
 from .. import oauth
 from ..i18n import tr
-from ..style import ACCENTS, STYLES
+from ..themes import ACCENTS, STYLES
 from . import accounts as A
 from . import assistant as AS
 from . import automation as AU
 from . import gestures as GS
 from . import imagetrust as IT
+from . import maintenance as MT
 from . import ui_personal as UP
 from . import ui_calendar as UC
 from . import ui_sync as US
@@ -379,7 +380,14 @@ class SettingsDialog(QDialog):
         form.addRow(tr("Mode"), mode)
         form.addRow(tr("Densité de la liste"), dens)
         form.addRow(tr("Couleur d'accent"), accent)
-        for key, label in (("load_images", tr("Charger les images distantes")), ("notifications", tr("Notifications de bureau"))):
+        lang = QComboBox()
+        for code, label in MT.languages():
+            lang.addItem(label, code)
+        lang.setCurrentIndex(max(0, lang.findData(self.cfg.get("ui_lang") or "auto")))
+        lang.currentIndexChanged.connect(lambda _i: self.main.say(MT.set_language(self.cfg, lang.currentData())))
+        form.addRow(tr("Langue de l'interface"), lang)
+        for key, label in (("load_images", tr("Charger les images distantes")), ("notifications", tr("Notifications de bureau")),
+                           ("open_today_on_start", tr("Ouvrir la page Aujourd'hui au lancement"))):
             c = QCheckBox(label)
             c.setChecked(bool(self.cfg.get(key)))
             c.toggled.connect(lambda v, k=key: self._set(k, bool(v)))

@@ -272,7 +272,7 @@ def test_demo_account_sent_messages_land_in_the_sent_folder():
 
 # ------------------------------------------------------------------ thème
 from mintmail.qt import theme as TH
-from mintmail.style import STYLES
+from mintmail.themes import STYLES
 
 
 def test_theme_builds_for_every_style_and_mode_with_colours_qt_can_read():

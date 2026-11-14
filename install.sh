@@ -44,20 +44,7 @@ fi
 # --- dépendances
 if [ "$DEPS" = 1 ] && command -v apt-get >/dev/null 2>&1; then
   MISSING=()
-  python3 -c "import gi; gi.require_version('Gtk','3.0'); from gi.repository import Gtk" 2>/dev/null || MISSING+=(python3-gi gir1.2-gtk-3.0)
-  if ! python3 - <<'PY' 2>/dev/null
-import gi
-for v in ("4.1","4.0"):
-    try:
-        gi.require_version("WebKit2", v); break
-    except ValueError:
-        pass
-else:
-    raise SystemExit(1)
-PY
-  then
-    if apt-cache show gir1.2-webkit2-4.1 >/dev/null 2>&1; then MISSING+=(gir1.2-webkit2-4.1); else MISSING+=(gir1.2-webkit2-4.0); fi
-  fi
+  python3 -c "import venv, ensurepip" 2>/dev/null || MISSING+=(python3-venv python3-pip)
   python3 -c "import keyring" 2>/dev/null || MISSING+=(python3-keyring)
   if [ "${#MISSING[@]}" -gt 0 ]; then
     echo "==> Installation des dépendances : ${MISSING[*]}"
@@ -96,6 +83,12 @@ for f in "$HERE"/mintmail/icons/mintmail-*.png; do s="$(basename "$f" .png)"; s=
 command -v update-desktop-database >/dev/null 2>&1 && $SUDO update-desktop-database "$APPS" >/dev/null 2>&1 || true
 command -v gtk-update-icon-cache >/dev/null 2>&1 && $SUDO gtk-update-icon-cache -q -t "$(dirname "$(dirname "$(dirname "$ICONS")")")" >/dev/null 2>&1 || true
 command -v xdg-mime >/dev/null 2>&1 && xdg-mime default me.saec.mintmail.desktop x-scheme-handler/mailto >/dev/null 2>&1 || true
+
+# --- interface Qt : PySide6 dans un venv privé de l'utilisateur (sans droits administrateur) ; le premier démarrage le fait aussi tout seul
+if ! python3 -c "import PySide6" 2>/dev/null; then
+  echo "==> Installation de l'interface Qt (PySide6) — quelques minutes la première fois…"
+  "$BIN/mintmail" --install-qt || echo "    (échec : relancez plus tard « mintmail --install-qt »)"
+fi
 
 echo "==> Terminé. Lancez « mintmail » ou cherchez MintMail dans le menu."
 case ":$PATH:" in *":$BIN:"*) ;; *) echo "    Astuce : ajoutez $BIN à votre PATH (ou redémarrez la session).";; esac

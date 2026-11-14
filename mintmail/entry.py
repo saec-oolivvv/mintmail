@@ -1,4 +1,4 @@
-"""Point d'entrée sans GTK : options utilitaires et message clair si l'interface ne peut pas démarrer."""
+"""Point d'entrée : options utilitaires (sans interface), puis ouverture de l'interface Qt, avec un message clair si elle ne peut pas démarrer."""
 import os
 import re
 import shutil
@@ -14,8 +14,8 @@ from .i18n import tr
 GUI_HELP = tr("""MintMail ne peut pas démarrer : %s
 
 Causes habituelles :
+  - PySide6 (l'interface Qt) n'est pas installé : mintmail --install-qt
   - le Python utilisé n'est pas celui du système (conda, pyenv, venv…) : lancez /usr/bin/mintmail ;
-  - il manque un composant : sudo apt install python3-gi gir1.2-gtk-3.0 gir1.2-webkit2-4.1
   - pas de session graphique (DISPLAY / WAYLAND_DISPLAY).
 Pour un rapport complet : /usr/bin/mintmail --diagnose
 """)
@@ -51,7 +51,7 @@ def _notify(text: str) -> None:
 
 def _qt_libs_ok() -> bool:
     """Qt exige des bibliothèques système (ex. libxcb-cursor0) : sans elles il s'arrête sans rien dire. On vérifie d'abord, on tente de les installer
-    (une fois par jour, mot de passe demandé par la fenêtre du système), sinon on explique et on laisse l'ancienne interface prendre le relais."""
+    (une fois par jour, mot de passe demandé par la fenêtre du système), sinon on explique précisément quoi installer."""
     from . import qtdeps as QD
     miss = QD.missing_libs()
     if not miss:
@@ -378,45 +378,29 @@ def main(argv=None) -> int:
         return check_update_cli()
     if "--check-pins" in argv:
         return check_pins_cli(test="--no-test" not in argv)
-    use_gtk = "--gtk" in argv or os.environ.get("MINTMAIL_UI") == "gtk"
-    auto_qt = os.environ.get("MINTMAIL_UI", "auto") == "auto" and os.environ.get("MINTMAIL_NO_KEYRING") != "1"     # (les tests ne lancent jamais une vraie fenêtre)
-    if not use_gtk and ("--qt" in argv or auto_qt):          # interface Qt : l'interface PAR DÉFAUT (la version GTK reste en secours : --gtk)
-        try:
-            from .qt.window import run as run_qt
-        except ImportError as e:
-            py = _qt_python()
-            if py and not os.environ.get("MINTMAIL_REEXEC"):         # PySide6 est dans un venv (celui du paquet, ou celui de l'utilisateur) : on s'y relance
-                os.environ["MINTMAIL_REEXEC"] = "1"
-                os.execv(py, [py, "-m", "mintmail"] + [a for a in argv if a != "--gtk"])
-            if "--qt" in argv:
-                sys.stderr.write(tr("L'interface Qt demande PySide6 (pip install PySide6, ou le venv avec --system-site-packages) : %s") % e + "\n")
-                return 1
-            _auto_install_qt_in_background()
-            sys.stderr.write(tr("Interface Qt indisponible (PySide6 absent) : l'ancienne interface GTK est utilisée à la place.") + "\n")
-        else:
-            from . import qtdeps as QD
-            marker = QD.start_marker(str(DATA_DIR))
-            if not _qt_libs_ok():
-                if "--qt" in argv:
-                    return 1
-                sys.stderr.write(tr("L'interface précédente (GTK) est utilisée en attendant.") + "\n")
-            elif not QD.begin_start(marker) and "--qt" not in argv:
-                msg = tr("Le dernier démarrage de l'interface Qt s'est arrêté brutalement : l'interface précédente (GTK) est utilisée cette fois. Pour voir la cause : QT_DEBUG_PLUGINS=1 mintmail --qt")
-                sys.stderr.write(msg + "\n")
-                log("Qt : " + msg)
-                _notify(msg)
-                QD.end_start(marker)
-            else:
-                return run_qt([a for a in argv if a not in ("--qt", "--gtk")])
+    argv = [a for a in argv if a != "--gtk"]                  # l'ancienne interface GTK n'existe plus (option ignorée)
+    try:
+        from .qt.window import run as run_qt
+    except ImportError as e:
+        py = _qt_python()
+        if py and not os.environ.get("MINTMAIL_REEXEC"):             # PySide6 est dans un venv (celui du paquet, ou celui de l'utilisateur) : on s'y relance
+            os.environ["MINTMAIL_REEXEC"] = "1"
+            os.execv(py, [py, "-m", "mintmail"] + argv)
+        _auto_install_qt_in_background()
+        log_exception("import de l'interface Qt")
+        sys.stderr.write(GUI_HELP % e + "\n")
+        return 1
+    from . import qtdeps as QD
+    marker = QD.start_marker(str(DATA_DIR))
+    if not _qt_libs_ok():
+        return 1
+    if not QD.begin_start(marker):
+        msg = tr("Le dernier démarrage de l'interface Qt s'est arrêté brutalement. Pour voir la cause : QT_DEBUG_PLUGINS=1 mintmail")
+        sys.stderr.write(msg + "\n")
+        log("Qt : " + msg)
+        _notify(msg)                           # (le témoin reste posé : si cette fois encore la fenêtre ne s'ouvre pas, le message reviendra)
     from .store import harden_permissions
     harden_permissions()                    # dossiers 0700 / fichiers 0600, même pour les anciennes installations
     install_hook()
     log("Démarrage MintMail %s (%s)" % (__version__, sys.executable))
-    try:
-        from .app import run
-    except (ImportError, ValueError) as e:
-        log_exception("import de l'interface")
-        sys.stderr.write(GUI_HELP % e + "\n")
-        return 1
-    return run([a for a in argv if a not in ("--settings", "--window")], settings="--settings" in argv,
-               window="--window" in argv)
+    return run_qt([a for a in argv if a != "--qt"])

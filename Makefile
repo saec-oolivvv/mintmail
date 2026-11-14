@@ -1,6 +1,6 @@
 .PHONY: test deb docs clean
 
-test:            ## lance tous les tests (GTK simulé)
+test:            ## lance tous les tests
 	python3 tests/run_all.py
 
 deb:             ## construit dist/mintmail_<version>_all.deb

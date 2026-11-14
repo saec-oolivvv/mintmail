@@ -2,7 +2,7 @@
 (Aurora, Papier, Terminal ; clair / sombre ; couleur d'accent). Testé partout : aucune couleur n'est laissée dans un format que Qt ne lit pas."""
 import re
 
-from ..style import AVATARS, DEFAULT_STYLE, NAV_TINTS, STYLES
+from ..themes import AVATARS, DEFAULT_STYLE, NAV_TINTS, STYLES
 
 _RGBA = re.compile(r"rgba\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*,\s*([0-9.]+)\s*\)")
 

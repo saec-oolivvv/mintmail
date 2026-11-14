@@ -1,4 +1,4 @@
-"""MintMail - client mail moderne pour Linux Mint (GTK3)."""
+"""MintMail - client mail moderne et multiplateforme (Qt)."""
 import os
 _here = os.path.dirname(os.path.abspath(__file__))
 try:

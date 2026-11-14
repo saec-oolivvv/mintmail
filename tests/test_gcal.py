@@ -1,10 +1,9 @@
 """Google Agenda : API (serveur local simulé), autorisation supplémentaire OAuth, routage des événements, conflits, agenda."""
 import datetime, json, os, sys, urllib.parse
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-import gtkstub   # noqa: F401
+import testenv
 from test_modules import Server
-from test_features2 import real_msg, win_with, FakeBackend
-from mintmail import caldav, extras, gcal, oauth, syncdata
+from mintmail import caldav, gcal, oauth, syncdata
 
 
 def google(store, mode="ok"):
@@ -84,91 +83,6 @@ def test_extra_calendar_scope_is_added_not_replaced():
     assert "mail.google.com" in q["scope"][0] and gcal.SCOPE in q["scope"][0] and q["include_granted_scopes"] == ["true"]
     q0 = urllib.parse.parse_qs(urllib.parse.urlparse(oauth.build_auth_url("google", "CID", "http://127.0.0.1:1/", "ST", "CH")).query)
     assert gcal.SCOPE not in q0["scope"][0] and "include_granted_scopes" not in q0                  # Gmail seul : rien de plus demandé
-
-
-def with_google(w, store=None):
-    acc = {"id": "acc12345", "name": "Moi", "email": "moi@gmail.com", "auth": "oauth2", "oauth_provider": "google"}
-    w.accounts = lambda: [acc]
-    w.config["gcal"] = {"account": "acc12345", "enabled": True}
-    tm = type("TM", (), {"access_token": lambda self, a: "TOK"})()
-    orig = oauth.manager_for
-    oauth.manager_for = lambda cfg: tm
-    return orig
-
-
-def test_events_go_to_google_agenda_first_then_caldav_then_ics():
-    w, be = win_with()
-    store, orig_mgr = {}, None
-    srv = google(store)
-    orig_api = gcal.API
-    gcal.API = srv.url + "/calendar/v3"
-    orig_mgr = with_google(w)
-    try:
-        inv = {"method": "REQUEST", "uid": "u1@x", "title": "Point projet", "start": "2026-11-12T14:00", "end": "2026-11-12T15:00",
-               "location": "Salle A", "organizer": "marie@y.be", "raw": "BEGIN:VCALENDAR\r\nMETHOD:REQUEST\r\nEND:VCALENDAR\r\n"}
-        w._full = lambda m: m
-        w.invite_add(real_msg(1, "Invitation", invite=inv))
-        assert len(store) == 1 and list(store.values())[0]["summary"] == "Point projet"
-        assert any("Google Agenda : ajouté" in t[0] for t in w.toasts)
-        w.invite_add(real_msg(1, "Invitation", invite=inv))                                       # 2e fois : pas de doublon
-        assert len(store) == 1 and any("déjà dans votre agenda" in t[0] for t in w.toasts)
-        # événement détecté par l'IA
-        w.calendar_add_event({"title": "Déjeuner client", "start": "2026-11-13T12:00", "end": "", "location": "Resto"}, uid="mintmail-x")
-        assert len(store) == 2
-        # Google désactivé : CalDAV
-        w.config["gcal"] = {"account": "acc12345", "enabled": False}
-        puts = []
-        orig_put = caldav.put_event
-        caldav.put_event = lambda url, user, pw, ics, uid: (puts.append((url, "METHOD:PUBLISH" in ics or "BEGIN:VCALENDAR" in ics)), (True, "ok"))[1]
-        w.config["caldav"] = {"url": "https://cal.x.be/dav/", "user": "moi"}
-        w.calendar_add_event({"title": "CalDAV", "start": "2026-11-14T10:00", "end": ""}, uid="u2")
-        assert puts == [("https://cal.x.be/dav/", True)] and len(store) == 2
-        caldav.put_event = orig_put
-        # ni l'un ni l'autre : fichier .ics ouvert dans l'agenda du système
-        w.config["caldav"] = {}
-        opened = []
-        orig_launch = extras.Gio.AppInfo.launch_default_for_uri
-        extras.Gio.AppInfo.launch_default_for_uri = staticmethod(lambda uri, ctx: opened.append(uri))
-        w.calendar_add_event({"title": "Fichier", "start": "2026-11-15T10:00", "end": ""}, uid="u3")
-        assert opened and opened[0].startswith("file://") and opened[0].endswith(".ics")
-        extras.Gio.AppInfo.launch_default_for_uri = orig_launch
-    finally:
-        gcal.API = orig_api
-        oauth.manager_for = orig_mgr
-        srv.close()
-
-
-def test_invitation_conflict_note_and_agenda_events():
-    w, be = win_with()
-    srv = google({})
-    orig_api = gcal.API
-    gcal.API = srv.url + "/calendar/v3"
-    orig_mgr = with_google(w)
-    try:
-        notes = []
-        w.reader.set_invite_note = lambda n: notes.append(n)
-        w.reader.msg = real_msg(1, "Invitation")
-        inv = {"uid": "u1", "title": "Point", "start": "2026-11-12T14:00", "end": "2026-11-12T15:00"}
-        m = real_msg(1, "Invitation", invite=inv)
-        w._invite_conflicts(m)
-        assert notes and notes[-1].startswith("⚠ Conflit avec « Réunion équipe »")
-        inv_free = {"uid": "u2", "title": "Tard", "start": "2026-11-12T18:00", "end": "2026-11-12T19:00"}
-        w._invite_conflicts(real_msg(1, "Invitation", invite=inv_free))
-        assert "libre sur ce créneau" in notes[-1]
-        w.reader.msg = real_msg(99, "Autre message")                                              # message changé entre-temps : pas de note tardive
-        n = len(notes)
-        w._invite_conflicts(m)
-        assert len(notes) == n
-        w.config["gcal"] = {}
-        w._invite_conflicts(m)
-        assert len(notes) == n                                                                    # Google Agenda inactif : aucune requête
-        w.config["gcal"] = {"account": "acc12345", "enabled": True}
-        ok, events = w.agenda_events(14)
-        assert ok and any(e["title"] == "Réunion équipe" for e in events)
-    finally:
-        gcal.API = orig_api
-        oauth.manager_for = orig_mgr
-        srv.close()
 
 
 def test_gcal_setting_syncs_with_strict_validation():

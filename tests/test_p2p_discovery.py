@@ -66,6 +66,10 @@ def test_active_scan_finds_only_machines_with_the_same_code():
         time.sleep(0.3)
         assert a.scan_now() == 1                                                          # B trouvée sans diffusion ni IP saisie
         assert a.peers()[0]["via"] == "recherche" and a.peers()[0]["port"] == "55711"
+        for _ in range(60):                                                              # l'application côté B se fait dans son propre fil : on lui laisse un instant
+            if cb["accounts"]:
+                break
+            time.sleep(0.05)
         assert cb["accounts"] and cb.password("acc1234") == "s3cret-pass"                  # et la synchro a eu lieu
         # mauvais code : la machine répond sur le port mais n'est pas retenue
         a2 = SyncEngine(ts.cfg("SA2", p2p_enabled=True, p2p_secret="un-tout-autre-code-12", p2p_port=55711))

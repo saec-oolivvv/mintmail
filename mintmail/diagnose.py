@@ -1,4 +1,4 @@
-"""Rapport de diagnostic (sans GTK, sans secrets) : à lancer avec « mintmail --diagnose » quand quelque chose ne démarre pas."""
+"""Rapport de diagnostic (sans interface, sans secrets) : à lancer avec « mintmail --diagnose » quand quelque chose ne démarre pas."""
 import importlib
 import json
 import os
@@ -57,7 +57,7 @@ def build_report() -> str:
     add("Système     : %s" % _os_name())
     add("Python      : %s" % sys.version.split()[0])
     add("Interpréteur: %s%s" % (sys.executable, "" if sys.executable == "/usr/bin/python3" else
-                                "   <-- PAS le Python du système : python3-gi n'y est peut-être pas visible"))
+                                "   <-- PAS le Python du système : PySide6 n'y est peut-être pas visible"))
     add("Paquet      : %s" % os.path.dirname(os.path.abspath(__file__)))
     from . import qtdeps as _QD
     _miss = _QD.missing_libs()
@@ -81,29 +81,20 @@ def build_report() -> str:
     add("Session     : %s  DISPLAY=%s  WAYLAND_DISPLAY=%s" % (os.environ.get("XDG_SESSION_TYPE", "?"),
                                                              os.environ.get("DISPLAY", "-"), os.environ.get("WAYLAND_DISPLAY", "-")))
     add("")
-    add("--- GTK / WebKit ---")
+    add("--- Qt / PySide6 ---")
     try:
-        import gi
-        add(ok(True) + "PyGObject %s" % getattr(gi, "__version__", "?"))
-        for ns, vers in (("Gtk", ("3.0",)), ("Gdk", ("3.0",)), ("Pango", ("1.0",)), ("Gio", ("2.0",)), ("WebKit2", ("4.1", "4.0"))):
-            found = None
-            for v in vers:
-                try:
-                    gi.require_version(ns, v)
-                    found = v
-                    break
-                except ValueError:
-                    continue
-            add("%s%s %s" % (ok(found), ns, found or ("introuvable (paquet : %s)" % (
-                "gir1.2-webkit2-4.1" if ns == "WebKit2" else "gir1.2-gtk-3.0"))))
-        try:
-            from gi.repository import Gtk
-            add(ok(True) + "GTK %d.%d.%d" % (Gtk.get_major_version(), Gtk.get_minor_version(), Gtk.get_micro_version()))
-        except Exception as e:
-            add(ok(False) + "GTK non chargeable : %s" % e)
+        import PySide6
+        from PySide6 import QtCore
+        add(ok(True) + "PySide6 %s (Qt %s)" % (getattr(PySide6, "__version__", "?"), QtCore.qVersion()))
+        for mod in ("QtWidgets", "QtGui", "QtSvg", "QtNetwork"):
+            try:
+                importlib.import_module("PySide6." + mod)
+                add(ok(True) + mod)
+            except ImportError as e:
+                add(ok(False) + "%s : %s" % (mod, e))
     except ImportError as e:
-        add(ok(False) + "PyGObject (module gi) absent pour cet interpréteur : %s" % e)
-        add("               -> sudo apt install python3-gi gir1.2-gtk-3.0 gir1.2-webkit2-4.1")
+        add(ok(False) + "PySide6 absent pour cet interpréteur : %s" % e)
+        add("               -> mintmail --install-qt")
     add("Trousseau   : %s" % _keyring_name())
     try:
         _cfgd = json.loads((CONFIG_DIR / "config.json").read_text(encoding="utf-8")) if (CONFIG_DIR / "config.json").exists() else {}
