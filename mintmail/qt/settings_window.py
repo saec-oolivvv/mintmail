@@ -668,6 +668,8 @@ class SettingsDialog(QDialog):
     def _set(self, key, value):
         self.cfg[key] = value
         self.cfg.save()
+        if key in ("threads", "swipe", "swipe_invert"):
+            self.main.reload()
         if key in ("theme", "style", "accent", "density", "load_images"):
             self.main.apply_theme()
             self.main.reload()

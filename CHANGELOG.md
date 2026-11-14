@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.32.0
+- Interface Qt installée automatiquement : le paquet .deb installe PySide6 dans son venv privé (/usr/lib/mintmail/venv) à l'installation et à chaque mise à jour s'il manque, sans jamais bloquer l'installation en cas d'échec (réseau) ; sans paquet (sources), MintMail installe PySide6 en arrière-plan dans ~/.local/share/mintmail/qt-venv au premier démarrage (une tentative par jour, notification) en gardant l'ancienne interface en attendant, puis s'y relance tout seul ; commande « mintmail --install-qt » pour le faire à la main
+- Interface Qt : conversations comme dans la version GTK — un message par fil dans la liste avec le nombre de messages, gras tant qu'un message du fil est non lu, ouvrir un fil marque tous ses messages lus, archiver / supprimer / spam / favori / reporter / geste de balayage valent pour tout le fil ; réglage « Regrouper en conversations » actif
+
 ## 1.31.0
 - MintMail ouvre désormais l'interface Qt par défaut dès que PySide6 est disponible (système, ou venv ~/mintmail-qt-venv / MINTMAIL_QT_PYTHON où le programme se relance tout seul) ; l'ancienne interface GTK reste en secours : « mintmail --gtk » ou MINTMAIL_UI=gtk, et sert automatiquement si PySide6 est absent ; paquet : PySide6 recommandé ; docs/PARITE.md liste ce qui reste à porter avant de retirer GTK (conversations, Aujourd'hui / agenda, contacts, signatures, modèles, pièces jointes, synchronisation entre postes…)
 

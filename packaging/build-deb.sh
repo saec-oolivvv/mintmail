@@ -14,7 +14,13 @@ awk '/^## /{n++; next} n==1 && /^- /{sub(/^- /,"  * "); print}' "$SRC/CHANGELOG.
 rm -rf "$OUT/build" && mkdir -p $ROOT/DEBIAN $ROOT/usr/lib/python3/dist-packages $ROOT/usr/bin $ROOT/usr/share/applications $ROOT/usr/share/icons/hicolor/scalable/apps $ROOT/usr/share/doc/mintmail
 cp -r $SRC/mintmail $ROOT/usr/lib/python3/dist-packages/mintmail
 find $ROOT -name __pycache__ -prune -exec rm -rf {} +
-printf '#!/bin/sh\nexec /usr/bin/python3 -I -m mintmail "$@"\n' > $ROOT/usr/bin/mintmail
+cat > $ROOT/usr/bin/mintmail <<'EOT'
+#!/bin/sh
+# Interface Qt : si le paquet a installé PySide6 dans son venv privé, on l'utilise ; sinon le Python du système (qui basculera sur GTK si PySide6 manque).
+V=/usr/lib/mintmail/venv/bin/python
+if [ -x "$V" ] && [ -z "$MINTMAIL_NO_VENV" ]; then exec "$V" -I -m mintmail "$@"; fi
+exec /usr/bin/python3 -I -m mintmail "$@"
+EOT
 sed 's|@EXEC@|mintmail|' $SRC/data/me.saec.mintmail.desktop > $ROOT/usr/share/applications/me.saec.mintmail.desktop
 cp $SRC/mintmail/icons/mintmail.svg $ROOT/usr/share/icons/hicolor/scalable/apps/mintmail.svg
 for f in $SRC/mintmail/icons/mintmail-*.png; do n=$(basename $f .png); n=${n#mintmail-}; mkdir -p $ROOT/usr/share/icons/hicolor/${n}x${n}/apps; cp $f $ROOT/usr/share/icons/hicolor/${n}x${n}/apps/mintmail.png; done
@@ -106,7 +112,7 @@ Version: $VER
 Section: mail
 Priority: optional
 Architecture: all
-Depends: python3 (>= 3.9), python3-gi, gir1.2-gtk-3.0, gir1.2-webkit2-4.1 | gir1.2-webkit2-4.0, openssl
+Depends: python3 (>= 3.9), python3-venv, python3-gi, gir1.2-gtk-3.0, gir1.2-webkit2-4.1 | gir1.2-webkit2-4.0, openssl
 Recommends: python3-pyside6.qtwidgets, python3-pyside6.qtwebenginewidgets, python3-keyring, libnotify-bin, pkexec | policykit-1
 Installed-Size: $SIZE
 Maintainer: SAEC <contact@saec.me>
@@ -136,6 +142,18 @@ cat > $ROOT/DEBIAN/postinst <<'EOT'
 #!/bin/sh
 set -e
 if [ "$1" = "configure" ]; then
+    # interface Qt : PySide6 installé automatiquement (venv privé du paquet) s'il manque ; un échec (réseau…) n'empêche JAMAIS l'installation
+    V=/usr/lib/mintmail/venv/bin/python
+    if ! /usr/bin/python3 -c 'import PySide6' >/dev/null 2>&1 && ! { [ -x "$V" ] && "$V" -c 'import mintmail, PySide6' >/dev/null 2>&1; }; then
+        echo "mintmail : installation de l'interface Qt (PySide6), quelques minutes la première fois…"
+        if /usr/bin/python3 -m venv --system-site-packages /usr/lib/mintmail/venv >/dev/null 2>&1 \
+           && /usr/lib/mintmail/venv/bin/python -m pip install --disable-pip-version-check -q --upgrade PySide6; then
+            echo "mintmail : interface Qt prête."
+        else
+            echo "mintmail : PySide6 n'a pas pu être installé (réseau ?) — l'ancienne interface sera utilisée ; réessayez avec : sudo /usr/bin/python3 -m venv --system-site-packages /usr/lib/mintmail/venv && sudo /usr/lib/mintmail/venv/bin/pip install PySide6"
+            rm -rf /usr/lib/mintmail/venv
+        fi
+    fi
     # clé publique absente du nouveau paquet : on remet celle de l'installation précédente (propriété de root, comme exigé pour les mises à jour)
     if [ ! -f /usr/share/mintmail/update-pubkey.pem ] && [ -f /var/lib/mintmail/update-pubkey.pem.keep ]; then
         mkdir -p /usr/share/mintmail && cp /var/lib/mintmail/update-pubkey.pem.keep /usr/share/mintmail/update-pubkey.pem && chown root:root /usr/share/mintmail/update-pubkey.pem && chmod 644 /usr/share/mintmail/update-pubkey.pem || true
@@ -166,6 +184,7 @@ cat > $ROOT/DEBIAN/postrm <<'EOT'
 #!/bin/sh
 set -e
 if [ "$1" = "remove" ] || [ "$1" = "purge" ]; then
+    rm -rf /usr/lib/mintmail/venv
     if command -v update-desktop-database >/dev/null 2>&1; then update-desktop-database -q /usr/share/applications || true; fi
     if command -v gtk-update-icon-cache >/dev/null 2>&1; then gtk-update-icon-cache -q -t -f /usr/share/icons/hicolor || true; fi
 fi

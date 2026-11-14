@@ -10,7 +10,7 @@ paramètres (comptes IMAP/SMTP, Gmail et Microsoft OAuth, apparence, filtres et 
 assistant IA (Ctrl+J) et carte IA du lecteur, réponse rapide · aide F1 · bandeau et installation des mises à jour · icône.
 
 ## À porter (GTK seulement)
-1. Conversations (regroupement par fil, compteur, déploiement)
+1. Conversations : le regroupement par fil, le compteur et « une action vaut pour tout le fil » sont faits (1.32.0) ; reste l'affichage du fil dans le lecteur (autres messages du fil)
 2. Aujourd'hui : agenda, priorités, tâches avec échéances, relances (« Me rappeler si pas de réponse »)
 3. Google Agenda / CalDAV : événements, créneaux proposés, invitations (.ics)
 4. Contacts : carnet, complétion, « Ajouter aux contacts »

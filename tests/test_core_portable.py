@@ -4,7 +4,7 @@ import os, subprocess, sys
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 CORE = ["models", "util", "i18n", "log", "netutil", "htmlsafe", "ical", "caldav", "gcal", "contacts", "tasks", "slots", "unsub", "store", "offline",
-        "backend", "ai_service", "ai_engine", "oauth", "syncdata", "p2p", "updater", "update_text", "sysdeps", "help_format", "style"]
+        "backend", "ai_service", "ai_engine", "oauth", "syncdata", "p2p", "updater", "update_text", "sysdeps", "qtsetup", "help_format", "style"]
 UI = ["window", "listing", "reader", "folders", "settings", "settings_extra", "settings_more", "compose", "extras", "widgets", "assistant",
       "updates_ui", "help_view", "ai_features", "app"]          # interface GTK : à remplacer par Qt, module par module
 

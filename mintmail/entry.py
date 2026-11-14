@@ -22,16 +22,42 @@ Pour un rapport complet : /usr/bin/mintmail --diagnose
 
 
 def _qt_python() -> str:
-    """Interpréteur d'un venv où MintMail ET PySide6 sont importables (MINTMAIL_QT_PYTHON, sinon ~/mintmail-qt-venv) ; « » si aucun."""
-    import subprocess
-    for py in (os.environ.get("MINTMAIL_QT_PYTHON", ""), os.path.expanduser("~/mintmail-qt-venv/bin/python")):
-        if py and os.access(py, os.X_OK) and os.path.realpath(py) != os.path.realpath(sys.executable):
-            try:
-                if subprocess.run([py, "-c", "import mintmail, PySide6"], capture_output=True, timeout=20).returncode == 0:
-                    return py
-            except (OSError, subprocess.SubprocessError):
-                pass
+    """Interpréteur d'un venv où MintMail ET PySide6 sont importables (voir qtsetup.candidates) ; « » si aucun."""
+    from . import qtsetup
+    for py in qtsetup.candidates():
+        if os.access(py, os.X_OK) and os.path.realpath(py) != os.path.realpath(sys.executable) and qtsetup.works(py):
+            return py
     return ""
+
+
+def install_qt_cli() -> int:
+    """mintmail --install-qt : installe PySide6 dans le venv privé de MintMail (sans droits administrateur), avec le détail à l'écran."""
+    from . import qtsetup
+    venv = qtsetup.user_venv()
+    print(tr("Installation de l'interface Qt (PySide6) dans %s — quelques minutes, ~1 Go de téléchargement…") % venv)
+    ok, detail = qtsetup.create_venv(venv)
+    print(tr("Interface Qt installée : elle s'ouvrira au prochain démarrage de MintMail.") if ok else tr("Échec de l'installation de l'interface Qt : %s") % detail)
+    return 0 if ok else 1
+
+
+def _auto_install_qt_in_background() -> None:
+    """PySide6 manque et aucun venv n'existe : on installe en arrière-plan (une tentative par jour), MintMail démarre tout de suite avec l'ancienne interface."""
+    if os.environ.get("MINTMAIL_NO_AUTOINSTALL"):
+        return
+    import subprocess
+    marker = Path(DATA_DIR) / "qt-install.attempt"
+    try:
+        if marker.exists() and time.time() - marker.stat().st_mtime < 86400:
+            return
+        marker.parent.mkdir(parents=True, exist_ok=True)
+        marker.write_text(str(time.time()))
+        subprocess.Popen([sys.executable, "-m", "mintmail", "--install-qt"], stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
+                         stderr=subprocess.DEVNULL, start_new_session=True)
+        if shutil.which("notify-send"):
+            subprocess.Popen(["notify-send", "-i", "mintmail", "MintMail", tr("Installation de l'interface Qt en arrière-plan : elle s'ouvrira au prochain démarrage.")],
+                             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    except OSError:
+        pass
 
 
 def _head(path: Path, n: int = 4096) -> str:
@@ -306,6 +332,8 @@ def main(argv=None) -> int:
         return print_report()
     if "--remove-local-install" in argv:
         return remove_local_install(argv)
+    if "--install-qt" in argv:
+        return install_qt_cli()
     if "--reset" in argv:
         return reset_data()
     if "--send-due" in argv:
@@ -320,13 +348,14 @@ def main(argv=None) -> int:
         try:
             from .qt.window import run as run_qt
         except ImportError as e:
+            py = _qt_python()
+            if py and not os.environ.get("MINTMAIL_REEXEC"):         # PySide6 est dans un venv (celui du paquet, ou celui de l'utilisateur) : on s'y relance
+                os.environ["MINTMAIL_REEXEC"] = "1"
+                os.execv(py, [py, "-m", "mintmail"] + [a for a in argv if a != "--gtk"])
             if "--qt" in argv:
                 sys.stderr.write(tr("L'interface Qt demande PySide6 (pip install PySide6, ou le venv avec --system-site-packages) : %s") % e + "\n")
                 return 1
-            py = _qt_python()
-            if py and not os.environ.get("MINTMAIL_REEXEC"):         # PySide6 est dans un venv (ex. ~/mintmail-qt-venv) : on s'y relance
-                os.environ["MINTMAIL_REEXEC"] = "1"
-                os.execv(py, [py, "-m", "mintmail"] + [a for a in argv if a != "--gtk"])
+            _auto_install_qt_in_background()
             sys.stderr.write(tr("Interface Qt indisponible (PySide6 absent) : l'ancienne interface GTK est utilisée à la place.") + "\n")
         else:
             return run_qt([a for a in argv if a not in ("--qt", "--gtk")])

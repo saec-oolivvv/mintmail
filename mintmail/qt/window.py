@@ -443,8 +443,9 @@ class MainWindow(QMainWindow):
 
     def reload(self):
         keep = self.current
-        msgs = vm.list_view(self.cache, self.view_key if not self.view_key.startswith(SS.PREFIX) else "inbox", self.account,
-                            self.search.text() or SS.query_of(self.config, self.view_key))
+        q = self.search.text() or SS.query_of(self.config, self.view_key)
+        view = self.view_key if not self.view_key.startswith(SS.PREFIX) else "inbox"
+        msgs = vm.list_view(self.cache, view, self.account, q, threads=vm.grouped(self.config, self.view_key, q))
         if self.view_key == "unread" and self._kept:
             have = {m.id for m in msgs}
             for mid in self._kept - have:                   # « Non lus » : le message ouvert reste affiché jusqu'à ce qu'on passe à un autre
@@ -582,6 +583,7 @@ class MainWindow(QMainWindow):
                 return
         self._show(self.engine.open_message(mid) if mid else None)
         if mid:
+            self._mark_thread_read(mid)
             self._update_counts()
             self._repaint_row(mid)
             self._background(self.engine.flush)
@@ -605,6 +607,17 @@ class MainWindow(QMainWindow):
         self.right.setVisible(layout != "list")
         if layout == "bottom":
             self.split.setSizes([320, 520])
+
+    def _mark_thread_read(self, mid):
+        """Ouvrir une conversation en marque tous les messages lus (même dossier), comme dans la version GTK."""
+        row = self.model.row_of(mid)
+        m = self.model.msgs[row] if row >= 0 else None
+        if m is None or getattr(m, "thread_count", 1) <= 1 or m.folder == "drafts" or not self.config.get("threads", True):
+            return
+        rest = [x for x in vm.expand_threads(self.cache, [m]) if x.unread and x.id != mid]
+        if rest:
+            op_ids = self.engine.set_flag(rest, "unread", False)
+            self._background(lambda: self.engine.run_ops(op_ids), "ops")
 
     def save_current_search(self):
         """Enregistre le texte de la barre de recherche sous un nom ; la recherche apparaît dans la section « Recherches »."""
@@ -690,7 +703,7 @@ class MainWindow(QMainWindow):
         rows = sorted({i.row() for i in self.list.selectionModel().selectedRows()})
         if not rows and self.current:
             rows = [r for r in [self.model.row_of(self.current)] if r >= 0]
-        return [self.model.msgs[r] for r in rows]
+        return vm.expand_threads(self.cache, [self.model.msgs[r] for r in rows], bool(self.config.get("threads", True)))
 
     def _after_action(self, msgs, op_ids, tag, extra=None):
         for m in msgs:
@@ -1206,22 +1219,24 @@ class MainWindow(QMainWindow):
         if not 0 <= row < len(self.model.msgs):
             return
         msg = self.model.msgs[row]
+        grp = vm.expand_threads(self.cache, [msg], bool(self.config.get("threads", True)))
         fx = GS.effect(act, msg, C.at(1, 8))
         if "move" in fx:
             dest = fx["move"]
             if dest == "trash" and msg.folder == "trash":
                 dest = "archive"
-            op_ids = self.engine.move([msg], dest)
-            self._after_action([msg], op_ids, "move", lambda: self.engine.finish_move([msg], dest, op_ids))
+            op_ids = self.engine.move(grp, dest)
+            self._after_action(grp, op_ids, "move", lambda: self.engine.finish_move(grp, dest, op_ids))
         elif "flag" in fx:
             field, value = fx["flag"]
-            op_ids = self.engine.set_flag([msg], field, value)
-            setattr(msg, field, value)
+            op_ids = self.engine.set_flag(grp, field, value)
+            for x in grp:
+                setattr(x, field, value)
             self.reload()
             self._background(lambda: self.engine.run_ops(op_ids), "ops")
         elif "snooze" in fx:
-            self.engine.snooze([msg], fx["snooze"])
-            self._after_action([msg], [], "ops", lambda: ([], [], False))
+            self.engine.snooze(grp, fx["snooze"])
+            self._after_action(grp, [], "ops", lambda: ([], [], False))
         elif "block" in fx:
             self.block_sender(fx["block"], msg)
 

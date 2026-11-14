@@ -563,6 +563,10 @@
    "Forces the Qt interface (already the default as soon as PySide6 is installed) and says what is missing otherwise."
   ],
   [
+   "mintmail --install-qt",
+   "Installs the Qt interface (PySide6) in MintMail's private venv, without administrator rights, with the details on screen. The .deb package already does it by itself; without the package, MintMail starts it in the background at first launch."
+  ],
+  [
    "mintmail --gtk",
    "Starts the old GTK interface (fallback). By default MintMail opens the Qt interface as soon as PySide6 is installed; MINTMAIL_UI=gtk does the same."
   ],

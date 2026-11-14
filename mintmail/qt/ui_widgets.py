@@ -200,7 +200,7 @@ class MessageDelegate(QStyledItemDelegate):
         p.drawText(QRect(x, top, w - tw - 6, 18), Qt.AlignLeft | Qt.AlignVCenter,
                    p.fontMetrics().elidedText(info["sender"], Qt.ElideRight, w - tw - 6))
         # ligne 2 : objet + marques
-        marks = ("📌 " if info["pinned"] else "") + ("★ " if info["starred"] else "") + ("📎" if info["attachments"] else "")
+        marks = ("%d✉  " % info["count"] if info.get("count") else "") + ("📌 " if info["pinned"] else "") + ("★ " if info["starred"] else "") + ("📎" if info["attachments"] else "")
         p.setFont(small)
         mw = p.fontMetrics().horizontalAdvance(marks) + 4 if marks else 0
         if marks:

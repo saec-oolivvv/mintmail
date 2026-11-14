@@ -991,3 +991,45 @@ def test_default_interface_is_qt_with_gtk_fallback_and_qt_python_discovery():
     finally:
         for k, v in old.items():
             (os.environ.__setitem__(k, v) if v is not None else os.environ.pop(k, None))
+
+
+# ------------------------------------------------------------------ installation transparente de PySide6, conversations
+from mintmail import qtsetup as QS
+
+
+def test_qt_install_looks_in_the_package_venv_then_the_user_venv_and_creates_a_venv_with_fixed_commands():
+    home = "/h"
+    c = QS.candidates({"MINTMAIL_QT_PYTHON": "/x/python"}, home)
+    assert c[0] == "/x/python" and c[1].startswith(QS.SYSTEM_VENV) and c[2].startswith("/h/.local/share/mintmail/qt-venv") and c[3].startswith("/h/mintmail-qt-venv")
+    assert QS.candidates({}, home)[0].startswith(QS.SYSTEM_VENV)
+    calls = []
+
+    class R:
+        def __init__(self, rc, err=""):
+            self.returncode, self.stderr, self.stdout = rc, err, ""
+    d = tempfile.mkdtemp()
+    ok = lambda cmd, **kw: (calls.append(cmd), R(0))[1]
+    assert QS.create_venv(os.path.join(d, "v"), run=ok, out=lambda *_: None, python="/usr/bin/python3") == (True, "")
+    assert calls[0][:5] == ["/usr/bin/python3", "-m", "venv", "--system-site-packages", os.path.join(d, "v")] and calls[1][-1] == "PySide6" and "pip" in calls[1]
+    res = QS.create_venv(os.path.join(d, "w"), run=lambda cmd, **kw: R(1, "no network"), out=lambda *_: None)
+    assert res[0] is False and "no network" in res[1]
+    assert QS.works("/definitely/not/python") is False
+
+
+def test_conversations_group_by_thread_expand_actions_to_the_whole_thread_and_follow_the_setting():
+    class Cfg(dict):
+        pass
+    cfg = Cfg(threads=True)
+    assert V.grouped(cfg, "inbox") and not V.grouped(cfg, "drafts") and not V.grouped(cfg, "inbox", "facture") and not V.grouped(Cfg(threads=False), "inbox")
+
+    class Cache:
+        def thread_members(self, account, tid, exclude=()):
+            return [_m(10, folder="inbox", thread_id=tid), _m(11, folder="inbox", thread_id=tid), _m(12, folder="trash", thread_id=tid)]
+    top = _m(11, folder="inbox", thread_id="t1")
+    top.thread_count, top.thread_unread = 3, True
+    solo = _m(20, folder="inbox")
+    out = V.expand_threads(Cache(), [top, solo])
+    assert [x.id for x in out] == ["m11", "m10", "m20"]                                     # le message cliqué d'abord, pas de doublon, pas les autres dossiers
+    assert [x.id for x in V.expand_threads(Cache(), [top], enabled=False)] == ["m11"]
+    info = V.row_info(top)
+    assert info["count"] == 3 and info["unread"] is True and V.row_info(solo)["count"] == 0

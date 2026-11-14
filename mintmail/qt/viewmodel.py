@@ -27,14 +27,40 @@ def accounts_of(config) -> List[dict]:
 
 def row_info(m) -> Dict:
     """Ce que la liste affiche pour un message (version allégée suffisante)."""
-    return {"id": m.id, "sender": m.display_sender, "email": m.sender_email or "", "subject": m.subject or "", "snippet": (m.snippet or "").replace("\n", " "),
+    info = {"id": m.id, "sender": m.display_sender, "email": m.sender_email or "", "subject": m.subject or "", "snippet": (m.snippet or "").replace("\n", " "),
             "time": format_time(m.date) if m.date else "", "unread": bool(m.unread), "starred": bool(m.starred),
             "pinned": bool(m.pinned), "attachments": bool(m.attachments)}
+    n = int(getattr(m, "thread_count", 1) or 1)
+    info["count"] = n if n > 1 else 0                                          # messages de la conversation (0 = message seul)
+    if n > 1:
+        info["unread"] = bool(getattr(m, "thread_unread", m.unread))          # un fil est en gras tant qu'un de ses messages est non lu
+    return info
 
 
-def list_view(cache, view="inbox", account="all", search="", limit=400):
-    """Messages d'une vue (cache.query), du plus récent au plus ancien."""
-    return cache.query(view=view, account=account, search=search, limit=limit)
+def list_view(cache, view="inbox", account="all", search="", limit=400, threads=False):
+    """Messages d'une vue (cache.query), du plus récent au plus ancien ; threads=True : un message par conversation (le plus récent)."""
+    return cache.query(view=view, account=account, search=search, limit=limit, threads=threads)
+
+
+def grouped(config, view, search="") -> bool:
+    """Conversations affichées ? Comme en GTK : réglage « threads », jamais pendant une recherche ni dans Brouillons / Boîte d'envoi."""
+    return bool(config.get("threads", True)) and not (search or "").strip() and view not in ("drafts", "outbox")
+
+
+def expand_threads(cache, msgs, enabled=True):
+    """Une action sur une conversation vaut pour tous ses messages du même dossier (le message cliqué reste en premier)."""
+    if not (enabled and any(getattr(m, "thread_count", 1) > 1 for m in msgs)):
+        return list(msgs)
+    out, seen = [], set()
+    for m in msgs:
+        group = [m]
+        if getattr(m, "thread_count", 1) > 1 and getattr(m, "thread_id", ""):
+            group += [x for x in cache.thread_members(m.account, m.thread_id) if x.folder == m.folder and x.id != m.id]
+        for x in group:
+            if x.id not in seen:
+                seen.add(x.id)
+                out.append(x)
+    return out
 
 
 def counts(cache, account="all") -> Dict[str, int]:
