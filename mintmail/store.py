@@ -170,6 +170,22 @@ def _q(x: str) -> str:
     return '"' + str(x).replace("\\", "\\\\").replace('"', '\\"') + '"'
 
 
+def _mac_parse_secret(err: str):
+    """Sortie de « security … -g » (sur stderr) : « password: "texte" » ou « password: 0x4142…  "AB" » (octets non imprimables / non ASCII) ; « password: » seul = vide."""
+    for line in err.splitlines():
+        if line.startswith("password:"):
+            v = line[len("password:"):].strip()
+            if v.startswith("0x"):
+                try:
+                    return bytes.fromhex(v[2:].split()[0]).decode("utf-8") or None
+                except (ValueError, IndexError):
+                    return None
+            if v.startswith('"') and v.endswith('"') and len(v) >= 2:
+                return v[1:-1] or None
+            return None
+    return None
+
+
 def mac_keychain(op, *args, run=subprocess.run):
     """Trousseau macOS via l'outil Apple « security » (signature stable) : l'élément est créé avec « -T /usr/bin/security », donc relu SANS fenêtre
     d'autorisation. Avec python-keyring, l'autorisation était liée à l'application elle-même (signature « ad hoc » qui change à chaque construction) :
@@ -177,15 +193,20 @@ def mac_keychain(op, *args, run=subprocess.run):
     account = str(args[1]) if len(args) > 1 else ""
     try:
         if op == "get_password":
-            r = run(["/usr/bin/security", "find-generic-password", "-a", account, "-s", MAC_SERVICE, "-w"], capture_output=True, text=True, timeout=60)
-            return r.stdout.rstrip("\n") if r.returncode == 0 and r.stdout.strip() else None
+            r = run(["/usr/bin/security", "find-generic-password", "-a", account, "-s", MAC_SERVICE, "-g"], capture_output=True, text=True, timeout=60)
+            if r.returncode != 0:
+                return None
+            return _mac_parse_secret(r.stderr or "")
         if op == "set_password":
             pw = str(args[2])
-            if "\n" in pw or "\r" in pw or "\0" in pw:
+            if "\0" in pw:
                 return False
-            cmd = "add-generic-password -U -a %s -s %s -w %s -T /usr/bin/security\n" % (_q(account), _q(MAC_SERVICE), _q(pw))
+            hexpw = pw.encode("utf-8").hex()                  # -X : octets exacts, aucun problème de guillemets / caractères spéciaux
+            cmd = "add-generic-password -U -a %s -s %s -X %s -T /usr/bin/security\n" % (_q(account), _q(MAC_SERVICE), hexpw)
             r = run(["/usr/bin/security", "-i"], input=cmd, capture_output=True, text=True, timeout=60)
-            return r.returncode == 0 and "error" not in (r.stderr or "").lower()
+            if not (r.returncode == 0 and "error" not in (r.stderr or "").lower()):
+                return False
+            return mac_keychain("get_password", *args[:2], run=run) == pw        # relecture : sinon repli fichier 0600, jamais un mot de passe faussé
         if op == "delete_password":
             run(["/usr/bin/security", "delete-generic-password", "-a", account, "-s", MAC_SERVICE], capture_output=True, text=True, timeout=60)
             return True

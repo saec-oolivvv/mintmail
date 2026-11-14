@@ -106,6 +106,15 @@ def build_report() -> str:
         add("%sPermissions : %s" % ("KO  " if wide else "OK  ", ("lisibles par d'autres comptes : %s (corrigé au prochain démarrage)" % ", ".join(map(str, wide))) if wide else "réglages et courrier en cache réservés à votre compte"))
     except Exception as e:
         add("Secrets / permissions : vérification impossible (%s)" % type(e).__name__)
+    if sys.platform == "darwin":
+        try:
+            from .store import mac_keychain
+            for a in _cfgd.get("accounts", []):
+                pw = mac_keychain("get_password", "mintmail", a.get("id", ""))
+                add("Mot de passe: compte %s -> %s" % (a.get("email") or a.get("id"), ("trousseau, %d caractère(s)" % len(pw)) if pw else
+                    ("fichier config, %d caractère(s)" % len((_cfgd.get("passwords") or {}).get(a.get("id"), ""))) if (_cfgd.get("passwords") or {}).get(a.get("id")) else "ABSENT (ressaisissez-le dans Réglages → Comptes)"))
+        except Exception as e:
+            add("Mot de passe: vérification impossible (%s)" % type(e).__name__)
     add("")
     add("--- Modules MintMail ---")
     bad = 0

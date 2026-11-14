@@ -37,19 +37,34 @@ def test_mac_keychain_goes_through_the_apple_security_tool_without_the_password_
         def __init__(self, rc=0, out="", err=""):
             self.returncode, self.stdout, self.stderr = rc, out, err
     seen = []
+    stored = {}
 
     def run(cmd, **kw):
         seen.append((cmd, kw.get("input")))
-        return R(0, "motdepasse\n")
-    assert store.mac_keychain("set_password", "mintmail", "acc1", 'p"w\\x', run=run) is True
-    cmd, stdin = seen[-1]
-    assert cmd == ["/usr/bin/security", "-i"] and "p" in stdin and "-T /usr/bin/security" in stdin and "-U" in stdin
-    assert 'p\\"w\\\\x' in stdin and not any("p\"w" in str(a) for a in cmd)                    # le secret n'est jamais dans la ligne de commande
-    assert store.mac_keychain("get_password", "mintmail", "acc1", run=run) == "motdepasse"
-    assert seen[-1][0][:2] == ["/usr/bin/security", "find-generic-password"] and "MintMail" in seen[-1][0]
+        if cmd[:2] == ["/usr/bin/security", "-i"]:
+            stored["hex"] = kw["input"].split("-X ")[1].split()[0]
+            return R(0)
+        if "find-generic-password" in cmd and "hex" in stored:
+            b = bytes.fromhex(stored["hex"])
+            try:
+                s = b.decode("ascii")
+                shown = '"%s"' % s if s.isprintable() else "0x%s" % stored["hex"].upper()
+            except UnicodeDecodeError:
+                shown = "0x%s  \"?\"" % stored["hex"].upper()
+            return R(0, "", "keychain: x\npassword: %s\n" % shown)
+        return R(44, "", "not found")
+    for pw in ('p"w\\x $1 !#', "mot de passe é€", "0xabc"):
+        stored.clear()
+        assert store.mac_keychain("set_password", "mintmail", "acc1", pw, run=run) is True
+        cmd, _stdin = [x for x in seen if x[0][:2] == ["/usr/bin/security", "-i"]][-1]
+        assert not any(pw in str(a) for a in cmd) and "-T /usr/bin/security" in _stdin and "-U" in _stdin and pw not in _stdin
+        assert store.mac_keychain("get_password", "mintmail", "acc1", run=run) == pw         # aller-retour exact
     assert store.mac_keychain("get_password", "mintmail", "x", run=lambda *a, **k: R(44, "", "not found")) is None
-    assert store.mac_keychain("set_password", "mintmail", "x", "a\nb", run=run) is False        # un saut de ligne casserait la commande : repli fichier 0600
+    assert store.mac_keychain("set_password", "mintmail", "x", "a\0b", run=run) is False
     assert store.mac_keychain("get_password", "mintmail", "x", run=lambda *a, **k: (_ for _ in ()).throw(OSError("absent"))) is None
+    assert store._mac_parse_secret('password: "ab cd"') == "ab cd" and store._mac_parse_secret("password:") is None
+    # écriture non relue à l'identique : refusée, le mot de passe reste dans le repli fichier 0600
+    assert store.mac_keychain("set_password", "mintmail", "z", "secret", run=lambda *a, **k: R(0, "", "")) is False
 
 
 def test_ca_bundle_is_taken_from_certifi_only_when_the_system_gives_none():

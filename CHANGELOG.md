@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.35.9
+- Mac : mots de passe écrits dans le trousseau en octets exacts (plus de souci avec les caractères spéciaux ou accentués), relus et vérifiés ; « mintmail --diagnose » indique par compte où se trouve le mot de passe et sa longueur (jamais son contenu)
+
 ## 1.35.8
 - Mac : mise à jour intégrée comme sous Linux (télécharge le .dmg de la bonne architecture, vérifie la somme SHA-256, l'ouvre) ; CI GitHub arm64 + Intel avec journal conservé ; numéro de version de l'app ; certificats TLS (certifi)
 
