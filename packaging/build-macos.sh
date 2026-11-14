@@ -31,14 +31,21 @@ for base in (16, 32, 128, 256, 512):
         img.save(os.path.join(out, "icon_%dx%d%s.png" % (base, base, "@2x" if scale == 2 else "")))
 PY
 then iconutil -c icns "$WORK/icon.iconset" -o "$WORK/MintMail.icns" && ICON_ARG="--icon $WORK/MintMail.icns" || true; fi
+# On n'embarque QUE les modules Qt utilisés (--collect-all PySide6 emportait tout Qt : Assistant, Designer, 3D… — 2 Go et une signature impossible)
+EXC=""
+for m in Qt3DAnimation Qt3DCore Qt3DExtras Qt3DInput Qt3DLogic Qt3DRender QtBluetooth QtCharts QtDataVisualization QtDesigner QtGraphs QtGraphsWidgets QtHelp \
+         QtHttpServer QtLocation QtMultimedia QtMultimediaWidgets QtNfc QtNetworkAuth QtQuick3D QtRemoteObjects QtScxml QtSensors QtSerialBus QtSerialPort \
+         QtSpatialAudio QtSql QtStateMachine QtTest QtTextToSpeech QtUiTools QtWebSockets; do EXC="$EXC --exclude-module PySide6.$m"; done
 "$WORK/venv/bin/pyinstaller" --noconfirm --clean --windowed --name MintMail $ICON_ARG \
-    --osx-bundle-identifier me.saec.mintmail \
-    --collect-submodules mintmail --collect-data mintmail --collect-all PySide6 --hidden-import keyring.backends.macOS \
+    --osx-bundle-identifier me.saec.mintmail --paths "$SRC" \
+    --collect-submodules mintmail --collect-data mintmail --hidden-import keyring.backends.macOS \
+    --hidden-import PySide6.QtCore --hidden-import PySide6.QtGui --hidden-import PySide6.QtWidgets --hidden-import PySide6.QtSvg \
+    --hidden-import PySide6.QtWebEngineCore --hidden-import PySide6.QtWebEngineWidgets $EXC \
     --distpath "$WORK/dist" --workpath "$WORK/build" --specpath "$WORK" packaging/macos_main.py
 APP="$WORK/dist/MintMail.app"
 /usr/libexec/PlistBuddy -c "Add :CFBundleShortVersionString string $VER" "$APP/Contents/Info.plist" 2>/dev/null || \
     /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString $VER" "$APP/Contents/Info.plist"
-codesign --force --deep --sign - "$APP"        # signature « ad hoc » : nécessaire pour démarrer sur les Mac Apple Silicon (ce n'est pas une signature Apple)
+codesign --force --deep --sign - "$APP" || echo "avertissement : signature ad hoc impossible (l'application se lancera quand même avec clic droit → Ouvrir)"        # signature « ad hoc » : nécessaire pour démarrer sur les Mac Apple Silicon (ce n'est pas une signature Apple)
 STAGE="$WORK/dmg"; mkdir -p "$STAGE" && cp -R "$APP" "$STAGE/" && ln -s /Applications "$STAGE/Applications"
 DMG="$OUT/MintMail-$VER-macos.dmg"
 rm -f "$DMG" && hdiutil create -volname "MintMail $VER" -srcfolder "$STAGE" -ov -format UDZO "$DMG" >/dev/null

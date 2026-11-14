@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.35.4
+- Application Mac : PyInstaller trouve maintenant le code de MintMail, n'embarque que les modules Qt utilisés et ne s'arrête plus sur la signature ad hoc
+
 ## 1.35.3
 - Mac : la mise à jour automatique n'existe pas ; MintMail explique de télécharger le nouveau .dmg au lieu d'afficher « clé de vérification absente »
 
