@@ -66,7 +66,9 @@ class ComposeWindow(QMainWindow):
         tpl.setMenu(tmenu)
         bar.addWidget(tpl)
         self.ai_btn = QPushButton(tr("✨ IA"))
-        self.ai_btn.setFlat(True)
+        self.ai_btn.setObjectName("chip")                          # bien visible : même pastille que « Charger les images »
+        self.ai_btn.setToolTip(tr("Aide IA à l'écriture : rédiger, améliorer, corriger, traduire…") + "  (Ctrl+J)")
+        self.ai_btn.setShortcut("Ctrl+J")
         aimenu = QMenu(self.ai_btn)
         for entry in P.AI_OPS:
             if entry is None:

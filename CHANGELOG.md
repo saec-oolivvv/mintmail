@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.34.0
+- Interface Qt : tout ce qui n'existait que dans l'ancienne interface est porté — Aujourd'hui (touche T), Google Agenda / CalDAV, invitations .ics, créneaux, tâches et relances, pièces jointes et désabonnement, synchronisation entre postes, barre latérale réduite, zoom, indicateur hors ligne, notifications, catégories, fil dans le lecteur
+- Interface Qt : l'IA partout — tri automatique avec pastilles Important / Suspect et résumé dans la liste, « En bref », brouillons préparés, recherche en langage naturel (« ? … »), clic droit IA complet, ✨ IA dans la rédaction (Ctrl+J)
+
 ## 1.33.3
 - Images distantes persistantes : « cette fois » / « toujours pour cette adresse » / « toujours pour le domaine » ; liste modifiable dans Réglages → Filtres et synchronisée entre postes
 - Signatures : les logos SVG s'affichent (rédaction, aperçu) ; à l'envoi, signature d'origine conservée et logo envoyé en PNG joint en ligne (lisible par Gmail/Outlook)

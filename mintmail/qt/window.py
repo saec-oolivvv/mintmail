@@ -34,6 +34,13 @@ from . import menus as MN
 from . import ui_appicon as AI
 from . import savedsearch as SS
 from . import imagetrust as IT
+from . import aiwork as AW
+from . import organizer as O
+from . import syncing as SY
+from .ai_window import AIMixin
+from .organizer_window import OrganizerMixin
+from .ui_organizer import MessageExtras
+from . import organizer_window as OW
 from .. import qtdeps as QD
 from ..store import DATA_DIR
 from .ui_palette import Palette
@@ -50,10 +57,12 @@ class MessageModel(QAbstractListModel):
         super().__init__()
         self.msgs, self.infos = [], []
 
-    def set_messages(self, msgs):
+    def set_messages(self, msgs, meta=None):
         self.beginResetModel()
         self.msgs = list(msgs)
         self.infos = [vm.row_info(m) for m in self.msgs]
+        if meta:
+            AW.decorate(self.infos, self.msgs, meta)                       # résumé IA, « Important », « Suspect »
         self.endResetModel()
 
     def rowCount(self, parent=QModelIndex()):
@@ -113,14 +122,16 @@ def _make_reader(on_link):
 class _Bridge(QObject):
     done = Signal(object)          # résultat d'une tâche de fond, remis dans le fil de l'interface
     progress = Signal(object)      # avancement d'une mise à jour (version, texte, fraction)
+    p2p = Signal()                 # éléments reçus d'un autre poste à appliquer dans le fil de l'interface
 
 
-class MainWindow(QMainWindow):
+class MainWindow(OrganizerMixin, AIMixin, QMainWindow):
     def __init__(self, config=None, cache=None):
         super().__init__()
         self.config, self.cache = config or Config(), cache or Cache()
         self.engine = vm.Engine(self.config, self.cache)
         self.select_mode = False
+        self.rail, self.category, self.sync_engine, self._p2p_job = bool(self.config.get("rail")), None, None, None
         self.view_key, self.account, self.load_images, self.current = "inbox", "all", False, None
         self._busy, self._kept, self._tick, self._sending, self._composers = False, set(), 0, False, []
         self.t = T.resolve(self.config, QApplication.palette().window().color().lightness() < 128)
@@ -155,17 +166,34 @@ class MainWindow(QMainWindow):
         nb.setContentsMargins(14, 4, 14, 8)
         nb.addWidget(self.new_btn)
         sl.addLayout(nb)
+        self.brand_text = brand
+        self.today_btn = QPushButton("📅   " + tr("Aujourd'hui"))
+        self.today_btn.setObjectName("flat")
+        self.today_btn.setCursor(Qt.PointingHandCursor)
+        self.today_btn.setToolTip(tr("Aujourd'hui : agenda, priorités, tâches, relances") + "  (T)")
+        self.today_btn.clicked.connect(lambda: self.show_today())
+        tb = QHBoxLayout()
+        tb.setContentsMargins(14, 0, 14, 4)
+        tb.addWidget(self.today_btn)
+        sl.addLayout(tb)
+        self.sidebar = side
         self.folders = NavList()
         self.folders.toggled.connect(self._toggle_folder)
         self.folders.setContextMenuPolicy(Qt.CustomContextMenu)
         self.folders.customContextMenuRequested.connect(self._nav_menu)
         self.folders.setMouseTracking(True)
         self.folders.setFrameShape(QFrame.NoFrame)
-        self.folders.setItemDelegate(NavDelegate(self.t))
+        self.nav_delegate = NavDelegate(self.t)
+        self.folders.setItemDelegate(self.nav_delegate)
         self.folders.setVerticalScrollMode(QListWidget.ScrollPerPixel)
         self._build_sidebar()
         self.folders.currentRowChanged.connect(self._view_changed)
         sl.addWidget(self.folders, 1)
+        self.p2p_lbl = QLabel()
+        self.p2p_lbl.setObjectName("footer")
+        self.p2p_lbl.setContentsMargins(20, 0, 14, 0)
+        self.p2p_lbl.hide()
+        sl.addWidget(self.p2p_lbl)
         foot = QHBoxLayout()
         foot.setContentsMargins(20, 0, 14, 0)
         self.status = QLabel()
@@ -217,9 +245,10 @@ class MainWindow(QMainWindow):
         self.list.selectionModel().selectionChanged.connect(lambda *_: self._selection_changed())
         self.search = QLineEdit()
         self.search.setObjectName("search")
-        self.search.setPlaceholderText("🔍  " + tr("Rechercher"))
+        self.search.setPlaceholderText("🔍  " + tr("Rechercher  (« ? … » : recherche IA)"))
         self.search.setClearButtonEnabled(True)
         self.search.textChanged.connect(lambda _t: self.reload())
+        self.search.returnPressed.connect(lambda: self.ai_search(self.search.text()) if AW.is_ai_query(self.search.text()) else None)
         self.title = QLabel()
         self.title.setObjectName("subject")
         self.count_lbl = QLabel()
@@ -277,6 +306,22 @@ class MainWindow(QMainWindow):
         self.actions_row.setContentsMargins(14, 0, 14, 4)
         self.actions_row.setSpacing(0)
         ll.addLayout(self.actions_row)
+        self.cat_bar = QWidget()
+        cb = QHBoxLayout(self.cat_bar)
+        cb.setContentsMargins(16, 0, 16, 2)
+        cb.setSpacing(4)
+        self.cat_buttons = {}
+        for key, label in OW.CATEGORIES:
+            b = QPushButton(label)
+            b.setObjectName("flat")
+            b.setCheckable(True)
+            b.setChecked(key is None)
+            b.clicked.connect(lambda _c=False, k=key: self.set_category(k))
+            cb.addWidget(b)
+            self.cat_buttons[key] = b
+        cb.addStretch(1)
+        ll.addWidget(self.cat_bar)
+        ll.addWidget(self.build_digest_card())
         ll.addWidget(self.list, 1)
         ll.addWidget(self.empty, 1)
 
@@ -318,6 +363,9 @@ class MainWindow(QMainWindow):
         ib.addWidget(self.images_btn)
         ib.addStretch(1)
         rl.addLayout(ib)
+        self.extras = MessageExtras()
+        self._wire_extras()
+        rl.addWidget(self.extras)
         self.ai_card = ReaderCard()
         self.ai_card.action.connect(self._on_ai_action)
         rl.addWidget(self.ai_card)
@@ -405,7 +453,18 @@ class MainWindow(QMainWindow):
         self._act(None, "", "X", lambda: self.sel_btn.toggle())
         self._act(None, "", "Ctrl+A", self.select_all)
         self._act(None, "", "\\", self.cycle_layout)
+        self._act(None, "", "T", self.show_today)
+        self._act(None, "", "Ctrl++", lambda: self.zoom_reader(OW.ZOOM_STEP))
+        self._act(None, "", "Ctrl+=", lambda: self.zoom_reader(OW.ZOOM_STEP))
+        self._act(None, "", "Ctrl+-", lambda: self.zoom_reader(-OW.ZOOM_STEP))
+        self._act(None, "", "Ctrl+0", lambda: self.zoom_reader(0))
+        self._act(None, "", "Ctrl+B", self.toggle_rail)
+        self.bridge.p2p.connect(self._p2p_run)
         self.reload()
+        self.set_rail(self.rail)
+        self.apply_zoom()
+        self.init_sync()
+        self.open_today_at_start()
         QTimer.singleShot(300, lambda: self.sync(quiet=True))
         QTimer.singleShot(8000, lambda: self.check_updates(startup=True))               # 8 s après CHAQUE démarrage…
         self.update_timer = QTimer(self)
@@ -447,9 +506,11 @@ class MainWindow(QMainWindow):
 
     def reload(self):
         keep = self.current
-        q = self.search.text() or SS.query_of(self.config, self.view_key)
+        raw = self.search.text()
+        q = ("" if AW.is_ai_query(raw) else raw) or SS.query_of(self.config, self.view_key)       # « ? … » : recherche IA, lancée par Entrée
         view = self.view_key if not self.view_key.startswith(SS.PREFIX) else "inbox"
-        msgs = vm.list_view(self.cache, view, self.account, q, threads=vm.grouped(self.config, self.view_key, q))
+        msgs = vm.list_view(self.cache, view, self.account, q, threads=vm.grouped(self.config, self.view_key, q),
+                            category=self.category if self.view_key == "inbox" else None)
         if self.view_key == "unread" and self._kept:
             have = {m.id for m in msgs}
             for mid in self._kept - have:                   # « Non lus » : le message ouvert reste affiché jusqu'à ce qu'on passe à un autre
@@ -457,7 +518,9 @@ class MainWindow(QMainWindow):
                 if m is not None:
                     msgs.append(m)
             msgs.sort(key=lambda m: m.date, reverse=True)
-        self.model.set_messages(msgs)
+        self.model.set_messages(msgs, self.cache.ai_meta([m.id for m in msgs]) if msgs else None)
+        self.update_digest_visibility()
+        self.update_category_bar()
         self.title.setText(self._view_title())
         self.count_lbl.setText("%d" % len(msgs) if msgs else "")
         self.empty.setVisible(not msgs)
@@ -1151,6 +1214,9 @@ class MainWindow(QMainWindow):
                 menu.addSeparator()
             else:
                 menu.addAction(it[1], lambda k=it[0]: self._run_cmd(k, m))
+        self.add_extra_menu(menu, m)
+        self.add_ai_menu(menu, m)
+        menu.addSeparator()
         sn = menu.addMenu(tr("Reporter"))
         for key, label in MN.SNOOZES:
             sn.addAction(label, lambda k=key: self._run_cmd(k, m))
@@ -1202,6 +1268,14 @@ class MainWindow(QMainWindow):
                 if getattr(self, "shown", None) is None or self.shown.id != m.id:
                     self._show(self.cache.get(m.id) or m)
                 return self._on_ai_action({"summarize": "analyze", "translate": "translate", "ai_reply": "reply_ai"}[key], "")
+            if key == "task_from":
+                return self.add_task_dialog(self.cache.get(m.id) or m)
+            if key == "slots":
+                return self.propose_slots(self.cache.get(m.id) or m)
+            if key == "followup3":
+                return self.add_followup(self.cache.get(m.id) or m, 3)
+            if key == "unsubscribe":
+                return self.unsubscribe(m)
             if key in ("snooze_tomorrow", "snooze_monday"):
                 msgs = self.selected_msgs() or [m]
                 self.engine.snooze(msgs, C.at(1, 8) if key == "snooze_tomorrow" else C.next_monday())
@@ -1217,7 +1291,12 @@ class MainWindow(QMainWindow):
             return self.set_layout(arg)
         if head == "settings":
             return self.show_settings(page=arg or None)
-        simple = {"assistant": lambda: self.toggle_assistant(True), "compose": self.compose, "sync": lambda: self.sync(False), "help": self.show_help,
+        if key == "ai_classify_inbox":
+            return self.run_ai(key, m or (self.model.msgs[0] if self.model.msgs else None)) if (m or self.model.msgs) else None
+        simple = {"today": self.show_today, "agenda": self.show_agenda, "new_event": self.new_event_dialog, "new_task": lambda: self.add_task_dialog(None),
+                  "rail": self.toggle_rail, "zoom_in": lambda: self.zoom_reader(OW.ZOOM_STEP), "zoom_out": lambda: self.zoom_reader(-OW.ZOOM_STEP),
+                  "zoom_reset": lambda: self.zoom_reader(0), "p2p_now": self.p2p_now, "digest": lambda: self.refresh_digest(force=True),
+                  "assistant": lambda: self.toggle_assistant(True), "compose": self.compose, "sync": lambda: self.sync(False), "help": self.show_help,
                   "apply_rules": self.apply_rules_now, "save_search": self.save_current_search, "mark_all_read": self.mark_all_read, "select_all": self.select_all, "select_mode": lambda: self.sel_btn.toggle(), "updates": lambda: self.check_updates(manual=True), "search": self.search.setFocus}
         if key in simple:
             simple[key]()
@@ -1307,6 +1386,7 @@ class MainWindow(QMainWindow):
             self.head.setText("")
             self.avatar.set_sender("", "")
             self.images_btn.hide()
+            self.extras.clear()
             self.ai_card.idle()
             self.quick.hide()
             self.reader.show_html("<html><body></body></html>")
@@ -1328,6 +1408,8 @@ class MainWindow(QMainWindow):
         self.images_btn.setVisible(bool(msg.html) and has_remote_content(msg.html) and not load)
         self._fill_images_menu(msg)
         self.reader.show_html(vm.render_html(msg, load, self.is_dark()))
+        self.apply_zoom()
+        self.fill_extras(msg)
         self.quick.show()
         self.quick.set_ai(AS.ai_engine(self.engine).enabled())
         if msg.folder != "drafts":
@@ -1414,9 +1496,16 @@ class MainWindow(QMainWindow):
             return
         self._busy = False
         errors = [str(err)] if err else list(res[1][1])
-        self.status.setText(("⚠ " + errors[0][:120]) if errors else tr("Synchronisé à ") + time.strftime("%H:%M"))
+        offline = bool(res and res[0] and res[0][2])
+        fresh = 0 if err else int(res[1][0] or 0)
+        self.status.setText(("⚠ " + errors[0][:120]) if errors else (self.offline_text(offline) or tr("Synchronisé à ") + time.strftime("%H:%M")))
         self.reload()
-        self._update_counts()                                 # pastilles des dossiers de rangement (non lus annoncés par le serveur)
+        self._update_counts()
+        self.p2p_footer()
+        self.notify_new_mail(fresh if getattr(self, "_synced_once", False) else 0)
+        self._synced_once = True
+        self.check_followups()
+        self.ai_after_sync()                                 # pastilles des dossiers de rangement (non lus annoncés par le serveur)
 
 
 def _keyring_hint():

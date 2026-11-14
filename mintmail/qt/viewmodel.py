@@ -37,9 +37,9 @@ def row_info(m) -> Dict:
     return info
 
 
-def list_view(cache, view="inbox", account="all", search="", limit=400, threads=False):
+def list_view(cache, view="inbox", account="all", search="", limit=400, threads=False, category=None):
     """Messages d'une vue (cache.query), du plus récent au plus ancien ; threads=True : un message par conversation (le plus récent)."""
-    return cache.query(view=view, account=account, search=search, limit=limit, threads=threads)
+    return cache.query(view=view, account=account, search=search, limit=limit, threads=threads, category=category)
 
 
 def grouped(config, view, search="") -> bool:

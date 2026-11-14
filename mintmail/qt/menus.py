@@ -41,7 +41,17 @@ def palette_commands(msg, engine=None) -> List[Tuple[str, str]]:
                  (tr("Mettre le domaine en spam — ") + dom, "spam_domain"), (tr("Bloquer l'expéditeur — ") + who, "block"),
                  (tr("Bloquer le domaine — ") + dom, "block_domain"), (tr("Voir tous les messages de ") + who, "from"), (tr("Ajouter aux contacts — ") + who, "addcontact"),
                  (tr("Reporter à demain 8 h"), "snooze_tomorrow")]
-    cmds += [(tr("✨ Ouvrir l'assistant IA"), "assistant"), (tr("Nouveau message"), "compose"), (tr("Actualiser"), "sync"),
+    if msg is not None:
+        cmds += [(tr("Créer une tâche depuis ce message"), "task_from"), (tr("Proposer des créneaux (agenda)"), "slots"),
+                 (tr("Me le rappeler si pas de réponse sous 3 jours"), "followup3"), (tr("Se désabonner de cet expéditeur"), "unsubscribe")]
+    cmds += [(tr("Aujourd'hui : agenda, priorités, tâches, relances"), "today"), (tr("Agenda des prochains jours"), "agenda"),
+             (tr("Nouvel événement dans l'agenda"), "new_event"), (tr("Nouvelle tâche"), "new_task"),
+             (tr("Barre latérale : réduire / agrandir (Ctrl+B)"), "rail"), (tr("Zoom du lecteur : agrandir"), "zoom_in"),
+             (tr("Zoom du lecteur : réduire"), "zoom_out"), (tr("Zoom du lecteur : taille normale"), "zoom_reset"),
+             (tr("Synchronisation entre mes postes (réglages)"), "settings:p2p"), (tr("Google Agenda / CalDAV (réglages)"), "settings:calendar"),
+             (tr("Synchroniser maintenant avec mes autres postes"), "p2p_now"),
+             (tr("✨ Résumer ma boîte de réception"), "digest"), (tr("✨ Classer ma boîte de réception (60 derniers)"), "ai_classify_inbox"),
+             (tr("✨ Ouvrir l'assistant IA"), "assistant"), (tr("Nouveau message"), "compose"), (tr("Actualiser"), "sync"),
              (tr("Aide et raccourcis (F1)"), "help"), (tr("Gérer les expéditeurs bloqués et les règles"), "settings:filters"),
              (tr("Appliquer les règles à la boîte de réception"), "apply_rules"),
              (tr("Disposition : colonnes"), "layout:columns"), (tr("Disposition : lecture en bas"), "layout:bottom"), (tr("Disposition : liste seule"), "layout:list"),

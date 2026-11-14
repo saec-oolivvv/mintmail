@@ -242,8 +242,11 @@ class NavDelegate(QStyledItemDelegate):
     def __init__(self, t):
         super().__init__()
         self.t = t
+        self.rail = False                                   # barre latérale réduite : pastilles seules
 
     def sizeHint(self, option, index):
+        if self.rail and index.data(KindRole) == "caption":
+            return QSize(option.rect.width(), 8)
         return QSize(option.rect.width(), 34 if index.data(KindRole) != "caption" else 34)
 
     def paint(self, p, option, index):
@@ -252,6 +255,22 @@ class NavDelegate(QStyledItemDelegate):
         p.save()
         p.setRenderHint(QPainter.Antialiasing, True)
         rect = option.rect
+        if self.rail:
+            if kind != "caption":
+                selected, hover = bool(option.state & QStyle.State_Selected), bool(option.state & QStyle.State_MouseOver)
+                if selected or hover:
+                    path = QPainterPath()
+                    path.addRoundedRect(QRectF(rect).adjusted(8, 2, -8, -2), t["rs"] + 2, t["rs"] + 2)
+                    p.fillPath(path, _c(t["accent"], 40) if selected else _c(t["hover"]))
+                key = index.data(KeyRole)
+                p.setPen(Qt.NoPen)
+                p.setBrush(_c((t["tints"].get(key) or t["dim"]) if key else t["dim"]))
+                p.drawEllipse(QRectF(rect.center().x() - 5, rect.center().y() - 5, 10, 10))
+                if (index.data(CountRole) or 0) and key != "drafts":
+                    p.setBrush(_c(t["accent"]))
+                    p.drawEllipse(QRectF(rect.center().x() + 7, rect.center().y() - 11, 7, 7))
+            p.restore()
+            return
         if kind == "caption":
             f = QFont(option.font)
             f.setPixelSize(11)

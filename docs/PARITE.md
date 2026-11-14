@@ -9,16 +9,16 @@ sélection multiple · clic droit · palette Ctrl+K · recherches enregistrées 
 paramètres (comptes IMAP/SMTP, Gmail et Microsoft OAuth, apparence, filtres et blocage, règles, IA, mises à jour, gestes) ·
 assistant IA (Ctrl+J) et carte IA du lecteur, réponse rapide · aide F1 · bandeau et installation des mises à jour · icône ·
 signatures HTML, identités d'envoi, modèles de réponse (menu « Modèles ») et aide IA à l'écriture ✨ dans la rédaction · contacts (carnet, import/export .vcf,
-complétion, « Ajouter aux contacts ») · conversations · vérification des bibliothèques système (jamais de plantage silencieux).
+complétion, « Ajouter aux contacts ») · images distantes persistantes par expéditeur · logos SVG de signature · conversations · vérification des bibliothèques système (jamais de plantage silencieux).
+
+## Porté en 1.34.0 (code écrit, à valider à l'écran)
+Aujourd'hui (agenda, priorités, tâches, relances) · Google Agenda / CalDAV, invitations (.ics), créneaux proposés · pièces jointes (puces, aperçu, enregistrement) et
+désabonnement · synchronisation chiffrée entre postes (réglages et état) · barre latérale réduite, zoom, indicateur hors ligne, notifications · catégories ·
+autres messages du fil dans le lecteur · IA partout : tri automatique avec pastilles « Important » / « Suspect » et résumé dans la liste, « En bref », brouillons préparés,
+recherche en langage naturel (« ? … »), clic droit IA complet, notification des messages importants.
 
 ## À porter (GTK seulement)
-1. Conversations : le regroupement par fil, le compteur et « une action vaut pour tout le fil » sont faits (1.32.0) ; reste l'affichage du fil dans le lecteur (autres messages du fil)
-2. Aujourd'hui : agenda, priorités, tâches avec échéances, relances (« Me rappeler si pas de réponse »)
-3. Google Agenda / CalDAV : événements, créneaux proposés, invitations (.ics)
-4. Pièces jointes : puces, aperçu, enregistrement ; désabonnement en un clic
-5. Synchronisation chiffrée entre postes (P2P) : réglages et état
-6. Barre latérale réduite (rail), zoom, mode hors ligne (indicateur), notifications de bureau
-7. « Voir tous ses messages », catégories (pastilles)
+Rien de connu. Reste : une période d'essai de l'interface Qt par l'utilisateur (le rendu n'a jamais pu être vérifié sans écran), puis retrait de GTK.
 
 ## Retrait de GTK (une fois la liste vide)
 Fichiers propres à GTK : `app.py`, `window.py`, `listing.py`, `folders.py`, `widgets.py`, `reader.py`, `compose.py`, `settings*.py`, `help_view.py`,
