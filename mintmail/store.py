@@ -2,6 +2,7 @@ import copy
 import json
 import os
 import sqlite3
+import sys
 import threading
 import time
 from pathlib import Path
@@ -130,7 +131,7 @@ class Config:
         pw = _keyring("get_password", APP, account_id) or self.data.get("passwords", {}).get(account_id, "")
         if pw:
             self._pw[account_id] = pw
-        else:
+        elif not keyring_pending("get_password", APP, account_id):          # réponse du trousseau encore attendue : pas un échec, on la rejoindra
             self._pw_miss[account_id] = time.time()
         return pw or ""
 
@@ -161,25 +162,57 @@ class Config:
             self.data.setdefault("passwords", {})[account_id] = pw
 
 
-def _keyring(op, *args, timeout=4):
-    """Appelle le trousseau dans un thread : un trousseau verrouillé ne gèle plus l'interface."""
+_inflight = {}                 # (op, service, compte) -> (fil, boîte) : un appel au trousseau encore en attente (fenêtre de mot de passe ouverte)
+_inflight_lock = threading.Lock()
+
+
+def _keyring_timeout():
+    """Sur Mac, le trousseau ouvre une fenêtre de mot de passe : 4 s ne suffisent pas pour la remplir (l'ancienne attente abandonnait puis redemandait en boucle)."""
+    if sys.platform == "darwin" and threading.current_thread() is not threading.main_thread():
+        return 180                                        # fil de fond seulement : le fil de l'interface ne gèle jamais plus de 4 s
+    return 4
+
+
+def keyring_pending(op, *args) -> bool:
+    """Vrai si un appel identique au trousseau attend encore la réponse de l'utilisateur."""
+    with _inflight_lock:
+        e = _inflight.get((op,) + tuple(args[:2]))
+    return bool(e and e[0].is_alive())
+
+
+def _keyring(op, *args, timeout=None):
+    """Appelle le trousseau dans un thread : un trousseau verrouillé ne gèle plus l'interface.
+    Un appel identique encore en attente est REJOINT, jamais relancé (sinon chaque relance rouvre la fenêtre du trousseau)."""
     if os.environ.get("MINTMAIL_NO_KEYRING") == "1":      # tests : ne jamais toucher au trousseau réel de l'utilisateur
         return None
-    box = {}
+    timeout = _keyring_timeout() if timeout is None else timeout
+    key = (op,) + tuple(args[:2])
+    with _inflight_lock:
+        entry = _inflight.get(key)
+        if entry is None:
+            box = {}
 
-    def run():
-        try:
-            import keyring
-            if op == "set_password":
-                keyring.set_password(*args)
-                box["v"] = True
-            else:
-                box["v"] = getattr(keyring, op)(*args)
-        except Exception:
-            pass
-    t = threading.Thread(target=run, daemon=True)
-    t.start()
+            def run(box=box):
+                try:
+                    import keyring
+                    if op == "set_password":
+                        keyring.set_password(*args)
+                        box["v"] = True
+                    else:
+                        box["v"] = getattr(keyring, op)(*args)
+                except Exception:
+                    pass
+                box["done"] = True
+            t = threading.Thread(target=run, daemon=True)
+            entry = _inflight[key] = (t, box)
+            t.start()
+    t, box = entry
     t.join(timeout)
+    if t.is_alive():
+        return None                                       # l'utilisateur n'a pas encore répondu : l'appel reste en cours et sera rejoint
+    with _inflight_lock:
+        if _inflight.get(key) is entry:
+            del _inflight[key]
     return box.get("v")
 
 
