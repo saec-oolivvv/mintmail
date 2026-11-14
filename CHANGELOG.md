@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.34.1
+- Correctif de publication : le contrôle des textes traduits refusait la 1.34.0 (texte de syncdata.py non déclaré) ; la 1.34.1 la remplace
+- Interface Qt : zoom du lecteur — plus d'avertissements « Point size <= 0 »
+
 ## 1.34.0
 - Interface Qt : tout ce qui n'existait que dans l'ancienne interface est porté — Aujourd'hui (touche T), Google Agenda / CalDAV, invitations .ics, créneaux, tâches et relances, pièces jointes et désabonnement, synchronisation entre postes, barre latérale réduite, zoom, indicateur hors ligne, notifications, catégories, fil dans le lecteur
 - Interface Qt : l'IA partout — tri automatique avec pastilles Important / Suspect et résumé dans la liste, « En bref », brouillons préparés, recherche en langage naturel (« ? … »), clic droit IA complet, ✨ IA dans la rédaction (Ctrl+J)

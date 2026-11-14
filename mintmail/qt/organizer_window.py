@@ -340,7 +340,7 @@ class OrganizerMixin:
             self.reader.setZoomFactor(z)
         else:
             f = self.reader.font()
-            base = getattr(self, "_reader_base_px", None) or f.pointSizeF() or 10.0
+            base = getattr(self, "_reader_base_px", None) or (f.pointSizeF() if f.pointSizeF() > 0 else 10.0)
             self._reader_base_px = base
             f.setPointSizeF(base * z)
             self.reader.setFont(f)
