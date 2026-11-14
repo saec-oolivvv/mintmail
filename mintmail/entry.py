@@ -264,7 +264,6 @@ def _init_language() -> str:
 def check_update_cli(api=None, allow_loopback=False, out=print) -> int:
     """`mintmail --check-update` : cherche une mise à jour et dit EXACTEMENT où on en est, sans interface et sans rien installer.
     Code de sortie : 0 à jour, 10 mise à jour disponible, 1 erreur."""
-    import time
     from . import updater
     from .store import Config
     from .update_text import explain

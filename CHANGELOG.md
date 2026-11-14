@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.33.2
+- Correctif de la publication 1.33.1 : import local de « time » retiré d'entry.py (le test de masquage d'imports échouait)
+
 ## 1.33.1
 - Correctif : MintMail 1.33.0 ne se lançait plus (UnboundLocalError : DATA_DIR) ; nouveau test contre ce type de masquage
 
