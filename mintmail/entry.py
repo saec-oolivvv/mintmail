@@ -166,11 +166,8 @@ def send_due() -> int:
                 cache.outbox_remove(oid)
                 failed += 1
                 log("Envoi différé abandonné (%s) : %s" % (out.subject[:40], e))
-                try:
-                    import subprocess
-                    subprocess.run(["notify-send", tr("MintMail : envoi impossible"), "%s — %s" % (out.subject[:50], str(e)[:120])], timeout=5)
-                except Exception:
-                    pass
+                from . import sysdeps
+                sysdeps.notify(tr("MintMail : envoi impossible"), "%s — %s" % (out.subject[:50], str(e)[:120]))
     print(tr("Envois différés : %d envoyé(s), %d abandonné(s).") % (sent, failed))
     return 0
 

@@ -7,12 +7,13 @@ import time
 from pathlib import Path
 
 from .models import Message, Outgoing
+from . import sysdeps
 from .util import thread_key, normalize_subject
 
 APP = "mintmail"
 P2P_MIN_SECRET = 12   # code de jumelage : 12 caractères minimum (les identifiants circulent entre machines)
-CONFIG_DIR = Path(os.environ.get("XDG_CONFIG_HOME", str(Path.home() / ".config"))) / APP
-DATA_DIR = Path(os.environ.get("XDG_DATA_HOME", str(Path.home() / ".local" / "share"))) / APP
+CONFIG_DIR = sysdeps.config_dir()      # Linux : ~/.config/mintmail (XDG) ; macOS : ~/Library/Application Support/MintMail ; Windows : %APPDATA%\\MintMail
+DATA_DIR = sysdeps.data_dir()
 
 
 def private_dir(p):

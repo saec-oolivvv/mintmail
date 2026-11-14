@@ -17,6 +17,7 @@ import urllib.parse
 import urllib.request
 from typing import Callable, Dict, Optional
 from .i18n import tr
+from . import sysdeps
 
 PROVIDERS: Dict[str, Dict] = {
     "google": {
@@ -43,7 +44,7 @@ class OAuthError(Exception):
         self.retryable = retryable          # problème de réseau passager (rejouable), indépendant de la langue du message
 
 
-SYSTEM_CLIENTS = "/etc/mintmail/oauth-clients.json"
+SYSTEM_CLIENTS = sysdeps.system_clients_path()
 
 # Assistant de configuration : étapes à faire UNE FOIS chez le fournisseur (libellé, adresse exacte à ouvrir)
 WIZARD: Dict[str, list] = {

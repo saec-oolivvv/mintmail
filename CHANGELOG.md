@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.17.0
+- Préparation du portage Windows et macOS (interface Qt) : le moteur (courrier, synchro, IA, règles) est isolé de l'interface Linux et vérifié par des tests, les dossiers et notifications passent par une couche système, et une intégration continue teste le moteur sur Linux, Windows et macOS ; rien ne change à l'usage sous Linux
+
 ## 1.16.1
 - Vue « Non lus » : le message que vous ouvrez y reste affiché (liste et lecteur) tant que vous ne passez pas à un autre ; il n'en sort qu'à ce moment-là, ou si vous agissez dessus (archiver, supprimer…), au lieu de disparaître dès son ouverture
 
