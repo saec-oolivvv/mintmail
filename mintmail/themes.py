@@ -15,7 +15,7 @@ NAV_TINTS = {"inbox": "#4f8cff", "unread": "#a78bfa", "starred": "#fbbf24", "pin
 STYLES = {
     "aurora": {
         "label": tr("Aurora — verre et lueurs"), "accent": "#7c8cff", "r": 16, "rs": 10, "rp": 999, "ra": 999,
-        "font": '"Inter", "Cantarell", "Ubuntu", "Segoe UI", sans-serif',
+        "font": '"Inter", "Cantarell", "Ubuntu", "Helvetica Neue", "Segoe UI", sans-serif',
         "head": '"Inter", "Cantarell", "Ubuntu", sans-serif', "hw": 800,
         "dark": dict(bg="#0a0e1a", side="rgba(255,255,255,0.035)", card="rgba(255,255,255,0.055)",
                      panel="rgba(255,255,255,0.03)", hover="rgba(255,255,255,0.10)", text="#e9edfb",
@@ -30,7 +30,7 @@ STYLES = {
     },
     "papier": {
         "label": tr("Papier — éditorial"), "accent": "#b4472f", "r": 4, "rs": 3, "rp": 4, "ra": 999,
-        "font": '"Source Sans 3", "Source Sans Pro", "Cantarell", "Ubuntu", sans-serif',
+        "font": '"Source Sans 3", "Source Sans Pro", "Cantarell", "Ubuntu", "Helvetica Neue", "Segoe UI", sans-serif',
         "head": '"Source Serif 4", "Source Serif Pro", "Georgia", "DejaVu Serif", serif', "hw": 700,
         "dark": dict(bg="#1b1814", side="#15120f", card="#241f1a", panel="#201c17", hover="#2e2822",
                      text="#efe7d8", dim="#a39880", line="#3a3329", field="#241f1a", ai1="#d98cb3",
@@ -41,8 +41,8 @@ STYLES = {
     },
     "terminal": {
         "label": tr("Terminal — phosphore"), "accent": "#3dff8a", "r": 2, "rs": 2, "rp": 2, "ra": 2,
-        "font": '"JetBrains Mono", "Fira Code", "DejaVu Sans Mono", "Ubuntu Mono", monospace',
-        "head": '"JetBrains Mono", "Fira Code", "DejaVu Sans Mono", "Ubuntu Mono", monospace', "hw": 700,
+        "font": '"JetBrains Mono", "Fira Code", "DejaVu Sans Mono", "Ubuntu Mono", "Menlo", "Consolas", monospace',
+        "head": '"JetBrains Mono", "Fira Code", "DejaVu Sans Mono", "Ubuntu Mono", "Menlo", "Consolas", monospace', "hw": 700,
         "dark": dict(bg="#050d08", side="#07140c", card="#0a1a10", panel="#08150d", hover="#0f2617",
                      text="#bff5cd", dim="#5f9a74", line="#14402a", field="#0a1a10", ai1="#7dffb0",
                      ai2="#3dff8a", on="#03120a", canvas="#050d08"),

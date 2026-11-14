@@ -1542,6 +1542,10 @@ def run(argv=None):
     app = QApplication.instance() or QApplication(list(argv if argv is not None else sys.argv))
     from . import ui_svg
     ui_svg.install()                                      # rendu des logos SVG des signatures (sans QtSvg : simplement non affichés)
+    if os.environ.get("MINTMAIL_QT_TRACE") == "1":         # diagnostic : affiche la pile Python à l'origine d'un message Qt (ex. « No file name specified »)
+        import traceback
+        from PySide6.QtCore import qInstallMessageHandler
+        qInstallMessageHandler(lambda mode, ctx, msg: (sys.stderr.write("Qt : %s\n" % msg), traceback.print_stack(limit=12, file=sys.stderr)))
     app.setApplicationName("mintmail")                    # = StartupWMClass du lanceur : bonne icône dans la barre des tâches (X11)
     app.setApplicationDisplayName(APP_NAME)
     app.setDesktopFileName(AI.DESKTOP_ID)                  # idem sous Wayland

@@ -1,8 +1,8 @@
-"""Aide refondue : mise en forme (touches, gras, commandes, liens sûrs, surlignage), données FR/EN parallèles, plans de page, widgets, styles."""
+"""Aide refondue : mise en forme (touches, gras, commandes, liens sûrs, surlignage), données FR/EN parallèles, les pages rendues (Qt) sont testées dans test_qt_viewmodel."""
 import json, os, re, sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-import gtkstub
-from mintmail import help_content as H, help_format as F, help_view as V, i18n
+import testenv  # noqa: F401
+from mintmail import help_content as H, help_format as F, i18n
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 CTX = {"version": "9.9.9", "config": "~/c", "data": "~/d", "log": "~/l"}
@@ -102,76 +102,3 @@ def test_sections_carry_icon_tagline_kinds_and_the_callouts_in_both_languages():
     assert with_lang("de", lambda: H.home()["welcome"][0]) == "Welcome to MintMail"                           # langue sans aide dédiée : anglais
     assert H.home()["welcome"][0] == "Bienvenue dans MintMail" and len(H.shortcuts()) == len(H.SHORTCUTS_HELP) and H.cli_options(CTX)[1][0] == "mintmail --help"
     assert [h["sid"] for h in H.search_full("oauth", CTX)][:1] == ["start"] and H.search("oauth", CTX)[0][1] == H.search_full("oauth", CTX)[0]["title"]
-
-
-def test_key_parts_splits_alternatives_and_notes():
-    assert V.key_parts("# / Suppr") == (["#", "Suppr"], "") and V.key_parts("J / K") == (["J", "K"], "") and V.key_parts("Ctrl+K") == (["Ctrl+K"], "")
-    assert V.key_parts("/  ou  Ctrl+F") == (["/", "Ctrl+F"], "") and V.key_parts("? … (recherche)") == (["?"], "(recherche)") and V.key_parts("\\") == (["\\"], "")
-    assert V.key_parts("") == ([""], "")
-
-
-def test_home_plan_has_welcome_four_steps_tip_keys_and_a_tile_per_section():
-    plan = V.plan_home(CTX, ordinal=100)
-    assert [p["t"] for p in plan] == ["welcome", "steps", "tip", "keys", "tiles"]
-    steps = plan[1]["steps"]
-    assert [s["n"] for s in steps] == [1, 2, 3, 4] and all(s["target"] in {s2["id"] for s2 in H.sections(CTX)} for s in steps)
-    assert plan[2]["text"] == V.plan_home(CTX, ordinal=100)[2]["text"] and plan[2]["text"] != V.plan_home(CTX, ordinal=100, tip_offset=1)[2]["text"]
-    assert len(plan[3]["keys"]) == 12 and plan[3]["target"] == "context" and len(plan[4]["tiles"]) == 15 and plan[4]["tiles"][0]["icon"] == "🚀"
-    assert [t["id"] for t in plan[4]["tiles"]] == [s["id"] for s in H.SECTIONS]
-    nav = V.nav_entries(CTX)
-    assert nav[0][0] == "home" and len(nav) == 16 and [n[0] for n in nav[1:]] == [s["id"] for s in H.SECTIONS]
-
-
-def test_section_plans_have_a_hero_one_card_per_topic_a_keycap_table_and_command_blocks():
-    for sec in H.sections(CTX):
-        plan = V.plan_section(sec, CTX)
-        assert plan[0]["t"] == "hero" and plan[0]["icon"] == sec["icon"] and plan[0]["tagline"] == sec["tagline"] and len(plan) == 1 + len(sec["items"])
-        assert all(p["t"] in ("card", "shortcuts", "cli") for p in plan[1:])
-    ctx_plan = V.plan_section(next(s for s in H.sections(CTX) if s["id"] == "context"), CTX)
-    table = [p for p in ctx_plan if p["t"] == "shortcuts"][0]
-    assert len(table["keys"]) == len(H.SHORTCUTS_HELP) and ("Ctrl+K", "Palette de commandes") in table["keys"]
-    cli_plan = [p for p in V.plan_section(next(s for s in H.sections(CTX) if s["id"] == "cli"), CTX) if p["t"] == "cli"][0]
-    assert any(c == "mintmail --check-update" for c, _ in cli_plan["options"]) and any("~/d/diagnostic.txt" in d for _, d in cli_plan["options"])
-    start = V.plan_section(H.sections(CTX)[0], CTX)
-    kinds = [k for p in start if p["t"] == "card" for k, _ in p["blocks"]]
-    assert {"bullet", "tip", "p"} <= set(kinds)                                                                 # puces et astuce réellement reconnues dans le contenu
-
-
-def test_results_plan_highlights_matches_links_to_the_section_and_handles_no_result():
-    plan = V.plan_results("oauth", CTX)
-    assert plan[0]["t"] == "heading" and "résultat" in plan[0]["text"] and "oauth" in plan[0]["text"]
-    res = plan[1:]
-    assert res and all(r["t"] == "result" and r["sid"] and r["chip"] == r["chip"].upper() for r in res)
-    assert any("<span bgcolor" in r["title_markup"] + r["excerpt_markup"] for r in res) and all("<script" not in r["excerpt_markup"] for r in res)
-    none = V.plan_results("zzzzqqqq", CTX)
-    assert [p["t"] for p in none] == ["heading", "empty"] and "0 résultat" in none[0]["text"]
-    hostile = V.plan_results("<script>", CTX)
-    assert [p["t"] for p in hostile] == ["heading", "empty"]
-
-
-def test_the_help_widgets_build_and_every_page_renders_in_french_and_english():
-    for lang in ("fr", "en"):
-        def go():
-            root = V.build(CTX)
-            for pid, _, _ in V.nav_entries(CTX):
-                root.help_show(pid)
-            root.help_goto("ai")
-            root.help_goto("home")
-            return True
-        assert with_lang(lang, go)
-    src = open(os.path.join(ROOT, "mintmail", "settings_extra.py"), encoding="utf-8").read()
-    assert "from .help_view import build" in src and "def help_page" in src
-
-
-def test_help_css_exists_in_every_style_and_theme():
-    from mintmail import style
-    dec = lambda x: x.decode("utf-8") if isinstance(x, bytes) else x
-    need = (".help-top", ".help-nav-row", ".help-welcome", ".help-hero", ".help-card", ".help-tip", ".help-warn", ".help-code", ".help-key", ".help-step-num", ".help-tile", ".help-chip", ".help-tipday", ".help-open")
-    for st in style.STYLES:
-        for dark in (True, False):
-            base, fancy = (dec(x) for x in style.build_css(dark, style=st))
-            assert all(n in base for n in need) and "%(" not in base + fancy and base.count("{") == base.count("}") and fancy.count("{") == fancy.count("}"), (st, dark)
-    aurora = dec(style.build_css(True, style="aurora")[1])
-    assert "linear-gradient" in aurora.split(".help-welcome", 1)[1][:200] and "box-shadow" in aurora.split(".help-hero", 1)[1][:300]
-    papier = dec(style.build_css(False, style="papier")[0])
-    assert "border-left: 4px solid @accent" in papier.split(".help-welcome, .help-hero {", 1)[1][:120]

@@ -1,13 +1,10 @@
 """Épingles : enregistrées SUR LA BOÎTE (mot-clé IMAP) pour être vues par les autres postes ; serveurs qui refusent les mots-clés ; migration des anciennes épingles."""
 import imaplib, os, sys, time, types
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-import gtkstub
-from test_listing import make_window
+import testenv  # noqa: F401
 from test_backend import RAW, msgs
 from mintmail import backend as B, offline
 from mintmail.backend import IMAPBackend, PinUnsupported, PIN_KEYWORD, parse_message
-from mintmail.models import Message
-from mintmail.store import Cache, Config
 
 
 class Server:
@@ -153,98 +150,6 @@ def test_a_server_that_refuses_custom_keywords_is_detected_never_pretended_and_c
     assert be.acc["pin_server"] is True and PIN_KEYWORD in srv.flags[2]
 
 
-def test_sync_applies_the_mailbox_pins_but_never_overwrites_a_pending_local_action_or_an_unknown_server():
-    w = make_window(10)
-    cache = w.cache
-    cache.upsert_many([Message(id="p%d" % i, account="acc", folder="inbox", real_folder="INBOX", uid=i, pinned=(i == 3), date=1000 + i) for i in (1, 2, 3, 4)])
-    kn = {i: "p%d" % i for i in (1, 2, 3, 4)}
-    cache.ops_add("acc", "flags", {"pinned": True, "items": [{"id": "p4", "uid": 4, "real": "INBOX"}]})            # l'épingle de p4 n'est pas encore partie
-    cache.ops_add("acc", "flags", {"seen": True, "items": [{"id": "p1", "uid": 1, "real": "INBOX"}]})               # une action SANS épingle ne protège rien
-    assert w._pending_pin_ids() == {"p4"}
-    w._apply_server_flags(kn, {1: (False, False, True), 2: (True, True, None), 3: (True, False, False), 4: (False, False, False)})
-    got = {i: cache.get_light("p%d" % i) for i in (1, 2, 3, 4)}
-    assert got[1].pinned is True and got[1].unread is False                                         # épinglé sur la boîte → épinglé ici
-    assert got[2].pinned is False and got[2].starred is True                                        # serveur inconnu : état local gardé (ici non épinglé), favori mis à jour
-    assert got[3].pinned is False                                                                    # désépinglé ailleurs → désépinglé ici (serveur prouvé)
-    assert got[4].pinned is False and True                                                           # p4 : action locale en attente
-    w._apply_server_flags(kn, {2: (True, True)})                                                     # ancien format à 2 éléments : toujours accepté
-    assert cache.get_light("p2").pinned is False
-
-
-def test_legacy_local_pins_are_pushed_once_to_the_mailbox_when_the_server_is_proven_and_a_toast_reports_it():
-    srv = Server()
-    a, b = station(srv), station(srv)
-    w = make_window(11)
-    cache = w.cache
-    cache.upsert_many([Message(id="acc|INBOX|%d" % i, account="acc", folder="inbox", real_folder="INBOX", uid=i, pinned=(i in (3, 4)), date=1000 + i) for i in (2, 3, 4)])
-    w._backends = {"acc": b}
-    w.accounts = lambda: [{"id": "acc"}]
-    w.backend = lambda aid: b
-    w.op_enqueue = lambda kind, lst, **kw: [cache.ops_add("acc", kind, dict(kw, items=[{"id": m.id, "uid": m.uid, "real": m.real_folder} for m in lst]))]
-    w.run_bg = lambda fn, done=None: done(fn(), None) if done else fn()
-    w._set_offline = lambda off: None
-    w.op_run = lambda ops: offline.OfflineMixin.op_run(w, ops)
-    w._op_exec = lambda op: offline.OfflineMixin._op_exec(w, op)
-    w.config["pins_pushed"] = []
-    w._save_pin_states()
-    assert srv.flags[3] == set() and w.config["pins_pushed"] == []                                  # serveur pas encore prouvé : rien n'est envoyé
-    a.set_flags_many(msgs([2]), pinned=True)
-    b.sync("inbox", {2: "acc|INBOX|2"}, limit=20)                                                   # B voit l'épingle de A et apprend que le serveur sait les garder
-    w._save_pin_states()
-    assert PIN_KEYWORD in srv.flags[3] and PIN_KEYWORD in srv.flags[4]                              # ses anciennes épingles locales partent vers la boîte
-    assert w.config["pins_pushed"] == ["acc"]
-    sent = len(stores(srv))
-    w._save_pin_states()
-    assert len(stores(srv)) == sent                                                                  # une seule fois par compte
-    _, flags, _, _ = a.sync("inbox", {3: "x", 4: "y"}, limit=20)
-    assert flags[3][2] is True and flags[4][2] is True                                              # l'autre poste les voit maintenant
-    w.toasts = []
-    w.push_local_pins()
-    assert w.toasts and "épingle(s) envoyée(s)" in w.toasts[-1][0] and "2" in w.toasts[-1][0]        # commande manuelle : résumé
-    cache.update_many(["acc|INBOX|3", "acc|INBOX|4"], pinned=False)
-    w.toasts = []
-    w.push_local_pins()
-    assert w.toasts and "Aucun message épinglé" in w.toasts[-1][0]
-
-
-def test_pinning_in_the_list_goes_to_the_mailbox_through_the_offline_queue_and_a_refusing_server_is_reported_once():
-    srv = Server(keywords_ok=False)
-    be = station(srv)
-    w = make_window(12)
-    cache = w.cache
-    m = Message(id="acc|INBOX|2", account="acc", folder="inbox", real_folder="INBOX", uid=2, date=1000)
-    cache.upsert_many([m])
-    w.backend = lambda aid: be
-    w.op_enqueue = lambda kind, lst, **kw: [cache.ops_add("acc", kind, dict(kw, items=[{"id": x.id, "uid": x.uid, "real": x.real_folder} for x in lst]))]
-    w.run_bg = lambda fn, done=None: done(fn(), None) if done else fn()
-    w._set_offline = lambda off: None
-    w._op_exec = lambda op: offline.OfflineMixin._op_exec(w, op)
-    w.op_run = lambda ops: offline.OfflineMixin.op_run(w, ops)
-    w._save_pin_states = lambda: None
-    w.toasts = []
-    w.set_flag([m], "pinned", True)
-    assert cache.get_light(m.id).pinned is True                                                      # l'épingle locale est faite quoi qu'il arrive
-    assert len(w.toasts) == 1 and "reste sur ce poste" in w.toasts[0][0]                             # le serveur refuse : on le DIT
-    w.set_flag([m], "pinned", False)
-    w.set_flag([m], "pinned", True)
-    assert len(w.toasts) == 1                                                                         # une seule alerte par session
-    srv2 = Server()
-    be2 = station(srv2)
-    w2 = make_window(13)
-    m2 = Message(id="acc|INBOX|3", account="acc", folder="inbox", real_folder="INBOX", uid=3, date=1000)
-    w2.cache.upsert_many([m2])
-    w2.backend = lambda aid: be2
-    w2.op_enqueue = lambda kind, lst, **kw: [w2.cache.ops_add("acc", kind, dict(kw, items=[{"id": x.id, "uid": x.uid, "real": x.real_folder} for x in lst]))]
-    w2.run_bg = lambda fn, done=None: done(fn(), None) if done else fn()
-    w2._set_offline = lambda off: None
-    w2._op_exec = lambda op: offline.OfflineMixin._op_exec(w2, op)
-    w2.op_run = lambda ops: offline.OfflineMixin.op_run(w2, ops)
-    w2._save_pin_states = lambda: None
-    w2.toasts = []
-    w2.set_flag([m2], "pinned", True)
-    assert PIN_KEYWORD in srv2.flags[3] and not w2.toasts and w2.cache.ops_pending() == []         # serveur capable : épinglé sur la boîte, file vide, aucune alerte
-
-
 def test_queued_actions_stay_compatible_and_the_palette_and_docs_mention_the_pin_command():
     calls = []
     be = types.SimpleNamespace(demo=False, set_flags_many=lambda items, **kw: calls.append(kw))
@@ -253,8 +158,6 @@ def test_queued_actions_stay_compatible_and_the_palette_and_docs_mention_the_pin
     offline.OfflineMixin._op_exec(fake, {"account": "a", "kind": "flags", "payload": {"pinned": True, "probe": True, "items": [{"id": "x", "uid": 1, "real": "INBOX"}]}})
     assert calls == [{"seen": True, "flagged": None}, {"seen": None, "flagged": None, "pinned": True, "probe": True}]      # anciennes actions : appel inchangé
     root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    src = open(os.path.join(root, "mintmail", "window.py"), encoding="utf-8").read()
-    assert 'tr("Envoyer mes épingles vers la boîte")' in src and "self._apply_server_flags(kn, flags)" in src
     aide, help_en = (open(os.path.join(root, "docs", n), encoding="utf-8").read() for n in ("AIDE.md", "HELP.md"))
     assert "enregistrée sur la boîte" in aide and "Envoyer mes épingles vers la boîte" in aide                    # aide française
     assert "stored on the mailbox" in help_en and "Send my pins to the mailbox" in help_en                         # aide anglaise

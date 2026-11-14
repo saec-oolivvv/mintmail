@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.35.2
+- Correctif de publication : tests test_pins et test_help_view adaptés au retrait de GTK
+- Mac : polices de repli (Helvetica Neue, Menlo) ; diagnostic MINTMAIL_QT_TRACE=1
+
 ## 1.35.0
 - MintMail n'a plus qu'une interface : Qt. L'ancienne interface GTK est retirée ; le paquet ne dépend plus de GTK ni de WebKit
 - Fonctions portées dans Qt : dossiers (nouveau, sous-dossier, renommer, supprimer), recherche aussi sur le serveur, envoi des épingles, journal d'erreurs, plein écran F11, copier l'adresse, choix de la langue, Aujourd'hui au lancement, mise en forme complète de la rédaction
