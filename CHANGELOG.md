@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.35.10
+- Mac : connexion IMAP/SMTP refusée (« invalid credentials ») car le mot de passe n'était lu qu'une fois ; un trousseau lent figeait un mot de passe vide envoyé au serveur. Il est relu à chaque connexion, un mot de passe vide n'est jamais envoyé (message clair, nouvel essai automatique)
+
 ## 1.35.9
 - Mac : mots de passe écrits dans le trousseau en octets exacts (plus de souci avec les caractères spéciaux ou accentués), relus et vérifiés ; « mintmail --diagnose » indique par compte où se trouve le mot de passe et sa longueur (jamais son contenu)
 

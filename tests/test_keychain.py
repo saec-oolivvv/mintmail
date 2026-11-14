@@ -80,3 +80,32 @@ def test_ca_bundle_is_taken_from_certifi_only_when_the_system_gives_none():
     env = {}
     assert netutil.ensure_ca_bundle(env, ctx(0), lambda: "/n'existe/pas") == "" and env == {}
     assert netutil.ensure_ca_bundle({}, ctx(0), lambda: (_ for _ in ()).throw(ImportError("certifi")) ) == ""      # certifi absent : sans effet
+
+
+def test_backend_rereads_the_password_at_every_connection_instead_of_freezing_an_empty_one():
+    from mintmail import backend
+    pws = iter(["", "", "secret"])                          # trousseau lent au démarrage : vide, vide, puis le vrai mot de passe
+    seen = []
+
+    class Imap:
+        def __init__(self, *a, **k):
+            pass
+
+        def login(self, user, pw):
+            seen.append((user, pw))
+            return "OK", []
+    old = backend.imaplib.IMAP4_SSL
+    backend.imaplib.IMAP4_SSL = Imap
+    try:
+        b = backend.IMAPBackend({"id": "a", "email": "x@y.z", "imap_host": "h", "imap_port": 993}, "", password_provider=lambda: next(pws))
+        for _ in range(2):
+            try:
+                b._connect()
+                assert False, "un mot de passe vide ne doit jamais être envoyé au serveur"
+            except backend.BackendError as e:
+                assert e.retryable
+        assert seen == []
+        b._connect()
+        assert seen == [("x@y.z", "secret")]
+    finally:
+        backend.imaplib.IMAP4_SSL = old

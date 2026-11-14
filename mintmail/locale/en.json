@@ -512,6 +512,7 @@
 "Mot de passe (ou mot de passe d'application)": "Password (or app password)",
 "Mot de passe du compte « %s » introuvable : le trousseau est inaccessible depuis cet environnement (installez « keyring » dans le venv, ou créez-le avec --system-site-packages).": "Password for account “%s” not found: the keyring is not reachable from this environment (install “keyring” in the venv, or create it with --system-site-packages).",
 "Mot de passe du compte « %s » introuvable : saisissez-le à nouveau dans Paramètres → Comptes.": "Password for account “%s” not found: enter it again in Settings → Accounts.",
+"Mot de passe introuvable pour %s : saisissez-le à nouveau dans Paramètres → Comptes.": "Password not found for %s: enter it again in Settings → Accounts.",
 "Mot de passe requis.": "Password required.",
 "NON (la version sera refusée)": "NO (the version will be refused)",
 "Neutre et poli": "Neutral and polite",

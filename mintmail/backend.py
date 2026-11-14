@@ -323,14 +323,22 @@ class _Conn:
 class IMAPBackend:
     demo = False
 
-    def __init__(self, account, password, token_provider=None):
+    def __init__(self, account, password, token_provider=None, password_provider=None):
         self.acc, self.password = account, password
+        self.password_provider = password_provider   # relit le mot de passe À CHAQUE connexion (trousseau lent au démarrage : ne jamais figer un mot de passe vide)
         self.token_provider = token_provider   # OAuth : fournit un jeton d'accès valide
         self._folders_cache = None
         self._conns = {"sync": _Conn(), "act": _Conn(), "meta": _Conn()}
         self._tree_cache = None
         self._pin_dirty = False
         self._gm_seen = False
+
+    def _pw(self):
+        pw = (self.password_provider() if self.password_provider else "") or self.password
+        if pw:
+            self.password = pw
+            return pw
+        raise BackendError(tr("Mot de passe introuvable pour %s : saisissez-le à nouveau dans Paramètres → Comptes.") % (self.acc.get("email") or self.acc.get("id")), retryable=True)
 
     # -- connexion
     def _connect(self):
@@ -347,8 +355,10 @@ class IMAPBackend:
                 token = self.token_provider()
                 imap.authenticate("XOAUTH2", lambda _c: oauth.xoauth2(user, token).encode())
             else:
-                imap.login(user, self.password)
+                imap.login(user, self._pw())
             return imap
+        except BackendError:
+            raise
         except oauth.OAuthError as e:
             raise BackendError(tr("Connexion OAuth : %s") % e)
         except Exception as e:
@@ -835,7 +845,7 @@ class IMAPBackend:
             if code != 235:
                 raise smtplib.SMTPAuthenticationError(code, resp)
         else:
-            s.login(user, self.password)
+            s.login(user, self._pw())
         return s
 
     def send(self, out):
@@ -1046,7 +1056,7 @@ def make_backend(account, config):
     if account.get("auth") == "oauth2":
         tm = oauth.manager_for(config)
         return IMAPBackend(account, "", token_provider=lambda: tm.access_token(account))
-    return IMAPBackend(account, config.password(account["id"]))
+    return IMAPBackend(account, config.password(account["id"]), password_provider=lambda: config.password(account["id"]))
 
 
 def new_account_id():

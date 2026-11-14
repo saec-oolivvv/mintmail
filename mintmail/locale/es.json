@@ -512,6 +512,7 @@
 "Mot de passe (ou mot de passe d'application)": "Contraseña (o contraseña de aplicación)",
 "Mot de passe du compte « %s » introuvable : le trousseau est inaccessible depuis cet environnement (installez « keyring » dans le venv, ou créez-le avec --system-site-packages).": "No se encontró la contraseña de la cuenta «%s»: el llavero no es accesible desde este entorno (instale «keyring» en el venv o créelo con --system-site-packages).",
 "Mot de passe du compte « %s » introuvable : saisissez-le à nouveau dans Paramètres → Comptes.": "No se encuentra la contraseña de la cuenta «%s»: vuelva a introducirla en Ajustes → Cuentas.",
+"Mot de passe introuvable pour %s : saisissez-le à nouveau dans Paramètres → Comptes.": "Contraseña no encontrada para %s: vuelva a introducirla en Ajustes → Cuentas.",
 "Mot de passe requis.": "Contraseña obligatoria.",
 "NON (la version sera refusée)": "NO (la versión será rechazada)",
 "Neutre et poli": "Neutro y cortés",
