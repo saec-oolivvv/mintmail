@@ -32,7 +32,8 @@ CLI_OPTIONS: List[Tuple[str, str]] = [
                             "(appelé chaque minute par la minuterie utilisateur mintmail-outbox)."),
     ("mintmail --check-pins", "Vérifie, pour chaque compte, si le serveur GARDE les épingles (étiquette Gmail ou mot-clé IMAP) : connexion, nombre de messages épinglés et essai réversible sur le message le plus récent. "
                               "Avec --no-test : lecture seule."),
-    ("mintmail --qt", "Ouvre l'interface Qt (expérimentale, étape du portage vers Windows et macOS) : dossiers, liste des messages, lecteur. Demande PySide6 (pip install PySide6) ; l'interface habituelle reste la référence."),
+    ("mintmail --qt", "Force l'interface Qt (c'est déjà l'interface par défaut dès que PySide6 est installé) et indique ce qui manque sinon."),
+    ("mintmail --gtk", "Lance l'ancienne interface GTK (secours). Par défaut MintMail ouvre l'interface Qt dès que PySide6 est installé ; MINTMAIL_UI=gtk fait de même."),
     ("mintmail --check-update", "Cherche une mise à jour et affiche le résultat détaillé (version, dépôt, signature, cause d'une erreur) : sans interface, sans rien installer. "
                                 "Code de sortie : 0 à jour, 10 mise à jour disponible, 1 erreur."),
 ]

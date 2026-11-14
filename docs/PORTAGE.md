@@ -27,3 +27,5 @@ La CI (`.github/workflows/portable.yml`) exécute `tests/run_core.py` sur Ubuntu
 - Le code Qt ne peut pas être exécuté dans l'environnement où MintMail est développé (pas de PySide6, pas de Windows ni de macOS) : la CI et vos essais sur de vrais postes sont le seul contrôle réel. Attendre des retours de rendu à chaque étape.
 - Les notifications Windows et macOS (`sysdeps.notify`) ne sont pas encore éprouvées sur de vraies machines.
 - Les droits de fichiers 0600/0700 n'ont pas d'équivalent exact sous Windows : les données sont protégées par le profil de l'utilisateur.
+
+Depuis la 1.31.0 l'interface Qt est celle par défaut ; voir docs/PARITE.md pour ce qui reste avant de retirer GTK.

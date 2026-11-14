@@ -21,6 +21,19 @@ Pour un rapport complet : /usr/bin/mintmail --diagnose
 """)
 
 
+def _qt_python() -> str:
+    """Interpréteur d'un venv où MintMail ET PySide6 sont importables (MINTMAIL_QT_PYTHON, sinon ~/mintmail-qt-venv) ; « » si aucun."""
+    import subprocess
+    for py in (os.environ.get("MINTMAIL_QT_PYTHON", ""), os.path.expanduser("~/mintmail-qt-venv/bin/python")):
+        if py and os.access(py, os.X_OK) and os.path.realpath(py) != os.path.realpath(sys.executable):
+            try:
+                if subprocess.run([py, "-c", "import mintmail, PySide6"], capture_output=True, timeout=20).returncode == 0:
+                    return py
+            except (OSError, subprocess.SubprocessError):
+                pass
+    return ""
+
+
 def _head(path: Path, n: int = 4096) -> str:
     try:
         return path.read_text(encoding="utf-8", errors="replace")[:n]
@@ -301,13 +314,22 @@ def main(argv=None) -> int:
         return check_update_cli()
     if "--check-pins" in argv:
         return check_pins_cli(test="--no-test" not in argv)
-    if "--qt" in argv:                      # interface Qt (expérimentale, étape 2 du portage) : liste des messages + lecteur
+    use_gtk = "--gtk" in argv or os.environ.get("MINTMAIL_UI") == "gtk"
+    auto_qt = os.environ.get("MINTMAIL_UI", "auto") == "auto" and os.environ.get("MINTMAIL_NO_KEYRING") != "1"     # (les tests ne lancent jamais une vraie fenêtre)
+    if not use_gtk and ("--qt" in argv or auto_qt):          # interface Qt : l'interface PAR DÉFAUT (la version GTK reste en secours : --gtk)
         try:
             from .qt.window import run as run_qt
         except ImportError as e:
-            sys.stderr.write("L'interface Qt demande PySide6 (pip install PySide6) : %s\n" % e)
-            return 1
-        return run_qt([a for a in argv if a != "--qt"])
+            if "--qt" in argv:
+                sys.stderr.write(tr("L'interface Qt demande PySide6 (pip install PySide6, ou le venv avec --system-site-packages) : %s") % e + "\n")
+                return 1
+            py = _qt_python()
+            if py and not os.environ.get("MINTMAIL_REEXEC"):         # PySide6 est dans un venv (ex. ~/mintmail-qt-venv) : on s'y relance
+                os.environ["MINTMAIL_REEXEC"] = "1"
+                os.execv(py, [py, "-m", "mintmail"] + [a for a in argv if a != "--gtk"])
+            sys.stderr.write(tr("Interface Qt indisponible (PySide6 absent) : l'ancienne interface GTK est utilisée à la place.") + "\n")
+        else:
+            return run_qt([a for a in argv if a not in ("--qt", "--gtk")])
     from .store import harden_permissions
     harden_permissions()                    # dossiers 0700 / fichiers 0600, même pour les anciennes installations
     install_hook()

@@ -977,3 +977,17 @@ def test_app_icon_files_cover_vector_and_all_png_sizes_in_numeric_order():
     base = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "mintmail", "icons")
     names = [os.path.basename(f) for f in sorted(__import__("glob").glob(os.path.join(base, "mintmail-*.png")), key=lambda f: int(os.path.basename(f)[9:-4]))]
     assert names[0] == "mintmail-16.png" and names[-1] == "mintmail-512.png" and "mintmail-128.png" in names and os.path.isfile(os.path.join(base, "mintmail.svg"))
+
+
+def test_default_interface_is_qt_with_gtk_fallback_and_qt_python_discovery():
+    tmp_path = tempfile.mkdtemp()
+    import mintmail.entry as E
+    assert E._qt_python.__doc__ and callable(E._qt_python)
+    old = {k: os.environ.get(k) for k in ("MINTMAIL_QT_PYTHON", "HOME")}
+    try:
+        os.environ["MINTMAIL_QT_PYTHON"] = os.path.join(str(tmp_path), "nope")
+        os.environ["HOME"] = str(tmp_path)
+        assert E._qt_python() == ""                                          # aucun venv : pas de relance, repli sur GTK
+    finally:
+        for k, v in old.items():
+            (os.environ.__setitem__(k, v) if v is not None else os.environ.pop(k, None))

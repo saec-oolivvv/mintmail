@@ -107,7 +107,7 @@ Section: mail
 Priority: optional
 Architecture: all
 Depends: python3 (>= 3.9), python3-gi, gir1.2-gtk-3.0, gir1.2-webkit2-4.1 | gir1.2-webkit2-4.0, openssl
-Recommends: python3-keyring, libnotify-bin, pkexec | policykit-1
+Recommends: python3-pyside6.qtwidgets, python3-pyside6.qtwebenginewidgets, python3-keyring, libnotify-bin, pkexec | policykit-1
 Installed-Size: $SIZE
 Maintainer: SAEC <contact@saec.me>
 Homepage: https://saec.me
