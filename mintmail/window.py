@@ -947,6 +947,8 @@ class MainWindow(UpdateMixin, ExtrasMixin, OfflineMixin, ListMixin, AIMixin, Fol
             reader.show_message(m, True)
         elif act == "move_menu":
             self.build_move_menu(msgs).popup_at_widget(reader.move_btn, Gdk.Gravity.SOUTH_WEST, Gdk.Gravity.NORTH_WEST, None)
+        elif act in ("not_spam", "not_spam_domain") and m:
+            self.not_spam(m, act == "not_spam_domain")
         elif act == "spam_sender" and m:
             self.spam_sender(m)
         elif act == "spam_domain" and m:
@@ -1318,9 +1320,9 @@ class MainWindow(UpdateMixin, ExtrasMixin, OfflineMixin, ListMixin, AIMixin, Fol
                                **({"unread": False} if dest in ("trash", "spam") else {}))
         self._bg_move(msgs, dest)
 
-    def _bg_move(self, msgs, dest):
+    def _bg_move(self, msgs, dest, notjunk=False):
         self._pending += 1
-        op_ids = self.op_enqueue("move", msgs, dest=dest)      # enregistré d'abord : rien n'est perdu si le réseau tombe
+        op_ids = self.op_enqueue("move", msgs, dest=dest, **({"notjunk": True} if notjunk else {}))      # enregistré d'abord : rien n'est perdu si le réseau tombe
 
         def work():
             ops = [o for o in self.cache.ops_pending() if o["id"] in op_ids]
@@ -1437,6 +1439,7 @@ class MainWindow(UpdateMixin, ExtrasMixin, OfflineMixin, ListMixin, AIMixin, Fol
                 (tr("Transférer"), lambda: self.forward(m)),
                 (tr("Archiver"), lambda: self.move_messages(self.selected_msgs() or [m], "archive")),
                 (tr("Supprimer"), lambda: self.move_messages(self.selected_msgs() or [m], "trash")),
+                *([(tr("✔ Ce n'est pas du spam — ") + who, lambda: self.not_spam(m))] if m.folder == "spam" else []),
                 (tr("Signaler comme spam (ce message)"), lambda: self.move_messages(self.selected_msgs() or [m], "spam")),
                 (tr("Mettre l'expéditeur en spam — ") + who, lambda: self.spam_sender(m)),
                 (tr("Mettre le domaine en spam — ") + dom, lambda: self.spam_sender(m, True)),

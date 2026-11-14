@@ -180,6 +180,10 @@ class AIMixin:
             self.block_sender(msg)
         elif act == "spam":
             self.move_messages([msg], "spam")
+        elif act == "not_spam":
+            self.not_spam(msg)
+        elif act == "not_spam_file":
+            self.not_spam(msg, folder=payload)
         elif act == "enable_ai":
             self.show_settings("ai")
         elif act == "quick_expand":
@@ -334,6 +338,12 @@ class AIMixin:
         sug, who = ana.get("folder") or "", msg.sender_email
         key = who.lower()
         items = []
+        if msg.folder == "spam":                                    # faux positif probable : l'IA propose de le sortir du Spam
+            suspect = bool(ana.get("suspicious"))
+            items.append((tr("✨ Ce n'est pas du spam (remettre en boîte de réception)") if not suspect
+                          else tr("✔ Ce n'est pas du spam (malgré l'avis de l'IA)"), lambda: self.not_spam(msg)))
+            if ana.get("folder") and not suspect:
+                items.append((tr("✨ Pas du spam, ranger dans « %s »") % ana["folder"], lambda: self.not_spam(msg, folder=ana["folder"])))
         habit = "" if sug else (self.cache.learn_best(msg.account, who) or "")      # ce que l'utilisateur fait déjà
         if habit:
             sug = habit
@@ -473,6 +483,8 @@ class AIMixin:
 
     def _resolve(self, a):
         q = a.get("query", "")
+        if a["type"] == "not_spam":
+            return self.cache.query("spam", self.account, search=q, limit=500) if q else [x for x in self.selected_msgs() if x.folder == "spam"]
         if q:
             return self.cache.query("inbox", self.account, search=q, limit=500)
         sel = self.selected_msgs()
@@ -483,13 +495,15 @@ class AIMixin:
     def _plan_items(self, plan):
         items = []
         for a in plan["actions"]:
-            msgs = self._resolve(a) if a["type"] in ("archive", "trash", "spam", "mark_read", "mark_unread", "star",
+            msgs = self._resolve(a) if a["type"] in ("archive", "trash", "spam", "not_spam", "mark_read", "mark_unread", "star",
                                                      "pin", "snooze", "move", "classify") else None
             if msgs is not None and not msgs:
                 items.append((tr("%s — aucun message concerné") % describe_action(a), lambda: None))
                 continue
-            items.append((describe_action(a, None if msgs is None else len(msgs)),
-                          lambda a=a, msgs=msgs: self.exec_action(a, msgs)))
+            label = describe_action(a, None if msgs is None else len(msgs))
+            if a["type"] == "not_spam":
+                label = tr("Ce n'est pas du spam (retour en boîte de réception)") + (" (%d)" % len(msgs) if msgs else "")
+            items.append((label, lambda a=a, msgs=msgs: self.exec_action(a, msgs)))
         return items
 
     def exec_action(self, a, msgs=None):
@@ -498,6 +512,9 @@ class AIMixin:
             self.search_entry.set_text(a["query"])
         elif t in ("archive", "trash", "spam"):
             self.move_messages(msgs, t)
+        elif t == "not_spam":
+            for m in {x.sender_email.lower(): x for x in msgs}.values():      # un message par expéditeur : tout son courrier du Spam suit
+                self.not_spam(m)
         elif t == "move":
             aid = msgs[0].account if msgs else self._default_account()
             self.ensure_folder(aid, a["folder"], lambda e: self.move_messages(msgs, dest_of(e), label=tr("déplacé vers « %s »") % e["path"]))

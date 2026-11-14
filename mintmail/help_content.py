@@ -257,6 +257,16 @@ SECTIONS: List[Dict] = [
          "Tous les messages concernés sont déplacés aussitôt, et les prochains aussi (spam → Spam, bloqué → Corbeille).\n"
          "• Touche B : menu Bloquer. Débloquer : menu ⋯ du lecteur ou Paramètres → Filtres & blocage. Un bandeau Annuler reste disponible.\n"
          "• Les listes (bloqués, spam) se gèrent dans Paramètres → Filtres & blocage et se synchronisent entre vos machines."),
+        ("Ce n'est pas du spam",
+         "Un bon message est tombé dans Spam ? Ouvrez-le (dossier Spam) :\n"
+         "• Bouton « ✔ Pas du spam » dans le lecteur (ou menu ⋯, clic droit, Spam ▾, palette Ctrl+K) : le message retourne en boîte de réception, "
+         "ainsi que TOUS les messages du dossier Spam envoyés par la même adresse (variante : tout le domaine). Un bandeau Annuler reste disponible.\n"
+         "• Le serveur est prévenu : le message perd son marquage « indésirable » ($Junk) et reçoit « non-spam » ($NotJunk), puis quitte le dossier Spam "
+         "(sur Gmail, il perd l'étiquette Spam). Hors ligne, l'action est conservée et envoyée au retour du réseau.\n"
+         "• L'expéditeur sort de la liste « envoyés en spam » : ses prochains messages ne sont plus reclassés dans Spam.\n"
+         "• ✨ L'IA vous le suggère : dans le dossier Spam, quand elle juge un message légitime, la carte de résumé propose « Ce n'est pas du spam » "
+         "et, si un dossier convient, « Pas du spam, ranger dans … » (tous les messages de l'expéditeur y vont alors). Elle apparaît aussi dans le clic droit, "
+         "et vous pouvez écrire à l'assistant : « ce n'est pas du spam »."),
         ("Règles automatiques",
          "Paramètres → Filtres & blocage → Règles : « Si l'expéditeur / l'objet / le destinataire contient … alors » archiver, supprimer, spam, "
          "marquer lu, favori, épingler, ou ranger dans le dossier … Elles s'appliquent aux nouveaux messages (et « Appliquer maintenant » à la boîte). "

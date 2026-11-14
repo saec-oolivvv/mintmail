@@ -28,7 +28,7 @@ REWRITE = {
 }
 RULE_FIELDS = {"from", "subject", "to"}
 RULE_ACTIONS = {"archive", "trash", "spam", "read", "star", "pin", "move"}
-QUERY_ACTIONS = {"search", "archive", "trash", "spam", "mark_read", "mark_unread", "star", "pin", "snooze", "move", "classify"}
+QUERY_ACTIONS = {"search", "archive", "trash", "spam", "not_spam", "mark_read", "mark_unread", "star", "pin", "snooze", "move", "classify"}
 SETTINGS_PAGES = {"accounts", "sig", "look", "ai", "p2p", "gestures", "filters", "templates", "keys", "help"}
 SUSPECT_WORDS = ("vérifier votre compte", "verify your account", "mot de passe expir", "password expire",
                  "gagné", "you have won", "bitcoin", "crypto", "colis en attente", "virement", "urgent action",
@@ -489,7 +489,7 @@ class AIEngine:
         system = (
             "Tu es l'assistant intégré d'un client de messagerie. Réponds UNIQUEMENT par un objet JSON "
             "{\"reply\": texte court en %s, \"actions\": [...]}. Actions possibles : "
-            "{type:search|archive|trash|spam|mark_read|mark_unread|star|pin, query}, {type:move, query, folder:nom du dossier (créé s'il n'existe pas)}, {type:classify, query} (ranger / trier / classer des messages par thème : l'application demande alors un classement détaillé à l'IA et te le fait valider), {type:create_folder, name, parent optionnel}, {type:snooze, query, until:3h|tomorrow|weekend|nextweek}, "
+            "{type:search|archive|trash|spam|not_spam|mark_read|mark_unread|star|pin, query} (not_spam : « ce n'est pas du spam » ; query cherche dans le dossier Spam), {type:move, query, folder:nom du dossier (créé s'il n'existe pas)}, {type:classify, query} (ranger / trier / classer des messages par thème : l'application demande alors un classement détaillé à l'IA et te le fait valider), {type:create_folder, name, parent optionnel}, {type:snooze, query, until:3h|tomorrow|weekend|nextweek}, "
             "{type:block_sender|spam_sender, email ou target:\"selected\"}, {type:compose, to, subject, body}, "
             "{type:create_rule, field:from|subject|to, text, action:archive|trash|spam|read|star|pin}, "
             "{type:open_settings, page}, {type:digest}. %s N'invente pas d'adresses. Si la demande est une question, "

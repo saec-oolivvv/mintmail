@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.15.0
+- Nouveau « Ce n'est pas du spam » (dossier Spam) : bouton « ✔ Pas du spam » dans le lecteur, menus ⋯ / clic droit / Spam ▾ / palette Ctrl+K — le message ET tous ceux du même expéditeur (variante : tout le domaine) retournent en boîte de réception, avec Annuler
+- Propagation au serveur : marqueur $Junk retiré et $NotJunk posé, puis sortie du dossier Spam (sur Gmail, le message perd l'étiquette Spam) ; conservé hors ligne et envoyé au retour du réseau ; l'expéditeur sort de la liste « envoyés en spam »
+- L'IA le suggère : dans le dossier Spam, un message jugé légitime reçoit « Ce n'est pas du spam » et « Pas du spam, ranger dans … » (carte de résumé et clic droit) ; l'assistant comprend « ce n'est pas du spam » ; aide FR/EN et traductions nl/de/es
+
 ## 1.14.2
 - Page Paramètres → Mises à jour : bouton « Relancer maintenant » après l'installation (comme sur le bandeau) ; l'état affiche « installé » tant que l'ancienne version tourne encore
 - Recherche de mise à jour toutes les heures (et à chaque démarrage) au lieu de toutes les 6 heures

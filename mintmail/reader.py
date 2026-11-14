@@ -227,6 +227,13 @@ class Reader(Gtk.Stack):
         self.block_btn.set_tooltip_text(tr("Bloquer l'adresse ou tout le domaine"))
         self.block_btn.get_style_context().add_class("pill")
         self.block_btn.connect("clicked", lambda *_: self.emit("action", "menu_block"))
+        self.notspam_btn = Gtk.Button(label=tr("✔ Pas du spam"))
+        self.notspam_btn.set_tooltip_text(tr("Ce n'est pas du spam : remet ce message et ceux du même expéditeur en boîte de réception"))
+        self.notspam_btn.get_style_context().add_class("pill")
+        self.notspam_btn.get_style_context().add_class("suggested-action")
+        self.notspam_btn.connect("clicked", lambda *_: self.emit("action", "not_spam"))
+        self.notspam_btn.set_no_show_all(True)                  # visible seulement pour un message du dossier Spam
+        tb.pack_start(self.notspam_btn, False, False, 2)
         tb.pack_start(self.spam_btn, False, False, 2)
         tb.pack_start(self.block_btn, False, False, 2)
         self.move_btn = icon_button("folder-open-symbolic", tr("Déplacer vers un dossier (V)"), relief=False)
@@ -252,6 +259,7 @@ class Reader(Gtk.Stack):
         for entry in ((tr("Répondre à tous"), "reply_all"), (tr("Transférer"), "forward"), (tr("Favori"), "star"),
                       (tr("Épingler"), "pin"), None,
                       (tr("Marquer comme non lu (U)"), "unread"), (tr("Afficher les images distantes"), "images"), None,
+                      (tr("✔ Ce n'est pas du spam"), "not_spam"), (tr("✔ Ce n'est pas du spam (tout son domaine)"), "not_spam_domain"),
                       (tr("Signaler comme spam (!)"), "spam"), (tr("Mettre l'expéditeur en spam"), "spam_sender"),
                       (tr("Mettre son domaine en spam"), "spam_domain"),
                       (tr("Bloquer l'expéditeur"), "block"), (tr("Bloquer son domaine"), "block_domain"),
@@ -426,7 +434,20 @@ class Reader(Gtk.Stack):
         self.ai_answer.set_selectable(True)
         self.ai_answer.get_style_context().add_class("ai-text")
         card.pack_start(self.ai_answer, False, False, 0)
-        card.show_all()                 # tous les enfants sont visibles ; seul le conteneur est affiché / masqué
+        self.ai_sug = Gtk.Box(spacing=6)                       # suggestions d'action (Spam : « ce n'est pas du spam », rangement)
+        self.ai_sug_lbl = Gtk.Label(xalign=0)
+        self.ai_sug_lbl.set_line_wrap(True)
+        self.ai_sug_lbl.get_style_context().add_class("ai-text")
+        self.ai_sug_btns = Gtk.FlowBox()
+        self.ai_sug_btns.set_selection_mode(Gtk.SelectionMode.NONE)
+        self.ai_sug_btns.set_max_children_per_line(3)
+        sug_col = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4)
+        sug_col.pack_start(self.ai_sug_lbl, False, False, 0)
+        sug_col.pack_start(self.ai_sug_btns, False, False, 0)
+        self.ai_sug.pack_start(sug_col, True, True, 0)
+        card.pack_start(self.ai_sug, False, False, 0)
+        card.show_all()
+        self.ai_sug.hide()                 # tous les enfants sont visibles ; seul le conteneur est affiché / masqué
         self.ai_warn.hide()
         self.ai_answer.hide()
         card.hide()
@@ -441,6 +462,27 @@ class Reader(Gtk.Stack):
         self.ai_answer.set_text("")
         self.ai_answer.hide()
         self.ai_title.set_text(tr("✨ RÉSUMÉ"))
+        for ch in self.ai_sug_btns.get_children():
+            self.ai_sug_btns.remove(ch)
+        self.ai_sug.hide()
+
+    def ai_spam_suggestion(self, res):
+        """Dans le dossier Spam, l'IA juge le message légitime : propose « Ce n'est pas du spam » (et un dossier de rangement)."""
+        m = self.msg
+        if m is None or m.folder != "spam" or res.get("suspicious") or res.get("local") or res.get("error"):
+            return
+        self.ai_sug_lbl.set_text(tr("✨ Ce message semble légitime : il n'a probablement pas sa place dans le Spam."))
+        btns = [(tr("✔ Ce n'est pas du spam"), "not_spam", "")]
+        folder = res.get("folder") or ""
+        if folder:
+            btns.append((tr("✔ Pas du spam, ranger dans « %s »") % folder, "not_spam_file", folder))
+        for label, act, payload in btns:
+            b = Gtk.Button(label=label)
+            b.get_style_context().add_class("pill")
+            b.connect("clicked", lambda _b, a=act, p=payload: self.emit("ai-action", a, p))
+            self.ai_sug_btns.add(b)
+        self.ai_sug_btns.show_all()
+        self.ai_sug.show_all()
 
     def _ai_show_card(self):
         self.ai_warn.set_visible(bool(self.ai_warn.get_text()))
@@ -487,6 +529,7 @@ class Reader(Gtk.Stack):
                 " : " + res["why"] if res.get("why") else ""))
         if error:
             self.ai_answer.set_text(tr("IA indisponible : %s") % error)
+        self.ai_spam_suggestion(res)
         self._ai_show_card()
 
     def is_open(self):
@@ -524,6 +567,7 @@ class Reader(Gtk.Stack):
 
     def show_message(self, msg, load_images=None):
         self.msg = msg
+        self.notspam_btn.set_visible(msg.folder == "spam")
         if load_images is not None:
             self.load_images = load_images
         self.subject.set_text(msg.subject)

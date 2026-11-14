@@ -683,8 +683,11 @@ class IMAPBackend:
     def move(self, msg, dest):
         return self.move_many([msg], dest)
 
-    def move_many(self, msgs, dest):
-        """Déplace plusieurs messages en une seule opération."""
+    def move_many(self, msgs, dest, notjunk=False):
+        """Déplace plusieurs messages en une seule opération.
+        notjunk=True (« Ce n'est pas du spam ») : avant de sortir du dossier Spam, le message perd $Junk et reçoit $NotJunk, que les
+        filtres du serveur (Dovecot, Thunderbird, Apple Mail…) lisent comme « non-spam » ; le déplacement hors du dossier fait le reste
+        (sur Gmail, le message quitte le libellé Spam)."""
         by = {}
         for m in msgs:
             if m.uid > 0 and m.real_folder:
@@ -700,6 +703,12 @@ class IMAPBackend:
             for real, uids in by.items():
                 self._select(conn, real)
                 ids = ",".join(str(u) for u in uids)
+                if notjunk:
+                    for op, flag in (("-FLAGS", "$Junk"), ("+FLAGS", "$NotJunk")):
+                        try:
+                            imap.uid("STORE", ids, op, "(%s)" % flag)
+                        except Exception:               # serveur sans mots-clés libres : le déplacement suffit
+                            pass
                 if target and target != real:
                     if "MOVE" in getattr(imap, "capabilities", ()):
                         imap.uid("MOVE", ids, _q(target))
@@ -979,7 +988,7 @@ class DemoBackend:
     def move(self, msg, dest):
         return None
 
-    def move_many(self, msgs, dest):
+    def move_many(self, msgs, dest, notjunk=False):
         return None
 
     def search_server(self, text, logicals, known_by_folder, limit=40):

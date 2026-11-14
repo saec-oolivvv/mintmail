@@ -10,6 +10,7 @@ gi.require_version("Gdk", "3.0")
 from gi.repository import Gtk, Gdk, GLib
 
 from .util import format_full
+from .folders import dest_of
 from .widgets import MessageRow, row_at_event
 
 PAGE = 100
@@ -201,6 +202,7 @@ class ListMixin:
                   lambda: self.set_flag(self.selected_msgs(), "starred", not m.starred)),
                  (tr("Désépingler") if m.pinned else tr("Épingler"),
                   lambda: self.set_flag(self.selected_msgs(), "pinned", not m.pinned)), None,
+                 *([(tr("✔ Ce n'est pas du spam"), lambda: self.not_spam(m))] if m.folder == "spam" else []),
                  (tr("Signaler comme spam"), lambda: self.move_messages(self.selected_msgs(), "spam")),
                  (tr("Mettre l'expéditeur en spam"), lambda: self.spam_sender(m)),
                  (tr("Bloquer l'expéditeur"), lambda: self.block_sender(m)),
@@ -294,7 +296,9 @@ class ListMixin:
         who = msg.sender_email
         dom = "@" + who.split("@")[-1]
         if kind == "spam":
-            return [(tr("Signaler ce message comme spam"), lambda: self.move_messages([msg], "spam")),
+            ns = [(tr("✔ Ce n'est pas du spam : %s") % who, lambda: self.not_spam(msg)),
+                  (tr("✔ Ce n'est pas du spam : tout le domaine %s") % dom, lambda: self.not_spam(msg, True))] if msg.folder == "spam" else []
+            return ns + [(tr("Signaler ce message comme spam"), lambda: self.move_messages([msg], "spam")),
                     (tr("Mettre %s en spam") % who, lambda: self.spam_sender(msg)),
                     (tr("Mettre tout le domaine %s en spam") % dom, lambda: self.spam_sender(msg, True))]
         if kind == "block":
@@ -422,7 +426,7 @@ class ListMixin:
             setattr(self.reader.msg, field, value)
             self.reader.refresh_flags()
 
-    def move_messages(self, msgs, dest, label=None):
+    def move_messages(self, msgs, dest, label=None, notjunk=False):
         if not msgs:
             return
         if dest == "trash" and all(m.folder == "trash" for m in msgs):
@@ -465,7 +469,7 @@ class ListMixin:
                 return
             state["done"] = True
             self._pending -= 1
-            self._bg_move(msgs, dest)
+            self._bg_move(msgs, dest, notjunk)
         n = len(msgs)
         verb = label or FOLDER_VERBS.get(dest, "déplacé")
         self.toast.popup(tr("%d message%s %s%s") % (n, "s" if n > 1 else "", verb, "s" if n > 1 and not label else ""),
@@ -520,6 +524,34 @@ class ListMixin:
         else:
             self.toast.popup(label, timeout=4)
         self.status.set_text(label)
+
+    def not_spam(self, msg, domain=False, folder=None):
+        """« Ce n'est pas du spam » : ce message ET tous ceux du même expéditeur (ou du même domaine) qui sont dans le Spam du même compte
+        retournent en boîte de réception — ou dans `folder` (suggestion de l'IA). Le serveur est prévenu (voir backend.move_many) ;
+        l'expéditeur sort de la liste « envoyés en spam » pour que ses prochains messages ne soient plus reclassés."""
+        key = self._key(msg, domain)
+        em, dom = self._key(msg), self._key(msg, True)
+        old = list(self.config["spam_senders"])
+        self.config["spam_senders"] = [x for x in old if x.lower() not in (em, dom)]
+        if self.config["spam_senders"] != old:
+            self.config.save()
+        msgs = [x for x in self.cache.by_sender(key, ("spam",))
+                if x.account == msg.account and self._key(x, domain) == key]
+        if msg.folder != "inbox" and msg.id not in {x.id for x in msgs}:
+            msgs.append(msg)
+        if folder:
+            self.ensure_folder(msg.account, folder, lambda e: self._not_spam_move(msgs, dest_of(e), tr("rangé dans « %s » (pas du spam)") % e["path"]))
+        else:
+            self._not_spam_move(msgs, "inbox", tr("remis en boîte de réception (pas du spam)"))
+
+    def _not_spam_move(self, msgs, dest, label):
+        for x in msgs:                                               # la pastille rouge « spam » de la liste ne doit plus rester
+            tri, ana = self.cache.ai_get(x.id, "triage"), self.cache.ai_get(x.id, "analysis")
+            if tri and tri.get("spam"):
+                self.cache.ai_set(x.id, "triage", dict(tri, spam=False))
+            if ana and ana.get("suspicious"):
+                self.cache.ai_set(x.id, "analysis", dict(ana, suspicious=False))
+        self.move_messages(msgs, dest, label=label, notjunk=True)
 
     def spam_sender(self, msg, domain=False):
         self._filter_sender(self._key(msg, domain), "spam_senders", msg)

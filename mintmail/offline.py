@@ -31,7 +31,10 @@ class OfflineMixin:
         p = op["payload"]
         items = [SimpleNamespace(id=i["id"], uid=i["uid"], real_folder=i["real"], account=op["account"]) for i in p["items"]]
         if op["kind"] == "move":
-            be.move_many(items, p["dest"])
+            if p.get("notjunk"):
+                be.move_many(items, p["dest"], notjunk=True)      # « Ce n'est pas du spam » (voir backend.move_many)
+            else:
+                be.move_many(items, p["dest"])
         elif op["kind"] == "flags":
             extra = {}
             if "pinned" in p:                                   # anciennes actions en file (sans épingle) : appel inchangé

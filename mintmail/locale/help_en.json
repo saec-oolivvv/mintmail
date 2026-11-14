@@ -201,6 +201,10 @@
      "• Report as spam (!): moves the message to Spam.\n• Spam ▾ / Block ▾ (reader) or right-click menu: choose the message alone, the sender's address, or the whole domain (@example.com). All the messages concerned are moved right away, and the next ones too (spam → Spam, blocked → Trash).\n• B key: Block menu. Unblock: reader ⋯ menu or Settings → Filters & blocking. An Undo banner stays available.\n• The lists (blocked, spam) are managed in Settings → Filters & blocking and sync between your machines."
     ],
     [
+     "Not spam",
+     "A good message ended up in Spam? Open it (Spam folder):\n• “✔ Not spam” button in the reader (or the ⋯ menu, right-click, Spam ▾, Ctrl+K palette): the message goes back to the inbox, along with ALL the messages in the Spam folder from the same address (variant: the whole domain). An Undo banner stays available.\n• The server is told: the message loses its junk marking ($Junk) and gets “not junk” ($NotJunk), then leaves the Spam folder (on Gmail, it loses the Spam label). Offline, the action is kept and sent when the network is back.\n• The sender leaves the “sent to spam” list: their next messages are no longer filed in Spam.\n• ✨ The AI suggests it: in the Spam folder, when it judges a message legitimate, the summary card offers “Not spam” and, if a folder fits, “Not spam, file in …” (all the sender's messages go there). It also appears in the right-click menu, and you can tell the assistant: “this is not spam”."
+    ],
+    [
      "Automatic rules",
      "Settings → Filters & blocking → Rules: “If the sender / subject / recipient contains … then” archive, delete, spam, mark read, favorite, pin, or file into the folder … They apply to new messages (and “Apply now” to the inbox). A rule can also come from the right-click menu (“Always file…”) or from the assistant."
     ],
