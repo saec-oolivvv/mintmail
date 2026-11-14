@@ -12,8 +12,7 @@ import time
 from . import __version__
 from .store import CONFIG_DIR, DATA_DIR
 
-MODULES = ("models", "util", "store", "backend", "syncdata", "p2p", "ai_service", "ai_engine", "style", "widgets",
-           "reader", "compose", "settings_extra", "settings", "assistant", "listing", "folders", "ai_features", "window", "app")
+MODULES = ("models", "util", "store", "backend", "syncdata", "p2p", "ai_service", "ai_engine", "themes", "netutil", "updater", "oauth", "i18n", "log")
 
 
 def _run(cmd, timeout=5):

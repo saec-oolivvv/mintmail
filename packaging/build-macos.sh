@@ -43,6 +43,10 @@ for m in Qt3DAnimation Qt3DCore Qt3DExtras Qt3DInput Qt3DLogic Qt3DRender QtBlue
     --hidden-import PySide6.QtWebEngineCore --hidden-import PySide6.QtWebEngineWidgets $EXC \
     --distpath "$WORK/dist" --workpath "$WORK/build" --specpath "$WORK" packaging/macos_main.py
 APP="$WORK/dist/MintMail.app"
+# fichiers de données du paquet (VERSION, langues, icônes) : sans VERSION l'application se croit en 1.0.0 (et proposerait sans fin une mise à jour)
+PKG="$APP/Contents/Frameworks/mintmail"; mkdir -p "$PKG"
+for D in VERSION locale icons; do [ -e "$PKG/$D" ] || cp -R "$SRC/mintmail/$D" "$PKG/$D"; done
+[ -f "$PKG/VERSION" ] || { echo "Échec : VERSION absent de l'application."; exit 1; }
 # numéro de version visible dans le Finder (« Lire les informations ») : PyInstaller met « 0.0.0 » par défaut
 for KEY in CFBundleShortVersionString CFBundleVersion; do
     /usr/libexec/PlistBuddy -c "Set :$KEY $VER" "$APP/Contents/Info.plist" 2>/dev/null || /usr/libexec/PlistBuddy -c "Add :$KEY string $VER" "$APP/Contents/Info.plist"

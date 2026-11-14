@@ -109,3 +109,28 @@ def test_backend_rereads_the_password_at_every_connection_instead_of_freezing_an
         assert seen == [("x@y.z", "secret")]
     finally:
         backend.imaplib.IMAP4_SSL = old
+
+
+def test_mac_password_is_recovered_from_the_old_keychain_entry_and_copied_to_the_new_one():
+    from mintmail import store
+    store._legacy_tried.discard("accL")
+
+    class R:
+        def __init__(self, rc=0, err=""):
+            self.returncode, self.stdout, self.stderr = rc, "", err
+    db = {("mintmail", "accL"): "ancien-secret"}
+    written = []
+
+    def run(cmd, **kw):
+        if cmd[:2] == ["/usr/bin/security", "-i"]:
+            written.append(kw["input"])
+            db[("MintMail", "accL")] = bytes.fromhex(kw["input"].split("-X ")[1].split()[0]).decode()
+            return R(0)
+        acc, svc = cmd[cmd.index("-a") + 1], cmd[cmd.index("-s") + 1]
+        v = db.get((svc, acc))
+        return R(0, 'password: "%s"\n' % v) if v else R(44, "not found")
+    assert store.mac_keychain("get_password", "mintmail", "accL", run=run) == "ancien-secret"
+    assert written and db[("MintMail", "accL")] == "ancien-secret"                       # copié dans la nouvelle rubrique
+    assert store.mac_keychain("get_password", "mintmail", "accL", run=run) == "ancien-secret"
+    store._legacy_tried.add("accM")
+    assert store.mac_keychain("get_password", "mintmail", "accM", run=run) is None       # l'ancienne rubrique n'est demandée qu'une fois par compte

@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.35.11
+- Mac : mots de passe de l'ancienne rubrique du trousseau récupérés une fois par compte (après la 1.35.6 tous semblaient absents, d'où l'échec IMAP) ; VERSION, langues et icônes toujours embarqués dans l'application (elle se déclarait en 1.0.0) ; diagnostic : liste de modules mise à jour
+
 ## 1.35.10
 - Mac : connexion IMAP/SMTP refusée (« invalid credentials ») car le mot de passe n'était lu qu'une fois ; un trousseau lent figeait un mot de passe vide envoyé au serveur. Il est relu à chaque connexion, un mot de passe vide n'est jamais envoyé (message clair, nouvel essai automatique)
 

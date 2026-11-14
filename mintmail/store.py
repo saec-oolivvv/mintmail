@@ -163,6 +163,8 @@ class Config:
             self.data.setdefault("passwords", {})[account_id] = pw
 
 
+LEGACY_SERVICE = "mintmail"
+_legacy_tried = set()
 MAC_SERVICE = "MintMail"       # service du trousseau macOS : DISTINCT de l'ancien « mintmail » (python-keyring), dont l'autorisation est liée à un autre programme
 
 
@@ -194,9 +196,16 @@ def mac_keychain(op, *args, run=subprocess.run):
     try:
         if op == "get_password":
             r = run(["/usr/bin/security", "find-generic-password", "-a", account, "-s", MAC_SERVICE, "-g"], capture_output=True, text=True, timeout=60)
-            if r.returncode != 0:
-                return None
-            return _mac_parse_secret(r.stderr or "")
+            if r.returncode == 0:
+                return _mac_parse_secret(r.stderr or "")
+            if len(args) > 1 and account not in _legacy_tried:               # ancienne rubrique « mintmail » (versions ≤ 1.35.5) : récupérée une fois, puis réécrite dans la nouvelle
+                _legacy_tried.add(account)
+                r = run(["/usr/bin/security", "find-generic-password", "-a", account, "-s", LEGACY_SERVICE, "-g"], capture_output=True, text=True, timeout=180)
+                pw = _mac_parse_secret(r.stderr or "") if r.returncode == 0 else None
+                if pw:
+                    mac_keychain("set_password", args[0], account, pw, run=run)
+                return pw
+            return None
         if op == "set_password":
             pw = str(args[2])
             if "\0" in pw:
