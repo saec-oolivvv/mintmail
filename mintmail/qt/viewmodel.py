@@ -79,6 +79,7 @@ class Engine(OfflineMixin):
     def __init__(self, config, cache):
         self.config, self.cache = config, cache
         self._backends: Dict[str, object] = {}
+        self.folder_unread: Dict[tuple, int] = {}              # (compte, dossier) → non lus annoncés par le serveur
 
     def accounts(self):
         return accounts_of(self.config)
@@ -169,6 +170,22 @@ class Engine(OfflineMixin):
     def move_targets(self, aid):
         """Destinations proposées pour déplacer un message de ce compte : [(destination, libellé)]."""
         return [(dest_of(e), e.get("label") or e["name"]) for e in self.folder_entries(aid) if e.get("selectable", True)]
+
+    def refresh_folder_counts(self):
+        """Non lus de chaque dossier de rangement, relevés sur le serveur (réseau : en fond). Retourne True si un chiffre a changé."""
+        changed = False
+        for a in self.accounts():
+            if a.get("demo"):
+                continue
+            names = [e["name"] for e in self.folder_entries(a["id"]) if e.get("selectable", True)][:60]
+            try:
+                status = self.backend(a["id"]).folder_status(names)
+            except Exception:
+                continue
+            for name, (_n, unseen) in status.items():
+                if self.folder_unread.get((a["id"], name)) != unseen:
+                    self.folder_unread[(a["id"], name)], changed = unseen, True
+        return changed
 
     def refresh_folders(self):
         """Relit l'arborescence sur le serveur (fond). Retourne True si elle a changé."""

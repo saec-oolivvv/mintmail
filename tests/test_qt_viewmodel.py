@@ -818,3 +818,86 @@ def test_update_install_flow_progress_success_and_every_failure_path():
     assert st.banner["state"] == "done" and st.chip == "" and st.start_install() == "" and any("installé" in l for l in st.status_lines())
     assert UP.restart_command()[1:] == ["-m", "mintmail", "--qt"]
     assert "disponible" in _up()[0].key_line() or "prête" in _up()[0].key_line()
+
+
+# ------------------------------------------------------------------ arbre des dossiers repliable
+from mintmail.qt import navtree as NT
+
+
+def _tree_eng(multi=False):
+    ent = lambda name, label, path, depth, special="", sel=True: {"name": name, "label": label, "path": path, "depth": depth, "special": special, "selectable": sel}
+    tree = [ent("INBOX", "Boîte", "Boîte", 0, "inbox"), ent("Clients", "Clients", "Clients", 0), ent("Clients/Alpha", "Alpha", "Clients › Alpha", 1),
+            ent("Clients/Alpha/2026", "2026", "Clients › Alpha › 2026", 2), ent("Clients/Beta", "Beta", "Clients › Beta", 1),
+            ent("Perso", "Perso", "Perso", 0), ent("[Gmail]", "[Gmail]", "[Gmail]", 0, sel=False), ent("[Gmail]/Tous", "Tous", "[Gmail] › Tous", 1)]
+    accs = [A] + ([{"id": "a2", "email": "b@x.be", "name": "Pro"}] if multi else [])
+    cfg = _CfgAU(accounts=accs, collapsed_folders=[], folders={a["id"]: tree for a in accs})
+    return V.Engine(cfg, Cache(os.path.join(tempfile.mkdtemp(), "c.db"))), cfg
+
+
+def test_nav_tree_is_collapsible_like_the_gtk_version_and_remembers_its_state():
+    eng, cfg = _tree_eng()
+    rows = NT.build(eng, cfg["collapsed_folders"])
+    assert [r["label"] for r in rows] == ["Clients", "Alpha", "2026", "Beta", "Perso", "[Gmail]", "Tous"]          # la Boîte de réception reste dans les vues
+    assert [r["depth"] for r in rows] == [0, 1, 2, 1, 0, 0, 1] and rows[0]["has_children"] and not rows[3]["has_children"]
+    assert rows[5]["selectable"] is False and rows[0]["toggle"] == "a1|Clients" and rows[3]["toggle"] == ""
+    assert NT.toggle(cfg, "a1|Clients") is True and cfg["collapsed_folders"] == ["a1|Clients"]
+    rows = NT.build(eng, cfg["collapsed_folders"])
+    assert [r["label"] for r in rows] == ["Clients", "Perso", "[Gmail]", "Tous"] and rows[0]["collapsed"]            # tout le sous-arbre disparaît
+    NT.toggle(cfg, "a1|Clients")
+    NT.toggle(cfg, "a1|Clients › Alpha")                                                                           # on peut ne replier qu'une branche
+    assert [r["label"] for r in NT.build(eng, cfg["collapsed_folders"])][:4] == ["Clients", "Alpha", "Beta", "Perso"]
+    assert NT.toggle(cfg, "a1|Clients › Alpha") is False and cfg["collapsed_folders"] == []
+
+
+def test_nav_tree_has_one_collapsible_section_per_account_and_unread_badges():
+    eng, cfg = _tree_eng(multi=True)
+    rows = NT.build(eng, [])
+    assert [r["kind"] for r in rows].count("account") == 2 and rows[0]["label"] == "A" and rows[0]["toggle"] == "acc:a1"
+    assert len([r for r in rows if r["kind"] == "folder"]) == 14
+    rows = NT.build(eng, ["acc:a2"])
+    assert [r["label"] for r in rows if r["kind"] == "account"] == ["A", "Pro"] and len([r for r in rows if r["kind"] == "folder"]) == 7
+    assert rows[-1]["kind"] == "account" and rows[-1]["collapsed"]
+    eng.folder_unread[("a1", "Clients/Beta")] = 3
+    eng.folder_unread[("a2", "Perso")] = 2
+    assert NT.unread_of(eng, next(r for r in rows if r["name"] == "Clients/Beta")) == 3
+    assert NT.account_unread(eng, rows[-1], rows) == 2 and NT.account_unread(eng, rows[0], rows) == 0
+    assert NT.unread_of(eng, rows[0]) == 0
+    eng1, _c = _tree_eng()
+    assert not any(r["kind"] == "account" for r in NT.build(eng1, []))                                              # un seul compte : pas de section
+
+
+def test_folder_counts_are_read_from_the_server_and_report_changes_only():
+    eng, cache, be = _eng()
+    be.folder_status = lambda names: {n: (5, 2 if n == "LTD" else 0) for n in names}
+    eng.config = {"accounts": [A], "folders": {"a1": [{"name": "INBOX", "selectable": True, "special": "inbox"}, {"name": "LTD", "selectable": True, "special": ""}]}}
+    assert eng.refresh_folder_counts() is True and eng.folder_unread[("a1", "LTD")] == 2
+    assert eng.refresh_folder_counts() is False
+    be.folder_status = lambda names: (_ for _ in ()).throw(RuntimeError("hors ligne"))
+    assert eng.refresh_folder_counts() is False and eng.folder_unread[("a1", "LTD")] == 2                        # hors ligne : on garde les derniers chiffres
+
+
+# ------------------------------------------------------------------ gestes de balayage
+from mintmail.qt import gestures as GS
+
+
+def test_swipe_thresholds_actions_and_touchpad_inversion_match_the_gtk_rules():
+    cfg = GS.settings({})
+    assert cfg == GS.DEFAULT_SWIPE
+    assert GS.pick(40, cfg) == (None, 0) and GS.pick(-89, cfg) == (None, 0)                      # trop court : rien
+    assert GS.pick(90, cfg) == ("archive", 1) and GS.pick(229, cfg) == ("archive", 1)
+    assert GS.pick(230, cfg) == ("trash", 2) and GS.pick(-100, cfg) == ("snooze", 1) and GS.pick(-300, cfg) == ("read", 2)
+    assert GS.pick(100, cfg, invert=True) == ("archive", 1)                                      # souris : jamais inversé
+    assert GS.pick(100, cfg, invert=True, wheel=True) == ("snooze", 1) and GS.pick(-300, cfg, invert=True, wheel=True) == ("trash", 2)
+    assert GS.pick(120, dict(cfg, right="none")) == (None, 0)
+    mine = GS.settings({"swipe": {"right": "star", "left_long": "bidon", "inconnu": "trash"}})
+    assert mine["right"] == "star" and mine["left_long"] == "read" and "inconnu" not in mine     # valeur ou clé inconnue : ignorée
+
+
+def test_swipe_effects_toggle_flags_and_target_the_right_things():
+    m = _m(1, unread=True)
+    assert GS.effect("archive", m, 5) == {"move": "archive"} and GS.effect("spam", m, 5) == {"move": "spam"} and GS.effect("trash", m, 5) == {"move": "trash"}
+    assert GS.effect("read", m, 5) == {"flag": ("unread", False)} and GS.effect("read", _m(2, unread=False), 5) == {"flag": ("unread", True)}
+    assert GS.effect("star", m, 5) == {"flag": ("starred", True)} and GS.effect("pin", _m(3, pinned=True), 5) == {"flag": ("pinned", False)}
+    assert GS.effect("snooze", m, 99.0) == {"snooze": 99.0} and GS.effect("block", _m(4, sender_email="A@B.be"), 5) == {"block": "a@b.be"}
+    assert GS.effect("none", m, 5) == {}
+    assert set(GS.DEFAULT_SWIPE.values()) <= set(GS.SWIPE_ACTIONS)

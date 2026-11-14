@@ -13,6 +13,8 @@ from ..style import ACCENTS, STYLES
 from . import accounts as A
 from . import assistant as AS
 from . import automation as AU
+from . import gestures as GS
+from .gestures import LAYOUTS
 from .. import __version__, updater
 
 
@@ -41,6 +43,7 @@ class SettingsDialog(QDialog):
         tabs.addTab(self._filters_tab(), tr("Filtres & blocage"))
         tabs.addTab(self._ai_tab(), "✨ IA")
         tabs.addTab(self._updates_tab(), tr("Mises à jour"))
+        tabs.addTab(self._gestures_tab(), tr("Gestes & disposition"))
         self.tabs = tabs
         close = QPushButton(tr("Fermer"))
         close.clicked.connect(self.accept)
@@ -54,7 +57,7 @@ class SettingsDialog(QDialog):
 
     def open_page(self, page):
         """Ouvre l'onglet demandé (par l'assistant ou « réglages de l'IA ») : accounts, look, filters ou ai."""
-        idx = {"accounts": 0, "look": 1, "appearance": 1, "filters": 2, "ai": 3, "updates": 4}.get(page)
+        idx = {"accounts": 0, "look": 1, "appearance": 1, "filters": 2, "ai": 3, "updates": 4, "gestures": 5, "layout": 5}.get(page)
         if idx is not None:
             self.tabs.setCurrentIndex(idx)
 
@@ -321,6 +324,40 @@ class SettingsDialog(QDialog):
         self._say(tr("Connecté ✔ — cliquez sur « Enregistrer »."))
 
     # ------------------------------------------------------------ apparence et messagerie
+    def _gestures_tab(self):
+        w = QWidget()
+        form = QFormLayout(w)
+        intro = QLabel(tr("Faites glisser un message vers la droite ou la gauche (souris, pavé tactile à deux doigts, écran tactile). Un glissement court déclenche l'action principale, un glissement long l'action secondaire."))
+        intro.setWordWrap(True)
+        intro.setObjectName("dim")
+        form.addRow(intro)
+        lay = QComboBox()
+        for k, label in LAYOUTS:
+            lay.addItem(label, k)
+        lay.setCurrentIndex(max(0, lay.findData(self.cfg.get("layout"))))
+        lay.currentIndexChanged.connect(lambda _i: self.main.set_layout(lay.currentData()))
+        form.addRow(tr("Disposition"), lay)
+        cur = GS.settings(self.cfg)
+        for key, label in (("right", tr("Glisser vers la droite")), ("right_long", tr("… jusqu'au bout (droite)")),
+                           ("left", tr("Glisser vers la gauche")), ("left_long", tr("… jusqu'au bout (gauche)"))):
+            c = QComboBox()
+            for k, v in GS.SWIPE_ACTIONS.items():
+                c.addItem(v[0], k)
+            c.setCurrentIndex(max(0, c.findData(cur[key])))
+            c.currentIndexChanged.connect(lambda _i, c=c, k=key: self._set_swipe(k, c.currentData()))
+            form.addRow(label, c)
+        for key, label in (("swipe_invert", tr("Inverser le sens au pavé tactile")), ("threads", tr("Regrouper en conversations"))):
+            sw = QCheckBox(label)
+            sw.setChecked(bool(self.cfg.get(key, key == "threads")))
+            sw.toggled.connect(lambda v, k=key: self._set(k, bool(v)))
+            form.addRow("", sw)
+        return w
+
+    def _set_swipe(self, key, value):
+        sw = dict(GS.settings(self.cfg))
+        sw[key] = value
+        self._set("swipe", sw)
+
     def _look_tab(self):
         w = QWidget()
         form = QFormLayout(w)

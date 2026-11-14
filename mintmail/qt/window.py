@@ -28,7 +28,10 @@ from .updating import UpdateState, restart_command
 from .ui_updates import UpdateBanner
 from .ui_assistant import AssistantPanel
 from .ui_readercard import QuickReply, ReaderCard
-from .ui_widgets import AvatarWidget, CountRole, InfoRole, KeyRole, KindRole, LabelRole, MessageDelegate, NavDelegate
+from . import navtree as NT
+from . import gestures as GS
+from .ui_widgets import (AccountRole, AvatarWidget, CountRole, DepthRole, FoldedRole, InfoRole, KeyRole, KindRole, LabelRole, MessageDelegate, MessageList, NameRole,
+                         NavDelegate, NavList, ToggleRole)
 
 IdRole = Qt.UserRole + 1
 
@@ -136,7 +139,8 @@ class MainWindow(QMainWindow):
         nb.setContentsMargins(14, 4, 14, 8)
         nb.addWidget(self.new_btn)
         sl.addLayout(nb)
-        self.folders = QListWidget()
+        self.folders = NavList()
+        self.folders.toggled.connect(self._toggle_folder)
         self.folders.setMouseTracking(True)
         self.folders.setFrameShape(QFrame.NoFrame)
         self.folders.setItemDelegate(NavDelegate(self.t))
@@ -179,12 +183,14 @@ class MainWindow(QMainWindow):
 
         # -- colonne liste : recherche, actions, messages
         self.model = MessageModel()
-        self.list = QListView()
+        self.delegate = MessageDelegate(self.t, T.row_height(self.config.get("density") or "comfortable"))
+        self.list = MessageList(self.delegate, lambda: (GS.settings(self.config), bool(self.config.get("swipe_invert"))))
+        self.list.swiped.connect(self._swiped)
         self.list.setModel(self.model)
         self.list.setMouseTracking(True)
         self.list.setFrameShape(QFrame.NoFrame)
         self.list.setVerticalScrollMode(QListView.ScrollPerPixel)
-        self.list.setItemDelegate(MessageDelegate(self.t, T.row_height(self.config.get("density") or "comfortable")))
+        self.list.setItemDelegate(self.delegate)
         self.list.setUniformItemSizes(True)
         self.list.setSelectionMode(QListView.ExtendedSelection)
         self.list.selectionModel().currentChanged.connect(self._row_changed)
@@ -283,7 +289,8 @@ class MainWindow(QMainWindow):
         rl.addWidget(self.quick)
         self._ai_token = 0
 
-        split = QSplitter()
+        self.listcol, self.right = listcol, right
+        split = self.split = QSplitter()
         split.setHandleWidth(1)
         split.addWidget(listcol)
         split.addWidget(right)
@@ -351,6 +358,9 @@ class MainWindow(QMainWindow):
         self.outbox_timer.timeout.connect(self.process_outbox)
         self.outbox_timer.start(2000)
         self.apply_theme()
+        self.set_layout(self.config.get("layout") or "columns")
+        self._act(None, "", "Escape", self._back_to_list)
+        self._act(None, "", "\\", self.cycle_layout)
         self.reload()
         QTimer.singleShot(300, lambda: self.sync(quiet=True))
         QTimer.singleShot(8000, lambda: self.check_updates(startup=True))               # 8 s après CHAQUE démarrage…
@@ -437,17 +447,24 @@ class MainWindow(QMainWindow):
                 it.setData(KindRole, "view")
                 it.setData(KindRole + 1, 0)
                 self.folders.addItem(it)
-        custom = self.engine.nav_folders()
-        if custom:
+        rows = NT.build(self.engine, self.config.get("collapsed_folders") or [])
+        if rows:
             self._caption(tr("Dossiers"))
-            for dest, label, depth, _aid in custom:
-                it = QListWidgetItem(label)
-                it.setData(KeyRole, dest)
-                it.setData(LabelRole, label)
-                it.setData(CountRole, 0)
-                it.setData(KindRole, "folder")
-                it.setData(KindRole + 1, depth)
-                self.folders.addItem(it)
+        for r in rows:
+            it = QListWidgetItem(r["label"])
+            it.setData(LabelRole, r["label"])
+            it.setData(CountRole, 0)
+            it.setData(KindRole, r["kind"])
+            it.setData(DepthRole, r["depth"])
+            it.setData(ToggleRole, r["toggle"])
+            it.setData(FoldedRole, r["collapsed"])
+            it.setData(AccountRole, r["aid"])
+            it.setData(NameRole, r["name"])
+            if r["kind"] == "folder" and r["selectable"]:
+                it.setData(KeyRole, r["key"])
+            else:
+                it.setFlags(Qt.ItemIsEnabled)                           # section d'un compte ou dossier de regroupement : ne se sélectionne pas
+            self.folders.addItem(it)
         self.select_view(keep_key or getattr(self, "view_key", "inbox"), quiet=True)
         self.folders.blockSignals(False)
 
@@ -466,12 +483,24 @@ class MainWindow(QMainWindow):
                 return it.data(LabelRole)
         return ""
 
+    def _toggle_folder(self, key):
+        """Plie / déplie un dossier ou une boîte (chevron) ; l'état est mémorisé comme dans la version GTK."""
+        NT.toggle(self.config, key)
+        self._build_sidebar(self.view_key)
+        self._update_counts()
+
     def _update_counts(self):
         c = vm.counts(self.cache, self.account)
+        unread = self.engine.folder_unread
         for i in range(self.folders.count()):
             it = self.folders.item(i)
-            key = it.data(KeyRole)
-            if key is not None:
+            kind, key = it.data(KindRole), it.data(KeyRole)
+            if kind == "folder":
+                it.setData(CountRole, int(unread.get((it.data(AccountRole), it.data(NameRole)), 0) or 0))
+            elif kind == "account":
+                aid = it.data(AccountRole)
+                it.setData(CountRole, sum(int(v or 0) for (a, n), v in unread.items() if a == aid and n not in vm.SPECIAL))
+            elif key is not None:
                 it.setData(CountRole, c.get(key, 0))
         self.folders.viewport().update()
         self.notspam_btn.setVisible(self.view_key == "spam")
@@ -513,6 +542,27 @@ class MainWindow(QMainWindow):
         a.triggered.connect(lambda _c=False: fn())
         self.addAction(a)
         return a
+
+    def set_layout(self, layout):
+        """Disposition : columns (liste | lecture), bottom (lecture en bas) ou list (liste seule, la lecture prend tout l'écran)."""
+        layout = layout if layout in ("columns", "bottom", "list") else "columns"
+        self.config["layout"] = layout
+        self.config.save()
+        self.split.setOrientation(Qt.Vertical if layout == "bottom" else Qt.Horizontal)
+        self.listcol.show()
+        self.right.setVisible(layout != "list")
+        if layout == "bottom":
+            self.split.setSizes([320, 520])
+
+    def cycle_layout(self):
+        order = ["columns", "bottom", "list"]
+        cur = self.config.get("layout") or "columns"
+        self.set_layout(order[(order.index(cur) + 1) % 3 if cur in order else 0])
+
+    def _back_to_list(self):
+        if (self.config.get("layout") == "list") and self.listcol.isHidden():
+            self.right.hide()
+            self.listcol.show()
 
     def _step(self, d):
         """Message suivant / précédent (J / K)."""
@@ -954,6 +1004,30 @@ class MainWindow(QMainWindow):
     def open_draft(self, msg):
         self.compose(**C.draft_args(msg))
 
+    def _swiped(self, row, act):
+        """Applique l'action d'un geste à la ligne balayée (même chemin que les boutons : cache d'abord, serveur ensuite)."""
+        if not 0 <= row < len(self.model.msgs):
+            return
+        msg = self.model.msgs[row]
+        fx = GS.effect(act, msg, C.at(1, 8))
+        if "move" in fx:
+            dest = fx["move"]
+            if dest == "trash" and msg.folder == "trash":
+                dest = "archive"
+            op_ids = self.engine.move([msg], dest)
+            self._after_action([msg], op_ids, "move", lambda: self.engine.finish_move([msg], dest, op_ids))
+        elif "flag" in fx:
+            field, value = fx["flag"]
+            op_ids = self.engine.set_flag([msg], field, value)
+            setattr(msg, field, value)
+            self.reload()
+            self._background(lambda: self.engine.run_ops(op_ids), "ops")
+        elif "snooze" in fx:
+            self.engine.snooze([msg], fx["snooze"])
+            self._after_action([msg], [], "ops", lambda: ([], [], False))
+        elif "block" in fx:
+            self.block_sender(fx["block"], msg)
+
     def snooze_tomorrow(self):
         msgs = self.selected_msgs()
         if msgs:
@@ -1017,6 +1091,9 @@ class MainWindow(QMainWindow):
             self.quick.hide()
             self.reader.show_html("<html><body></body></html>")
             return
+        if self.config.get("layout") == "list":                      # liste seule : la lecture remplace la liste (Échap pour revenir)
+            self.listcol.hide()
+            self.right.show()
         h = vm.header_lines(msg)
         esc = lambda x: (x or "").replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
         dim = self.t["dim"]
@@ -1060,7 +1137,7 @@ class MainWindow(QMainWindow):
         self._busy = True
         if not quiet:
             self.status.setText(tr("Synchronisation…"))
-        self._background(lambda: (self.engine.flush(), AU.sync_and_route(self.engine)), "sync")
+        self._background(lambda: (self.engine.flush(), AU.sync_and_route(self.engine), self.engine.refresh_folder_counts()), "sync")
 
     def run_bg(self, fn, cb):
         """Travail en fond puis cb(résultat, erreur) dans le fil de l'interface."""
@@ -1102,6 +1179,7 @@ class MainWindow(QMainWindow):
         errors = [str(err)] if err else list(res[1][1])
         self.status.setText(("⚠ " + errors[0][:120]) if errors else tr("Synchronisé à ") + time.strftime("%H:%M"))
         self.reload()
+        self._update_counts()                                 # pastilles des dossiers de rangement (non lus annoncés par le serveur)
 
 
 def _keyring_hint():

@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.26.0
+- Interface Qt (expérimentale, mintmail --qt) : dossiers repliables comme dans la version GTK — chevrons pour plier / déplier chaque dossier (état mémorisé), une section par compte quand il y en a plusieurs, compteur de non lus par dossier ; les sous-dossiers ne sont plus tous dépliés
+- Interface Qt : gestes de balayage sur la liste des messages (souris ou deux doigts sur le pavé tactile) avec fond coloré et libellé de l'action, glissement court ou long, mêmes actions et seuils que la version GTK ; disposition colonnes / lecture en bas / liste seule (touche « \ », Échap pour revenir à la liste) ; onglet « Gestes & disposition » des réglages (actions, inversion au pavé tactile, conversations)
+
 ## 1.25.0
 - Interface Qt (expérimentale, mintmail --qt) : carte IA du lecteur comme dans la version GTK — résumé, points clés, tâches, alerte d'hameçonnage, suggestion « Ce n'est pas du spam » (avec rangement), traduction, question sur le message, bouton « ✨ Répondre » qui rédige une réponse à relire ; barre « Réponse rapide » avec réponses toutes faites, envoi immédiat avec la signature du bon compte ou alias, et développement du texte par l'IA
 - Interface Qt : connexion IMAP « bad login » corrigée à la source — l'interface Qt tournait dans un venv sans le module « keyring », donc sans accès au mot de passe enregistré dans le trousseau ; MintMail le signale désormais clairement (message dans la barre d'état et dans le terminal, avec la commande d'installation) au lieu de tenter une connexion sans mot de passe, et lit le trousseau en fond dès l'ouverture ; le test des traductions couvre maintenant aussi le paquet Qt

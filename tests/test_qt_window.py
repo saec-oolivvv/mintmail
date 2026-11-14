@@ -215,3 +215,20 @@ def test_update_banner_chip_and_settings_tab():
     d = SettingsDialog(w)
     d.open_page("updates")
     assert d.tabs.currentIndex() == 4 and "99.0.0" not in d._up_key.text()
+
+
+def test_sidebar_folders_fold_and_unfold_and_remember_it():
+    if _qt() is None:
+        return
+    os.environ["MINTMAIL_QT_NO_WEBENGINE"] = "1"
+    from mintmail.qt.ui_widgets import KindRole, LabelRole
+    w = _window()
+    ent = lambda name, label, path, depth: {"name": name, "label": label, "path": path, "depth": depth, "special": "", "selectable": True, "delim": "/"}
+    w.config["folders"] = {"demo": [ent("Clients", "Clients", "Clients", 0), ent("Clients/Alpha", "Alpha", "Clients › Alpha", 1), ent("Perso", "Perso", "Perso", 0)]}
+    w._build_sidebar("inbox")
+    labels = lambda: [w.folders.item(i).data(LabelRole) for i in range(w.folders.count()) if w.folders.item(i).data(KindRole) == "folder"]
+    assert labels() == ["Clients", "Alpha", "Perso"]
+    w._toggle_folder("demo|Clients")
+    assert labels() == ["Clients", "Perso"] and w.config["collapsed_folders"] == ["demo|Clients"]
+    w._toggle_folder("demo|Clients")
+    assert labels() == ["Clients", "Alpha", "Perso"] and w.view_key == "inbox"
