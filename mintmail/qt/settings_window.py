@@ -11,6 +11,7 @@ from .. import oauth
 from ..i18n import tr
 from ..style import ACCENTS, STYLES
 from . import accounts as A
+from . import automation as AU
 
 
 class _Signals(QObject):
@@ -31,6 +32,7 @@ class SettingsDialog(QDialog):
         tabs = QTabWidget()
         tabs.addTab(self._accounts_tab(), tr("Comptes"))
         tabs.addTab(self._look_tab(), tr("Apparence"))
+        tabs.addTab(self._filters_tab(), tr("Filtres & blocage"))
         close = QPushButton(tr("Fermer"))
         close.clicked.connect(self.accept)
         lay = QVBoxLayout(self)
@@ -330,6 +332,96 @@ class SettingsDialog(QDialog):
         reset.clicked.connect(self._reset_look)
         form.addRow("", reset)
         return w
+
+    # ------------------------------------------------------------ filtres, expéditeurs bloqués, règles
+    def _filters_tab(self):
+        w = QWidget()
+        lay = QVBoxLayout(w)
+        self._sender_lists = {}
+        for kind, title, hint in (("blocked", tr("Expéditeurs bloqués"), ""),
+                                  ("spam_senders", tr("Expéditeurs envoyés en spam"), tr("Leurs messages vont directement dans le dossier Spam."))):
+            lay.addWidget(QLabel("<b>%s</b>" % title))
+            if hint:
+                lay.addWidget(QLabel(hint))
+            lst = QListWidget()
+            lst.setMaximumHeight(90)
+            self._sender_lists[kind] = lst
+            row = QHBoxLayout()
+            edit = QLineEdit()
+            edit.setPlaceholderText(tr("adresse@exemple.com ou @domaine.com"))
+            add, rem = QPushButton(tr("Ajouter")), QPushButton(tr("Retirer"))
+            add.clicked.connect(lambda _=False, k=kind, e=edit: self._add_sender(k, e))
+            edit.returnPressed.connect(add.click)
+            rem.clicked.connect(lambda _=False, k=kind: self._remove_sender(k))
+            for x in (edit, add, rem):
+                row.addWidget(x, 1 if x is edit else 0)
+            lay.addWidget(lst)
+            lay.addLayout(row)
+        lay.addWidget(QLabel(tr("<b>Règles automatiques</b>")))
+        lay.addWidget(QLabel(tr("Appliquées à chaque nouveau message de la boîte de réception.")))
+        self._rules = QListWidget()
+        lay.addWidget(self._rules, 1)
+        row = QHBoxLayout()
+        self._r_field, self._r_action = QComboBox(), QComboBox()
+        for k, label in AU.RULE_FIELDS:
+            self._r_field.addItem(label, k)
+        for k, label in AU.RULE_ACTIONS:
+            self._r_action.addItem(label, k)
+        self._r_text, self._r_folder = QLineEdit(), QLineEdit()
+        self._r_folder.setPlaceholderText(tr("dossier (pour « Ranger »)"))
+        add = QPushButton(tr("Ajouter la règle"))
+        add.clicked.connect(self._add_rule)
+        rem = QPushButton(tr("Retirer"))
+        rem.clicked.connect(self._remove_rule)
+        for x in (self._r_field, self._r_text, self._r_action, self._r_folder, add, rem):
+            row.addWidget(x, 1 if x is self._r_text else 0)
+        lay.addLayout(row)
+        now = QPushButton(tr("Appliquer maintenant à la boîte de réception"))
+        now.clicked.connect(self._apply_rules_now)
+        lay.addWidget(now)
+        self._fill_filters()
+        return w
+
+    def _fill_filters(self):
+        for kind, lst in self._sender_lists.items():
+            lst.clear()
+            lst.addItems(list(self.cfg[kind]))
+        self._rules.clear()
+        fields, actions = dict(AU.RULE_FIELDS), dict(AU.RULE_ACTIONS)
+        for r in self.cfg["rules"]:
+            txt = "%s « %s » → %s" % (fields.get(r.get("field"), r.get("field")), r.get("text"), actions.get(r.get("action"), r.get("action")))
+            self._rules.addItem(txt + ((" " + r.get("folder", "")) if r.get("action") == "move" else ""))
+
+    def _add_sender(self, kind, edit):
+        key = edit.text().strip().lower()
+        if not key or ("@" not in key):
+            return
+        msgs, dest = AU.filter_sender(self.main.engine, key, kind)
+        edit.clear()
+        self._fill_filters()
+        self.main.move_messages(msgs, dest)
+
+    def _remove_sender(self, kind):
+        it = self._sender_lists[kind].currentItem()
+        if it:
+            AU.unfilter_sender(self.main.engine, kind, it.text())
+            self._fill_filters()
+
+    def _add_rule(self):
+        action, folder = self._r_action.currentData(), self._r_folder.text().strip()
+        if action == "move" and not folder:
+            self.main.status.setText(tr("Indiquez le dossier de destination"))
+            return
+        if AU.add_rule(self.main.engine, self._r_field.currentData(), self._r_text.text(), action, folder):
+            self._r_text.clear()
+            self._fill_filters()
+
+    def _remove_rule(self):
+        if AU.remove_rule(self.main.engine, self._rules.currentRow()):
+            self._fill_filters()
+
+    def _apply_rules_now(self):
+        self.main.apply_rules_now()
 
     def _combo(self, items, key):
         c = QComboBox()

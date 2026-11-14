@@ -123,3 +123,21 @@ def test_theme_follows_the_settings_and_the_settings_dialog_opens():
     d.close()
     w.accounts_changed()                                                       # sans compte réel : reste en démonstration
     assert not w.demo_banner.isHidden() or True
+
+
+def test_block_sender_and_filters_tab():
+    if _qt() is None:
+        return
+    os.environ["MINTMAIL_QT_NO_WEBENGINE"] = "1"
+    w = _window()
+    w.block_sender("e1@x.be", w.cache.get("q1"))
+    assert "e1@x.be" in w.config["blocked"] and w.cache.get("q1").folder == "trash"
+    from mintmail.qt.settings_window import SettingsDialog
+    d = SettingsDialog(w)
+    assert d._sender_lists["blocked"].count() == 1
+    d._r_text.setText("Sujet 2")
+    d._add_rule()
+    assert d._rules.count() == 1
+    d._rules.setCurrentRow(0)
+    d._remove_rule()
+    assert d._rules.count() == 0

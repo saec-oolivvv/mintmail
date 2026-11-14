@@ -374,3 +374,88 @@ def test_reset_appearance_restores_defaults():
     AC.reset_appearance(cfg)
     assert "theme" not in cfg and "style" not in cfg and cfg.saved == 1
     assert set(AC.APPEARANCE_KEYS) <= set(DEFAULTS)                                      # chaque clé réinitialisable existe vraiment
+
+
+# ------------------------------------------------------------------ règles, expéditeurs bloqués / spam
+from mintmail.qt import automation as AU
+
+
+class _CfgAU(dict):
+    def save(self):
+        self.saved = getattr(self, "saved", 0) + 1
+
+
+def _eng_au(**extra):
+    eng, cache, be = _eng()
+    cfg = _CfgAU({"accounts": [A], "blocked": [], "spam_senders": [], "rules": [],
+                  "folders": {"a1": [{"name": "INBOX", "label": "Boîte", "path": "Boîte", "special": "inbox", "selectable": True, "depth": 0},
+                                     {"name": "Factures", "label": "Factures", "path": "Factures", "special": "", "selectable": True, "depth": 0}]}})
+    cfg.update(extra)
+    eng.config = cfg
+    return eng, cache, be
+
+
+def test_rule_match_and_find_folder_follow_the_gtk_semantics():
+    m = _m(1, subject="Facture mars", sender_name="Ana", sender_email="ana@shop.be")
+    assert AU.rule_match({"field": "subject", "text": "FACTURE"}, m) and not AU.rule_match({"field": "subject", "text": ""}, m)
+    assert AU.rule_match({"field": "from", "text": "shop.be"}, m) and not AU.rule_match({"field": "to", "text": "shop"}, m)
+    eng, _c, _b = _eng_au()
+    assert AU.find_folder(eng, "factures")[1]["name"] == "Factures" and AU.find_folder(eng, "zzz") is None and AU.find_folder(eng, "") is None
+
+
+def test_route_applies_block_spam_and_rules_and_apply_moves_updates_the_cache():
+    eng, cache, be = _eng_au(blocked=["@bad.com"], spam_senders=["s2@x.be"],
+                             rules=[{"field": "subject", "text": "facture", "action": "move", "folder": "Factures"},
+                                    {"field": "subject", "text": "promo", "action": "archive"},
+                                    {"field": "subject", "text": "info", "action": "read"}])
+    ms = [_m(1, sender_email="u@bad.com"), _m(2), _m(3, subject="Facture"), _m(4, subject="Promo -20%"), _m(5, subject="Info"), _m(6)]
+    for m in ms:
+        cache.upsert(m) if hasattr(cache, "upsert") else cache.add([m])
+    keep, plan = AU.route(eng, ms)
+    assert [m.id for m in keep] == ["m5", "m6"] and {k: [m.id for m in v] for k, v in plan.items()} == {
+        "trash": ["m1"], "spam": ["m2"], "f:Factures": ["m3"], "archive": ["m4"]}
+    groups = AU.apply_moves(eng, plan)
+    assert len(groups) == 4 and cache.get("m1").folder == "trash" and cache.get("m3").folder == "f:Factures"
+    assert cache.get("m5").unread is False                                                   # règle « marquer lu »
+    assert AU.route(eng, [])[1] == {}
+
+
+def test_filter_sender_block_unblock_and_not_spam_roundtrip():
+    eng, cache, _b = _eng_au()
+    a, b = _m(1, sender_email="x@spam.io"), _m(2, sender_email="y@spam.io")
+    for m in (a, b):
+        cache.upsert(m) if hasattr(cache, "upsert") else cache.add([m])
+    msgs, dest = AU.filter_sender(eng, "@spam.io", "blocked", a)
+    assert dest == "trash" and {m.id for m in msgs} == {"m1", "m2"} and eng.config["blocked"] == ["@spam.io"]
+    AU.filter_sender(eng, "@spam.io", "blocked")
+    assert eng.config["blocked"] == ["@spam.io"]                                              # pas de doublon
+    AU.unfilter_sender(eng, "blocked", "@SPAM.io")
+    assert eng.config["blocked"] == []
+    c = _m(3, folder="spam", sender_email="z@x.be")
+    cache.upsert(c) if hasattr(cache, "upsert") else cache.add([c])
+    eng.config["spam_senders"] = ["z@x.be", "@x.be"]
+    back = AU.not_spam(eng, c)
+    assert [m.id for m in back] == ["m3"] and eng.config["spam_senders"] == []
+
+
+def test_rules_add_remove_and_apply_now():
+    eng, cache, _b = _eng_au()
+    assert AU.add_rule(eng, "subject", " Promo ", "trash") and not AU.add_rule(eng, "subject", "Promo", "trash") and not AU.add_rule(eng, "from", " ", "trash")
+    assert AU.add_rule(eng, "subject", "Fact", "move", "Factures") and eng.config["rules"][1]["folder"] == "Factures"
+    m = _m(1, subject="Promo")
+    cache.upsert(m) if hasattr(cache, "upsert") else cache.add([m])
+    left, groups = AU.apply_rules_now(eng)
+    assert left == 0 and groups[0][1] == "trash"
+    assert AU.remove_rule(eng, 0) and len(eng.config["rules"]) == 1 and not AU.remove_rule(eng, 9)
+
+
+def test_sync_and_route_only_filters_new_messages():
+    eng, cache, be = _eng_au(blocked=["s9@x.be"])
+    old = _m(1, sender_email="s9@x.be")                                                      # déjà en boîte : on n'y touche pas
+    cache.upsert_many([old, _m(2)])
+    be.result = ([_m(9, sender_email="s9@x.be"), _m(8)], {}, {1, 2, 8, 9}, 1)
+    fresh, errors, done = AU.sync_and_route(eng)
+    assert not errors and done == [("trash", 1)]
+    assert cache.get("m1").folder == "inbox" and cache.get("m8").folder == "inbox"
+    assert ("move", [9], "trash", False) in be.calls                                           # le serveur est prévenu du rangement
+    assert fresh == 1                                                                         # m9 (bloqué) ne compte pas comme nouveau non lu

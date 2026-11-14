@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.22.0
+- Interface Qt (expérimentale, mintmail --qt) : filtres et blocage comme dans la version GTK — expéditeurs bloqués ou envoyés en spam (adresse ou domaine entier), bouton « Bloquer », « Ce n'est pas du spam » pour tout l'expéditeur, règles automatiques (archiver, supprimer, spam, lu, favori, épingle, ranger dans un dossier) appliquées aux seuls nouveaux messages après chaque synchronisation, onglet « Filtres & blocage » des paramètres avec « Appliquer maintenant »
+
 ## 1.21.0
 - Interface Qt (expérimentale, mintmail --qt) : refonte graphique aux couleurs de MintMail (styles Aurora, Papier et Terminal, clair ou sombre, couleur d'accent, densité de liste) avec pastilles d'initiales, barre latérale à compteurs et lecteur à en-tête ; fenêtre Paramètres (Ctrl+,) pour ajouter, tester, modifier et supprimer des comptes (mot de passe ou connexion Google / Microsoft) et régler l'apparence ; bannière du mode démonstration ; test de synchronisation rendu indépendant de l'ordre de démarrage des deux machines (échec aléatoire à la publication)
 

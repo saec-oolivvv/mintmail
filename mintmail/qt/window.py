@@ -14,6 +14,7 @@ from .. import APP_NAME, __version__
 from ..htmlsafe import safe_to_open
 from ..i18n import tr
 from ..store import Cache, Config
+from . import automation as AU
 from . import composing as C
 from . import theme as T
 from . import viewmodel as vm
@@ -274,9 +275,10 @@ class MainWindow(QMainWindow):
         self._tool("🗄", tr("Archiver"), "E", lambda: self.move_selected("archive"), self_layout=self.actions_row)
         self._tool("🗑", tr("Supprimer"), "Delete", lambda: self.move_selected("trash"), self_layout=self.actions_row)
         self._tool("⚠", tr("Signaler comme spam"), "!", lambda: self.move_selected("spam"), self_layout=self.actions_row)
-        self.notspam_btn = self._tool("✔", tr("Ce n'est pas du spam (retour en boîte de réception)"), None, lambda: self.move_selected("inbox"),
+        self.notspam_btn = self._tool("✔", tr("Ce n'est pas du spam (retour en boîte de réception)"), None, self.not_spam_selected,
                                       self_layout=self.actions_row)
         self.notspam_btn.hide()
+        self.block_btn = self._tool("⛔", tr("Bloquer l'expéditeur"), None, self._block_menu, self_layout=self.actions_row)
         self.actions_row.addSpacing(10)
         self._tool("☆", tr("Favori"), "S", lambda: self.toggle_flag("starred"), self_layout=self.actions_row)
         self._tool("📌", tr("Épingler"), "P", lambda: self.toggle_flag("pinned"), self_layout=self.actions_row)
@@ -509,6 +511,45 @@ class MainWindow(QMainWindow):
         self.reload()
         self._background(lambda: self.engine.run_ops(op_ids), "ops")
 
+    def not_spam_selected(self):
+        msgs = self.selected_msgs()
+        if msgs:
+            back = AU.not_spam(self.engine, msgs[0])
+            self.move_messages(back or msgs, "inbox")
+
+    def _block_menu(self):
+        msgs = self.selected_msgs()
+        if not msgs:
+            return
+        m = msgs[0]
+        menu = QMenu(self)
+        for domain in (False, True):
+            key = AU.sender_key(m, domain)
+            menu.addAction(tr("Bloquer %s") % key, lambda k=key: self.block_sender(k, m))
+        menu.exec(self.block_btn.mapToGlobal(self.block_btn.rect().bottomLeft()))
+
+    def block_sender(self, key, msg=None):
+        msgs, dest = AU.filter_sender(self.engine, key, "blocked", msg)
+        self.status.setText(tr("Bloqué : ") + key)
+        self.move_messages(msgs, dest)
+
+    def move_messages(self, msgs, dest):
+        """Déplace des messages (cache tout de suite, serveur en fond) — utilisé par les listes de blocage et les règles."""
+        if not msgs:
+            return
+        if dest in ("trash", "spam"):
+            self.cache.update_many([m.id for m in msgs], unread=False)
+        op_ids = self.engine.move(msgs, dest)
+        self.reload()
+        self._background(lambda: self.engine.finish_move(msgs, dest, op_ids), "move")
+
+    def apply_rules_now(self):
+        left, groups = AU.apply_rules_now(self.engine)
+        self.reload()
+        self.status.setText(tr("Règles appliquées (%d message(s) restent dans la boîte)") % left)
+        for msgs, dest, op_ids in groups:
+            self._background(lambda m=msgs, d=dest, o=op_ids: self.engine.finish_move(m, d, o), "move")
+
     def _move_menu(self):
         msgs = self.selected_msgs()
         if not msgs:
@@ -670,7 +711,7 @@ class MainWindow(QMainWindow):
         self._busy = True
         if not quiet:
             self.status.setText(tr("Synchronisation…"))
-        self._background(lambda: (self.engine.flush(), self.engine.sync()), "sync")
+        self._background(lambda: (self.engine.flush(), AU.sync_and_route(self.engine)), "sync")
 
     def _task_done(self, payload):
         tag, (res, err) = payload
