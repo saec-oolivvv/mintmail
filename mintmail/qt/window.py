@@ -15,7 +15,9 @@ from .. import APP_NAME, __version__
 from ..htmlsafe import safe_to_open
 from ..i18n import tr
 from ..store import Cache, Config
+from . import composing as C
 from . import viewmodel as vm
+from .compose_window import ComposeWindow
 
 IdRole = Qt.UserRole + 1
 InfoRole = Qt.UserRole + 2
@@ -142,7 +144,7 @@ class MainWindow(QMainWindow):
         self.config, self.cache = config or Config(), cache or Cache()
         self.engine = vm.Engine(self.config, self.cache)
         self.view_key, self.account, self.load_images, self.current = "inbox", "all", False, None
-        self._busy, self._kept, self._tick = False, set(), 0
+        self._busy, self._kept, self._tick, self._sending, self._composers = False, set(), 0, False, []
         self.setWindowTitle("%s %s (Qt)" % (APP_NAME, __version__))
         self.resize(1280, 800)
 
@@ -202,6 +204,11 @@ class MainWindow(QMainWindow):
         self.addToolBar(bar)
         bar.addAction(tr("Synchronisation…").rstrip("…"), self.sync)
         bar.addSeparator()
+        self._act(bar, tr("Nouveau message"), "C", lambda: self.compose())
+        self._act(bar, tr("Répondre"), "R", lambda: self.reply())
+        self._act(bar, tr("Répondre à tous"), "A", lambda: self.reply(True))
+        self._act(bar, tr("Transférer"), "F", lambda: self.forward())
+        bar.addSeparator()
         self._act(bar, tr("Archiver"), "E", lambda: self.move_selected("archive"))
         self._act(bar, tr("Supprimer"), "Delete", lambda: self.move_selected("trash"))
         self._act(bar, tr("Signaler comme spam"), "!", lambda: self.move_selected("spam"))
@@ -217,12 +224,20 @@ class MainWindow(QMainWindow):
         bar.addWidget(self.move_btn)
         self.status = QLabel()
         self.statusBar().addWidget(self.status)
+        self.undo_btn = QPushButton()
+        self.undo_btn.setFlat(True)
+        self.undo_btn.clicked.connect(self._undo_send)
+        self.undo_btn.hide()
+        self.statusBar().addWidget(self.undo_btn)
 
         self.bridge = _Bridge()
         self.bridge.done.connect(self._task_done)
         self.timer = QTimer(self)
         self.timer.timeout.connect(self._on_timer)
         self.timer.start(60_000)
+        self.outbox_timer = QTimer(self)
+        self.outbox_timer.timeout.connect(self.process_outbox)
+        self.outbox_timer.start(2000)
         self.reload()
         QTimer.singleShot(300, lambda: self.sync(quiet=True))
         QTimer.singleShot(600, self._refresh_folders)
@@ -299,6 +314,11 @@ class MainWindow(QMainWindow):
             m = self.cache.get_light(mid)
             if m is not None and m.unread:
                 self._kept.add(mid)
+        if mid and self.view_key == "drafts":
+            d = self.cache.get(mid)
+            if d is not None and d.folder == "drafts":
+                self.open_draft(d)
+                return
         self._show(self.engine.open_message(mid) if mid else None)
         if mid:
             self._update_counts()
@@ -311,9 +331,19 @@ class MainWindow(QMainWindow):
         if shortcut:
             a.setShortcut(QKeySequence(shortcut))
         a.triggered.connect(lambda _c=False: fn())
-        bar.addAction(a)
+        if bar is not None:
+            bar.addAction(a)
         self.addAction(a)
         return a
+
+    def _step(self, d):
+        """Message suivant / précédent (J / K)."""
+        n = self.model.rowCount()
+        if not n:
+            return
+        r = self.model.row_of(self.current) if self.current else -1
+        r = min(n - 1, max(0, r + d)) if r >= 0 else (0 if d > 0 else n - 1)
+        self.list.setCurrentIndex(self.model.index(r))
 
     def selected_msgs(self):
         rows = sorted({i.row() for i in self.list.selectionModel().selectedRows()})
@@ -365,6 +395,72 @@ class MainWindow(QMainWindow):
         for dest, label in self.engine.move_targets(msgs[0].account):
             menu.addAction(label, lambda d=dest: self.move_selected(d))
         menu.exec(self.move_btn.mapToGlobal(self.move_btn.rect().bottomLeft()))
+
+    # ------------------------------------------------------------ rédaction
+    def compose(self, **kw):
+        kw.setdefault("account_id", self.engine.default_account(None, self.account))
+        w = ComposeWindow(self, **kw)
+        self._composers.append(w)
+        w.destroyed.connect(lambda _o=None, w=w: self._composers.remove(w) if w in self._composers else None)
+        return w
+
+    def _open_msg(self):
+        """Message complet affiché dans le lecteur, ou celui qui est sélectionné dans la liste."""
+        m = getattr(self, "shown", None)
+        if m is None:
+            sel = self.selected_msgs()
+            m = self.cache.get(sel[0].id) if sel else None
+        return m
+
+    def reply(self, all_=False):
+        m = self._open_msg()
+        if m:
+            self.compose(**C.reply_args(self.config, self.engine.accounts(), m, all_, self.engine.default_account(m, self.account)))
+
+    def forward(self):
+        m = self._open_msg()
+        if m:
+            self.compose(**C.forward_args(m, self.engine.default_account(m, self.account)))
+
+    def open_draft(self, msg):
+        self.compose(**C.draft_args(msg))
+
+    def snooze_tomorrow(self):
+        msgs = self.selected_msgs()
+        if msgs:
+            self.engine.snooze(msgs, C.at(1, 8))
+            self._after_action(msgs, [], "ops", lambda: ([], [], False))
+
+    # ------------------------------------------------------------ envoi
+    def queue_send(self, out, delay=0, scheduled=False):
+        oid = self.engine.queue_send(out, delay, scheduled)
+        if scheduled:
+            self.status.setText(tr("Envoi programmé pour le %s") % __import__("mintmail.util", fromlist=["format_full"]).format_full(time.time() + delay))
+            return
+        self._undo = oid
+        self.undo_btn.setText(tr("Annuler"))
+        self.undo_btn.show()
+        self.status.setText(tr("Envoi du message…"))
+        QTimer.singleShot(max(2, int(self.config["undo_seconds"])) * 1000, self._hide_undo)
+
+    def _hide_undo(self):
+        self.undo_btn.hide()
+        self._undo = None
+
+    def _undo_send(self):
+        oid, self._undo = getattr(self, "_undo", None), None
+        self.undo_btn.hide()
+        out = self.engine.undo_send(oid) if oid else None
+        if out is not None:
+            self.compose(account_id=out.account, to=out.to, cc=out.cc, subject=out.subject, body_html=out.html, raw=True,
+                         in_reply_to=out.in_reply_to, references=out.references, attachments=out.attachments)
+            self.status.setText("")
+
+    def process_outbox(self):
+        if self._sending or not self.cache.outbox_due():
+            return
+        self._sending = True
+        self._background(self.engine.process_outbox, "outbox")
 
     # ------------------------------------------------------------ dossiers
     def _refresh_folders(self):
@@ -427,6 +523,21 @@ class MainWindow(QMainWindow):
 
     def _task_done(self, payload):
         tag, (res, err) = payload
+        if tag == "outbox":
+            self._sending = False
+            for kind, out, e in (res or []):
+                if kind == "sent":
+                    self.status.setText(tr("Message envoyé ✔"))
+                elif kind == "retry":
+                    self.status.setText(tr("Hors ligne : message conservé, nouvel essai automatique."))
+                else:
+                    self.status.setText(tr("Échec de l'envoi : %s") % str(e)[:90])
+                    self.compose(account_id=out.account, to=out.to, cc=out.cc, subject=out.subject, body_html=out.html, raw=True,
+                                 attachments=out.attachments)
+            if err:
+                self.status.setText("⚠ " + str(err)[:120])
+            self.reload()
+            return
         if tag == "folders":
             if res:
                 self._build_sidebar(self.view_key)

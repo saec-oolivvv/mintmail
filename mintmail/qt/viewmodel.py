@@ -3,7 +3,7 @@ S'appuie uniquement sur le moteur (store, backend, offline, htmlsafe, util) : te
 import time
 from typing import Dict, List, Tuple
 
-from ..backend import make_backend
+from ..backend import is_retryable, make_backend
 from ..htmlsafe import reader_csp, sanitize
 from ..i18n import tr
 from ..offline import OfflineMixin
@@ -226,3 +226,61 @@ class Engine(OfflineMixin):
         if field == "pinned":
             return self.op_enqueue("flags", msgs, pinned=bool(value))
         raise ValueError(field)
+
+    # -- envoi
+    def default_account(self, msg=None, current="all"):
+        if msg and any(a["id"] == msg.account for a in self.accounts()):
+            return msg.account
+        return current if current != "all" and any(a["id"] == current for a in self.accounts()) else self.accounts()[0]["id"]
+
+    def queue_send(self, out, delay=0, scheduled=False):
+        """Met le message dans la boîte d'envoi (délai d'annulation, ou date programmée). Retourne son identifiant."""
+        import uuid
+        oid = uuid.uuid4().hex
+        wait = delay if scheduled else self.config["undo_seconds"]
+        self.cache.outbox_add(oid, time.time() + wait, out)
+        return oid
+
+    def undo_send(self, oid):
+        """Annule un envoi pas encore parti ; retourne le message (pour le rouvrir) ou None s'il est déjà parti."""
+        out = next((o for i, _t, o, _n in self.cache.outbox_list() if i == oid), None)
+        self.cache.outbox_remove(oid)
+        return out
+
+    def process_outbox(self):
+        """Envoie les messages dont l'heure est venue (à appeler hors du fil de l'interface). Retourne [(état, message, erreur)] avec
+        état « sent », « retry » (hors ligne : conservé, nouvel essai dans 1 min) ou « failed »."""
+        events = []
+        for oid, out in self.cache.outbox_due():
+            if not self.cache.outbox_claim(oid):
+                continue                    # pris par l'envoi différé en tâche de fond (minuterie) : pas de double envoi
+            try:
+                be = self.backend(out.account)
+                be.send(out)
+            except Exception as e:
+                if is_retryable(e) and self.cache.outbox_tries(oid) < 10:
+                    self.cache.outbox_reschedule(oid, time.time() + 60)
+                    events.append(("retry", out, e))
+                else:
+                    self.cache.outbox_remove(oid)
+                    events.append(("failed", out, e))
+                continue
+            self.cache.outbox_remove(oid)
+            acc = next((a for a in self.accounts() if a["id"] == out.account), {})
+            if be.demo:
+                import uuid
+                from ..models import Message
+                from ..util import html_to_text
+                t = html_to_text(out.html)
+                self.cache.upsert(Message(id="demo|SENT|%s" % uuid.uuid4().hex[:8], account=out.account, folder="sent", uid=0,
+                                          sender_name=acc.get("name", ""), sender_email=acc.get("email", ""), to=out.to, subject=out.subject,
+                                          date=time.time(), snippet=t[:150], text=t, html=out.html, unread=False))
+            else:
+                self.sync(folders=("sent",))
+            events.append(("sent", out, None))
+        return events
+
+    def snooze(self, msgs, ts):
+        """Reporte des messages jusqu'à ts (ils quittent la boîte puis y reviennent à l'heure dite)."""
+        if msgs and ts > time.time():
+            self.cache.update_many([m.id for m in msgs], snoozed_until=ts)

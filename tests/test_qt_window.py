@@ -69,3 +69,34 @@ def test_actions_archive_star_and_unread_view_keeps_the_opened_message():
     w.list.setCurrentIndex(w.model.index(w.model.row_of("q2")))   # on passe à un autre : q1 s'en va
     w.reload()
     assert w.model.row_of("q1") < 0 and w.model.row_of("q2") >= 0
+
+
+def test_compose_reply_send_and_draft_flow():
+    if _qt() is None:
+        return
+    os.environ["MINTMAIL_QT_NO_WEBENGINE"] = "1"
+    w = _window()
+    w.engine.flush = lambda: ([], [], False)
+    w.list.setCurrentIndex(w.model.index(w.model.row_of("q0")))
+    w.reply()
+    c = w._composers[-1]
+    assert c.to.text() == "e0@x.be" and c.subject.text() == "Re: Sujet 0" and "Bonjour" in c.editor.toPlainText()
+    c.to.setText("pas-une-adresse")
+    from PySide6.QtWidgets import QMessageBox
+    QMessageBox.warning = staticmethod(lambda *a, **k: None)
+    c.do_send(0)
+    assert not c.sent and w.cache.outbox_count() == 0                         # adresse invalide : rien n'est parti
+    c.to.setText("dest@x.be")
+    c.do_send(0)
+    assert c.sent and w.cache.outbox_count() == 1 and w.undo_btn.text()
+    w.engine.undo_send = lambda oid: w.cache.outbox_list()[0][2]
+    w._undo_send()
+    c2 = w._composers[-1]
+    assert c2.raw and c2.to.text() == "dest@x.be"                            # « Annuler » rouvre le message
+    c2.sent = True
+    c2.close()
+    n = w.compose(subject="brouillon")
+    n._save()
+    assert any(m.subject == "brouillon" for m in w.cache.query("drafts", "all"))
+    n.sent = True
+    n.close()

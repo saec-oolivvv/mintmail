@@ -171,3 +171,100 @@ def test_folder_tree_lists_custom_folders_and_move_targets():
         def save(self): self.saved = True
     eng2.config = Cfg({"accounts": [A]})
     assert eng2.refresh_folders() is True and eng2.config["folders"]["a1"] == be.tree and eng2.refresh_folders() is False
+
+
+# ------------------------------------------------------------------ rédaction (sans Qt)
+from mintmail.qt import composing as C
+from mintmail.models import Outgoing
+
+
+def _cfg(**kw):
+    d = {"accounts": [A, {"id": "a2", "email": "b@x.be", "name": "B"}], "identities": [
+        {"id": "i1", "account": "a1", "email": "ventes@x.be", "name": "Ventes", "signature_html": "<b>Équipe ventes</b>"}], "undo_seconds": 6}
+    d.update(kw)
+    return d
+
+
+def test_reply_quotes_the_original_and_picks_the_alias_it_was_sent_to():
+    cfg = _cfg()
+    m = _m(1, to="ventes@x.be, moi@y.be", cc="tiers@z.be", reply_to="", message_id="<m1@x>", references="<r0@x>", html="<p>Bonjour <script>x</script></p>")
+    a = C.reply_args(cfg, cfg["accounts"], m, all_=True, default_account="a1")
+    assert a["account_id"] == "ident:i1" and a["to"] == "s1@x.be" and a["subject"] == "Re: Sujet 1"
+    assert "moi@y.be" in a["cc"] and "tiers@z.be" in a["cc"] and "ventes@x.be" not in a["cc"]          # mes propres adresses n'y sont pas
+    assert "<blockquote>" in a["quote_html"] and "<script" not in a["quote_html"] and a["in_reply_to"] == "<m1@x>"
+    single = C.reply_args(cfg, cfg["accounts"], m, default_account="a1")
+    assert single["cc"] == ""
+    f = C.forward_args(_m(2, attachments=[{"filename": "a.pdf", "path": "/tmp/a.pdf"}]), "a1")
+    assert f["subject"] == "Fwd: Sujet 2" and f["attachments"] == ["/tmp/a.pdf"] and 'id="qt"' in f["quote_html"]
+
+
+def test_signature_follows_the_chosen_sender_and_never_duplicates():
+    cfg = _cfg()
+    acc, ident = C.resolve_from(cfg, cfg["accounts"], "ident:i1")
+    assert acc["id"] == "a1" and ident["email"] == "ventes@x.be"
+    assert [k for k, _ in C.from_choices(cfg, cfg["accounts"])] == ["a1", "ident:i1", "a2"]
+    sig = C.signature_html(acc, ident)
+    body = C.initial_content("", "<div id='qt'>cité</div>", sig)
+    assert body.count('id="sig"') == 1 and body.endswith("<div id='qt'>cité</div>")
+    other = C.signature_html({"signature_html": "Cordialement"}, None)
+    swapped = C.swap_signature(body, other)
+    assert "Équipe ventes" not in swapped and "Cordialement" in swapped and swapped.count('id="sig"') == 1
+    assert C.initial_content("<p>brouillon</p>", "", sig, raw=True) == "<p>brouillon</p>"
+    assert C.signature_html({"signature_html": "  "}, None) == ""
+
+
+def test_recipient_validation_and_outgoing_message():
+    assert C.valid_recipients("a@b.be, c@d.fr") and C.valid_recipients("a@b.be", "x@y.be", "z@t.be")
+    assert not C.valid_recipients("") and not C.valid_recipients("pas-une-adresse") and not C.valid_recipients("a@b.be", "oups")
+    cfg = _cfg()
+    acc, ident = C.resolve_from(cfg, cfg["accounts"], "ident:i1")
+    out = C.build_outgoing(acc, ident, " a@b.be ", "", "", "  ", "<p>x</p>", ["/tmp/f"], "<id@x>", "<r@x>")
+    assert out.account == "a1" and out.from_email == "ventes@x.be" and out.to == "a@b.be" and out.subject == "(Sans objet)" and out.in_reply_to == "<id@x>"
+    assert C.body_of_qt_html("<html><head><style>p{}</style></head><body style='x'><p>salut</p></body></html>") == "<p>salut</p>"
+
+
+def test_draft_roundtrip_and_schedule_times():
+    eng, cache, _ = _eng()
+    did = C.save_draft(cache, A, None, "a@b.be", "", "Objet", "<p>corps</p>", [], "<id@x>", "")
+    d = cache.get(did)
+    assert d.folder == "drafts" and d.to == "a@b.be" and d.subject == "Objet" and "corps" in d.text and not d.unread
+    again = C.save_draft(cache, A, did, "a@b.be", "", "Objet 2", "<p>autre</p>", [])
+    assert again == did and cache.get(did).subject == "Objet 2"
+    args = C.draft_args(cache.get(did))
+    assert args["draft_id"] == did and args["raw"] is True and args["account_id"] == "a1"
+    now = time.time()
+    assert C.at(1, 8) > now and C.next_monday() > now
+
+
+def test_outbox_sends_after_the_undo_delay_keeps_offline_messages_and_reports_failures():
+    eng, cache, be = _eng()
+    sent = []
+    be.send = lambda out: sent.append(out.subject)
+    eng.config = {"accounts": [A], "undo_seconds": 0}
+    oid = eng.queue_send(Outgoing(account="a1", to="x@y.be", subject="S1", html="<p>1</p>"))
+    out = eng.undo_send(oid)                                                   # annulé avant le départ : rien n'est envoyé
+    assert out.subject == "S1" and not eng.process_outbox() and not sent
+    eng.queue_send(Outgoing(account="a1", to="x@y.be", subject="S2", html="<p>2</p>"))
+    ev = eng.process_outbox()
+    assert [(k, o.subject) for k, o, _e in ev] == [("sent", "S2")] and sent == ["S2"] and not cache.outbox_due()
+    def down(out): raise ConnectionResetError("réseau")
+    be.send = down
+    eng.queue_send(Outgoing(account="a1", to="x@y.be", subject="S3", html="x"))
+    assert [k for k, _o, _e in eng.process_outbox()] == ["retry"] and cache.outbox_count() == 1       # conservé pour un nouvel essai
+    def refused(out): raise RuntimeError("550 refusé")
+    be.send = refused
+    cache.outbox_reschedule(cache.outbox_list()[0][0], time.time() - 1)
+    assert [k for k, _o, _e in eng.process_outbox()] == ["failed"] and cache.outbox_count() == 0
+    eng.queue_send(Outgoing(account="a1", to="x@y.be", subject="S4", html="x"), delay=3600, scheduled=True)
+    assert not eng.process_outbox() and cache.outbox_count() == 1               # programmé : attend son heure
+
+
+def test_demo_account_sent_messages_land_in_the_sent_folder():
+    eng, cache, _ = _eng()
+    eng.config = {"accounts": [], "undo_seconds": 0}
+    eng._backends["demo"] = V.make_backend(V.DEMO_ACCOUNT, eng.config)
+    eng._backends["demo"].send = lambda out: None
+    eng.queue_send(Outgoing(account="demo", to="x@y.be", subject="Démo", html="<p>hop</p>"))
+    assert [k for k, _o, _e in eng.process_outbox()] == ["sent"]
+    assert any(m.subject == "Démo" for m in cache.query("sent", "all"))
+    eng.snooze([_m(1)], time.time() + 3600)                                     # sans effet sur un message absent du cache, sans erreur

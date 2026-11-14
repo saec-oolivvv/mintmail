@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.20.0
+- Interface Qt (expérimentale, mintmail --qt) : rédaction complète (nouveau message, répondre, répondre à tous, transférer, brouillons, alias et signatures, pièces jointes, Cc/Cci, envoi différé, annulation de l'envoi) avec boîte d'envoi qui renvoie hors ligne, reporter au lendemain, raccourcis C R A F H J K et /
+
 ## 1.19.0
 - Interface Qt (expérimentale, mintmail --qt) : dossiers de rangement dans la barre latérale, archiver, supprimer, spam et « ce n'est pas du spam », favori, épingle, non lu, déplacer vers un dossier (raccourcis E, Suppr, !, S, P, U, V), vue « Non lus » qui garde le message ouvert jusqu'à ce qu'on passe à un autre ; actions enregistrées d'abord et rejouées hors ligne
 
