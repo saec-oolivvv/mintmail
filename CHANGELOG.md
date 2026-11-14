@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.35.12
+- Nouvelle commande « mintmail --test-login » : essaie la connexion IMAP de chaque compte (trois variantes) et affiche la réponse exacte du serveur, avec un test d'écriture du trousseau sur Mac ; n'affiche jamais un mot de passe
+
 ## 1.35.11
 - Mac : mots de passe de l'ancienne rubrique du trousseau récupérés une fois par compte (après la 1.35.6 tous semblaient absents, d'où l'échec IMAP) ; VERSION, langues et icônes toujours embarqués dans l'application (elle se déclarait en 1.0.0) ; diagnostic : liste de modules mise à jour
 

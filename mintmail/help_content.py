@@ -35,6 +35,7 @@ CLI_OPTIONS: List[Tuple[str, str]] = [
                               "Avec --no-test : lecture seule."),
     ("mintmail --qt", "Force l'interface Qt (c'est déjà l'interface par défaut dès que PySide6 est installé) et indique ce qui manque sinon."),
     ("mintmail --install-qt", "Installe l'interface Qt (PySide6) dans le venv privé de MintMail, sans droits administrateur, avec le détail à l'écran. Le paquet .deb le fait déjà tout seul ; sans paquet, MintMail le lance en arrière-plan au premier démarrage."),
+    ("mintmail --test-login", "Essaie la connexion IMAP de chaque compte (trois variantes) et affiche la réponse exacte du serveur ; sur Mac, teste aussi l'écriture dans le trousseau. N'affiche jamais un mot de passe."),
     ("mintmail --check-update", "Cherche une mise à jour et affiche le résultat détaillé (version, dépôt, signature, cause d'une erreur) : sans interface, sans rien installer. "
                                 "Code de sortie : 0 à jour, 10 mise à jour disponible, 1 erreur."),
 ]

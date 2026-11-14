@@ -1,4 +1,4 @@
-# Aide de MintMail 1.35.8
+# Aide de MintMail 1.35.11
 _Généré par `make docs` depuis l'aide intégrée (touche F1 dans l'application)._
 
 ## Premiers pas
@@ -466,6 +466,8 @@ mintmail --qt
     Force l'interface Qt (c'est déjà l'interface par défaut dès que PySide6 est installé) et indique ce qui manque sinon.
 mintmail --install-qt
     Installe l'interface Qt (PySide6) dans le venv privé de MintMail, sans droits administrateur, avec le détail à l'écran. Le paquet .deb le fait déjà tout seul ; sans paquet, MintMail le lance en arrière-plan au premier démarrage.
+mintmail --test-login
+    Essaie la connexion IMAP de chaque compte (trois variantes) et affiche la réponse exacte du serveur ; sur Mac, teste aussi l'écriture dans le trousseau. N'affiche jamais un mot de passe.
 mintmail --check-update
     Cherche une mise à jour et affiche le résultat détaillé (version, dépôt, signature, cause d'une erreur) : sans interface, sans rien installer. Code de sortie : 0 à jour, 10 mise à jour disponible, 1 erreur.
 ```
@@ -500,7 +502,7 @@ Mise à jour : sudo apt install ./mintmail_X.Y.Z_all.deb (vos réglages et votre
 
 ## À propos et crédits
 
-### MintMail 1.35.8
+### MintMail 1.35.11
 
 Le client mail pour Linux Mint dont l'IA est l'ADN : il lit, trie, résume, classe, rédige et agit avec vous — toujours avec votre accord.  
 Développé par SAEC — https://saec.me · Logiciel libre sous licence MIT (© 2026 SAEC) : vous pouvez l'utiliser, le modifier et le redistribuer. Application Qt (PySide6) / Python, sans service cloud imposé : vos mails, vos clés et vos réglages restent chez vous.

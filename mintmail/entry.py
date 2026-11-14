@@ -261,6 +261,52 @@ def _init_language() -> str:
     return i18n.init_from_config(value if isinstance(value, str) else "auto")
 
 
+def test_login_cli(out=print) -> int:
+    """`mintmail --test-login` : essaie la connexion IMAP de chaque compte et affiche la reponse EXACTE du serveur (jamais un mot de passe)."""
+    import imaplib
+    import ssl
+    import subprocess
+    from .store import Config, MAC_SERVICE
+    cfg = Config()
+    out("Python %s | OpenSSL %s | imaplib %s" % (sys.version.split()[0], ssl.OPENSSL_VERSION, getattr(imaplib, "__version__", "?")))
+    if sys.platform == "darwin":
+        r = subprocess.run(["/usr/bin/security", "-i"], input='add-generic-password -U -a "mm-test" -s "%s-test" -X 7465737431 -T /usr/bin/security\n' % MAC_SERVICE,
+                           capture_output=True, text=True, timeout=120)
+        g = subprocess.run(["/usr/bin/security", "find-generic-password", "-a", "mm-test", "-s", MAC_SERVICE + "-test", "-g"], capture_output=True, text=True, timeout=120)
+        out("keychain write: rc=%s err=%r | read: rc=%s out=%r" % (r.returncode, (r.stderr or "").strip()[:200], g.returncode, (g.stderr or "").strip()[:80]))
+        subprocess.run(["/usr/bin/security", "delete-generic-password", "-a", "mm-test", "-s", MAC_SERVICE + "-test"], capture_output=True, timeout=60)
+    bad = 0
+    for a in cfg.data.get("accounts", []):
+        if a.get("demo"):
+            continue
+        user = a.get("username") or a.get("email")
+        pw = cfg.password(a["id"])
+        out("")
+        out("== %s | user=%r | %s:%s ssl=%s | auth=%s" % (a.get("email"), user, a.get("imap_host"), a.get("imap_port"), a.get("imap_ssl", True), a.get("auth", "password")))
+        out("   " + ", ".join(["secret length=" + str(len(pw)), "spaces=" + str(pw.count(" ")), "dashes=" + str(pw.count("-")), "ascii=" + str(pw.isascii()), "edge-whitespace=" + str(pw != pw.strip())]))
+        if a.get("auth") == "oauth2":
+            out("   (oauth account: password test skipped)")
+            continue
+        variants = [("login(as stored)", pw, "login"), ("login(spaces and dashes removed)", pw.replace(" ", "").replace("-", ""), "login"), ("AUTHENTICATE PLAIN(as stored)", pw, "plain")]
+        for label, p, how in variants:
+            try:
+                if a.get("imap_ssl", True):
+                    im = imaplib.IMAP4_SSL(a["imap_host"], int(a["imap_port"]), ssl_context=ssl.create_default_context(), timeout=30)
+                else:
+                    im = imaplib.IMAP4(a["imap_host"], int(a["imap_port"]), timeout=30)
+                    im.starttls(ssl.create_default_context())
+                if how == "login":
+                    typ, data = im.login(user, p)
+                else:
+                    typ, data = im.authenticate("PLAIN", lambda _c, u=user, q=p: ("\0%s\0%s" % (u, q)).encode("utf-8"))
+                out("   %-36s -> OK" % label)
+                im.logout()
+            except Exception as e:
+                bad += 1
+                out("   %-36s -> %s: %s" % (label, type(e).__name__, str(e)[:200]))
+    return 1 if bad else 0
+
+
 def check_update_cli(api=None, allow_loopback=False, out=print) -> int:
     """`mintmail --check-update` : cherche une mise à jour et dit EXACTEMENT où on en est, sans interface et sans rien installer.
     Code de sortie : 0 à jour, 10 mise à jour disponible, 1 erreur."""
@@ -376,6 +422,8 @@ def main(argv=None) -> int:
         return reset_data()
     if "--send-due" in argv:
         return send_due()
+    if "--test-login" in argv:
+        return test_login_cli()
     if "--check-update" in argv:
         return check_update_cli()
     if "--check-pins" in argv:

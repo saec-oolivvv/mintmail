@@ -579,6 +579,10 @@
    "Installs the Qt interface (PySide6) in MintMail's private venv, without administrator rights, with the details on screen. The .deb package already does it by itself; without the package, MintMail starts it in the background at first launch."
   ],
   [
+   "mintmail --test-login",
+   "Tries the IMAP login of each account (three variants) and prints the server's exact reply; on Mac it also tests writing to the Keychain. Never prints a password."
+  ],
+  [
    "mintmail --check-update",
    "Checks for an update and prints the detailed result (version, repository, signature, cause of an error): no interface, nothing installed. Exit code: 0 up to date, 10 update available, 1 error."
   ]
