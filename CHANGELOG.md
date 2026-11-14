@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.32.1
+- Correctif interface Qt : la fenêtre principale ne s'ouvrait pas (« QTextBrowser » non importé dans qt/window.py, révélé par les tests chez vous avec le vrai PySide6) ; nouveau test qui détecte tout nom utilisé sans être défini ou importé, même sans PySide6
+
 ## 1.32.0
 - Interface Qt installée automatiquement : le paquet .deb installe PySide6 dans son venv privé (/usr/lib/mintmail/venv) à l'installation et à chaque mise à jour s'il manque, sans jamais bloquer l'installation en cas d'échec (réseau) ; sans paquet (sources), MintMail installe PySide6 en arrière-plan dans ~/.local/share/mintmail/qt-venv au premier démarrage (une tentative par jour, notification) en gardant l'ancienne interface en attendant, puis s'y relance tout seul ; commande « mintmail --install-qt » pour le faire à la main
 - Interface Qt : conversations comme dans la version GTK — un message par fil dans la liste avec le nombre de messages, gras tant qu'un message du fil est non lu, ouvrir un fil marque tous ses messages lus, archiver / supprimer / spam / favori / reporter / geste de balayage valent pour tout le fil ; réglage « Regrouper en conversations » actif

@@ -8,7 +8,7 @@ import time
 from PySide6.QtCore import QAbstractListModel, QModelIndex, QObject, Qt, QTimer, QUrl, Signal
 from PySide6.QtGui import QAction, QDesktopServices, QKeySequence
 from PySide6.QtWidgets import (QApplication, QFrame, QHBoxLayout, QLabel, QLineEdit, QListView, QListWidget, QListWidgetItem, QMainWindow, QMenu,
-                               QInputDialog, QMessageBox, QPushButton, QSplitter, QVBoxLayout, QWidget)
+                               QInputDialog, QMessageBox, QPushButton, QSplitter, QTextBrowser, QVBoxLayout, QWidget)
 
 from .. import APP_NAME, __version__
 from ..htmlsafe import safe_to_open
