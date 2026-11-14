@@ -354,6 +354,8 @@ def check_pins_cli(test=True, out=print, cfg=None, factory=None) -> int:
 def main(argv=None) -> int:
     argv = list(argv if argv is not None else sys.argv)
     _init_language()
+    from .netutil import ensure_ca_bundle
+    ensure_ca_bundle()                                     # Mac : certificats TLS de « certifi » quand le système n'en donne aucun
     if "--help" in argv or "-h" in argv:
         from . import help_content as H
         print(tr("MintMail %s — options :\n") % __version__)

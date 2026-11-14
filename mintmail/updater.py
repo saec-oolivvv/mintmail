@@ -34,6 +34,7 @@ HELPER = "/usr/lib/mintmail/apply-update"
 DOWNLOAD_HOSTS = ("github.com", "githubusercontent.com")
 CHECK_INTERVAL = 55 * 60          # « toutes les heures » : un peu moins d'une heure, pour absorber le décalage entre la recherche du démarrage et la minuterie horaire ; pendant que MintMail tourne ; au DÉMARRAGE la recherche a lieu à chaque fois (requête conditionnelle ETag : 304, quasi gratuite)
 MAX_JSON, MAX_DEB, MAX_SIG, MAX_SUMS = 2_000_000, 150_000_000, 8192, 65536
+MAX_DMG = 900_000_000                                                  # image disque Mac (Qt WebEngine comprise)
 _REPO = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]{0,99}/[A-Za-z0-9._-]{1,100}")
 
 
@@ -52,6 +53,9 @@ class Update:
     sums_url: str
     notes: str
     page: str
+    dmg_url: str = ""                                                      # Mac : image disque de la version pour CE processeur (joint par la CI) et sa somme de contrôle
+    dmg_sum_url: str = ""
+    dmg_size: int = 0
 
 
 @dataclass
@@ -173,8 +177,17 @@ def check(repo, current=__version__, etag="", api=API, allow_loopback=False) -> 
     if size > MAX_DEB:
         return Result("error", code="toobig")
     page = data.get("html_url") if isinstance(data.get("html_url"), str) and host_allowed(data.get("html_url")) else "https://github.com/%s/releases" % repo
+    dmg_name = mac_dmg_name(vtxt)
+    dmg, dsum = assets.get(dmg_name), assets.get(dmg_name + ".sha256")
+    dmg_url = dsum_url = ""
+    dmg_size = 0
+    if dmg and dsum and isinstance(dmg.get("browser_download_url"), str) and isinstance(dsum.get("browser_download_url"), str) \
+            and host_allowed(dmg["browser_download_url"], allow_loopback) and host_allowed(dsum["browser_download_url"], allow_loopback) \
+            and isinstance(dmg.get("size"), int) and 0 < dmg["size"] <= MAX_DMG:
+        dmg_url, dsum_url, dmg_size = dmg["browser_download_url"], dsum["browser_download_url"], dmg["size"]
     return Result("available", Update(vtxt, deb["browser_download_url"], size, sig["browser_download_url"] if sig else "",
-                                      sums["browser_download_url"] if sums else "", str(data.get("body") or "")[:2000], page))
+                                      sums["browser_download_url"] if sums else "", str(data.get("body") or "")[:2000], page,
+                                      dmg_url, dsum_url, dmg_size))
 
 
 def disk_version() -> str:
@@ -195,7 +208,7 @@ def restart_pending(current=__version__) -> str:
 def update_to_dict(up: Update) -> dict:
     """Forme enregistrable (réglages) d'une mise à jour détectée : permet d'afficher le bandeau dès le lancement suivant."""
     return {"version": up.version, "deb_url": up.deb_url, "deb_size": up.deb_size, "sig_url": up.sig_url, "sums_url": up.sums_url,
-            "notes": up.notes, "page": up.page}
+            "notes": up.notes, "page": up.page, "dmg_url": up.dmg_url, "dmg_sum_url": up.dmg_sum_url, "dmg_size": up.dmg_size}
 
 
 def update_from_dict(d, current=__version__, allow_loopback=False) -> Optional[Update]:
@@ -216,7 +229,12 @@ def update_from_dict(d, current=__version__, allow_loopback=False) -> Optional[U
             return None
         if not page or not host_allowed(page, allow_loopback):
             page = ""
-        return Update(version, deb_url, size, sig_url, sums_url, notes[:2000], page)
+        dmg_url, dmg_sum_url, dmg_size = d.get("dmg_url") or "", d.get("dmg_sum_url") or "", d.get("dmg_size") or 0
+        if not all(isinstance(x, str) for x in (dmg_url, dmg_sum_url)) or not isinstance(dmg_size, int) or not 0 <= dmg_size <= MAX_DMG \
+                or any(u and not host_allowed(u, allow_loopback) for u in (dmg_url, dmg_sum_url)):
+            dmg_url = dmg_sum_url = ""
+            dmg_size = 0
+        return Update(version, deb_url, size, sig_url, sums_url, notes[:2000], page, dmg_url, dmg_sum_url, dmg_size)
     except (TypeError, ValueError):
         return None
 
@@ -288,6 +306,46 @@ def fetch(update: Update, dest_dir, allow_loopback=False, progress=None):
         sig = d / (name + ".sig")
         _download(update.sig_url, sig, MAX_SIG, 0, allow_loopback)
     return deb, sig
+
+
+def mac_arch(machine=None) -> str:
+    import platform
+    m = (machine or platform.machine() or "").lower()
+    return "arm64" if m in ("arm64", "aarch64") else "x86_64"
+
+
+def mac_dmg_name(version, arch=None) -> str:
+    return "MintMail-%s-macos-%s.dmg" % (version, arch or mac_arch())
+
+
+def fetch_dmg(update: Update, dest_dir, allow_loopback=False, progress=None):
+    """Mac : télécharge l'image disque de la version et vérifie sa somme de contrôle (fichier .sha256 publié avec elle). Retourne le chemin.
+    Pas de signature SAEC ici (l'image est construite par GitHub, qui n'a jamais la clé privée) : la protection est HTTPS vers GitHub + cette somme."""
+    if not update.dmg_url or not update.dmg_sum_url:
+        raise UpdateError("nodmg")
+    dest = Path(dest_dir)
+    dest.mkdir(parents=True, exist_ok=True)
+    name = mac_dmg_name(update.version)
+    path = dest / name
+    digest = _download(update.dmg_url, path, MAX_DMG, update.dmg_size, allow_loopback, progress)
+    _s, _h, body = _get(update.dmg_sum_url, {"User-Agent": "MintMail/%s" % __version__}, MAX_SUMS, allow_loopback)
+    want = None
+    for line in body.decode("utf-8", "replace").splitlines():
+        m = re.fullmatch(r"([0-9a-fA-F]{64})(?:\s+\*?(\S+))?", line.strip())
+        if m and (not m.group(2) or os.path.basename(m.group(2)) == name):
+            want = m.group(1).lower()
+    if want is None or want != digest:
+        path.unlink(missing_ok=True)
+        raise UpdateError("checksum")
+    return path
+
+
+def open_dmg(path, runner=subprocess.run) -> bool:
+    """Mac : ouvre l'image disque dans le Finder (commande fixe)."""
+    try:
+        return runner(["/usr/bin/open", str(path)], capture_output=True, timeout=30).returncode == 0
+    except (OSError, subprocess.SubprocessError):
+        return False
 
 
 def can_install(pubkey=PUBKEY, helper=HELPER, which=shutil.which, platform=None) -> Tuple[bool, str]:

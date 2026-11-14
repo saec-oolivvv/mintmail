@@ -1,5 +1,6 @@
 """Logique de l'interface Qt SANS Qt : vues, lignes de liste, HTML du lecteur, synchronisation, lecture d'un message.
 S'appuie uniquement sur le moteur (store, backend, offline, htmlsafe, util) : testable partout."""
+import sys
 import time
 from typing import Dict, List, Tuple
 
@@ -116,6 +117,8 @@ class Engine(OfflineMixin):
             if acc is None:
                 raise RuntimeError("compte introuvable")
             if not acc.get("demo") and acc.get("auth") != "oauth2" and not self.config.password(aid):
+                if sys.platform == "darwin":
+                    raise RuntimeError(tr("Mot de passe du compte « %s » introuvable : saisissez-le à nouveau dans Paramètres → Comptes.") % (acc.get("email") or aid))
                 raise RuntimeError(tr("Mot de passe du compte « %s » introuvable : le trousseau est inaccessible depuis cet environnement (installez « keyring » dans le venv, ou créez-le avec --system-site-packages).") % (acc.get("email") or aid))
             self._backends[aid] = make_backend(acc, self.config)
         return self._backends[aid]

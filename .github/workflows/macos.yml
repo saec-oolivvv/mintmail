@@ -1,6 +1,7 @@
 name: Application macOS
-# Construit MintMail-<version>-macos.dmg sur un Mac hébergé par GitHub : à la main (Actions → Application macOS → Run workflow)
-# et automatiquement à la publication d'une Release, où le .dmg est joint. Non signé par Apple (clic droit → Ouvrir au premier lancement).
+# Construit MintMail-<version>-macos-<arch>.dmg (+ .sha256) sur des Mac hébergés par GitHub, pour Apple Silicon (arm64) ET Intel (x86_64) :
+# à la main (Actions → Application macOS → Run workflow) et automatiquement à la publication d'une Release, où les fichiers sont joints
+# (la mise à jour intégrée de MintMail les y cherche). Non signé par Apple : clic droit → Ouvrir au premier lancement.
 on:
   workflow_dispatch:
   release:
@@ -9,18 +10,40 @@ permissions:
   contents: write
 jobs:
   dmg:
-    runs-on: macos-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: macos-14            # Apple Silicon
+          - runner: macos-15-intel      # Intel
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'release' && github.event.release.tag_name || github.ref }}
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - run: sh packaging/build-macos.sh
+      - name: Construire le .dmg
+        shell: bash
+        run: |
+          set -o pipefail
+          sh packaging/build-macos.sh 2>&1 | tee build.log
+      - name: Journal de construction (utile en cas d'échec)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-log-${{ matrix.runner }}
+          path: build.log
       - uses: actions/upload-artifact@v4
         with:
-          name: MintMail-macos
-          path: dist/*.dmg
-      - if: github.event_name == 'release'
+          name: MintMail-macos-${{ matrix.runner }}
+          path: |
+            dist/*.dmg
+            dist/*.dmg.sha256
+      - name: Joindre à la Release
+        if: github.event_name == 'release'
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release upload "${{ github.event.release.tag_name }}" dist/*.dmg --clobber
+        run: gh release upload "${{ github.event.release.tag_name }}" dist/*.dmg dist/*.dmg.sha256 --clobber

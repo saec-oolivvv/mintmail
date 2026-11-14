@@ -437,7 +437,7 @@ def test_packaging_installs_helper_policy_and_key_with_safe_permissions():
 
 
 def test_every_update_error_code_has_a_translated_explanation():
-    codes = ["macos", "network", "ratelimit", "norelease", "badrepo", "badjson", "badversion", "noasset", "badurl", "toobig", "badsize", "checksum", "http", "nokey", "unsigned",
+    codes = ["macos", "nodmg", "network", "ratelimit", "norelease", "badrepo", "badjson", "badversion", "noasset", "badurl", "toobig", "badsize", "checksum", "http", "nokey", "unsigned",
              "bad_signature", "bad_package", "not_newer", "bad_file", "key_untrusted", "install_failed", "cancelled", "nohelper", "not_root", "usage", "internal"]
     texts = {c: UI.explain(c) for c in codes}
     assert all(t and "(%s)" not in t for t in texts.values()) and len(set(texts.values())) == len(codes)

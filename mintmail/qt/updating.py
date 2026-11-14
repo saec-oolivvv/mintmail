@@ -13,6 +13,10 @@ from ..i18n import tr
 from ..update_text import explain
 
 
+def _mac() -> bool:
+    return sys.platform == "darwin"
+
+
 class UpdateState:
     def __init__(self, config, upd=updater, version=__version__, now: Callable[[], float] = time.time):
         self.config, self.upd, self.version, self.now = config, upd, version, now
@@ -54,6 +58,10 @@ class UpdateState:
     def show_done(self, version):
         self._set("done", "✔", tr("MintMail %s est installé") % version, tr("Relancez MintMail pour profiter de la nouvelle version."), "", None,
                   ["restart", "close"])
+
+    def show_mac_done(self, version):
+        self._set("done", "✔", tr("MintMail %s est téléchargé") % version,
+                  tr("Glissez MintMail dans le dossier Applications (la fenêtre vient de s'ouvrir), puis relancez-le."), "", None, ["close"])
 
     def show_error(self, text, page=""):
         self._set("error", "⚠", tr("La mise à jour a échoué"), text, "", None, ["retry"] + (["notes"] if page else []) + ["close"])
@@ -146,6 +154,14 @@ class UpdateState:
             self.update = None
             self.refresh()
             return ""
+        if _mac():                                                                       # Mac : image disque téléchargée puis ouverte (pas de paquet .deb ni de clé)
+            if not (up.dmg_url and up.dmg_sum_url):
+                text = explain("nodmg")
+                self.show_error(text, up.page)
+                return text
+            self.busy = True
+            self.show_progress(up.version, tr("Téléchargement…"), 0.0)
+            return None
         ok, why = self.upd.can_install()
         if not ok and why == "nokey" and source_repo():                                  # lancé depuis les sources (venv, dépôt cloné) : mise à jour par git
             self.busy = True
@@ -163,6 +179,16 @@ class UpdateState:
         """Téléchargement, vérification de la signature puis installation (réseau et mot de passe administrateur : EN FOND).
         Retourne (réussi, code, détail)."""
         up, last = self.update, {"pct": -1}
+        if _mac():
+            def mac_progress(done, total):
+                pct = int(100 * done / total) if total else -1
+                if pct != last["pct"]:
+                    last["pct"] = pct
+                    stage(up.version, tr("Téléchargement…"), (done / total) if total else None)
+            path = self.upd.fetch_dmg(up, os.path.expanduser("~/Downloads"), progress=mac_progress)
+            stage(up.version, tr("Ouverture de l'image disque…"), None)
+            self.upd.open_dmg(path)
+            return True, "", str(path)
         if not self.upd.can_install()[0] and source_repo():
             stage(up.version, tr("Mise à jour du dépôt…"), None)
             return git_update(source_repo())
@@ -192,6 +218,9 @@ class UpdateState:
         if ok:
             self.update, c["update_available"], self.chip = None, None, ""
             c.save()
+            if _mac():
+                self.show_mac_done(up.version)
+                return ""
             self.upd.cleanup()
             self.show_done(detail or up.version)
             return ""
@@ -226,6 +255,8 @@ class UpdateState:
         return lines
 
     def key_line(self) -> str:
+        if _mac():
+            return tr("Mac : « Installer » télécharge l'image disque (.dmg) de la nouvelle version, vérifie sa somme de contrôle et l'ouvre : vous la glissez dans Applications.")
         ok, why = self.upd.can_install()
         if not ok and why == "nokey" and source_repo():
             return tr("Mise à jour depuis le dépôt de sources (git) : prête, MintMail est lancé depuis les sources.")

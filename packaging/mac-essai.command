@@ -13,7 +13,7 @@ if [ ! -x .venv-essai/bin/python ]; then
     echo "→ Première fois : préparation de l'environnement (quelques minutes)…"
     "$PY" -m venv .venv-essai || exit 1
     .venv-essai/bin/pip install --quiet --upgrade pip || exit 1
-    .venv-essai/bin/pip install --quiet PySide6 keyring || { echo "Échec du téléchargement de PySide6 (réseau ?)."; exit 1; }
+    .venv-essai/bin/pip install --quiet PySide6 keyring certifi || { echo "Échec du téléchargement de PySide6 (réseau ?)."; exit 1; }
 fi
 export MINTMAIL_NO_AUTOINSTALL=1
 echo "→ Lancement de MintMail $(cat VERSION 2>/dev/null)…  (journal d'erreurs : ~/Library/Application Support/MintMail/data/mintmail.log)"

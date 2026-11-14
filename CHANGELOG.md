@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.35.8
+- Mac : mise à jour intégrée comme sous Linux (télécharge le .dmg de la bonne architecture, vérifie la somme SHA-256, l'ouvre) ; CI GitHub arm64 + Intel avec journal conservé ; numéro de version de l'app ; certificats TLS (certifi)
+
 ## 1.35.7
 - Documentation en anglais (README, SECURITY, CHANGELOG, docs) ; README.fr.md et SECURITY.fr.md conservés ; docs/ARCHITECTURE.md remplace les notes de portage GTK ; l'aide dit que la recherche de mise à jour a lieu à chaque lancement puis chaque heure
 

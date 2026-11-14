@@ -13,7 +13,7 @@ Multi-account IMAP/SMTP, smart inbox, AI summaries and folder sorting, smart rep
   sudo apt install ./mintmail_X.Y.Z_all.deb
   ```
   Dependencies (Python 3 and the Qt / PySide6 interface, installed in the package's private environment) come automatically. To update, install the new `.deb` (or use *Settings → Updates*); your settings and cache are kept.
-- **macOS (`.dmg`)**: `MintMail-X.Y.Z-macos.dmg`, attached to each Release (or build it yourself on a Mac: `sh packaging/build-macos.sh`). Drag MintMail to *Applications*. The app is not signed by Apple yet: right-click → **Open** the first time. Updates are manual on macOS (download the new `.dmg`, replace the app). To try MintMail without installing anything: `packaging/mac-essai.command`.
+- **macOS (`.dmg`)**: `MintMail-X.Y.Z-macos.dmg`, attached to each Release (one for Apple Silicon `arm64`, one for Intel `x86_64`; or build it yourself on a Mac: `sh packaging/build-macos.sh`). Drag MintMail to *Applications*. The app is not signed by Apple yet: right-click → **Open** the first time. *Settings → Updates → Install* on macOS downloads the new `.dmg`, checks its checksum and opens it: drag the app into *Applications*. To try MintMail without installing anything: `packaging/mac-essai.command`.
 - **Source code**: **Code → Download ZIP**, or `git clone`.
 - **Build the package yourself**: `make deb` (needs `dpkg-deb` and `python3`) → `dist/mintmail_<version>_all.deb`.
 
@@ -46,7 +46,7 @@ The interface is available in **French, English, Dutch, German and Spanish**: Se
 
 ## Updates
 
-Settings → **Updates**: MintMail looks for a new version on GitHub (every hour while running and at each launch, anonymous request, can be turned off). On Linux it installs it in one click after checking a **signature**, with your administrator password. On macOS it announces the new version and you download the `.dmg`. How it works and its security: [docs/UPDATES.md](docs/UPDATES.md). Publishing a version: [docs/RELEASING.md](docs/RELEASING.md) (`tools/release.sh`).
+Settings → **Updates**: MintMail looks for a new version on GitHub (every hour while running and at each launch, anonymous request, can be turned off). On Linux it installs it in one click after checking a **signature**, with your administrator password. On macOS it downloads the new `.dmg` (checksum verified, no SAEC signature) and opens it for you to drag into Applications. How it works and its security: [docs/UPDATES.md](docs/UPDATES.md). Publishing a version: [docs/RELEASING.md](docs/RELEASING.md) (`tools/release.sh`).
 
 ## Security
 

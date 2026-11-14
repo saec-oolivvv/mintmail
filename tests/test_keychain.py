@@ -50,3 +50,18 @@ def test_mac_keychain_goes_through_the_apple_security_tool_without_the_password_
     assert store.mac_keychain("get_password", "mintmail", "x", run=lambda *a, **k: R(44, "", "not found")) is None
     assert store.mac_keychain("set_password", "mintmail", "x", "a\nb", run=run) is False        # un saut de ligne casserait la commande : repli fichier 0600
     assert store.mac_keychain("get_password", "mintmail", "x", run=lambda *a, **k: (_ for _ in ()).throw(OSError("absent"))) is None
+
+
+def test_ca_bundle_is_taken_from_certifi_only_when_the_system_gives_none():
+    from mintmail import netutil
+    ctx = lambda n: (lambda: type("C", (), {"cert_store_stats": lambda self: {"x509_ca": n}})())
+    here = os.path.abspath(__file__)
+    env = {}
+    assert netutil.ensure_ca_bundle(env, ctx(0), lambda: here) == here and env["SSL_CERT_FILE"] == here        # aucun certificat système : certifi
+    env = {}
+    assert netutil.ensure_ca_bundle(env, ctx(140), lambda: here) == "" and env == {}                          # le système suffit : rien à faire
+    env = {"SSL_CERT_FILE": "/x"}
+    assert netutil.ensure_ca_bundle(env, ctx(0), lambda: here) == "" and env == {"SSL_CERT_FILE": "/x"}       # choix de l'utilisateur respecté
+    env = {}
+    assert netutil.ensure_ca_bundle(env, ctx(0), lambda: "/n'existe/pas") == "" and env == {}
+    assert netutil.ensure_ca_bundle({}, ctx(0), lambda: (_ for _ in ()).throw(ImportError("certifi")) ) == ""      # certifi absent : sans effet

@@ -81,3 +81,25 @@ def scan_candidates(limit: int = 1024) -> List[str]:
                 seen.add(s)
                 hosts.append(s)
     return hosts
+
+
+def ensure_ca_bundle(environ=None, make_context=None, certifi_path=None) -> str:
+    """Certificats TLS : sur Mac (Python embarqué dans l'application, ou Python.org), le système n'offre aucune autorité de certification à OpenSSL
+    et TOUTE connexion IMAP / SMTP / HTTPS échoue (« CERTIFICATE_VERIFY_FAILED »). Si c'est le cas et que « certifi » est disponible, on le désigne par
+    SSL_CERT_FILE (lu par ssl.create_default_context partout dans le programme). Retourne le fichier utilisé, ou « » s'il n'y a rien à faire."""
+    import os
+    import ssl
+    env = os.environ if environ is None else environ
+    if env.get("SSL_CERT_FILE"):
+        return ""
+    try:
+        ctx = (make_context or ssl.create_default_context)()
+        if ctx.cert_store_stats().get("x509_ca", 0) > 0:
+            return ""                                          # le système fournit déjà des certificats
+        path = certifi_path() if certifi_path else __import__("certifi").where()
+        if path and os.path.isfile(path):
+            env["SSL_CERT_FILE"] = path
+            return path
+    except Exception:
+        pass
+    return ""

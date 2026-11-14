@@ -1,4 +1,4 @@
-# Aide de MintMail 1.35.7
+# Aide de MintMail 1.35.8
 _Généré par `make docs` depuis l'aide intégrée (touche F1 dans l'application)._
 
 ## Premiers pas
@@ -500,7 +500,7 @@ Mise à jour : sudo apt install ./mintmail_X.Y.Z_all.deb (vos réglages et votre
 
 ## À propos et crédits
 
-### MintMail 1.35.7
+### MintMail 1.35.8
 
 Le client mail pour Linux Mint dont l'IA est l'ADN : il lit, trie, résume, classe, rédige et agit avec vous — toujours avec votre accord.  
 Développé par SAEC — https://saec.me · Logiciel libre sous licence MIT (© 2026 SAEC) : vous pouvez l'utiliser, le modifier et le redistribuer. Application Qt (PySide6) / Python, sans service cloud imposé : vos mails, vos clés et vos réglages restent chez vous.
