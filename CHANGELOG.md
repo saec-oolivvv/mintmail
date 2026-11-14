@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.30.1
+- Mises à jour : « clé de vérification absente » corrigée à la source — le paquet .deb ne supprime plus jamais la clé publique de mises à jour lors d'une installation (elle est mise à l'abri puis remise si le nouveau paquet n'en contient pas) ; MintMail lancé depuis les sources (dépôt cloné, venv) se met à jour avec git (fetch + pull --ff-only) puis propose de relancer, au lieu de s'arrêter sur l'absence de clé
+- Interface Qt : icône du programme sur toutes les fenêtres et dans la barre des tâches (X11 et Wayland), logo dans la barre latérale
+
 ## 1.30.0
 - Interface Qt (expérimentale, mintmail --qt) : recherches enregistrées comme dans la version GTK — « Enregistrer la recherche actuelle » (palette Ctrl+K), section « Recherches » dans la barre latérale (les recherches de la version GTK y apparaissent aussi, elles sont synchronisées), ouverture en un clic, suppression par clic droit ou par la palette
 

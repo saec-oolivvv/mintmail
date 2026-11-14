@@ -31,6 +31,7 @@ from .ui_readercard import QuickReply, ReaderCard
 from . import navtree as NT
 from . import gestures as GS
 from . import menus as MN
+from . import ui_appicon as AI
 from . import savedsearch as SS
 from .ui_palette import Palette
 from .ui_widgets import (AccountRole, AvatarWidget, CountRole, DepthRole, FoldedRole, InfoRole, KeyRole, KindRole, LabelRole, MessageDelegate, MessageList, NameRole,
@@ -121,6 +122,7 @@ class MainWindow(QMainWindow):
         self._busy, self._kept, self._tick, self._sending, self._composers = False, set(), 0, False, []
         self.t = T.resolve(self.config, QApplication.palette().window().color().lightness() < 128)
         self.setWindowTitle("%s %s (Qt)" % (APP_NAME, __version__))
+        self.setWindowIcon(AI.load())
         self.resize(1360, 840)
         self.setMinimumSize(900, 560)
 
@@ -133,8 +135,15 @@ class MainWindow(QMainWindow):
         sl.setSpacing(8)
         brand = QLabel(APP_NAME)
         brand.setObjectName("brand")
-        brand.setContentsMargins(22, 0, 22, 4)
-        sl.addWidget(brand)
+        logo = QLabel()
+        logo.setPixmap(AI.load().pixmap(28, 28))
+        brand.setContentsMargins(0, 0, 0, 0)
+        brow = QHBoxLayout()
+        brow.setContentsMargins(20, 0, 20, 4)
+        brow.setSpacing(10)
+        brow.addWidget(logo)
+        brow.addWidget(brand, 1)
+        sl.addLayout(brow)
         self.new_btn = QPushButton("✎   " + tr("Nouveau message"))
         self.new_btn.setObjectName("primary")
         self.new_btn.setCursor(Qt.PointingHandCursor)
@@ -1382,7 +1391,10 @@ def _keyring_hint():
 def run(argv=None):
     _keyring_hint()
     app = QApplication.instance() or QApplication(list(argv if argv is not None else sys.argv))
-    app.setApplicationName(APP_NAME)
+    app.setApplicationName("mintmail")                    # = StartupWMClass du lanceur : bonne icône dans la barre des tâches (X11)
+    app.setApplicationDisplayName(APP_NAME)
+    app.setDesktopFileName(AI.DESKTOP_ID)                  # idem sous Wayland
+    app.setWindowIcon(AI.load())
     win = MainWindow()
     win.show()
     return app.exec()

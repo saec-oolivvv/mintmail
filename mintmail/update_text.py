@@ -29,6 +29,7 @@ def explain(code, detail=""):
         "nohelper": tr("Installation automatique indisponible sur cette machine (pkexec ou programme d'installation absent)."),
         "not_root": tr("Droits administrateur requis."),
         "usage": tr("Appel invalide du programme d'installation."),
+        "git": tr("La mise à jour du dépôt de sources a échoué (modifications locales ou historique divergent) : lancez « sh mintmail-sync.sh » dans le terminal."),
         "internal": tr("Erreur interne pendant la mise à jour."),
     }
     return table.get(code, tr("Erreur de mise à jour (%s).") % code)

@@ -944,3 +944,36 @@ def test_saved_searches_are_added_replaced_deleted_and_resolved_like_the_gtk_ver
     cmds = MN.palette_commands(None, eng)
     assert ("Aller à : Factures", "goto:saved:0") in cmds and ("Supprimer la recherche enregistrée : Factures", "delsaved:0") in cmds
     assert ("Enregistrer la recherche actuelle", "save_search") in MN.palette_commands(None)
+
+
+# ------------------------------------------------------------------ mise à jour depuis les sources, icône
+from mintmail.qt import updating as UPD
+
+
+def test_source_checkout_updates_with_git_fast_forward_only_and_reports_failures():
+    calls = []
+
+    class R:
+        def __init__(self, rc, err=""):
+            self.returncode, self.stderr, self.stdout = rc, err, ""
+
+    def ok(cmd, **kw):
+        calls.append((cmd, kw["cwd"]))
+        return R(0)
+    assert UPD.git_update("/r", run=ok) == (True, "", "") and calls == [(["git", "fetch", "--tags", "origin"], "/r"), (["git", "pull", "--ff-only"], "/r")]
+    bad = lambda cmd, **kw: R(1, "fatal: Not possible to fast-forward")
+    res = UPD.git_update("/r", run=bad)
+    assert res[0] is False and res[1] == "git" and "fast-forward" in res[2]
+
+    def boom(cmd, **kw):
+        raise OSError("git absent")
+    assert UPD.git_update("/r", run=boom)[:2] == (False, "git")
+    from mintmail.update_text import explain
+    assert "sync" in explain("git")
+    assert UPD.source_repo() in ("", os.path.dirname(os.path.dirname(os.path.dirname(UPD.__file__))))
+
+
+def test_app_icon_files_cover_vector_and_all_png_sizes_in_numeric_order():
+    base = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "mintmail", "icons")
+    names = [os.path.basename(f) for f in sorted(__import__("glob").glob(os.path.join(base, "mintmail-*.png")), key=lambda f: int(os.path.basename(f)[9:-4]))]
+    assert names[0] == "mintmail-16.png" and names[-1] == "mintmail-512.png" and "mintmail-128.png" in names and os.path.isfile(os.path.join(base, "mintmail.svg"))

@@ -2,6 +2,8 @@
 
 UpdateState tient l'état (version annoncée, opération en cours, bandeau) ; l'interface lit `banner` et `status_lines()` et lance le réseau en fond.
 Aucune règle de sécurité n'est réimplémentée ici : tout passe par `updater` (signature RSA vérifiée, retour en arrière refusé, hôtes autorisés)."""
+import os
+import subprocess
 import sys
 import time
 from typing import Callable, Dict, List, Optional, Tuple
@@ -145,6 +147,10 @@ class UpdateState:
             self.refresh()
             return ""
         ok, why = self.upd.can_install()
+        if not ok and why == "nokey" and source_repo():                                  # lancé depuis les sources (venv, dépôt cloné) : mise à jour par git
+            self.busy = True
+            self.show_progress(up.version, tr("Mise à jour du dépôt…"), None)
+            return None
         if not ok:
             text = explain(why)
             self.show_error(text, up.page)
@@ -157,6 +163,9 @@ class UpdateState:
         """Téléchargement, vérification de la signature puis installation (réseau et mot de passe administrateur : EN FOND).
         Retourne (réussi, code, détail)."""
         up, last = self.update, {"pct": -1}
+        if not self.upd.can_install()[0] and source_repo():
+            stage(up.version, tr("Mise à jour du dépôt…"), None)
+            return git_update(source_repo())
 
         def progress(done, total):
             pct = int(100 * done / total) if total else -1
@@ -218,8 +227,29 @@ class UpdateState:
 
     def key_line(self) -> str:
         ok, why = self.upd.can_install()
+        if not ok and why == "nokey" and source_repo():
+            return tr("Mise à jour depuis le dépôt de sources (git) : prête, MintMail est lancé depuis les sources.")
         return tr("Installation automatique : prête (clé de vérification présente).") if ok else \
             tr("Installation automatique désactivée : %s Vous serez seulement informé des nouvelles versions.") % explain(why)
+
+
+def source_repo() -> str:
+    """Racine du dépôt git si MintMail est lancé depuis ses sources (venv + clone), sinon « »."""
+    root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    return root if os.path.isdir(os.path.join(root, ".git")) and os.path.isfile(os.path.join(root, "VERSION")) else ""
+
+
+def git_update(repo: str, run=subprocess.run):
+    """Met à jour un dépôt de sources : récupère GitHub puis avance sans conflit (--ff-only) ; commandes FIXES, aucun texte externe.
+    Retourne (réussi, code, détail) comme l'installation du paquet."""
+    try:
+        for cmd in (["git", "fetch", "--tags", "origin"], ["git", "pull", "--ff-only"]):
+            r = run(cmd, cwd=repo, capture_output=True, text=True, timeout=180)
+            if r.returncode != 0:
+                return False, "git", (r.stderr or r.stdout or "").strip()[-300:]
+    except (OSError, subprocess.SubprocessError) as e:
+        return False, "git", str(e)[:200]
+    return True, "", ""
 
 
 def restart_command() -> List[str]:

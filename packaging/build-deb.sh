@@ -123,10 +123,23 @@ Description: Client de messagerie moderne avec IA intégrée
  HTML signatures, rules, blocking and encrypted sync between your machines.
  The interface is available in French and English.
 EOT
+cat > $ROOT/DEBIAN/preinst <<'EOT'
+#!/bin/sh
+set -e
+# La clé publique de mises à jour ne doit JAMAIS disparaître lors d'une installation : si le paquet précédent en avait une, on la met à l'abri.
+if [ -f /usr/share/mintmail/update-pubkey.pem ] && [ ! -L /usr/share/mintmail/update-pubkey.pem ]; then
+    mkdir -p /var/lib/mintmail && cp -p /usr/share/mintmail/update-pubkey.pem /var/lib/mintmail/update-pubkey.pem.keep && chmod 644 /var/lib/mintmail/update-pubkey.pem.keep || true
+fi
+exit 0
+EOT
 cat > $ROOT/DEBIAN/postinst <<'EOT'
 #!/bin/sh
 set -e
 if [ "$1" = "configure" ]; then
+    # clé publique absente du nouveau paquet : on remet celle de l'installation précédente (propriété de root, comme exigé pour les mises à jour)
+    if [ ! -f /usr/share/mintmail/update-pubkey.pem ] && [ -f /var/lib/mintmail/update-pubkey.pem.keep ]; then
+        mkdir -p /usr/share/mintmail && cp /var/lib/mintmail/update-pubkey.pem.keep /usr/share/mintmail/update-pubkey.pem && chown root:root /usr/share/mintmail/update-pubkey.pem && chmod 644 /usr/share/mintmail/update-pubkey.pem || true
+    fi
     if command -v py3compile >/dev/null 2>&1; then py3compile -p mintmail || true; fi
     if command -v update-desktop-database >/dev/null 2>&1; then update-desktop-database -q /usr/share/applications || true; fi
     if command -v gtk-update-icon-cache >/dev/null 2>&1; then gtk-update-icon-cache -q -t -f /usr/share/icons/hicolor || true; fi
@@ -158,11 +171,11 @@ if [ "$1" = "remove" ] || [ "$1" = "purge" ]; then
 fi
 exit 0
 EOT
-chmod 755 $ROOT/DEBIAN/postinst $ROOT/DEBIAN/prerm $ROOT/DEBIAN/postrm
+chmod 755 $ROOT/DEBIAN/preinst $ROOT/DEBIAN/postinst $ROOT/DEBIAN/prerm $ROOT/DEBIAN/postrm
 find $ROOT -type d -exec chmod 755 {} +; find $ROOT/usr -type f -exec chmod 644 {} +; chmod 755 $ROOT/usr/bin/mintmail $ROOT/usr/lib/mintmail/apply-update   # pkexec exige un programme exécutable
 [ -f $ROOT/etc/mintmail/oauth-clients.json ] && echo /etc/mintmail/oauth-clients.json > $ROOT/DEBIAN/conffiles && chmod 644 $ROOT/etc/mintmail/oauth-clients.json
 (cd $ROOT && find usr -type f -exec md5sum {} + > DEBIAN/md5sums)
-for f in postinst prerm postrm; do sh -n $ROOT/DEBIAN/$f; done
+for f in preinst postinst prerm postrm; do sh -n $ROOT/DEBIAN/$f; done
 dpkg-deb --root-owner-group -Zxz --build $ROOT $OUT/mintmail_${FVER}_all.deb >/dev/null
 rm -rf "$OUT/build" "$CHG"
 echo "construit : $OUT/mintmail_${FVER}_all.deb"
