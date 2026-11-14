@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.33.1
+- Correctif : MintMail 1.33.0 ne se lançait plus (UnboundLocalError : DATA_DIR) ; nouveau test contre ce type de masquage
+
 ## 1.33.0
 - Interface Qt : réglages Signatures (aperçu en direct), Identités d'envoi (alias), Modèles de réponse et Contacts (carnet, recherche, import/export .vcf, « Écrire ») ; rédaction : menu « Modèles » et menu ✨ IA (rédiger depuis une idée, améliorer, corriger, raccourcir, développer, ton, traduire, suggérer un objet — sur la sélection ou sur le texte écrit) ; clic droit et palette « Ajouter aux contacts »
 - Interface Qt : correctif — changer d'expéditeur dans la rédaction dupliquait la signature (Qt perd les attributs id du HTML) ; la signature et la citation sont maintenant repérées par des marqueurs invisibles, retirés à l'envoi

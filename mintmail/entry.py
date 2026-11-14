@@ -357,7 +357,6 @@ def main(argv=None) -> int:
     _init_language()
     if "--help" in argv or "-h" in argv:
         from . import help_content as H
-        from .store import CONFIG_DIR, DATA_DIR
         print(tr("MintMail %s — options :\n") % __version__)
         print(H.cli_text({"config": str(CONFIG_DIR), "data": str(DATA_DIR), "version": __version__}))
         print(tr("\nAide complète dans l'application : touche F1."))
