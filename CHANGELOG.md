@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.34.2
+- Interface Qt : la liste affiche enfin les données de l'IA — pastille Important / Suspect et résumé de l'IA à la place de l'extrait
+
 ## 1.34.1
 - Correctif de publication : le contrôle des textes traduits refusait la 1.34.0 (texte de syncdata.py non déclaré) ; la 1.34.1 la remplace
 - Interface Qt : zoom du lecteur — plus d'avertissements « Point size <= 0 »

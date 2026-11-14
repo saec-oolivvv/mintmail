@@ -4,6 +4,7 @@ from PySide6.QtGui import QColor, QFont, QPainter, QPainterPath, QPen
 from PySide6.QtWidgets import QListView, QListWidget, QStyle, QStyledItemDelegate, QWidget
 
 from ..util import color_index, initials
+from ..i18n import tr
 from . import gestures as GS
 
 InfoRole = Qt.UserRole + 2
@@ -200,11 +201,12 @@ class MessageDelegate(QStyledItemDelegate):
         p.drawText(QRect(x, top, w - tw - 6, 18), Qt.AlignLeft | Qt.AlignVCenter,
                    p.fontMetrics().elidedText(info["sender"], Qt.ElideRight, w - tw - 6))
         # ligne 2 : objet + marques
-        marks = ("%d✉  " % info["count"] if info.get("count") else "") + ("📌 " if info["pinned"] else "") + ("★ " if info["starred"] else "") + ("📎" if info["attachments"] else "")
+        badge = (tr("⚠ Suspect") + "  ") if info.get("spam") else (tr("⚡ Important") + "  ") if info.get("prio") == 3 else ""
+        marks = badge + ("%d✉  " % info["count"] if info.get("count") else "") + ("📌 " if info["pinned"] else "") + ("★ " if info["starred"] else "") + ("📎" if info["attachments"] else "")
         p.setFont(small)
         mw = p.fontMetrics().horizontalAdvance(marks) + 4 if marks else 0
         if marks:
-            p.setPen(_c("#f5b301") if info["starred"] else _c(t["dim"]))
+            p.setPen(_c("#dc2626") if info.get("spam") else _c(t["accent"]) if info.get("prio") == 3 else _c("#f5b301") if info["starred"] else _c(t["dim"]))
             p.drawText(QRect(x + w - mw, top + 20, mw, 18), Qt.AlignRight | Qt.AlignVCenter, marks)
         sf = QFont(bold if unread else plain)
         sf.setBold(unread)
@@ -214,8 +216,10 @@ class MessageDelegate(QStyledItemDelegate):
                    p.fontMetrics().elidedText(info["subject"] or "", Qt.ElideRight, w - mw - 6))
         # ligne 3 : extrait
         p.setFont(small)
-        p.setPen(_c(t["dim"]))
-        p.drawText(QRect(x, top + 40, w, 18), Qt.AlignLeft | Qt.AlignVCenter, p.fontMetrics().elidedText(info["snippet"], Qt.ElideRight, w))
+        ai = info.get("ai")
+        p.setPen(_c(t["accent"]) if ai else _c(t["dim"]))                                  # résumé de l'IA en couleur d'accent
+        line = ("✨ " + ai) if ai else info["snippet"]
+        p.drawText(QRect(x, top + 40, w, 18), Qt.AlignLeft | Qt.AlignVCenter, p.fontMetrics().elidedText(line, Qt.ElideRight, w))
         if unread:
             p.setPen(Qt.NoPen)
             p.setBrush(_c(t["accent"]))
