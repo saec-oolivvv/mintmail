@@ -65,6 +65,11 @@ QLabel { background: transparent; }
 #dim { color: %(dim)s; }
 #subject { font-size: 18px; font-weight: %(hw)s; }
 #footer { color: %(dim)s; font-size: 12px; }
+#assistant { background: %(panel)s; border-left: 1px solid %(line)s; }
+#assistanthead { border-bottom: 1px solid %(line)s; }
+#bubble_user { background: %(accent)s; color: %(on)s; border-radius: 14px; padding: 9px 13px; }
+#bubble_ai { background: %(card)s; border: 1px solid %(line)s; border-radius: 14px; padding: 9px 13px; }
+#planrow { background: %(hover)s; border-radius: %(rs)dpx; }
 QListView, QListWidget { background: transparent; border: none; outline: 0; }
 QListView::item, QListWidget::item { border: none; }
 QLineEdit, QTextEdit, QComboBox, QSpinBox, QPlainTextEdit {

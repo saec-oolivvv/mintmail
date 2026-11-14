@@ -5,16 +5,19 @@ import threading
 from PySide6.QtCore import QObject, Qt, QUrl, Signal
 from PySide6.QtGui import QDesktopServices
 from PySide6.QtWidgets import (QCheckBox, QComboBox, QDialog, QDialogButtonBox, QFormLayout, QHBoxLayout, QLabel, QLineEdit, QListWidget,
-                               QListWidgetItem, QMessageBox, QPushButton, QSpinBox, QTabWidget, QVBoxLayout, QWidget)
+                               QListWidgetItem, QMenu, QMessageBox, QPushButton, QSpinBox, QTabWidget, QVBoxLayout, QWidget)
 
 from .. import oauth
 from ..i18n import tr
 from ..style import ACCENTS, STYLES
 from . import accounts as A
+from . import assistant as AS
 from . import automation as AU
 
 
 class _Signals(QObject):
+    ai_say = Signal(str, bool)
+    ai_models = Signal(object, str)
     say = Signal(str, bool)
     oauth_done = Signal(object, str)
 
@@ -27,12 +30,16 @@ class SettingsDialog(QDialog):
         self.resize(860, 620)
         self.sig = _Signals()
         self.sig.say.connect(self._say)
+        self.sig.ai_say.connect(self._ai_say)
+        self.sig.ai_models.connect(self._ai_models)
         self.sig.oauth_done.connect(self._oauth_done)
         self.current, self._oauth, self._oauth_token = {}, None, None
         tabs = QTabWidget()
         tabs.addTab(self._accounts_tab(), tr("Comptes"))
         tabs.addTab(self._look_tab(), tr("Apparence"))
         tabs.addTab(self._filters_tab(), tr("Filtres & blocage"))
+        tabs.addTab(self._ai_tab(), "✨ IA")
+        self.tabs = tabs
         close = QPushButton(tr("Fermer"))
         close.clicked.connect(self.accept)
         lay = QVBoxLayout(self)
@@ -42,6 +49,12 @@ class SettingsDialog(QDialog):
         row.addWidget(close)
         lay.addLayout(row)
         self._reload_accounts()
+
+    def open_page(self, page):
+        """Ouvre l'onglet demandé (par l'assistant ou « réglages de l'IA ») : accounts, look, filters ou ai."""
+        idx = {"accounts": 0, "look": 1, "appearance": 1, "filters": 2, "ai": 3}.get(page)
+        if idx is not None:
+            self.tabs.setCurrentIndex(idx)
 
     # ------------------------------------------------------------ comptes
     def _accounts_tab(self):
@@ -422,6 +435,127 @@ class SettingsDialog(QDialog):
 
     def _apply_rules_now(self):
         self.main.apply_rules_now()
+
+    # ------------------------------------------------------------ intelligence artificielle
+    def _ai_tab(self):
+        w = QWidget()
+        form = QFormLayout(w)
+        for key, label, default in AS.AI_SWITCHES:
+            c = QCheckBox(label)
+            c.setChecked(bool(self.cfg.get(key, default)))
+            c.toggled.connect(lambda v, k=key: self._set(k, bool(v)))
+            form.addRow("", c)
+        for key, label, default, options in AS.AI_CHOICES:
+            c = QComboBox()
+            for k, v in options:
+                c.addItem(v, k)
+            i = c.findData(self.cfg.get(key, default))
+            c.setCurrentIndex(i if i >= 0 else 0)
+            c.currentIndexChanged.connect(lambda _i, c=c, k=key: self._set(k, c.currentData()))
+            form.addRow(label, c)
+        self._ai_prov = QComboBox()
+        for k, (label, _b, _m, _n) in AS.PROVIDERS.items():
+            self._ai_prov.addItem(label, k)
+        i = self._ai_prov.findData(self.cfg.get("ai_provider", "nvidia"))
+        self._ai_prov.setCurrentIndex(max(i, 0))
+        form.addRow(tr("Fournisseur"), self._ai_prov)
+        has_key = bool(self.cfg.get("ai_has_key") or self.cfg.get("nvidia_api_key"))
+        self._ai_key = QLineEdit()
+        self._ai_key.setEchoMode(QLineEdit.Password)
+        save = QPushButton(tr("Enregistrer la clé"))
+        row = QHBoxLayout()
+        row.addWidget(self._ai_key, 1)
+        row.addWidget(save)
+        form.addRow(tr("Clé API"), row)
+        self._ai_base, self._ai_model = QLineEdit(), QLineEdit()
+        self._ai_base.setText(self.cfg.get("nvidia_api_base") or "")
+        self._ai_model.setText(self.cfg.get("ai_model") or "")
+        form.addRow(tr("Endpoint API"), self._ai_base)
+        form.addRow(tr("Modèle"), self._ai_model)
+        detect, test = QPushButton(tr("🔍 Détecter les modèles installés")), QPushButton(tr("Tester la connexion"))
+        self._ai_clear = QPushButton(tr("Vider le cache IA (%d éléments)") % self.main.cache.ai_count())
+        learn = QPushButton(tr("Oublier mes habitudes de rangement"))
+        for b in (detect, test, self._ai_clear, learn):
+            form.addRow("", b)
+        self._ai_status = QLabel("")
+        self._ai_status.setWordWrap(True)
+        form.addRow("", self._ai_status)
+
+        def placeholders():
+            base, model, needs = AS.set_provider(self.cfg, self._ai_prov.currentData())
+            self._ai_base.setPlaceholderText(base or "https://…/v1 (compatible OpenAI)")
+            self._ai_model.setPlaceholderText(model or tr("nom du modèle"))
+            self._ai_key.setPlaceholderText(tr("Clé enregistrée — saisir pour la remplacer") if has_key or self.cfg.get("ai_has_key") else (
+                tr("Clé API NVIDIA (nvapi-…)") if needs else tr("Facultatif (service local : aucune clé nécessaire)")))
+
+        def provider_changed(_i):
+            before = self.cfg.get("ai_provider", "nvidia")
+            placeholders()
+            if before != self.cfg.get("ai_provider"):
+                self._ai_base.clear()
+                self._ai_model.clear()
+        self._ai_prov.currentIndexChanged.connect(provider_changed)
+        placeholders()
+
+        def store_key():
+            if AS.save_key(self.cfg, self._ai_key.text()):
+                self._ai_key.clear()
+                self._ai_say(tr("Clé enregistrée dans le trousseau."), False)
+                placeholders()
+        save.clicked.connect(store_key)
+        self._ai_key.returnPressed.connect(store_key)
+
+        def store_base():
+            err = AS.save_endpoint(self.cfg, self._ai_base.text())
+            if err:
+                self._ai_say(err, True)
+        self._ai_base.editingFinished.connect(store_base)
+        self._ai_model.editingFinished.connect(lambda: (self.cfg.__setitem__("ai_model", self._ai_model.text().strip()), self.cfg.save()))
+
+        def do_test():
+            self._ai_say(tr("Test en cours…"), False)
+            args = (self._ai_key.text(), self._ai_base.text(), self._ai_model.text())
+
+            def work():
+                err, ok = AS.test_connection(self.cfg, *args)
+                self.sig.ai_say.emit(tr("Connexion réussie.") if ok else str(err), not ok)
+            threading.Thread(target=work, daemon=True).start()
+        test.clicked.connect(do_test)
+
+        def do_detect():
+            self._ai_say(tr("Recherche des modèles…"), False)
+            args = (self._ai_base.text(), self._ai_key.text())
+
+            def work():
+                try:
+                    self.sig.ai_models.emit(AS.detect_models(self.cfg, *args), "")
+                except AS.AIServiceError as e:
+                    self.sig.ai_models.emit([], str(e))
+            threading.Thread(target=work, daemon=True).start()
+        detect.clicked.connect(do_detect)
+        self._ai_detect = detect
+
+        def clear():
+            self.main.cache.ai_clear()
+            self._ai_clear.setText(tr("Vider le cache IA (0 élément)"))
+            self.main.reload()
+        self._ai_clear.clicked.connect(clear)
+        learn.clicked.connect(lambda: (self.main.cache.learn_clear(), self._ai_say(tr("Habitudes de rangement effacées."), False)))
+        return w
+
+    def _ai_say(self, text, error):
+        self._ai_status.setText(text)
+        self._ai_status.setStyleSheet("color: %s;" % ("#dc2626" if error else "#16a34a"))
+
+    def _ai_models(self, names, err):
+        if err:
+            self._ai_say(err + tr(" — Ollama est-il lancé (ollama serve) et un modèle installé (ollama pull llama3.2) ?"), True)
+            return
+        menu = QMenu(self)
+        for n in names[:40]:
+            menu.addAction(n, lambda n=n: (self._ai_model.setText(n), self.cfg.__setitem__("ai_model", n), self.cfg.save()))
+        self._ai_say(tr("%d modèle(s) trouvé(s) : choisissez-en un.") % len(names), False)
+        menu.exec(self._ai_detect.mapToGlobal(self._ai_detect.rect().bottomLeft()))
 
     def _combo(self, items, key):
         c = QComboBox()

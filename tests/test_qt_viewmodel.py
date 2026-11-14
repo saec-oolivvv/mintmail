@@ -459,3 +459,132 @@ def test_sync_and_route_only_filters_new_messages():
     assert cache.get("m1").folder == "inbox" and cache.get("m8").folder == "inbox"
     assert ("move", [9], "trash", False) in be.calls                                           # le serveur est prévenu du rangement
     assert fresh == 1                                                                         # m9 (bloqué) ne compte pas comme nouveau non lu
+
+
+# ------------------------------------------------------------------ assistant IA
+from mintmail.qt import assistant as AS
+
+
+class _FakeAI:
+    def __init__(self, plan=None, cls=None):
+        self._plan, self._cls, self.folder_names, self.asked = plan, cls, [], []
+
+    def plan(self, text, ctx, hist):
+        self.asked.append((text, ctx, hist))
+        return self._plan
+
+    def classify(self, msgs, existing, account=None, **kw):
+        return self._cls
+
+    def enabled(self):
+        return True
+
+    def local_digest(self, counts, msgs):
+        return "local %d" % len(msgs)
+
+
+def _eng_as(plan=None, cls=None, **extra):
+    eng, cache, be = _eng_au(**extra)
+    eng.config.setdefault("ai_privacy", "full")
+    eng.config.get = lambda k, d=None, _c=eng.config: dict.get(_c, k, d)
+    eng.ai = _FakeAI(plan, cls)
+    be.created = []
+    be.create_folder = lambda path: be.created.append(path)
+    return eng, cache, be
+
+
+def test_assistant_context_and_plan_resolution_follow_the_gtk_rules():
+    eng, cache, be = _eng_as({"reply": "ok", "actions": [{"type": "archive", "query": "from:s1"}, {"type": "trash", "query": "zzz"},
+                                                            {"type": "search", "query": "x"}, {"type": "not_spam"}]})
+    cache.upsert_many([_m(1), _m(2)])
+    res = AS.ask(eng, "range", "Boîte de réception", "all", None, [])
+    ctx = eng.ai.asked[0][1]
+    assert "Boîte de réception" in ctx and "Dossiers existants" in ctx and "Factures" in ctx and "Derniers non lus" in ctx
+    labels = [i["label"] for i in res["items"]]
+    assert "Archiver (1 message)" in labels[0] and "aucun message concerné" in labels[1] and labels[2].startswith("Rechercher")
+    assert res["items"][1]["action"] is None and res["items"][3]["action"] is None
+    assert eng.ai_hist[-1]["content"] == "ok" and eng.ai.folder_names
+    eng.config["ai_privacy"] = "minimal"
+    assert "Derniers non lus" not in AS.context(eng, "v", "all")
+
+
+def test_assistant_run_moves_flags_rules_and_ui_requests():
+    eng, cache, be = _eng_as()
+    ms = [_m(1), _m(2)]
+    cache.upsert_many(ms)
+    out = AS.run(eng, {"type": "archive"}, ms)
+    assert out["changed"] and ("move", [1, 2], "archive", False) in be.calls
+    out = AS.run(eng, {"type": "star"}, [_m(1)])
+    assert any(c[0] == "flags" for c in be.calls)
+    assert AS.run(eng, {"type": "search", "query": "is:unread"})["search"] == "is:unread"
+    assert AS.run(eng, {"type": "open_settings", "page": "ai"})["settings"] == "ai"
+    c = AS.run(eng, {"type": "compose", "to": "a@b.c", "subject": "S", "body": "x\ny"})["compose"]
+    assert c["to"] == "a@b.c" and "<br" in c["body_html"] or "<p" in c["body_html"]
+    AS.run(eng, {"type": "create_rule", "field": "subject", "text": "promo", "action": "trash"})
+    AS.run(eng, {"type": "create_rule", "field": "subject", "text": "promo", "action": "trash"})
+    assert eng.config["rules"] == [{"field": "subject", "text": "promo", "action": "trash"}]
+    AS.run(eng, {"type": "block_sender", "email": "@spam.io"})
+    assert eng.config["blocked"] == ["@spam.io"]
+    AS.run(eng, {"type": "block_sender"}, selected=[_m(7, sender_email="z@z.be")])
+    assert "z@z.be" in eng.config["blocked"]
+    cache.upsert(_m(5))
+    AS.run(eng, {"type": "snooze", "until": "3h"}, [_m(5)])
+    assert cache.get("m5").snoozed_until > time.time()
+    assert AS.snooze_time("nextweek") > time.time() and AS.snooze_time("weekend") > time.time()
+
+
+def test_assistant_creates_folders_once_and_moves_into_them():
+    eng, cache, be = _eng_as()
+    m = _m(1)
+    cache.upsert(m)
+    out = AS.run(eng, {"type": "move", "folder": "Clients"}, [m])
+    assert be.created == ["Clients"] and out["changed"] and ("move", [1], "f:Clients", False) in be.calls
+    assert any(e["label"] == "Clients" for e in eng.folder_entries("a1"))
+    AS.run(eng, {"type": "create_folder", "name": "Clients"})                                  # idempotent : rien de recréé
+    assert be.created == ["Clients"]
+    AS.run(eng, {"type": "create_folder", "name": "Alpha", "parent": "Clients"})
+    assert be.created == ["Clients", "Clients/Alpha"] and AU.find_folder(eng, "Clients › Alpha")
+    assert AS.ensure_folder(eng, "a1", "Clients › Beta")["path"] == "Clients › Beta"
+    assert AS.create_folder(eng, "a1", "///") is None
+    be.create_folder = lambda p: (_ for _ in ()).throw(RuntimeError("ALREADYEXISTS"))
+    assert AS.create_folder(eng, "a1", "Déjà")["label"] == "Déjà"                            # « existe déjà » n'est pas une erreur
+
+
+def test_assistant_classify_proposes_then_applies_only_on_approval():
+    eng, cache, be = _eng_as(cls={"moves": {"Factures": ["m1", "m2"], "Nouveau": ["m3"]}, "new": ["Nouveau"], "stay": 1})
+    ms = [_m(1), _m(2), _m(3), _m(4, folder="trash")]
+    cache.upsert_many(ms)
+    out = AS.run(eng, {"type": "classify"}, ms)
+    plan = out["plan"]
+    assert [p["folder"] for p in plan] == ["Factures", "Nouveau"] and plan[1]["new"] and "(nouveau dossier)" in plan[1]["label"]
+    assert not be.calls and not be.created                                                    # rien n'a bougé avant l'accord
+    assert AS.apply_group(eng, "a1", "Nouveau", plan[1]["msgs"]) == 1 and be.created == ["Nouveau"]
+    assert AS.apply_group(eng, "a1", "Factures", plan[0]["msgs"]) == 2
+
+
+def test_assistant_digest_is_local_without_ai_and_says_all_clear_when_empty():
+    eng, cache, _b = _eng_as()
+    assert "à jour" in AS.digest(eng)
+    cache.upsert_many([_m(1), _m(2)])
+    eng.ai.enabled = lambda: False
+    assert AS.digest(eng) == "local 2"
+
+
+def test_ai_settings_logic_provider_key_and_endpoint_rules():
+    class Cfg(dict):
+        def __init__(self, *a, **k):
+            super().__init__(*a, **k)
+            self.data, self.pw, self.saved = {"nvidia_api_key": "vieux"}, {}, 0
+        def save(self): self.saved += 1
+        def set_password(self, k, v): self.pw[k] = v
+    cfg = Cfg(ai_provider="nvidia", nvidia_api_base="https://x/v1", ai_model="m")
+    base, model, needs = AS.set_provider(cfg, "ollama")
+    assert base.startswith("http://localhost") and not needs and cfg["nvidia_api_base"] == "" and cfg["ai_model"] == ""
+    assert AS.set_provider(cfg, "nimporte")[2] is True and cfg["ai_provider"] == "nvidia"       # fournisseur inconnu → NVIDIA
+    assert AS.save_key(cfg, "  ") is False and AS.save_key(cfg, " nvapi-1 ") and cfg.pw["ai:nvidia"] == "nvapi-1"
+    assert cfg["ai_has_key"] is True and "nvidia_api_key" not in cfg.data                      # plus jamais en clair
+    assert AS.save_endpoint(cfg, "http://exemple.com/v1") and cfg["nvidia_api_base"] != "http://exemple.com/v1"
+    assert AS.save_endpoint(cfg, "https://exemple.com/v1") is None and cfg["nvidia_api_base"] == "https://exemple.com/v1"
+    assert AS.save_endpoint(cfg, "http://localhost:11434/v1") is None and AS.save_endpoint(cfg, "") is None and cfg["nvidia_api_base"] == ""
+    assert {k for k, _l, _d in AS.AI_SWITCHES} <= set(__import__("mintmail.store", fromlist=["DEFAULTS"]).DEFAULTS)
+    assert {k for k, _l, _d, _o in AS.AI_CHOICES} <= set(__import__("mintmail.store", fromlist=["DEFAULTS"]).DEFAULTS)

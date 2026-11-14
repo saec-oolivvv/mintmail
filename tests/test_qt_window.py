@@ -141,3 +141,21 @@ def test_block_sender_and_filters_tab():
     d._rules.setCurrentRow(0)
     d._remove_rule()
     assert d._rules.count() == 0
+
+
+def test_assistant_panel_toggles_and_unconfigured_ai_offers_settings():
+    if _qt() is None:
+        return
+    os.environ["MINTMAIL_QT_NO_WEBENGINE"] = "1"
+    w = _window()
+    w.show()
+    w.toggle_assistant(True)
+    assert w.assistant.isVisible()
+    w.assistant_ask("Résume ma boîte")                                                       # IA non configurée : un bouton ouvre les réglages
+    assert w.assistant.log.count() >= 4
+    w.toggle_assistant(False)
+    assert not w.assistant.isVisible()
+    from mintmail.qt.settings_window import SettingsDialog
+    d = SettingsDialog(w)
+    d.open_page("ai")
+    assert d.tabs.currentIndex() == 3

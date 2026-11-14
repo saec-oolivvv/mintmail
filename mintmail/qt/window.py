@@ -14,12 +14,14 @@ from .. import APP_NAME, __version__
 from ..htmlsafe import safe_to_open
 from ..i18n import tr
 from ..store import Cache, Config
+from . import assistant as AS
 from . import automation as AU
 from . import composing as C
 from . import theme as T
 from . import viewmodel as vm
 from .compose_window import ComposeWindow
 from .settings_window import SettingsDialog
+from .ui_assistant import AssistantPanel
 from .ui_widgets import AvatarWidget, CountRole, InfoRole, KeyRole, KindRole, LabelRole, MessageDelegate, NavDelegate
 
 IdRole = Qt.UserRole + 1
@@ -269,6 +271,11 @@ class MainWindow(QMainWindow):
         rh.setSpacing(0)
         rh.addWidget(side)
         rh.addWidget(split, 1)
+        self.assistant = AssistantPanel()
+        self.assistant.hide()
+        self.assistant.asked.connect(self.assistant_ask)
+        self.assistant.closed.connect(lambda: self.toggle_assistant(False))
+        rh.addWidget(self.assistant)
         self.setCentralWidget(root)
 
         # -- actions sur les messages (boutons de la colonne liste + raccourcis)
@@ -285,6 +292,7 @@ class MainWindow(QMainWindow):
         self._tool("✉", tr("Marquer comme non lu"), "U", lambda: self.toggle_flag("unread"), self_layout=self.actions_row)
         self.move_btn = self._tool("📁", tr("Déplacer vers…"), "V", self._move_menu, self_layout=self.actions_row)
         self.actions_row.addStretch(1)
+        self.ai_btn = self._tool("✨", tr("Assistant IA (Ctrl+J)"), "Ctrl+J", self.toggle_assistant, self_layout=self.actions_row)
         self._act(None, tr("Nouveau message"), "C", lambda: self.compose())
         self._act(None, tr("Paramètres"), "Ctrl+,", lambda: self.show_settings())
         self._act(None, tr("Rechercher"), "/", lambda: self.search.setFocus())
@@ -533,6 +541,85 @@ class MainWindow(QMainWindow):
         self.status.setText(tr("Bloqué : ") + key)
         self.move_messages(msgs, dest)
 
+    # ------------------------------------------------------------ assistant IA
+    def toggle_assistant(self, show=None):
+        show = (not self.assistant.isVisible()) if show is None else show
+        self.assistant.setVisible(bool(show))
+        if show:
+            self.assistant.focus_entry()
+
+    def assistant_ask(self, text):
+        p = self.assistant
+        self.toggle_assistant(True)
+        p.add_user(text)
+        ai = AS.ai_engine(self.engine)
+        if not ai.enabled():
+            p.add_ai(tr("L'IA n'est pas encore configurée. Ajoutez votre clé API NVIDIA pour que je puisse vous aider."))
+            p.add_plan([(tr("Ouvrir les réglages de l'IA"), lambda: self.show_settings(page="ai"))])
+            return
+        p.set_busy(True)
+        sel = self.selected_msgs()
+        args = (text, self.view_title(), self.account, self._open_msg(), sel)
+
+        def done(res, err):
+            p.set_busy(False)
+            if err:
+                p.add_ai(tr("Désolé, l'IA a rencontré une erreur : %s") % str(err)[:160])
+                return
+            if res["reply"]:
+                p.add_ai(res["reply"])
+            items = [(i["label"], (lambda i=i: self._assistant_run(i)) if i["action"] else None) for i in res["items"]]
+            if items:
+                p.add_plan(items)
+            elif not res["reply"]:
+                p.add_ai(tr("Je n'ai pas compris, pouvez-vous reformuler ?"))
+        self.run_bg(lambda: AS.ask(self.engine, *args), done)
+
+    def view_title(self):
+        return dict(vm.VIEWS).get(self.view_key, self.view_key)
+
+    def _assistant_run(self, item):
+        a, msgs, sel, acc = item["action"], item["msgs"], self.selected_msgs(), self.account
+
+        def done(out, err):
+            if err:
+                self.assistant.add_ai(tr("Désolé, l'IA a rencontré une erreur : %s") % str(err)[:160])
+                return
+            if out.get("changed"):
+                self.reload()
+                self._build_sidebar(self.view_key)
+            if out.get("toast"):
+                self.status.setText(out["toast"])
+            if out.get("search") is not None:
+                self.search.setText(out["search"])
+            if out.get("compose"):
+                self.compose(**out["compose"])
+            if out.get("settings") is not None or a["type"] == "open_settings":
+                self.show_settings(page=out.get("settings"))
+            if out.get("text"):
+                self.assistant.add_ai(out["text"])
+            if out.get("plan") is not None:
+                plan = out["plan"]
+                if not plan:
+                    self.assistant.add_ai(tr("Rien à ranger : ces messages restent dans la boîte de réception."))
+                else:
+                    self.assistant.add_plan([(g["label"], lambda g=g: self._apply_group(g)) for g in plan])
+        if a["type"] == "classify":
+            self.assistant.add_ai(tr("Je classe %d message(s)… Rien n'est déplacé ni créé avant votre accord.") % len(msgs))
+            self.assistant.set_busy(True)
+            inner = done
+            done = lambda out, err: (self.assistant.set_busy(False), inner(out, err))
+        self.run_bg(lambda: AS.run(self.engine, a, msgs, acc, sel), done)
+
+    def _apply_group(self, g):
+        def done(n, err):
+            if err:
+                self.status.setText("⚠ " + str(err)[:120])
+            else:
+                self.reload()
+                self._build_sidebar(self.view_key)
+        self.run_bg(lambda: AS.apply_group(self.engine, g["aid"], g["folder"], g["msgs"]), done)
+
     def move_messages(self, msgs, dest):
         """Déplace des messages (cache tout de suite, serveur en fond) — utilisé par les listes de blocage et les règles."""
         if not msgs:
@@ -560,8 +647,9 @@ class MainWindow(QMainWindow):
         menu.exec(self.move_btn.mapToGlobal(self.move_btn.rect().bottomLeft()))
 
     # ------------------------------------------------------------ paramètres et comptes
-    def show_settings(self, add=False):
+    def show_settings(self, add=False, page=None):
         dlg = SettingsDialog(self)
+        dlg.open_page(page)
         if add or not [a for a in self.config["accounts"]]:
             dlg._add_account()
         dlg.exec()
@@ -713,8 +801,15 @@ class MainWindow(QMainWindow):
             self.status.setText(tr("Synchronisation…"))
         self._background(lambda: (self.engine.flush(), AU.sync_and_route(self.engine)), "sync")
 
+    def run_bg(self, fn, cb):
+        """Travail en fond puis cb(résultat, erreur) dans le fil de l'interface."""
+        self._background(fn, cb)
+
     def _task_done(self, payload):
         tag, (res, err) = payload
+        if callable(tag):
+            tag(res, err)
+            return
         if tag == "outbox":
             self._sending = False
             for kind, out, e in (res or []):

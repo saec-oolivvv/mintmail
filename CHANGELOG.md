@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.23.0
+- Interface Qt (expérimentale, mintmail --qt) : assistant IA comme dans la version GTK — panneau Ctrl+J avec suggestions, plans d'actions à valider un par un ou d'un coup (archiver, supprimer, spam, ranger, créer un dossier ou une règle, bloquer un expéditeur, reporter, rédiger, résumer la boîte, rechercher), classement des messages par l'IA avec création des dossiers seulement après votre accord ; onglet « IA » des réglages (fournisseur NVIDIA / Ollama / autre, clé dans le trousseau, modèle, test de connexion, confidentialité, langue, ton)
+
 ## 1.22.0
 - Interface Qt (expérimentale, mintmail --qt) : filtres et blocage comme dans la version GTK — expéditeurs bloqués ou envoyés en spam (adresse ou domaine entier), bouton « Bloquer », « Ce n'est pas du spam » pour tout l'expéditeur, règles automatiques (archiver, supprimer, spam, lu, favori, épingle, ranger dans un dossier) appliquées aux seuls nouveaux messages après chaque synchronisation, onglet « Filtres & blocage » des paramètres avec « Appliquer maintenant »
 
