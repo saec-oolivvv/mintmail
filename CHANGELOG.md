@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.19.0
+- Interface Qt (expérimentale, mintmail --qt) : dossiers de rangement dans la barre latérale, archiver, supprimer, spam et « ce n'est pas du spam », favori, épingle, non lu, déplacer vers un dossier (raccourcis E, Suppr, !, S, P, U, V), vue « Non lus » qui garde le message ouvert jusqu'à ce qu'on passe à un autre ; actions enregistrées d'abord et rejouées hors ligne
+
 ## 1.18.0
 - Interface Qt (expérimentale) : « mintmail --qt » ouvre une fenêtre PySide6 avec dossiers, liste des messages et lecteur (HTML assaini, JavaScript coupé, liens filtrés), synchronisation en arrière-plan et message marqué lu sur le serveur ; l'interface habituelle ne change pas, et la CI teste aussi la fenêtre Qt sur Linux, Windows et macOS
 

@@ -13,7 +13,7 @@ class FakeBackend:
     demo = False
 
     def __init__(self):
-        self.calls, self.result, self.fail = [], ([], {}, None, 0), None
+        self.calls, self.result, self.fail, self.tree = [], ([], {}, None, 0), None, []
 
     def sync(self, logical, known, limit=60, on_batch=None, unseen=False):
         if self.fail:
@@ -21,7 +21,16 @@ class FakeBackend:
         return self.result if logical == "inbox" else ([], {}, None, 0)
 
     def set_flags_many(self, items, seen=None, flagged=None, **kw):
-        self.calls.append(("flags", [i.uid for i in items], seen))
+        self.calls.append(("flags", [i.uid for i in items], seen) if not kw and flagged is None else ("flags", [i.uid for i in items], seen, flagged, kw))
+
+    def move_many(self, items, dest, notjunk=False):
+        self.calls.append(("move", [i.uid for i in items], dest, notjunk))
+
+    def delete_many(self, items):
+        self.calls.append(("delete", [i.uid for i in items]))
+
+    def list_folders(self):
+        return self.tree
 
 
 def _eng():
@@ -99,3 +108,66 @@ def test_local_pending_action_wins_over_the_server_state_and_errors_are_reported
 def test_demo_account_is_used_without_configuration():
     assert V.accounts_of({"accounts": []})[0]["demo"] is True
     assert V.accounts_of({"accounts": [A]}) == [A]
+
+
+def test_move_updates_the_cache_first_then_the_server_and_resyncs_the_destination():
+    eng, cache, be = _eng()
+    cache.upsert_many([_m(1), _m(2)])
+    msgs = [cache.get_light("m1"), cache.get_light("m2")]
+    ids = eng.move(msgs, "archive")
+    assert cache.get("m1").folder == "archive" and cache.ops_count() == 2 - 1          # une action pour le compte
+    be.result = ([_m(11, folder="archive", real_folder="Archive")], {}, {11}, 1)
+    errors, offline = eng.finish_move(msgs, "archive", ids)
+    assert not errors and not offline and be.calls[0] == ("move", [1, 2], "archive", False) and cache.ops_count() == 0
+    assert cache.get("m1") is None                                                    # copie locale remplacée par celle du serveur
+    eng2, cache2, be2 = _eng()
+    cache2.upsert_many([_m(3, folder="spam", real_folder="Spam")])
+    m3 = [cache2.get_light("m3")]
+    eng2.finish_move(m3, "inbox", eng2.move(m3, "inbox"))
+    assert be2.calls[0] == ("move", [3], "inbox", True)                              # « Ce n'est pas du spam » apprend au serveur
+
+
+def test_move_offline_keeps_the_action_and_delete_forever_removes_locally():
+    eng, cache, be = _eng()
+    cache.upsert_many([_m(1), _m(2)])
+    def boom(items, dest, notjunk=False):
+        raise ConnectionResetError("réseau")
+    be.move_many = boom
+    m1 = [cache.get_light("m1")]
+    ids = eng.move(m1, "trash")
+    errors, offline = eng.finish_move(m1, "trash", ids)
+    assert offline and cache.ops_count() == 1 and cache.get("m1").folder == "trash"  # conservé, rejoué au retour du réseau
+    m2 = [cache.get_light("m2")]
+    ids = eng.delete_forever(m2)
+    assert cache.get("m2") is None
+    eng.run_ops(ids)
+    assert ("delete", [2]) in be.calls
+
+
+def test_flags_star_unread_pin_are_local_first_and_sent_to_the_server():
+    eng, cache, be = _eng()
+    cache.upsert_many([_m(1, unread=False)])
+    m = [cache.get_light("m1")]
+    for field, value in (("starred", True), ("unread", True), ("pinned", True)):
+        eng.run_ops(eng.set_flag(m, field, value))
+    c = cache.get("m1")
+    assert c.starred and c.unread and c.pinned
+    assert be.calls[0][3] is True and be.calls[1][2] is False and be.calls[2][4] == {"pinned": True}
+
+
+def test_folder_tree_lists_custom_folders_and_move_targets():
+    cfg = {"accounts": [A], "folders": {"a1": [
+        {"name": "INBOX", "label": "Boîte", "special": "inbox", "selectable": True, "depth": 0},
+        {"name": "LTD", "label": "LTD", "special": "", "selectable": True, "depth": 0},
+        {"name": "LTD/Sub", "label": "Sub", "special": "", "selectable": True, "depth": 1},
+        {"name": "[Gmail]", "label": "[Gmail]", "special": "", "selectable": False, "depth": 0}]}}
+    eng = V.Engine(cfg, Cache(os.path.join(tempfile.mkdtemp(), "c.db")))
+    nav = eng.nav_folders()
+    assert [(d, l, depth) for d, l, depth, _a in nav] == [("f:LTD", "LTD", 0), ("f:LTD/Sub", "Sub", 1)]
+    assert ("f:LTD", "LTD") in eng.move_targets("a1") and ("inbox", "Boîte") in eng.move_targets("a1")
+    eng2, _c, be = _eng()
+    be.tree = [{"name": "INBOX", "label": "I", "special": "inbox", "selectable": True, "depth": 0}, {"name": "Z", "label": "Z", "special": "", "selectable": True, "depth": 0}]
+    class Cfg(dict):
+        def save(self): self.saved = True
+    eng2.config = Cfg({"accounts": [A]})
+    assert eng2.refresh_folders() is True and eng2.config["folders"]["a1"] == be.tree and eng2.refresh_folders() is False

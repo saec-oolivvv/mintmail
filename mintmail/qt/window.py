@@ -6,9 +6,10 @@ import threading
 import time
 
 from PySide6.QtCore import QAbstractListModel, QModelIndex, QObject, QRect, QSize, Qt, QTimer, QUrl, Signal
-from PySide6.QtGui import QColor, QDesktopServices, QFont
-from PySide6.QtWidgets import (QApplication, QLabel, QLineEdit, QListView, QListWidget, QListWidgetItem, QMainWindow,
+from PySide6.QtGui import QAction, QColor, QDesktopServices, QFont, QKeySequence
+from PySide6.QtWidgets import (QApplication, QLabel, QMenu, QMessageBox, QLineEdit, QListView, QListWidget, QListWidgetItem, QMainWindow,
                                QPushButton, QSplitter, QStyle, QStyledItemDelegate, QTextBrowser, QToolBar, QVBoxLayout, QWidget)
+
 
 from .. import APP_NAME, __version__
 from ..htmlsafe import safe_to_open
@@ -141,17 +142,13 @@ class MainWindow(QMainWindow):
         self.config, self.cache = config or Config(), cache or Cache()
         self.engine = vm.Engine(self.config, self.cache)
         self.view_key, self.account, self.load_images, self.current = "inbox", "all", False, None
-        self._busy = False
+        self._busy, self._kept, self._tick = False, set(), 0
         self.setWindowTitle("%s %s (Qt)" % (APP_NAME, __version__))
         self.resize(1280, 800)
 
         self.folders = QListWidget()
         self.folders.setFixedWidth(210)
-        for key, label in vm.VIEWS:
-            it = QListWidgetItem(label)
-            it.setData(Qt.UserRole, key)
-            self.folders.addItem(it)
-        self.folders.setCurrentRow(0)
+        self._build_sidebar()
         self.folders.currentRowChanged.connect(self._view_changed)
 
         self.model = MessageModel()
@@ -159,6 +156,7 @@ class MainWindow(QMainWindow):
         self.list.setModel(self.model)
         self.list.setItemDelegate(MessageDelegate())
         self.list.setUniformItemSizes(True)
+        self.list.setSelectionMode(QListView.ExtendedSelection)
         self.list.selectionModel().currentChanged.connect(self._row_changed)
         self.search = QLineEdit()
         self.search.setPlaceholderText(tr("Rechercher"))
@@ -203,16 +201,31 @@ class MainWindow(QMainWindow):
         bar.setMovable(False)
         self.addToolBar(bar)
         bar.addAction(tr("Synchronisation…").rstrip("…"), self.sync)
+        bar.addSeparator()
+        self._act(bar, tr("Archiver"), "E", lambda: self.move_selected("archive"))
+        self._act(bar, tr("Supprimer"), "Delete", lambda: self.move_selected("trash"))
+        self._act(bar, tr("Signaler comme spam"), "!", lambda: self.move_selected("spam"))
+        self.notspam_act = self._act(bar, tr("Ce n'est pas du spam (retour en boîte de réception)"), None, lambda: self.move_selected("inbox"))
+        self.notspam_act.setVisible(False)
+        bar.addSeparator()
+        self._act(bar, tr("Favori"), "S", lambda: self.toggle_flag("starred"))
+        self._act(bar, tr("Épingler"), "P", lambda: self.toggle_flag("pinned"))
+        self._act(bar, tr("Marquer comme non lu"), "U", lambda: self.toggle_flag("unread"))
+        self.move_btn = QPushButton(tr("Déplacer vers…"))
+        self.move_btn.setShortcut(QKeySequence("V"))
+        self.move_btn.clicked.connect(self._move_menu)
+        bar.addWidget(self.move_btn)
         self.status = QLabel()
         self.statusBar().addWidget(self.status)
 
         self.bridge = _Bridge()
         self.bridge.done.connect(self._task_done)
         self.timer = QTimer(self)
-        self.timer.timeout.connect(lambda: self.sync(quiet=True))
+        self.timer.timeout.connect(self._on_timer)
         self.timer.start(60_000)
         self.reload()
         QTimer.singleShot(300, lambda: self.sync(quiet=True))
+        QTimer.singleShot(600, self._refresh_folders)
 
     # ------------------------------------------------------------ affichage
     def is_dark(self):
@@ -221,6 +234,13 @@ class MainWindow(QMainWindow):
     def reload(self):
         keep = self.current
         msgs = vm.list_view(self.cache, self.view_key, self.account, self.search.text())
+        if self.view_key == "unread" and self._kept:
+            have = {m.id for m in msgs}
+            for mid in self._kept - have:                   # « Non lus » : le message ouvert reste affiché jusqu'à ce qu'on passe à un autre
+                m = self.cache.get_light(mid)
+                if m is not None:
+                    msgs.append(m)
+            msgs.sort(key=lambda m: m.date, reverse=True)
         self.model.set_messages(msgs)
         self.empty.setVisible(not msgs)
         self.list.setVisible(bool(msgs))
@@ -228,31 +248,133 @@ class MainWindow(QMainWindow):
             r = self.model.row_of(keep)
             if r >= 0:
                 self.list.blockSignals(True)
+                self.list.selectionModel().blockSignals(True)
                 self.list.setCurrentIndex(self.model.index(r))
+                self.list.selectionModel().blockSignals(False)
                 self.list.blockSignals(False)
         self._update_counts()
 
+    def _build_sidebar(self, keep_key=None):
+        self.folders.blockSignals(True)
+        self.folders.clear()
+        for key, label in vm.VIEWS:
+            it = QListWidgetItem(label)
+            it.setData(Qt.UserRole, key)
+            it.setData(Qt.UserRole + 1, label)
+            self.folders.addItem(it)
+        for dest, label, depth, _aid in self.engine.nav_folders():
+            it = QListWidgetItem("    " * min(depth, 3) + label)
+            it.setData(Qt.UserRole, dest)
+            it.setData(Qt.UserRole + 1, "    " * min(depth, 3) + label)
+            self.folders.addItem(it)
+        keep_key = keep_key or getattr(self, "view_key", "inbox")
+        row = next((i for i in range(self.folders.count()) if self.folders.item(i).data(Qt.UserRole) == keep_key), 0)
+        self.folders.setCurrentRow(row)
+        self.folders.blockSignals(False)
+
     def _update_counts(self):
         c = vm.counts(self.cache, self.account)
-        for i, (key, label) in enumerate(vm.VIEWS):
+        for i in range(self.folders.count()):
+            it = self.folders.item(i)
+            key, label = it.data(Qt.UserRole), it.data(Qt.UserRole + 1)
             n = c.get(key, 0)
-            self.folders.item(i).setText("%s  (%d)" % (label, n) if n and key != "drafts" else label)
+            it.setText("%s  (%d)" % (label, n) if n and key != "drafts" else label)
+        self.notspam_act.setVisible(self.view_key == "spam")
 
     def _view_changed(self, row):
         if row >= 0:
             self.view_key = self.folders.item(row).data(Qt.UserRole)
-            self.current = None
+            self.current, self._kept = None, set()
             self.reload()
             self._show(None)
 
     def _row_changed(self, cur, _prev):
         mid = cur.data(IdRole) if cur.isValid() else None
+        old = self.current
         self.current, self.load_images = mid, False
+        if old and old != mid and old in self._kept:
+            self._kept.discard(old)                          # on est passé à un autre message : l'ancien quitte « Non lus »
+            QTimer.singleShot(0, self.reload)
+        if mid and self.view_key == "unread":
+            m = self.cache.get_light(mid)
+            if m is not None and m.unread:
+                self._kept.add(mid)
         self._show(self.engine.open_message(mid) if mid else None)
         if mid:
             self._update_counts()
             self._repaint_row(mid)
             self._background(self.engine.flush)
+
+    # ------------------------------------------------------------ actions
+    def _act(self, bar, text, shortcut, fn):
+        a = QAction(text, self)
+        if shortcut:
+            a.setShortcut(QKeySequence(shortcut))
+        a.triggered.connect(lambda _c=False: fn())
+        bar.addAction(a)
+        self.addAction(a)
+        return a
+
+    def selected_msgs(self):
+        rows = sorted({i.row() for i in self.list.selectionModel().selectedRows()})
+        if not rows and self.current:
+            rows = [r for r in [self.model.row_of(self.current)] if r >= 0]
+        return [self.model.msgs[r] for r in rows]
+
+    def _after_action(self, msgs, op_ids, tag, extra=None):
+        for m in msgs:
+            self._kept.discard(m.id)
+        self.current = None
+        self.list.clearSelection()
+        self.list.setCurrentIndex(QModelIndex())
+        self._show(None)
+        self.reload()
+        self._background(lambda: (extra() if extra else self.engine.run_ops(op_ids)), tag)
+
+    def move_selected(self, dest):
+        msgs = self.selected_msgs()
+        if not msgs:
+            return
+        if dest == "trash" and all(m.folder == "trash" for m in msgs):
+            ok = QMessageBox.question(self, APP_NAME, tr("Supprimer définitivement %d message(s) ?") % len(msgs)) == QMessageBox.Yes
+            if ok:
+                op_ids = self.engine.delete_forever(msgs)
+                self._after_action(msgs, op_ids, "ops")
+            return
+        op_ids = self.engine.move(msgs, dest)
+        self._after_action(msgs, op_ids, "move", lambda: self.engine.finish_move(msgs, dest, op_ids))
+
+    def toggle_flag(self, field):
+        msgs = self.selected_msgs()
+        if not msgs:
+            return
+        value = not getattr(msgs[0], field)                  # l'état du premier message décide pour tous
+        op_ids = self.engine.set_flag(msgs, field, value)
+        if field == "unread" and value:
+            self._kept.discard(msgs[0].id)
+        for m in msgs:
+            setattr(m, field, value)
+        self.reload()
+        self._background(lambda: self.engine.run_ops(op_ids), "ops")
+
+    def _move_menu(self):
+        msgs = self.selected_msgs()
+        if not msgs:
+            return
+        menu = QMenu(self)
+        for dest, label in self.engine.move_targets(msgs[0].account):
+            menu.addAction(label, lambda d=dest: self.move_selected(d))
+        menu.exec(self.move_btn.mapToGlobal(self.move_btn.rect().bottomLeft()))
+
+    # ------------------------------------------------------------ dossiers
+    def _refresh_folders(self):
+        self._background(self.engine.refresh_folders, "folders")
+
+    def _on_timer(self):
+        self._tick += 1
+        self.sync(quiet=True)
+        if self._tick % 5 == 0:
+            self._refresh_folders()
 
     def _repaint_row(self, mid):
         r = self.model.row_of(mid)
@@ -305,6 +427,16 @@ class MainWindow(QMainWindow):
 
     def _task_done(self, payload):
         tag, (res, err) = payload
+        if tag == "folders":
+            if res:
+                self._build_sidebar(self.view_key)
+            return
+        if tag in ("move", "ops"):
+            errs = [str(err)] if err else (list(res[0]) if tag == "move" and res else list(res[1]) if res else [])
+            if errs:
+                self.status.setText("⚠ " + errs[0][:120])
+            self.reload()
+            return
         if tag != "sync":
             return
         self._busy = False

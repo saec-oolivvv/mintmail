@@ -64,6 +64,15 @@ def header_lines(msg) -> Dict[str, str]:
             "to": msg.to, "subject": msg.subject, "date": time.strftime("%d/%m/%Y %H:%M", time.localtime(msg.date)) if msg.date else ""}
 
 
+SPECIAL = {"INBOX": "inbox", "Drafts": "drafts", "Sent": "sent", "Archive": "archive", "Spam": "spam", "Trash": "trash"}
+LOGICAL = {"inbox", "sent", "drafts", "archive", "spam", "trash"}
+
+
+def dest_of(entry) -> str:
+    """Identifiant de destination d'un dossier : nom logique (sent, trash…) ou « f:<nom réel> » — identique à l'interface GTK."""
+    return entry["special"] if entry.get("special") in LOGICAL else "f:" + entry["name"]
+
+
 class Engine(OfflineMixin):
     """Moteur sans interface : comptes, serveurs, actions en file, synchronisation. Une instance par fenêtre."""
 
@@ -94,10 +103,8 @@ class Engine(OfflineMixin):
 
     def set_unread(self, mid, unread):
         m = self.cache.get(mid)
-        if m is None:
-            return
-        self.cache.update(mid, unread=bool(unread))
-        self.op_enqueue("flags", [m], seen=not unread)
+        if m is not None:
+            self.set_flag([m], "unread", unread)
 
     # -- réseau (à appeler hors du fil de l'interface)
     def flush(self):
@@ -140,3 +147,82 @@ class Engine(OfflineMixin):
                 ups.setdefault((fl[0], fl[1]), []).append(mid)
         for (unread, starred), ids in ups.items():
             self.cache.update_many(ids, unread=unread, starred=starred)
+
+    # -- dossiers
+    def folder_entries(self, aid):
+        """Dossiers du compte connus (relevés sur le serveur), sinon les six dossiers de base."""
+        ents = (self.config.get("folders") or {}).get(aid)
+        return ents or [{"name": n, "label": n, "depth": 0, "special": k, "selectable": True} for n, k in SPECIAL.items()]
+
+    def nav_folders(self):
+        """Dossiers de rangement (hors dossiers spéciaux, déjà dans les vues) : [(destination, libellé, profondeur, compte)]."""
+        out, many = [], len(self.accounts()) > 1
+        for a in self.accounts():
+            for e in self.folder_entries(a["id"]):
+                if e.get("selectable", True) and e.get("special") not in LOGICAL:
+                    label = e.get("label") or e["name"]
+                    out.append((dest_of(e), ("%s › %s" % (a.get("name") or a["email"], label)) if many else label, e.get("depth", 0), a["id"]))
+        return out
+
+    def move_targets(self, aid):
+        """Destinations proposées pour déplacer un message de ce compte : [(destination, libellé)]."""
+        return [(dest_of(e), e.get("label") or e["name"]) for e in self.folder_entries(aid) if e.get("selectable", True)]
+
+    def refresh_folders(self):
+        """Relit l'arborescence sur le serveur (fond). Retourne True si elle a changé."""
+        tree, changed = dict(self.config.get("folders") or {}), False
+        for a in self.accounts():
+            if a.get("demo"):
+                continue
+            try:
+                ents = self.backend(a["id"]).list_folders()
+            except Exception:
+                continue
+            if ents and ents != tree.get(a["id"]):
+                tree[a["id"]], changed = ents, True
+        if changed:
+            self.config["folders"] = tree
+            self.config.save()
+        return changed
+
+    # -- actions sur des messages (cache d'abord, serveur ensuite : rien n'est perdu hors ligne)
+    def move(self, msgs, dest):
+        """Déplace dans le cache tout de suite ; retourne les identifiants d'actions à exécuter (finish_move, en fond)."""
+        self.cache.update_many([m.id for m in msgs], folder=dest, snoozed_until=0.0)
+        extra = {"notjunk": True} if dest == "inbox" and all(m.folder == "spam" for m in msgs) else {}
+        return self.op_enqueue("move", msgs, dest=dest, **extra)
+
+    def finish_move(self, msgs, dest, op_ids):
+        """Exécute le déplacement sur le serveur ; si tout va bien, remplace les copies locales par celles du serveur (bon UID, bon dossier).
+        Retourne (erreurs, hors_ligne)."""
+        _ok, errors, offline = self.op_run([o for o in self.cache.ops_pending() if o["id"] in op_ids])
+        if not errors and not offline:
+            real = []
+            for m in msgs:
+                try:
+                    if not self.backend(m.account).demo:
+                        real.append(m.id)
+                except Exception:
+                    pass
+            if real:
+                self.cache.delete_many(real)
+                self.sync(folders=("inbox", dest))
+        return errors, offline
+
+    def delete_forever(self, msgs):
+        self.cache.delete_many([m.id for m in msgs])
+        return self.op_enqueue("delete", msgs)
+
+    def run_ops(self, op_ids):
+        return self.op_run([o for o in self.cache.ops_pending() if o["id"] in op_ids])
+
+    def set_flag(self, msgs, field, value):
+        """field : starred (favori), unread (non lu) ou pinned (épingle, aussi enregistrée sur la boîte). Retourne les actions à exécuter."""
+        self.cache.update_many([m.id for m in msgs], **{field: bool(value)})
+        if field == "starred":
+            return self.op_enqueue("flags", msgs, flagged=bool(value))
+        if field == "unread":
+            return self.op_enqueue("flags", msgs, seen=not value)
+        if field == "pinned":
+            return self.op_enqueue("flags", msgs, pinned=bool(value))
+        raise ValueError(field)
