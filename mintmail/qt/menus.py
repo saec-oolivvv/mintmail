@@ -47,7 +47,7 @@ def palette_commands(msg, engine=None) -> List[Tuple[str, str]]:
              (tr("Disposition : colonnes"), "layout:columns"), (tr("Disposition : lecture en bas"), "layout:bottom"), (tr("Disposition : liste seule"), "layout:list"),
              (tr("Paramètres (Ctrl+,)"), "settings"), (tr("Réglages de l'IA"), "settings:ai"), (tr("Rechercher les mises à jour"), "updates"),
              (tr("Mises à jour"), "settings:updates"), (tr("Gestes de swipe (réglages)"), "settings:gestures"), (tr("Rechercher"), "search"),
-             (tr("Tout marquer comme lu"), "mark_all_read"), (tr("Tout sélectionner"), "select_all"), (tr("Mode sélection multiple"), "select_mode")]
+             (tr("Enregistrer la recherche actuelle"), "save_search"), (tr("Tout marquer comme lu"), "mark_all_read"), (tr("Tout sélectionner"), "select_all"), (tr("Mode sélection multiple"), "select_mode")]
     if engine is not None:
         many = len(engine.accounts()) > 1
         for acc in engine.accounts():
@@ -58,6 +58,9 @@ def palette_commands(msg, engine=None) -> List[Tuple[str, str]]:
                     if msg is not None:
                         cmds.append((tr("Déplacer vers : ") + nm, "move:" + dest_of(e)))
     cmds += [(tr("Aller à : ") + label, "goto:" + key) for key, label in VIEWS]
+    for i, sv in enumerate((getattr(engine, "config", None) or {}).get("saved_searches") or []) if engine is not None else []:
+        cmds.append((tr("Aller à : ") + sv.get("name", ""), "goto:saved:%d" % i))
+        cmds.append((tr("Supprimer la recherche enregistrée : ") + sv.get("name", ""), "delsaved:%d" % i))
     return cmds
 
 

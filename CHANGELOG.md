@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.30.0
+- Interface Qt (expérimentale, mintmail --qt) : recherches enregistrées comme dans la version GTK — « Enregistrer la recherche actuelle » (palette Ctrl+K), section « Recherches » dans la barre latérale (les recherches de la version GTK y apparaissent aussi, elles sont synchronisées), ouverture en un clic, suppression par clic droit ou par la palette
+
 ## 1.29.1
 - Correctif des tests de relecture des traductions : les catalogues de langue (en, nl, de, es et leurs fichiers d'état) ne se terminent plus par un saut de ligne superflu ; l'export / import à vide de l'outil de relecture ne les modifie plus (le test test_review_tools bloquait la publication depuis la 1.25.0)
 - Interface Qt : refonte graphique (cartes arrondies, messages en bulles) et mode sélection multiple (X, cases, barre « n sélectionnés », Ctrl+A, tout marquer comme lu)

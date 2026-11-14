@@ -926,3 +926,21 @@ def test_context_menu_labels_follow_the_message_state_and_palette_search_matches
 def test_palette_offers_bulk_commands_even_without_a_message():
     keys = [k for _l, k in MN.palette_commands(None)]
     assert {"mark_all_read", "select_all", "select_mode"} <= set(keys)
+
+
+# ------------------------------------------------------------------ recherches enregistrées
+from mintmail.qt import savedsearch as SS
+
+
+def test_saved_searches_are_added_replaced_deleted_and_resolved_like_the_gtk_version():
+    eng, cfg = _tree_eng()
+    cfg["saved_searches"] = []
+    assert SS.add(cfg, " ", "x") is None and SS.add(cfg, "n", "  ") is None and cfg["saved_searches"] == []
+    assert SS.add(cfg, "Factures", "from:acme facture") == "saved:0" and SS.add(cfg, "Non lus pro", "is:unread") == "saved:1"
+    assert SS.rows(cfg) == [("saved:0", "Factures"), ("saved:1", "Non lus pro")]
+    assert SS.query_of(cfg, "saved:0") == "from:acme facture" and SS.query_of(cfg, "inbox") == "" and SS.query_of(cfg, "saved:9") == "" and SS.query_of(cfg, "saved:x") == ""
+    assert SS.add(cfg, "Factures", "facture 2026") == "saved:1" and [s["name"] for s in cfg["saved_searches"]] == ["Non lus pro", "Factures"]     # même nom : remplacée
+    assert SS.delete(cfg, 0) is True and SS.delete(cfg, 5) is False and SS.rows(cfg) == [("saved:0", "Factures")]
+    cmds = MN.palette_commands(None, eng)
+    assert ("Aller à : Factures", "goto:saved:0") in cmds and ("Supprimer la recherche enregistrée : Factures", "delsaved:0") in cmds
+    assert ("Enregistrer la recherche actuelle", "save_search") in MN.palette_commands(None)

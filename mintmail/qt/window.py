@@ -8,7 +8,7 @@ import time
 from PySide6.QtCore import QAbstractListModel, QModelIndex, QObject, Qt, QTimer, QUrl, Signal
 from PySide6.QtGui import QAction, QDesktopServices, QKeySequence
 from PySide6.QtWidgets import (QApplication, QFrame, QHBoxLayout, QLabel, QLineEdit, QListView, QListWidget, QListWidgetItem, QMainWindow, QMenu,
-                               QMessageBox, QPushButton, QSplitter, QVBoxLayout, QWidget)
+                               QInputDialog, QMessageBox, QPushButton, QSplitter, QVBoxLayout, QWidget)
 
 from .. import APP_NAME, __version__
 from ..htmlsafe import safe_to_open
@@ -31,6 +31,7 @@ from .ui_readercard import QuickReply, ReaderCard
 from . import navtree as NT
 from . import gestures as GS
 from . import menus as MN
+from . import savedsearch as SS
 from .ui_palette import Palette
 from .ui_widgets import (AccountRole, AvatarWidget, CountRole, DepthRole, FoldedRole, InfoRole, KeyRole, KindRole, LabelRole, MessageDelegate, MessageList, NameRole,
                          NavDelegate, NavList, ToggleRole)
@@ -144,6 +145,8 @@ class MainWindow(QMainWindow):
         sl.addLayout(nb)
         self.folders = NavList()
         self.folders.toggled.connect(self._toggle_folder)
+        self.folders.setContextMenuPolicy(Qt.CustomContextMenu)
+        self.folders.customContextMenuRequested.connect(self._nav_menu)
         self.folders.setMouseTracking(True)
         self.folders.setFrameShape(QFrame.NoFrame)
         self.folders.setItemDelegate(NavDelegate(self.t))
@@ -431,7 +434,8 @@ class MainWindow(QMainWindow):
 
     def reload(self):
         keep = self.current
-        msgs = vm.list_view(self.cache, self.view_key, self.account, self.search.text())
+        msgs = vm.list_view(self.cache, self.view_key if not self.view_key.startswith(SS.PREFIX) else "inbox", self.account,
+                            self.search.text() or SS.query_of(self.config, self.view_key))
         if self.view_key == "unread" and self._kept:
             have = {m.id for m in msgs}
             for mid in self._kept - have:                   # « Non lus » : le message ouvert reste affiché jusqu'à ce qu'on passe à un autre
@@ -474,6 +478,17 @@ class MainWindow(QMainWindow):
                 it.setData(CountRole, 0)
                 it.setData(KindRole, "view")
                 it.setData(KindRole + 1, 0)
+                self.folders.addItem(it)
+        saved = SS.rows(self.config)
+        if saved:
+            self._caption(tr("Recherches"))
+            for key, name in saved:
+                it = QListWidgetItem(name)
+                it.setData(KeyRole, key)
+                it.setData(LabelRole, name)
+                it.setData(CountRole, 0)
+                it.setData(KindRole, "folder")
+                it.setData(DepthRole, 0)
                 self.folders.addItem(it)
         rows = NT.build(self.engine, self.config.get("collapsed_folders") or [])
         if rows:
@@ -581,6 +596,33 @@ class MainWindow(QMainWindow):
         self.right.setVisible(layout != "list")
         if layout == "bottom":
             self.split.setSizes([320, 520])
+
+    def save_current_search(self):
+        """Enregistre le texte de la barre de recherche sous un nom ; la recherche apparaît dans la section « Recherches »."""
+        q = self.search.text().strip() or SS.query_of(self.config, self.view_key)
+        if not q:
+            self.status.setText(tr("Tapez d'abord une recherche, puis enregistrez-la"))
+            return
+        name, ok = QInputDialog.getText(self, tr("Enregistrer la recherche"), tr("Enregistrer la recherche"), text=q)
+        key = SS.add(self.config, name, q) if ok else None
+        if key:
+            self.search.clear()
+            self._build_sidebar(key)
+            self._view_changed(next((i for i in range(self.folders.count()) if self.folders.item(i).data(KeyRole) == key), -1))
+
+    def _nav_menu(self, pos):
+        it = self.folders.itemAt(pos)
+        key = it.data(KeyRole) if it is not None else None
+        if not key or not str(key).startswith(SS.PREFIX):
+            return
+        menu = QMenu(self)
+        menu.addAction(tr("Supprimer la recherche enregistrée : ") + (it.data(LabelRole) or ""), lambda: self._delete_saved(int(key[len(SS.PREFIX):])))
+        menu.exec(self.folders.viewport().mapToGlobal(pos))
+
+    def _delete_saved(self, i):
+        SS.delete(self.config, i)
+        self._build_sidebar("inbox")
+        self._view_changed(next((n for n in range(self.folders.count()) if self.folders.item(n).data(KeyRole) == "inbox"), -1))
 
     def set_select_mode(self, on):
         """Mode sélection multiple : cases rondes sur chaque message, un clic coche / décoche ; barre « n sélectionnés » au-dessus de la liste."""
@@ -1139,12 +1181,14 @@ class MainWindow(QMainWindow):
         if head == "goto":
             self.select_view(arg)
             return self._view_changed(next((i for i in range(self.folders.count()) if self.folders.item(i).data(KeyRole) == arg), -1))
+        if head == "delsaved":
+            return self._delete_saved(int(arg))
         if head == "layout":
             return self.set_layout(arg)
         if head == "settings":
             return self.show_settings(page=arg or None)
         simple = {"assistant": lambda: self.toggle_assistant(True), "compose": self.compose, "sync": lambda: self.sync(False), "help": self.show_help,
-                  "apply_rules": self.apply_rules_now, "mark_all_read": self.mark_all_read, "select_all": self.select_all, "select_mode": lambda: self.sel_btn.toggle(), "updates": lambda: self.check_updates(manual=True), "search": self.search.setFocus}
+                  "apply_rules": self.apply_rules_now, "save_search": self.save_current_search, "mark_all_read": self.mark_all_read, "select_all": self.select_all, "select_mode": lambda: self.sel_btn.toggle(), "updates": lambda: self.check_updates(manual=True), "search": self.search.setFocus}
         if key in simple:
             simple[key]()
 
