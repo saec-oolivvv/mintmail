@@ -735,6 +735,10 @@ class MainWindow(UpdateMixin, ExtrasMixin, OfflineMixin, ListMixin, AIMixin, Fol
             short = 0 < len(str(self.config.get("p2p_secret") or "")) < P2P_MIN_SECRET
             self.p2p_lbl.set_text("⇄ " + eng.short_label()
                                   if eng.is_enabled() else (tr("⇄ désactivée : code < %d car.") % P2P_MIN_SECRET if short else ""))
+        if self._ticks % 60 == 30 and not self._sync_busy and not self._pending:
+            self.refresh_folders_soon(40)                   # dossier créé / renommé sur un autre poste
+            if time.time() - self._last_sync > 55:
+                self.sync(False, ("inbox",), quiet=True)    # épingles, lu, favoris, rangements faits ailleurs
         if self._ticks % 30 == 0:
             woken = self.cache.wake_snoozed()
             if woken:
@@ -1312,6 +1316,7 @@ class MainWindow(UpdateMixin, ExtrasMixin, OfflineMixin, ListMixin, AIMixin, Fol
 
     def _push_ping(self):
         self.sync(False, ("inbox",), quiet=True)
+        self.refresh_folders_soon(15)                       # un message rangé ailleurs a souvent un nouveau dossier derrière lui
         return False
 
     # -------------------------------------------------- déplacements en arrière-plan

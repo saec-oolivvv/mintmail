@@ -738,7 +738,7 @@ class IMAPBackend:
 
     # ------------------------------------------------------------ push (IMAP IDLE)
     def watch(self, on_change, stop):
-        """Boucle IDLE sur la boîte de réception : on_change() à l'arrivée d'un message. Bloquant (thread dédié)."""
+        """Boucle IDLE sur la boîte de réception : on_change() à l'arrivée, au départ ou au changement d'un message (y compris les drapeaux posés depuis un autre poste). Bloquant (thread dédié)."""
         backoff = 5
         while not stop.is_set():
             imap = None
@@ -786,7 +786,7 @@ class IMAPBackend:
         changed, end = False, time.time() + max_wait
         while not stop.is_set() and time.time() < end and not changed:
             buf += read(5)
-            if re.search(rb"\* \d+ (EXISTS|EXPUNGE|RECENT)", buf):
+            if re.search(rb"\* \d+ (EXISTS|EXPUNGE|RECENT|FETCH)", buf):      # FETCH : drapeaux changés ailleurs (épingle, lu, favori)
                 changed = True
         sock.sendall(b"DONE\r\n")
         t0 = time.time()

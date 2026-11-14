@@ -1,11 +1,13 @@
 """Dossiers : arborescence IMAP complète par compte, navigation, compteurs, déplacement, création / renommage / suppression."""
+import time
+
 import gi
 from .i18n import tr
 gi.require_version("Gtk", "3.0")
 gi.require_version("Gdk", "3.0")
 from gi.repository import Gtk, Gdk, GLib
 
-from .backend import utf7_decode
+from .backend import utf7_decode, utf7_encode
 from .widgets import Avatar, icon, row_at_event
 
 SMART_VIEWS = ("inbox", "unread", "starred", "pinned", "snoozed", "drafts")
@@ -31,8 +33,18 @@ class FolderMixin:
         self.folder_tree = {k: list(v) for k, v in (self.config.get("folders") or {}).items()}
         self.folder_unread, self._folder_badges = {}, {}
         self._dyn_rows, self._nav_guard, self._counts_busy = [], False, False
+        self._folder_state()
         self._collapsed = set(self.config.get("collapsed_folders") or [])
         self._fetch_limit = {}
+
+    def _folder_state(self):
+        """État de la relecture / création de dossiers (créé à la demande : une fenêtre construite sans _init_folders fonctionne aussi)."""
+        d = self.__dict__
+        for k, v in (("_folders_busy", False), ("_folders_again", False), ("_folders_ts", 0.0)):
+            d.setdefault(k, v)
+        for k in ("_folders_after", "_folder_creating"):
+            if not isinstance(d.get(k), (list, dict)):
+                d[k] = [] if k == "_folders_after" else {}
 
     def tree_of(self, aid):
         return self.folder_tree.get(aid) or DEFAULT_TREE
@@ -385,6 +397,13 @@ class FolderMixin:
     # --------------------------------------------------------- liste & compteurs
     def refresh_folders(self, after=None):
         """Relit l'arborescence des dossiers de chaque compte (arrière-plan) puis met à jour l'arbre et les compteurs."""
+        self._folder_state()
+        if after:
+            self._folders_after.append(after)
+        if self._folders_busy:                       # une relecture est en cours : on en refera une juste après (elle verra aussi ce qui vient d'être créé)
+            self._folders_again = self._folders_again or bool(after)
+            return
+        self._folders_busy, self._folders_again = True, False
         accts = list(self.accounts())
 
         def work():
@@ -397,6 +416,11 @@ class FolderMixin:
             return out
 
         def done(res, err):
+            self._folders_busy = False
+            self._folders_ts = time.time()
+            if self._folders_again:
+                self.refresh_folders()
+                return
             changed = False
             for aid, ents in (res or {}).items():
                 if ents and ents != self.folder_tree.get(aid):
@@ -407,9 +431,16 @@ class FolderMixin:
                 self.config.save()
                 self._rebuild_nav_dynamic()
             self.refresh_folder_counts()
-            if after:
-                after()
+            afters, self._folders_after = self._folders_after, []
+            for cb in afters:
+                cb()
         self.run_bg(work, done)
+
+    def refresh_folders_soon(self, min_age=20):
+        """Relecture légère (une commande LIST) : au plus une toutes les `min_age` secondes — un dossier créé sur un autre poste apparaît vite."""
+        self._folder_state()
+        if time.time() - self._folders_ts >= min_age:
+            self.refresh_folders()
 
     def refresh_folder_counts(self):
         if self._counts_busy:
@@ -578,13 +609,41 @@ class FolderMixin:
             if then:
                 then(existing[1])
             return
+        self._folder_state()
+        key = (aid, label.lower())
+        if key in self._folder_creating:             # déjà en cours (ex. « créer le dossier » puis « déplacer » validés d'un coup) : on attend la même création
+            if then:
+                self._folder_creating[key].append(then)
+            return
+        self._folder_creating[key] = [then] if then else []
+
+        def finish(entry):
+            for cb in self._folder_creating.pop(key, []):
+                cb(entry)
 
         def done(_r, err):
-            if err:
+            if err and "exist" not in str(err).lower():          # « ALREADYEXISTS » : le dossier est là, on continue
+                self._folder_creating.pop(key, None)
                 self.toast.popup(tr("Création du dossier impossible : %s") % str(err)[:100], timeout=6)
                 return
-            self.refresh_folders(after=(lambda: then(self.find_folder(label, aid)[1]) if then and self.find_folder(label, aid) else None))
+            entry = self._known_folder(aid, path, label, name, delim)      # visible tout de suite, sans attendre la relecture du serveur
+            self.refresh_folders(after=lambda: finish((self.find_folder(label, aid) or (None, entry))[1]))
         self.run_bg(lambda: self.backend(aid).create_folder(path), done)
+
+    def _known_folder(self, aid, path, label, name, delim):
+        """Entrée du dossier qu'on vient de créer ; ajoutée à l'arbre local si la relecture ne l'a pas encore listé."""
+        found = self.find_folder(label, aid)
+        if found and found[1]["path"].lower() == label.lower():
+            return found[1]
+        entry = {"name": utf7_encode(path), "path": label, "label": name, "depth": label.count(" › "), "delim": delim,
+                 "special": "", "selectable": True}
+        tree = [e for e in self.folder_tree.get(aid, self.tree_of(aid))]
+        tree.append(entry)
+        self.folder_tree[aid] = tree
+        self.config["folders"] = self.folder_tree
+        self.config.save()
+        self._rebuild_nav_dynamic()
+        return entry
 
     def ensure_folder(self, aid, spec, cb):
         """Retrouve le dossier désigné (chemin ou nom) ; le crée s'il n'existe pas ; puis cb(entrée)."""

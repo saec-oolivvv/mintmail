@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.15.1
+- Correction : « ranger tous les messages de X dans le dossier Y » créait le dossier mais ne déplaçait rien quand « créer le dossier » et « déplacer » étaient validés d'un coup (double création refusée par le serveur, déplacement abandonné sans message) ; la création est désormais unique, tolère « existe déjà », et le dossier sert immédiatement
+- Réplication entre postes : la liste des dossiers est relue toutes les minutes environ (elle ne l'était qu'au démarrage) et aussitôt après un changement signalé par le serveur ; la boîte de réception est resynchronisée chaque minute (épingles, lu, favoris posés sur un autre poste)
+- Temps réel : l'écoute IDLE réagit maintenant aussi aux changements de drapeaux faits depuis un autre poste (épingle, lu, favori), pas seulement aux arrivées et départs de messages
+
 ## 1.15.0
 - Nouveau « Ce n'est pas du spam » (dossier Spam) : bouton « ✔ Pas du spam » dans le lecteur, menus ⋯ / clic droit / Spam ▾ / palette Ctrl+K — le message ET tous ceux du même expéditeur (variante : tout le domaine) retournent en boîte de réception, avec Annuler
 - Propagation au serveur : marqueur $Junk retiré et $NotJunk posé, puis sortie du dossier Spam (sur Gmail, le message perd l'étiquette Spam) ; conservé hors ligne et envoyé au retour du réseau ; l'expéditeur sort de la liste « envoyés en spam »
