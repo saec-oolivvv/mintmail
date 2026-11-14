@@ -112,6 +112,7 @@ class FolderMixin:
         self.nav.set_selection_mode(Gtk.SelectionMode.SINGLE)
         self.nav.set_activate_on_single_click(True)
         self.badges, self.nav_labels = {}, []
+        self._nav_initial = None          # reste None si la dernière vue (ex. Envoyés, un dossier) n'est pas une boîte intelligente : _reselect_nav la retrouve
         self.nav.add(self._caption_row(tr("Boîtes intelligentes")))
         for vid in SMART_VIEWS:
             label, ic = next((l, i) for k, l, i in self.NAV_ROWS if k == vid)

@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.20.1
+- Correctif de démarrage : MintMail ne plante plus (« _nav_initial ») quand la dernière vue ouverte est Envoyés, Archives ou un dossier ; la barre latérale la retrouve toute seule
+
 ## 1.20.0
 - Interface Qt (expérimentale, mintmail --qt) : rédaction complète (nouveau message, répondre, répondre à tous, transférer, brouillons, alias et signatures, pièces jointes, Cc/Cci, envoi différé, annulation de l'envoi) avec boîte d'envoi qui renvoie hors ligne, reporter au lendemain, raccourcis C R A F H J K et /
 

@@ -335,7 +335,8 @@ class MainWindow(UpdateMixin, ExtrasMixin, OfflineMixin, ListMixin, AIMixin, Fol
         self._fill_accounts()
         self._rebuild_nav_dynamic()
         self._nav_guard = True
-        self.nav.select_row(self._nav_initial)
+        if self._nav_initial is not None:
+            self.nav.select_row(self._nav_initial)
         self._nav_guard = False
 
     def _sidebar_footer(self):

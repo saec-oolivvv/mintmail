@@ -64,3 +64,11 @@ def test_other_views_and_search_are_unaffected():
     w.view = "unread"
     w.reload_list(full=True)
     assert first not in w.rows                                      # lu dans la boîte : n'apparaît pas dans « Non lus »
+
+
+def test_startup_survives_a_last_view_that_is_not_a_smart_box():
+    """Dernière vue = Envoyés, Archives, un dossier… : la barre latérale ne définissait alors jamais la ligne initiale (AttributeError au démarrage)."""
+    src_f = open(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "mintmail", "folders.py"), encoding="utf-8").read()
+    src_w = open(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "mintmail", "window.py"), encoding="utf-8").read()
+    assert "self._nav_initial = None" in src_f and src_f.index("self._nav_initial = None") < src_f.index("for vid in SMART_VIEWS:")
+    assert "if self._nav_initial is not None:" in src_w
