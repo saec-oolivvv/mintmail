@@ -1,0 +1,45 @@
+#!/bin/sh
+# Construit dist/MintMail-<version>-macos.dmg (à lancer SUR UN MAC : Python 3.10+ requis ; pip télécharge PySide6 et PyInstaller).
+# Usage : packaging/build-macos.sh          L'application n'est pas signée par Apple : au premier lancement, clic droit → Ouvrir.
+set -e
+[ "$(uname)" = "Darwin" ] || { echo "Ce script se lance sur macOS."; exit 1; }
+SRC=$(cd "$(dirname "$0")/.." && pwd)
+cd "$SRC"
+VER=$(tr -d '[:space:]' < VERSION)
+OUT="$SRC/dist"; WORK="$OUT/macos-build"
+rm -rf "$WORK" && mkdir -p "$WORK"
+python3 -m venv "$WORK/venv"
+"$WORK/venv/bin/pip" install --quiet --upgrade pip
+"$WORK/venv/bin/pip" install --quiet PySide6 keyring pyinstaller pillow
+# icône : le SVG du paquet est rendu en PNG par Qt, puis converti en .icns par iconutil (échec = application sans icône personnalisée)
+ICON_ARG=""
+if "$WORK/venv/bin/python" - "$SRC/mintmail/icons/mintmail.svg" "$WORK/icon.iconset" <<'PY'
+import os, sys
+os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+from PySide6.QtGui import QGuiApplication, QImage, QPainter
+from PySide6.QtSvg import QSvgRenderer
+app = QGuiApplication([])
+svg, out = sys.argv[1], sys.argv[2]
+os.makedirs(out, exist_ok=True)
+r = QSvgRenderer(svg)
+for base in (16, 32, 128, 256, 512):
+    for scale in (1, 2):
+        px = base * scale
+        img = QImage(px, px, QImage.Format_ARGB32)
+        img.fill(0)
+        p = QPainter(img); r.render(p); p.end()
+        img.save(os.path.join(out, "icon_%dx%d%s.png" % (base, base, "@2x" if scale == 2 else "")))
+PY
+then iconutil -c icns "$WORK/icon.iconset" -o "$WORK/MintMail.icns" && ICON_ARG="--icon $WORK/MintMail.icns" || true; fi
+"$WORK/venv/bin/pyinstaller" --noconfirm --clean --windowed --name MintMail $ICON_ARG \
+    --osx-bundle-identifier me.saec.mintmail \
+    --collect-submodules mintmail --collect-data mintmail --collect-all PySide6 --hidden-import keyring.backends.macOS \
+    --distpath "$WORK/dist" --workpath "$WORK/build" --specpath "$WORK" packaging/macos_main.py
+APP="$WORK/dist/MintMail.app"
+/usr/libexec/PlistBuddy -c "Add :CFBundleShortVersionString string $VER" "$APP/Contents/Info.plist" 2>/dev/null || \
+    /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString $VER" "$APP/Contents/Info.plist"
+codesign --force --deep --sign - "$APP"        # signature « ad hoc » : nécessaire pour démarrer sur les Mac Apple Silicon (ce n'est pas une signature Apple)
+STAGE="$WORK/dmg"; mkdir -p "$STAGE" && cp -R "$APP" "$STAGE/" && ln -s /Applications "$STAGE/Applications"
+DMG="$OUT/MintMail-$VER-macos.dmg"
+rm -f "$DMG" && hdiutil create -volname "MintMail $VER" -srcfolder "$STAGE" -ov -format UDZO "$DMG" >/dev/null
+echo "construit : $DMG"

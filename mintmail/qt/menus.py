@@ -19,7 +19,7 @@ def context_items(msg, blocked: bool = False) -> List[Item]:
         *([("notspam", tr("✔ Ce n'est pas du spam"))] if msg.folder == "spam" else []),
         ("spam", tr("Signaler comme spam")), ("spam_sender", tr("Mettre l'expéditeur en spam")),
         ("block", tr("Débloquer ") + msg.sender_email if blocked else tr("Bloquer l'expéditeur")),
-        ("from", tr("Voir tous ses messages")), None,
+        ("from", tr("Voir tous ses messages")), ("addcontact", tr("Ajouter aux contacts")), None,
         ("summarize", tr("✨ Résumer / analyser ce message")), ("translate", tr("✨ Traduire ce message")),
     ]
 
@@ -39,7 +39,7 @@ def palette_commands(msg, engine=None) -> List[Tuple[str, str]]:
                  *([(tr("✔ Ce n'est pas du spam — ") + who, "notspam")] if msg.folder == "spam" else []),
                  (tr("Signaler comme spam (ce message)"), "spam"), (tr("Mettre l'expéditeur en spam — ") + who, "spam_sender"),
                  (tr("Mettre le domaine en spam — ") + dom, "spam_domain"), (tr("Bloquer l'expéditeur — ") + who, "block"),
-                 (tr("Bloquer le domaine — ") + dom, "block_domain"), (tr("Voir tous les messages de ") + who, "from"),
+                 (tr("Bloquer le domaine — ") + dom, "block_domain"), (tr("Voir tous les messages de ") + who, "from"), (tr("Ajouter aux contacts — ") + who, "addcontact"),
                  (tr("Reporter à demain 8 h"), "snooze_tomorrow")]
     cmds += [(tr("✨ Ouvrir l'assistant IA"), "assistant"), (tr("Nouveau message"), "compose"), (tr("Actualiser"), "sync"),
              (tr("Aide et raccourcis (F1)"), "help"), (tr("Gérer les expéditeurs bloqués et les règles"), "settings:filters"),

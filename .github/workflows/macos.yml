@@ -1,0 +1,26 @@
+name: Application macOS
+# Construit MintMail-<version>-macos.dmg sur un Mac hébergé par GitHub : à la main (Actions → Application macOS → Run workflow)
+# et automatiquement à la publication d'une Release, où le .dmg est joint. Non signé par Apple (clic droit → Ouvrir au premier lancement).
+on:
+  workflow_dispatch:
+  release:
+    types: [published]
+permissions:
+  contents: write
+jobs:
+  dmg:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: sh packaging/build-macos.sh
+      - uses: actions/upload-artifact@v4
+        with:
+          name: MintMail-macos
+          path: dist/*.dmg
+      - if: github.event_name == 'release'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release upload "${{ github.event.release.tag_name }}" dist/*.dmg --clobber

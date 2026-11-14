@@ -14,6 +14,7 @@ from . import accounts as A
 from . import assistant as AS
 from . import automation as AU
 from . import gestures as GS
+from . import ui_personal as UP
 from .gestures import LAYOUTS
 from .. import __version__, updater
 
@@ -44,6 +45,10 @@ class SettingsDialog(QDialog):
         tabs.addTab(self._ai_tab(), "✨ IA")
         tabs.addTab(self._updates_tab(), tr("Mises à jour"))
         tabs.addTab(self._gestures_tab(), tr("Gestes & disposition"))
+        tabs.addTab(UP.signatures_tab(self), tr("Signatures"))
+        tabs.addTab(UP.identities_tab(self), tr("Identités d'envoi"))
+        tabs.addTab(UP.templates_tab(self), tr("Modèles de réponse"))
+        tabs.addTab(UP.contacts_tab(self), tr("Contacts"))
         self.tabs = tabs
         close = QPushButton(tr("Fermer"))
         close.clicked.connect(self.accept)
@@ -57,7 +62,7 @@ class SettingsDialog(QDialog):
 
     def open_page(self, page):
         """Ouvre l'onglet demandé (par l'assistant ou « réglages de l'IA ») : accounts, look, filters ou ai."""
-        idx = {"accounts": 0, "look": 1, "appearance": 1, "filters": 2, "ai": 3, "updates": 4, "gestures": 5, "layout": 5}.get(page)
+        idx = {"accounts": 0, "look": 1, "appearance": 1, "filters": 2, "ai": 3, "updates": 4, "gestures": 5, "layout": 5, "sig": 6, "signatures": 6, "identities": 7, "templates": 8, "contacts": 9}.get(page)
         if idx is not None:
             self.tabs.setCurrentIndex(idx)
 

@@ -1189,6 +1189,10 @@ class MainWindow(QMainWindow):
                     self.status.setText(tr("Débloqué : ") + keyv)
                     return
                 return self.block_sender(keyv, m)
+            if key == "addcontact":
+                from . import personal as PE
+                self.status.setText(PE.add_sender_to_contacts(self.config, self.cache, m)[1])
+                return
             if key == "from":
                 self.search.setText(m.sender_email)
                 return

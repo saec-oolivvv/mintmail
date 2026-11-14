@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.33.0
+- Interface Qt : réglages Signatures (aperçu en direct), Identités d'envoi (alias), Modèles de réponse et Contacts (carnet, recherche, import/export .vcf, « Écrire ») ; rédaction : menu « Modèles » et menu ✨ IA (rédiger depuis une idée, améliorer, corriger, raccourcir, développer, ton, traduire, suggérer un objet — sur la sélection ou sur le texte écrit) ; clic droit et palette « Ajouter aux contacts »
+- Interface Qt : correctif — changer d'expéditeur dans la rédaction dupliquait la signature (Qt perd les attributs id du HTML) ; la signature et la citation sont maintenant repérées par des marqueurs invisibles, retirés à l'envoi
+- macOS : packaging/build-macos.sh et workflow GitHub « Application macOS » construisent un .dmg (non signé par Apple) joint à chaque Release
+
 ## 1.32.2
 - Interface Qt : plus jamais de plantage silencieux au lancement — les bibliothèques système exigées par Qt (ex. libxcb-cursor0) sont vérifiées avant d'ouvrir la fenêtre ; si elles manquent, MintMail tente de les installer (une fois par jour, mot de passe demandé par la fenêtre du système), sinon il affiche la commande exacte (sudo apt install …) et ouvre l'ancienne interface ; un démarrage Qt qui s'arrête brutalement est détecté au lancement suivant (ancienne interface + indication QT_DEBUG_PLUGINS=1) ; le .deb installe ces bibliothèques d'office ; mintmail --diagnose les contrôle
 

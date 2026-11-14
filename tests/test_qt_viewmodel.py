@@ -1064,3 +1064,56 @@ def test_qtdeps_attempt_throttle_and_startup_marker_detect_a_silent_crash():
     QD.end_start(mk)
     assert QD.begin_start(mk) is True
     QD.end_start(mk); QD.end_start(mk)          # idempotent
+
+
+def test_personal_signature_identity_template_contact_rules():
+    from mintmail.qt import personal as P
+    from mintmail.store import Cache, Config
+    import tempfile
+    d = tempfile.mkdtemp()
+    try:
+        cfg, cache = Config(os.path.join(d, "cfg.json")), Cache(os.path.join(d, "c.db"))
+    except TypeError:
+        cfg, cache = Config(), Cache()
+    cfg["accounts"] = [{"id": "a1", "email": "me@x.be", "name": "Moi"}]
+    assert P.set_signature(cfg, "a1", "<b>Moi</b>") and P.get_signature(cfg, "a1") == "<b>Moi</b>" and not P.set_signature(cfg, "zz", "x")
+    assert "<script" not in P.signature_preview("<b>a</b><script>alert(1)</script>")
+    ident, msg = P.identity_save(cfg, None, "a1", "Pro", "pro@x.be", "<i>sig</i>")
+    assert ident and P.identities(cfg)[0]["email"] == "pro@x.be"
+    assert P.identity_save(cfg, None, "a1", "", "pas-une-adresse", "")[0] is None and P.identity_save(cfg, None, "", "", "a@b.be", "")[0] is None
+    again, _ = P.identity_save(cfg, ident["id"], "a1", "Pro2", "pro@x.be", "")
+    assert len(P.identities(cfg)) == 1 and P.identities(cfg)[0]["name"] == "Pro2"
+    assert P.identity_delete(cfg, ident["id"]) and not P.identities(cfg) and not P.identity_delete(cfg, "nope")
+    n = len(cfg["templates"])
+    i = P.template_add(cfg)
+    assert i == n and P.template_save(cfg, i, "  ", "<p>Salut</p>") and cfg["templates"][i]["name"] and P.template_html(cfg, i) == "<p>Salut</p>"
+    assert P.template_delete(cfg, i) and len(cfg["templates"]) == n and not P.template_delete(cfg, 999) and P.template_html(cfg, 999) == ""
+    assert P.contact_save(cfg, cache, " Bob@X.be ", "Bob", "123", "ACME", "n") and not P.contact_save(cfg, cache, "nope")
+    assert [c["email"] for c in cache.contacts_list("bob")] == ["bob@x.be"] and "(auto)" not in P.contact_label(cache.contacts_list("bob")[0])
+    vcf = P.export_vcf(cache)
+    P.contact_remove(cfg, cache, "bob@x.be")
+    assert not cache.contacts_list("bob") and P.import_vcf(cfg, cache, vcf) == 1 and cache.contacts_list("bob")
+    m = Message(id="m", account="a1", folder="inbox", uid=1, sender_name="Zed", sender_email="zed@x.be", subject="s", date=1.0)
+    assert P.add_sender_to_contacts(cfg, cache, m)[0] and cache.contacts_list("zed")
+    assert P.ai_needs_text("fix") and not P.ai_needs_text("write")
+
+    class AI:
+        def write_from_prompt(self, idea, subject, to, quoted): return "écrit:" + idea
+        def subject_for(self, text): return "Objet"
+        def rewrite(self, text, op): return op + ":" + text
+    assert P.ai_run(AI(), "write", "", idea="x") == ("body", "écrit:x") and P.ai_run(AI(), "subject", "t") == ("subject", "Objet") and P.ai_run(AI(), "fix", "t") == ("body", "fix:t")
+
+
+def test_signature_survives_qt_html_roundtrip_and_is_swapped_not_duplicated():
+    from mintmail.qt import composing as C
+    a1 = {"id": "a1", "email": "a@x.be", "signature_html": "<b>A</b>"}
+    sig1 = C.signature_html(a1, None)
+    assert C.SIG_MARK in sig1
+    qt_like = '<p style="margin:0">Bonjour</p><p style="margin:0">%s-- <br />&lt;b&gt;A&lt;/b&gt;%s</p>' % (C.SIG_MARK, C.SIG_MARK)       # Qt a perdu l'id du <div>
+    swapped = C.swap_signature(qt_like, C.signature_html({"id": "a2", "email": "b@x.be", "signature_html": "<i>B</i>"}, None))
+    assert swapped.count(C.SIG_MARK) == 2 and "<i>B</i>" in swapped and "&lt;b&gt;A" not in swapped and swapped.startswith('<p style="margin:0">Bonjour</p>')
+    assert C.swap_signature(qt_like, "").count(C.SIG_MARK) == 0                                   # expéditeur sans signature : elle disparaît
+    assert C.swap_signature("<p>x</p>", sig1).endswith(sig1)                                       # aucune signature : ajoutée
+    assert C.clean_for_send(sig1 + C.QUOTE_MARK) == '<div id="sig">-- <br><b>A</b></div>'
+    out = C.build_outgoing(a1, None, "t@x.be", "", "", "S", "x" + sig1, [])
+    assert C.SIG_MARK not in out.html

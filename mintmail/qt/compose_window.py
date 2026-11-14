@@ -13,6 +13,8 @@ from PySide6.QtWidgets import (QComboBox, QCompleter, QDialog, QDialogButtonBox,
 from ..i18n import tr
 from ..util import human_size
 from . import composing as C
+from . import personal as P
+from ..util import text_to_html
 
 
 class ComposeWindow(QMainWindow):
@@ -53,6 +55,25 @@ class ComposeWindow(QMainWindow):
         self._fmt_action(bar, tr("Souligné"), "Ctrl+U", self._underline)
         self._fmt_action(bar, tr("Liste à puces"), None, self._bullets)
         self._fmt_action(bar, tr("Insérer un lien"), "Ctrl+K", self._link)
+        tpl = QPushButton(tr("Modèles"))
+        tpl.setFlat(True)
+        tmenu = QMenu(tpl)
+        for i, t in enumerate(P.templates(self.engine.config)):
+            tmenu.addAction(t["name"], lambda i=i: self._insert_template(i))
+        if not P.templates(self.engine.config):
+            tmenu.addAction(tr("Aucun modèle (voir Paramètres)")).setEnabled(False)
+        tpl.setMenu(tmenu)
+        bar.addWidget(tpl)
+        self.ai_btn = QPushButton(tr("✨ IA"))
+        self.ai_btn.setFlat(True)
+        aimenu = QMenu(self.ai_btn)
+        for entry in P.AI_OPS:
+            if entry is None:
+                aimenu.addSeparator()
+            else:
+                aimenu.addAction(entry[0], lambda op=entry[1]: self._ai_op(op))
+        self.ai_btn.setMenu(aimenu)
+        bar.addWidget(self.ai_btn)
 
         self.from_box = QComboBox()
         for key, label in C.from_choices(self.engine.config, self.accounts):
@@ -163,6 +184,75 @@ class ComposeWindow(QMainWindow):
             cur = self.editor.textCursor()
             label = cur.selectedText() or url
             cur.insertHtml('<a href="%s">%s</a>' % (url.replace('"', "%22"), label.replace("<", "&lt;")))
+
+    # -- modèles de réponse
+    def _insert_template(self, i):
+        self.editor.textCursor().insertHtml(P.template_html(self.engine.config, i))
+
+    # -- aide IA à l'écriture (✨) : opère sur le texte écrit (hors signature et citation), ou sur la sélection
+    def _user_range(self):
+        """(début, fin) du texte écrit : avant la signature (marqueur invisible) ou, à défaut, avant la citation."""
+        doc = self.editor.document()
+        end = doc.characterCount() - 1
+        for mark in (C.SIG_MARK, C.QUOTE_MARK):
+            found = doc.find(mark)
+            if not found.isNull():
+                end = min(end, found.selectionStart())
+        return 0, max(0, end)
+
+    def _ai_busy(self, busy):
+        self.ai_btn.setEnabled(not busy)
+        self.ai_btn.setText("✨ …" if busy else tr("✨ IA"))
+
+    def _ai_op(self, op):
+        main = self.main
+        from . import assistant as AS
+        ai = AS.ai_engine(self.engine)
+        if not ai.enabled():
+            main.status.setText(tr("IA non configurée : Paramètres → IA."))
+            main.show_settings(page="ai")
+            return
+        cur = self.editor.textCursor()
+        selection = cur.hasSelection()
+        start, end = (cur.selectionStart(), cur.selectionEnd()) if selection else self._user_range()
+        text = ""
+        idea = ""
+        if op == "write":
+            idea, ok = QInputDialog.getMultiLineText(self, tr("✨ Rédiger avec l'IA"), tr("Que voulez-vous dire ? (quelques mots suffisent)"))
+            idea = (idea or "").strip()
+            if not ok or not idea:
+                return
+        else:
+            probe = self.editor.textCursor()
+            probe.setPosition(start)
+            probe.setPosition(end, probe.MoveMode.KeepAnchor)
+            text = probe.selectedText().replace("\u2029", "\n").replace(C.SIG_MARK, "").replace(C.QUOTE_MARK, "").strip()
+            if not text:
+                main.status.setText(tr("Écrivez d'abord un peu de texte."))
+                return
+        subject, to = self.subject.text().strip(), self.to.text().strip()
+        from ..util import html_to_text
+        quoted = html_to_text(self.quote_html) if self.quote_html else ""
+        self._ai_busy(True)
+
+        def done(res, err):
+            self._ai_busy(False)
+            if err:
+                main.status.setText(tr("Erreur IA : %s") % str(err)[:90])
+                return
+            target, out = res
+            if not out:
+                main.status.setText(tr("L'IA n'a rien renvoyé."))
+                return
+            if target == "subject":
+                self.subject.setText(out)
+            else:
+                c = self.editor.textCursor()
+                c.setPosition(start)
+                c.setPosition(end, c.MoveMode.KeepAnchor)
+                c.insertHtml(text_to_html(out))
+            main.status.setText(tr("✨ Fait. Relisez avant d'envoyer."))
+        main.run_bg(lambda: P.ai_run(ai, op, text, subject, to, idea, quoted), done)
 
     # -- pièces jointes
     def _attach(self):

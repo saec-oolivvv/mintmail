@@ -45,16 +45,29 @@ def resolve_from(config, accounts, choice):
     return next((a for a in accounts if a["id"] == aid), accounts[0] if accounts else None), ident
 
 
+SIG_MARK = "\u2063"        # séparateur invisible : encadre la signature (Qt perd les attributs id des <div> en réexportant le HTML, pas ce caractère)
+QUOTE_MARK = "\u2064"      # idem : début de la citation
+
+
 def signature_html(account, ident) -> str:
     sig = (ident or {}).get("signature_html") or (account.get("signature_html", "") if account else "")
-    return '<div id="sig">-- <br>%s</div>' % sig if sig.strip() else ""
+    return '<div id="sig">%s-- <br>%s%s</div>' % (SIG_MARK, sig, SIG_MARK) if sig.strip() else ""
 
 
 def swap_signature(body: str, new_sig: str) -> str:
-    """Change de signature quand on change d'expéditeur, sans toucher au reste du message."""
+    """Change de signature quand on change d'expéditeur, sans toucher au reste du message (ni dupliquer la signature)."""
+    span = re.compile(SIG_MARK + ".*?" + SIG_MARK, re.S)
+    inner = span.search(new_sig or "")
+    if span.search(body):
+        return span.sub(lambda m: inner.group(0) if inner else "", body, count=1)
     if '<div id="sig">' in body:
         return re.sub(r'<div id="sig">.*?</div>', lambda m: new_sig, body, count=1, flags=re.S)
     return body + new_sig
+
+
+def clean_for_send(html_text: str) -> str:
+    """Retire les marqueurs invisibles avant l'envoi ou l'enregistrement."""
+    return (html_text or "").replace(SIG_MARK, "").replace(QUOTE_MARK, "")
 
 
 def initial_content(body_html, quote_html, signature, raw=False, ai_text="") -> str:
@@ -66,7 +79,7 @@ def initial_content(body_html, quote_html, signature, raw=False, ai_text="") -> 
 
 def quote_html(msg) -> str:
     orig = sanitize_html(msg.html) if msg.html else text_to_html(msg.text)
-    return tr('<div id="qt"><br><div>Le %s, %s a écrit :</div><blockquote>%s</blockquote></div>') % (
+    return tr('<div id="qt"><br><div>Le %s, %s a écrit :</div><blockquote>%s</blockquote></div>').replace('<div id="qt">', '<div id="qt">' + QUOTE_MARK, 1) % (
         format_full(msg.date), html.escape(msg.display_sender), orig)
 
 
@@ -88,7 +101,7 @@ def forward_args(msg, default_account="") -> Dict:
     head = (tr("<br>---------- Message transféré ----------<br>De : %s &lt;%s&gt;<br>Date : %s<br>Objet : %s<br>À : %s<br>")
             % (html.escape(msg.sender_name), html.escape(msg.sender_email), format_full(msg.date), html.escape(msg.subject), html.escape(msg.to)))
     return dict(account_id=default_account, subject="Fwd: " + normalize_subject(msg.subject),
-                quote_html='<div id="qt">' + head + (sanitize_html(msg.html) if msg.html else text_to_html(msg.text)) + "</div>",
+                quote_html='<div id="qt">' + QUOTE_MARK + head + (sanitize_html(msg.html) if msg.html else text_to_html(msg.text)) + "</div>",
                 attachments=[a["path"] for a in msg.attachments])
 
 
@@ -107,7 +120,7 @@ def valid_recipients(to, cc="", bcc="") -> bool:
 def build_outgoing(account, ident, to, cc, bcc, subject, body, attachments, in_reply_to="", references="") -> Outgoing:
     return Outgoing(account=account["id"], to=to.strip(), cc=cc.strip(), bcc=bcc.strip(),
                     from_email=ident["email"] if ident else "", from_name=ident.get("name", "") if ident else "",
-                    subject=subject.strip() or "(Sans objet)", html=body, attachments=list(attachments),
+                    subject=subject.strip() or "(Sans objet)", html=clean_for_send(body), attachments=list(attachments),
                     in_reply_to=in_reply_to, references=references)
 
 
@@ -116,10 +129,11 @@ def save_draft(cache, account, draft_id, to, cc, subject, body, attachments, in_
     import os
     from ..util import html_to_text
     did = draft_id or "draft-%s" % uuid.uuid4().hex[:10]
+    body = clean_for_send(body)
     text = html_to_text(body)
     cache.upsert(Message(
         id=did, account=account["id"], folder="drafts", uid=0, sender_name=account.get("name", ""), sender_email=account["email"],
-        to=to, cc=cc, subject=subject or "(Sans objet)", date=time.time(), snippet=text[:150], text=text, html=body, unread=False,
+        to=to, cc=cc, subject=subject or "(Sans objet)", date=time.time(), snippet=text[:150], text=text, html=clean_for_send(body), unread=False,
         attachments=[{"filename": os.path.basename(p), "path": p, "size": os.path.getsize(p) if os.path.exists(p) else 0, "mime": ""} for p in attachments],
         message_id=in_reply_to, references=references))
     return did
@@ -145,7 +159,7 @@ def quick_reply_outgoing(config, accounts, msg, text, default_account="") -> Out
     acc = next((a for a in accounts if a["id"] == default_account), accounts[0])
     ident = addressed_identity(config, msg)
     sig = signature_html(acc, ident)
-    body = text_to_html(text) + ("<br><br>" + sig if sig else "")
+    body = text_to_html(text) + ("<br><br>" + clean_for_send(sig) if sig else "")
     return Outgoing(account=acc["id"], to=(msg.reply_to or msg.sender_email), subject="Re: " + normalize_subject(msg.subject), html=body,
                     from_email=ident["email"] if ident else "", from_name=ident.get("name", "") if ident else "",
                     in_reply_to=msg.message_id, references=msg.references)
