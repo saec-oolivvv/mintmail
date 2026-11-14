@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.33.3
+- Images distantes persistantes : « cette fois » / « toujours pour cette adresse » / « toujours pour le domaine » ; liste modifiable dans Réglages → Filtres et synchronisée entre postes
+- Signatures : les logos SVG s'affichent (rédaction, aperçu) ; à l'envoi, signature d'origine conservée et logo envoyé en PNG joint en ligne (lisible par Gmail/Outlook)
+- Réglages : sélection des listes bien visible (couleur d'accent, survol)
+
 ## 1.33.2
 - Correctif de la publication 1.33.1 : import local de « time » retiré d'entry.py (le test de masquage d'imports échouait)
 

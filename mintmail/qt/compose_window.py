@@ -13,6 +13,7 @@ from PySide6.QtWidgets import (QComboBox, QCompleter, QDialog, QDialogButtonBox,
 from ..i18n import tr
 from ..util import human_size
 from . import composing as C
+from . import sigimages as SI
 from . import personal as P
 from ..util import text_to_html
 
@@ -114,7 +115,7 @@ class ComposeWindow(QMainWindow):
         self.from_box.currentIndexChanged.connect(self._from_changed)
 
         self.initial = C.initial_content(self.body_html, self.quote_html, self._signature(), self.raw, self.ai_text)
-        self.editor.setHtml(self.initial)
+        self.editor.setHtml(SI.to_display(self.initial))
         self.initial = C.body_of_qt_html(self.editor.toHtml())        # forme Qt du contenu de départ : sert à savoir si l'on a écrit quelque chose
         self._refresh_atts()
         (self.subject if to else self.to).setFocus()
@@ -148,7 +149,7 @@ class ComposeWindow(QMainWindow):
 
     def _from_changed(self, _i):
         if self.initial is not None:
-            self.editor.setHtml(C.swap_signature(C.body_of_qt_html(self.editor.toHtml()), self._signature()))
+            self.editor.setHtml(SI.to_display(C.swap_signature(C.body_of_qt_html(self.editor.toHtml()), self._signature())))
 
     # -- mise en forme
     def _merge(self, fmt):

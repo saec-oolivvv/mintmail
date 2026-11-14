@@ -7,6 +7,7 @@ from .. import contacts as vcf
 from ..backend import new_account_id
 from ..i18n import tr
 from ..util import sanitize_html
+from . import sigimages as SI
 
 SIG_TEMPLATE = tr('<p><b>Prénom Nom</b><br>Fonction — Société<br>'
                   '📞 +32 000 00 00 00 · ✉ vous@exemple.be<br>'
@@ -40,7 +41,8 @@ def set_signature(config, account_id: str, html: str) -> bool:
 
 def signature_preview(html: str) -> str:
     """HTML de l'aperçu (nettoyé : jamais de script)."""
-    return "<div style='font-size:14px'>%s</div>" % sanitize_html(html or "")
+    from ..htmlsafe import sanitize
+    return "<div style='font-size:14px'>%s</div>" % sanitize(SI.to_display(html or ""), keep_style=True, allow_remote_images=False)
 
 
 # ------------------------------------------------------------------ identités (alias)

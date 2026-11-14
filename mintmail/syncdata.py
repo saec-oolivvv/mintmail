@@ -107,7 +107,7 @@ def valid_item(key: str, item: Any) -> bool:
     if not isinstance(item.get("ts"), (int, float)) or not _b(item.get("del", False)):
         return False
     if item.get("del"):
-        return kind_of(key) in ("acct", "set", "secret", "rule", "blocked", "spam", "search", "tpl", "ident", "contact", "task")
+        return kind_of(key) in ("acct", "set", "secret", "rule", "blocked", "spam", "imgs", "search", "tpl", "ident", "contact", "task")
     v, kind, rest = item.get("v"), kind_of(key), key.split(":", 1)[-1]
     if kind == "acct":
         a = clean_account(v)
@@ -134,7 +134,7 @@ def valid_item(key: str, item: Any) -> bool:
         return (isinstance(v, dict) and v.get("field") in RULE_FIELDS and v.get("action") in RULE_ACTIONS
                 and _str(200)(v.get("text")) and bool(v.get("text"))
                 and (v.get("action") != "move" or (isinstance(v.get("folder"), str) and 0 < len(v["folder"]) <= 120)))
-    if kind in ("blocked", "spam"):
+    if kind in ("blocked", "spam", "imgs"):
         return isinstance(v, str) and 0 < len(v) <= 200 and re.match(r"^@?[^\s@]+(@[^\s@]+)?$", v) is not None and v == rest
     if kind == "search":
         return isinstance(v, str) and 0 < len(v) <= 300 and 0 < len(rest) <= 100
@@ -174,6 +174,8 @@ def collect(config) -> Dict[str, Tuple[Any, Optional[str]]]:
         out["blocked:" + v] = (v, None)
     for v in config.get("spam_senders", []):
         out["spam:" + v] = (v, None)
+    for v in config.get("image_senders", []):
+        out["imgs:" + v] = (v, None)
     for s in config.get("saved_searches", []):
         out["search:" + s["name"]] = (s["query"], None)
     for t in config.get("templates", []):
@@ -314,8 +316,8 @@ def _apply_list_item(config, kind, rest, v, deleted, cache=None):
     if kind == "rule":
         rules = [r for r in config["rules"] if hash_value(r) != rest]
         config["rules"] = rules if deleted else rules + [v]
-    elif kind in ("blocked", "spam"):
-        name = "blocked" if kind == "blocked" else "spam_senders"
+    elif kind in ("blocked", "spam", "imgs"):
+        name = {"blocked": "blocked", "spam": "spam_senders", "imgs": "image_senders"}[kind]
         lst = [x for x in config[name] if x != rest]
         config[name] = lst if deleted else lst + [rest]
     elif kind == "search":
@@ -346,5 +348,5 @@ def _apply_list_item(config, kind, rest, v, deleted, cache=None):
 
 def describe(res: dict) -> str:
     names = {"acct": tr("compte(s)"), "set": tr("réglage(s)"), "secret": tr("clé IA"), "rule": tr("règle(s)"), "blocked": tr("blocage(s)"),
-             "spam": tr("expéditeur(s) en spam"), "search": tr("recherche(s)"), "tpl": tr("modèle(s)"), "ident": tr("identité(s)"), "contact": tr("contact(s)"), "task": tr("tâche(s)")}
+             "spam": tr("expéditeur(s) en spam"), "imgs": tr("expéditeur(s) aux images chargées"), "search": tr("recherche(s)"), "tpl": tr("modèle(s)"), "ident": tr("identité(s)"), "contact": tr("contact(s)"), "task": tr("tâche(s)")}
     return ", ".join("%d %s" % (n, names.get(k, k)) for k, n in res.get("kinds", {}).items()) or tr("à jour")

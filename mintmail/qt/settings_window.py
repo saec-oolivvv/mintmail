@@ -14,6 +14,7 @@ from . import accounts as A
 from . import assistant as AS
 from . import automation as AU
 from . import gestures as GS
+from . import imagetrust as IT
 from . import ui_personal as UP
 from .gestures import LAYOUTS
 from .. import __version__, updater
@@ -396,7 +397,9 @@ class SettingsDialog(QDialog):
         lay = QVBoxLayout(w)
         self._sender_lists = {}
         for kind, title, hint in (("blocked", tr("Expéditeurs bloqués"), ""),
-                                  ("spam_senders", tr("Expéditeurs envoyés en spam"), tr("Leurs messages vont directement dans le dossier Spam."))):
+                                  ("spam_senders", tr("Expéditeurs envoyés en spam"), tr("Leurs messages vont directement dans le dossier Spam.")),
+                                  ("image_senders", tr("Expéditeurs dont les images sont toujours chargées"),
+                                   tr("Les images distantes de leurs messages s'affichent sans confirmation (adresse ou @domaine)."))):
             lay.addWidget(QLabel("<b>%s</b>" % title))
             if hint:
                 lay.addWidget(QLabel(hint))
@@ -452,6 +455,11 @@ class SettingsDialog(QDialog):
     def _add_sender(self, kind, edit):
         key = edit.text().strip().lower()
         if not key or ("@" not in key):
+            return
+        if kind == "image_senders":                                      # simple liste de confiance : aucun message n'est déplacé
+            IT.trust(self.main.engine.config, key)
+            edit.clear()
+            self._fill_filters()
             return
         msgs, dest = AU.filter_sender(self.main.engine, key, kind)
         edit.clear()

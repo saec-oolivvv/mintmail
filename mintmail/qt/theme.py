@@ -76,6 +76,9 @@ QProgressBar::chunk { background: %(accent)s; border-radius: 3px; }
 #planrow { background: %(hover)s; border-radius: %(rs)dpx; }
 QListView, QListWidget { background: transparent; border: none; outline: 0; }
 QListView::item, QListWidget::item { border: none; }
+QDialog QListWidget::item { padding: 6px 10px; border-radius: %(rs)dpx; }
+QDialog QListWidget::item:hover { background: %(hover)s; }
+QDialog QListWidget::item:selected, QDialog QListWidget::item:selected:active, QDialog QListWidget::item:selected:!active { background: %(accent)s; color: %(on)s; }
 QLineEdit, QTextEdit, QComboBox, QSpinBox, QPlainTextEdit {
     background: %(field)s; border: 1px solid %(line)s; border-radius: %(rs)dpx; padding: 7px 10px; selection-background-color: %(accent)s; selection-color: %(on)s; }
 QLineEdit:focus, QTextEdit:focus, QComboBox:focus, QSpinBox:focus { border: 1px solid %(accent)s; }

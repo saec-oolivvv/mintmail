@@ -65,7 +65,7 @@ DEFAULTS = {
     "side_width": 230, "zoom": 1.0,
     "swipe": {"right": "archive", "right_long": "trash", "left": "snooze", "left_long": "read"},
     "swipe_invert": False,
-    "blocked": [], "spam_senders": [], "rules": [], "saved_searches": [], "followups": [],
+    "blocked": [], "spam_senders": [], "image_senders": [], "rules": [], "saved_searches": [], "followups": [],
     "templates": [
         {"name": "Accusé de réception", "html": "<p>Bonjour,</p><p>Merci pour votre message, je reviens vers vous rapidement.</p><p>Cordialement,</p>"},
         {"name": "Proposition de rendez-vous", "html": "<p>Bonjour,</p><p>Seriez-vous disponible cette semaine pour un court échange (20 minutes) ? Je vous propose mardi ou jeudi en fin de matinée.</p><p>Bien cordialement,</p>"},

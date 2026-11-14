@@ -9,6 +9,7 @@ from typing import Dict, List, Optional
 
 from ..i18n import tr
 from ..models import Message, Outgoing
+from . import sigimages as SI
 from ..util import format_full, normalize_subject, split_addresses, sanitize_html, text_to_html
 
 EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
@@ -52,6 +53,16 @@ QUOTE_MARK = "\u2064"      # idem : début de la citation
 def signature_html(account, ident) -> str:
     sig = (ident or {}).get("signature_html") or (account.get("signature_html", "") if account else "")
     return '<div id="sig">%s-- <br>%s%s</div>' % (SIG_MARK, sig, SIG_MARK) if sig.strip() else ""
+
+
+def restore_signature(body: str, account, ident) -> str:
+    """Remet la signature D'ORIGINE à la place de sa version passée par l'éditeur Qt (qui perd le SVG, les coins arrondis, les largeurs…).
+    La signature se modifie dans les Réglages, pas message par message ; sans marqueurs (signature effacée), rien n'est ajouté."""
+    inner = re.search(SIG_MARK + ".*?" + SIG_MARK, signature_html(account, ident), re.S)
+    found = re.search(SIG_MARK + ".*?" + SIG_MARK, body or "", re.S)
+    if not inner or not found:
+        return body
+    return body[:found.start()] + inner.group(0) + body[found.end():]
 
 
 def swap_signature(body: str, new_sig: str) -> str:
@@ -106,7 +117,7 @@ def forward_args(msg, default_account="") -> Dict:
 
 
 def draft_args(msg) -> Dict:
-    return dict(account_id=msg.account, to=msg.to, cc=msg.cc, subject=msg.subject, body_html=sanitize_html(msg.html), raw=True,
+    return dict(account_id=msg.account, to=msg.to, cc=msg.cc, subject=msg.subject, body_html=sanitize_html(SI.to_display(msg.html)), raw=True,
                 in_reply_to=msg.message_id, references=msg.references, attachments=[a["path"] for a in msg.attachments], draft_id=msg.id)
 
 
@@ -118,10 +129,11 @@ def valid_recipients(to, cc="", bcc="") -> bool:
 
 
 def build_outgoing(account, ident, to, cc, bcc, subject, body, attachments, in_reply_to="", references="") -> Outgoing:
+    html_out, inline = SI.to_mail(clean_for_send(restore_signature(body, account, ident)))    # logos SVG / images « data: » → images jointes en ligne
     return Outgoing(account=account["id"], to=to.strip(), cc=cc.strip(), bcc=bcc.strip(),
                     from_email=ident["email"] if ident else "", from_name=ident.get("name", "") if ident else "",
-                    subject=subject.strip() or "(Sans objet)", html=clean_for_send(body), attachments=list(attachments),
-                    in_reply_to=in_reply_to, references=references)
+                    subject=subject.strip() or "(Sans objet)", html=html_out, attachments=list(attachments),
+                    in_reply_to=in_reply_to, references=references, inline=inline)
 
 
 def save_draft(cache, account, draft_id, to, cc, subject, body, attachments, in_reply_to="", references="") -> str:
@@ -160,6 +172,7 @@ def quick_reply_outgoing(config, accounts, msg, text, default_account="") -> Out
     ident = addressed_identity(config, msg)
     sig = signature_html(acc, ident)
     body = text_to_html(text) + ("<br><br>" + clean_for_send(sig) if sig else "")
+    body, inline = SI.to_mail(body)
     return Outgoing(account=acc["id"], to=(msg.reply_to or msg.sender_email), subject="Re: " + normalize_subject(msg.subject), html=body,
                     from_email=ident["email"] if ident else "", from_name=ident.get("name", "") if ident else "",
-                    in_reply_to=msg.message_id, references=msg.references)
+                    in_reply_to=msg.message_id, references=msg.references, inline=inline)

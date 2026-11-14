@@ -33,6 +33,7 @@ from . import gestures as GS
 from . import menus as MN
 from . import ui_appicon as AI
 from . import savedsearch as SS
+from . import imagetrust as IT
 from .. import qtdeps as QD
 from ..store import DATA_DIR
 from .ui_palette import Palette
@@ -302,7 +303,8 @@ class MainWindow(QMainWindow):
         readerhead.setLayout(headrow)
         self.images_btn = QPushButton(tr("Charger les images distantes"))
         self.images_btn.setObjectName("chip")
-        self.images_btn.clicked.connect(self._load_images)
+        self.images_menu = QMenu(self.images_btn)
+        self.images_btn.setMenu(self.images_menu)             # un clic ouvre le choix : cette fois / toujours pour l'expéditeur / pour le domaine
         self.images_btn.hide()
         self.reader = _make_reader(self._open_link)
         right = QFrame()
@@ -1322,12 +1324,29 @@ class MainWindow(QMainWindow):
         self.head.setToolTip("%s\n%s" % (h["from"], h["to"]))
         self.avatar.set_sender(msg.display_sender, msg.sender_email)
         from ..util import has_remote_content
-        self.images_btn.setVisible(bool(msg.html) and has_remote_content(msg.html) and not self.load_images)
-        self.reader.show_html(vm.render_html(msg, self.load_images, self.is_dark()))
+        load = self.load_images or IT.trusted(self.config, msg.sender_email)        # expéditeur de confiance : images chargées d'office
+        self.images_btn.setVisible(bool(msg.html) and has_remote_content(msg.html) and not load)
+        self._fill_images_menu(msg)
+        self.reader.show_html(vm.render_html(msg, load, self.is_dark()))
         self.quick.show()
         self.quick.set_ai(AS.ai_engine(self.engine).enabled())
         if msg.folder != "drafts":
             self.ai_open(msg)
+
+    def _fill_images_menu(self, msg):
+        m = self.images_menu
+        m.clear()
+        em, dom = IT.keys_for(msg.sender_email)
+        m.addAction(tr("Charger les images cette fois")).triggered.connect(lambda _c=False: self._load_images())
+        if em:
+            m.addSeparator()
+            m.addAction(tr("Toujours charger les images de %s") % em).triggered.connect(lambda _c=False, k=em: self._trust_images(k))
+            m.addAction(tr("Toujours charger les images de %s") % dom).triggered.connect(lambda _c=False, k=dom: self._trust_images(k))
+
+    def _trust_images(self, key):
+        if IT.trust(self.config, key):
+            self.status.setText(tr("Images toujours chargées pour %s (Réglages → Filtres pour revenir en arrière)") % key)
+        self._load_images()
 
     def _load_images(self):
         self.load_images = True
@@ -1412,6 +1431,8 @@ def _keyring_hint():
 def run(argv=None):
     _keyring_hint()
     app = QApplication.instance() or QApplication(list(argv if argv is not None else sys.argv))
+    from . import ui_svg
+    ui_svg.install()                                      # rendu des logos SVG des signatures (sans QtSvg : simplement non affichés)
     app.setApplicationName("mintmail")                    # = StartupWMClass du lanceur : bonne icône dans la barre des tâches (X11)
     app.setApplicationDisplayName(APP_NAME)
     app.setDesktopFileName(AI.DESKTOP_ID)                  # idem sous Wayland

@@ -854,6 +854,8 @@ class IMAPBackend:
             em["References"] = (out.references + " " + out.in_reply_to).strip()
         em.set_content(out.text or html_to_text(out.html))
         em.add_alternative(out.html, subtype="html")
+        for cid, sub, b64 in (out.inline or []):          # logos de signature : image jointe « en ligne » référencée par cid:
+            em.get_body(preferencelist=("html",)).add_related(base64.b64decode(b64), "image", sub, cid="<%s>" % cid)
         if out.ics:   # réponse à une invitation : partie text/calendar (Outlook, Google, Apple la reconnaissent)
             em.add_attachment(out.ics.encode("utf-8"), maintype="text", subtype="calendar", filename="invite.ics",
                               params={"method": out.ics_method or "REPLY", "charset": "UTF-8"})

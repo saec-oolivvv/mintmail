@@ -62,6 +62,7 @@ class Outgoing:
     from_name: str = ""
     ics: str = ""                 # partie text/calendar (réponse à une invitation)
     ics_method: str = ""
+    inline: list = field(default_factory=list)   # images en ligne [[cid, sous-type, base64]] (logos de signature…)
 
     def to_dict(self):
         return asdict(self)
