@@ -290,8 +290,12 @@ def fetch(update: Update, dest_dir, allow_loopback=False, progress=None):
     return deb, sig
 
 
-def can_install(pubkey=PUBKEY, helper=HELPER, which=shutil.which) -> Tuple[bool, str]:
-    """(possible, code de la raison) : installation automatique seulement si la clé publique, le programme root et pkexec sont présents."""
+def can_install(pubkey=PUBKEY, helper=HELPER, which=shutil.which, platform=None) -> Tuple[bool, str]:
+    """(possible, code de la raison) : installation automatique seulement si la clé publique, le programme root et pkexec sont présents.
+    Sur Mac, l'installation du paquet .deb n'existe pas : on renvoie « macos » (mise à jour à la main avec le .dmg de la Release)."""
+    import sys
+    if (platform or sys.platform) == "darwin":
+        return False, "macos"
     if not os.path.exists(pubkey):
         return False, "nokey"
     if not os.path.exists(helper) or not which("pkexec"):

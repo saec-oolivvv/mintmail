@@ -17,6 +17,7 @@ def explain(code, detail=""):
         "badsize": tr("Téléchargement incomplet."),
         "checksum": tr("Somme de contrôle incorrecte : téléchargement corrompu, refusé."),
         "http": tr("Erreur du serveur de téléchargement."),
+        "macos": tr("Sur Mac, la mise à jour se fait à la main : téléchargez le nouveau fichier .dmg sur la page de la version, puis remplacez l'application MintMail."),
         "nokey": tr("Clé de vérification absente : installation automatique désactivée."),
         "unsigned": tr("Version non signée : refusée par sécurité."),
         "bad_signature": tr("SIGNATURE INVALIDE : paquet refusé (il ne vient pas de SAEC ou a été modifié)."),

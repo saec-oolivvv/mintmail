@@ -694,6 +694,7 @@
 "Supprimer le brouillon": "Den Entwurf löschen",
 "Supprimer le dossier « %s » ?": "Den Ordner „%s“ löschen?",
 "Supprimer…": "Löschen…",
+"Sur Mac, la mise à jour se fait à la main : téléchargez le nouveau fichier .dmg sur la page de la version, puis remplacez l'application MintMail.": "Auf dem Mac erfolgt das Update manuell: Laden Sie die neue .dmg-Datei von der Release-Seite herunter und ersetzen Sie dann die MintMail-App.",
 "Synchro : ": "Sync: ",
 "Synchro : %s": "Sync: %s",
 "Synchro : compte « %s » ajouté — ": "Sync: Konto „%s“ hinzugefügt — ",

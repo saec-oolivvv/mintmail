@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.35.3
+- Mac : la mise à jour automatique n'existe pas ; MintMail explique de télécharger le nouveau .dmg au lieu d'afficher « clé de vérification absente »
+
 ## 1.35.2
 - Correctif de publication : tests test_pins et test_help_view adaptés au retrait de GTK
 - Mac : polices de repli (Helvetica Neue, Menlo) ; diagnostic MINTMAIL_QT_TRACE=1
