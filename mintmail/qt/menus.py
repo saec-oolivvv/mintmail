@@ -46,7 +46,8 @@ def palette_commands(msg, engine=None) -> List[Tuple[str, str]]:
              (tr("Appliquer les règles à la boîte de réception"), "apply_rules"),
              (tr("Disposition : colonnes"), "layout:columns"), (tr("Disposition : lecture en bas"), "layout:bottom"), (tr("Disposition : liste seule"), "layout:list"),
              (tr("Paramètres (Ctrl+,)"), "settings"), (tr("Réglages de l'IA"), "settings:ai"), (tr("Rechercher les mises à jour"), "updates"),
-             (tr("Mises à jour"), "settings:updates"), (tr("Gestes de swipe (réglages)"), "settings:gestures"), (tr("Rechercher"), "search")]
+             (tr("Mises à jour"), "settings:updates"), (tr("Gestes de swipe (réglages)"), "settings:gestures"), (tr("Rechercher"), "search"),
+             (tr("Tout marquer comme lu"), "mark_all_read"), (tr("Tout sélectionner"), "select_all"), (tr("Mode sélection multiple"), "select_mode")]
     if engine is not None:
         many = len(engine.accounts()) > 1
         for acc in engine.accounts():

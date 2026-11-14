@@ -1,6 +1,6 @@
 """Éléments visuels Qt : pastille d'initiales, lignes de la liste des messages, lignes de la barre latérale (peints à la main, aux couleurs du thème)."""
 from PySide6.QtCore import QRect, QRectF, QSize, Qt, QTimer, Signal
-from PySide6.QtGui import QColor, QFont, QPainter, QPainterPath
+from PySide6.QtGui import QColor, QFont, QPainter, QPainterPath, QPen
 from PySide6.QtWidgets import QListView, QListWidget, QStyle, QStyledItemDelegate, QWidget
 
 from ..util import color_index, initials
@@ -139,6 +139,7 @@ class MessageDelegate(QStyledItemDelegate):
     def __init__(self, t, height=78):
         super().__init__()
         self.t, self.h = t, height
+        self.select_mode = False
         self.swipe = None                            # (ligne, décalage, action) pendant un geste
 
     def sizeHint(self, option, index):
@@ -152,17 +153,32 @@ class MessageDelegate(QStyledItemDelegate):
             self._paint_swipe(p, option.rect, sw[1], sw[2])
             p.translate(max(-option.rect.width(), min(option.rect.width(), sw[1])) * 0.9, 0)
         p.setRenderHint(QPainter.Antialiasing, True)
-        card = QRectF(option.rect).adjusted(8, 2, -8, -2)
+        card = QRectF(option.rect).adjusted(10, 3, -10, -3)
         selected, hover = bool(option.state & QStyle.State_Selected), bool(option.state & QStyle.State_MouseOver)
-        if selected or hover:
-            path = QPainterPath()
-            path.addRoundedRect(card, t["rs"] + 4, t["rs"] + 4)
-            p.fillPath(path, _c(t["accent"], 46) if selected else _c(t["hover"]))
+        rad = min(t["r"], 16) if t["r"] > 8 else t["rs"]
+        path = QPainterPath()
+        path.addRoundedRect(card, rad, rad)                                    # chaque message est une bulle : fond, filet, accent à la sélection
+        p.fillPath(path, _c(t["hover"]) if hover and not selected else _c(t["card"]))
+        if selected:
+            p.fillPath(path, _c(t["accent"], 46))
+        p.setPen(QPen(_c(t["accent"], 150) if selected else _c(t["line"]), 1))
+        p.setBrush(Qt.NoBrush)
+        p.drawPath(path)
         if selected:
             p.setPen(Qt.NoPen)
             p.setBrush(_c(t["accent"]))
             p.drawRoundedRect(QRectF(card.left(), card.top() + 14, 3, card.height() - 28), 1.5, 1.5)
         r = option.rect.adjusted(20, 0, -20, 0)
+        if self.select_mode:                                                   # case ronde à cocher, l'avatar se décale
+            cy = option.rect.center().y()
+            p.setPen(QPen(_c(t["accent"]) if selected else _c(t["dim"]), 1.6))
+            p.setBrush(_c(t["accent"]) if selected else Qt.NoBrush)
+            p.drawEllipse(QRectF(r.left() - 2, cy - 9, 18, 18))
+            if selected:
+                p.setPen(QPen(_c("#ffffff"), 2))
+                p.drawLine(r.left() + 3, cy, r.left() + 6, cy + 4)
+                p.drawLine(r.left() + 6, cy + 4, r.left() + 12, cy - 4)
+            r = r.adjusted(26, 0, 0, 0)
         av = QRect(r.left(), option.rect.top() + (self.h - 40) // 2, 40, 40)
         draw_avatar(p, av, info["sender"], info["email"] or info["sender"], t)
         x, w = av.right() + 13, r.right() - av.right() - 13

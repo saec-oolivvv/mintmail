@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.29.1
+- Correctif des tests de relecture des traductions : les catalogues de langue (en, nl, de, es et leurs fichiers d'état) ne se terminent plus par un saut de ligne superflu ; l'export / import à vide de l'outil de relecture ne les modifie plus (le test test_review_tools bloquait la publication depuis la 1.25.0)
+- Interface Qt : refonte graphique (cartes arrondies, messages en bulles) et mode sélection multiple (X, cases, barre « n sélectionnés », Ctrl+A, tout marquer comme lu)
+
 ## 1.27.0
 - Interface Qt (expérimentale, mintmail --qt) : clic droit sur un message comme dans la version GTK — répondre, transférer, archiver, supprimer, lu / non lu, favori, épingle, spam, bloquer ou débloquer l'expéditeur, voir tous ses messages, résumer / traduire / répondre avec l'IA, reporter, déplacer vers un dossier ; il agit sur la sélection
 - Interface Qt : palette de commandes (Ctrl+K) — actions sur le message courant, aller à un dossier ou à une vue, déplacer vers un dossier, dispositions, réglages, aide, mises à jour ; un texte sans commande correspondante est confié à l'assistant IA

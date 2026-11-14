@@ -115,6 +115,7 @@ class MainWindow(QMainWindow):
         super().__init__()
         self.config, self.cache = config or Config(), cache or Cache()
         self.engine = vm.Engine(self.config, self.cache)
+        self.select_mode = False
         self.view_key, self.account, self.load_images, self.current = "inbox", "all", False, None
         self._busy, self._kept, self._tick, self._sending, self._composers = False, set(), 0, False, []
         self.t = T.resolve(self.config, QApplication.palette().window().color().lightness() < 128)
@@ -198,6 +199,7 @@ class MainWindow(QMainWindow):
         self.list.setUniformItemSizes(True)
         self.list.setSelectionMode(QListView.ExtendedSelection)
         self.list.selectionModel().currentChanged.connect(self._row_changed)
+        self.list.selectionModel().selectionChanged.connect(lambda *_: self._selection_changed())
         self.search = QLineEdit()
         self.search.setObjectName("search")
         self.search.setPlaceholderText("🔍  " + tr("Rechercher"))
@@ -220,7 +222,26 @@ class MainWindow(QMainWindow):
         top.addWidget(self.title)
         top.addStretch(1)
         top.addWidget(self.count_lbl)
+        self.sel_btn = QPushButton("☑")
+        self.sel_btn.setObjectName("flat")
+        self.sel_btn.setCheckable(True)
+        self.sel_btn.setCursor(Qt.PointingHandCursor)
+        self.sel_btn.setToolTip(tr("Mode sélection multiple") + "  (X)")
+        self.sel_btn.toggled.connect(self.set_select_mode)
+        top.addWidget(self.sel_btn)
         ll.addLayout(top)
+        self.bulk_lbl = QLabel()
+        self.bulk_lbl.setObjectName("chip")
+        self.bulk_lbl.setStyleSheet("padding: 5px 12px; border-radius: 12px; font-weight: 600;")
+        self.bulk_lbl.setContentsMargins(0, 0, 0, 0)
+        bb = QHBoxLayout()
+        bb.setContentsMargins(20, 0, 20, 0)
+        bb.addWidget(self.bulk_lbl)
+        bb.addStretch(1)
+        self.bulk_row = QWidget()
+        self.bulk_row.setLayout(bb)
+        self.bulk_row.hide()
+        ll.addWidget(self.bulk_row)
         self.demo_banner = QFrame()
         dbl = QHBoxLayout(self.demo_banner)
         dbl.setContentsMargins(20, 2, 16, 2)
@@ -273,7 +294,7 @@ class MainWindow(QMainWindow):
         right = QFrame()
         right.setObjectName("readerwrap")
         rl = QVBoxLayout(right)
-        rl.setContentsMargins(0, 0, 0, 0)
+        rl.setContentsMargins(6, 6, 6, 6)                    # marge intérieure : les coins du lecteur web restent dans l'arrondi
         rl.setSpacing(0)
         rl.addWidget(readerhead)
         ib = QHBoxLayout()
@@ -295,7 +316,7 @@ class MainWindow(QMainWindow):
 
         self.listcol, self.right = listcol, right
         split = self.split = QSplitter()
-        split.setHandleWidth(1)
+        split.setHandleWidth(12)
         split.addWidget(listcol)
         split.addWidget(right)
         split.setStretchFactor(0, 2)
@@ -305,8 +326,8 @@ class MainWindow(QMainWindow):
         root = QFrame()
         root.setObjectName("root")
         rh = QHBoxLayout(root)
-        rh.setContentsMargins(0, 0, 0, 0)
-        rh.setSpacing(0)
+        rh.setContentsMargins(12, 12, 12, 12)                # cartes flottantes aux angles arrondis, séparées par de l'air
+        rh.setSpacing(12)
         rh.addWidget(side)
         rh.addWidget(split, 1)
         self.assistant = AssistantPanel()
@@ -365,6 +386,8 @@ class MainWindow(QMainWindow):
         self.set_layout(self.config.get("layout") or "columns")
         self._act(None, "", "Escape", self._back_to_list)
         self._act(None, "", "Ctrl+K", self.show_palette)
+        self._act(None, "", "X", lambda: self.sel_btn.toggle())
+        self._act(None, "", "Ctrl+A", self.select_all)
         self._act(None, "", "\\", self.cycle_layout)
         self.reload()
         QTimer.singleShot(300, lambda: self.sync(quiet=True))
@@ -558,6 +581,40 @@ class MainWindow(QMainWindow):
         self.right.setVisible(layout != "list")
         if layout == "bottom":
             self.split.setSizes([320, 520])
+
+    def set_select_mode(self, on):
+        """Mode sélection multiple : cases rondes sur chaque message, un clic coche / décoche ; barre « n sélectionnés » au-dessus de la liste."""
+        self.select_mode = bool(on)
+        self.delegate.select_mode = self.select_mode
+        self.list.setSelectionMode(QListView.MultiSelection if on else QListView.ExtendedSelection)
+        self.list.clearSelection()
+        self.list.viewport().update()
+        self._selection_changed()
+
+    def select_all(self):
+        if not self.sel_btn.isChecked():
+            self.sel_btn.setChecked(True)
+        self.list.selectAll()
+
+    def mark_all_read(self):
+        """Tout marquer comme lu dans la vue affichée (comme la version GTK)."""
+        msgs = [m for m in self.model.msgs if m.unread]
+        if msgs:
+            op_ids = self.engine.set_flag(msgs, "unread", False)
+            for m in msgs:
+                m.unread = False
+            self.reload()
+            self._background(lambda: self.engine.run_ops(op_ids), "ops")
+
+    def _selection_changed(self):
+        n = len({i.row() for i in self.list.selectionModel().selectedRows()})
+        self.bulk_lbl.setText(tr("%d sélectionné%s") % (n, "s" if n > 1 else ""))
+        self.bulk_row.setVisible(n >= 1 and (getattr(self, "select_mode", False) or n > 1))
+        if n > 1:
+            self._show(None)
+            self.reader.show_html("<html><body style='font-family:sans-serif;color:%s;text-align:center;padding-top:140px'><h2>%s</h2></body></html>"
+                                  % (self.t["dim"], tr("%d messages sélectionnés") % n))
+        self.list.viewport().update()
 
     def cycle_layout(self):
         order = ["columns", "bottom", "list"]
@@ -1087,7 +1144,7 @@ class MainWindow(QMainWindow):
         if head == "settings":
             return self.show_settings(page=arg or None)
         simple = {"assistant": lambda: self.toggle_assistant(True), "compose": self.compose, "sync": lambda: self.sync(False), "help": self.show_help,
-                  "apply_rules": self.apply_rules_now, "updates": lambda: self.check_updates(manual=True), "search": self.search.setFocus}
+                  "apply_rules": self.apply_rules_now, "mark_all_read": self.mark_all_read, "select_all": self.select_all, "select_mode": lambda: self.sel_btn.toggle(), "updates": lambda: self.check_updates(manual=True), "search": self.search.setFocus}
         if key in simple:
             simple[key]()
 

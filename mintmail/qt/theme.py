@@ -56,10 +56,10 @@ def build_qss(t: dict) -> str:
 QMainWindow, QDialog, QMessageBox { background: %(bg)s; color: %(text)s; }
 QWidget { color: %(text)s; font-size: 14px; }
 QLabel { background: transparent; }
-#root, #listcol { background: %(bg)s; }
-#sidebar { background: %(side)s; border-right: 1px solid %(line)s; }
-#readerwrap { background: %(panel)s; border-left: 1px solid %(line)s; }
-#readerhead { background: %(panel)s; border-bottom: 1px solid %(line)s; }
+#root { background: %(bg)s; }
+#sidebar, #listcol, #readerwrap, #assistant { background: %(panel)s; border: 1px solid %(line)s; border-radius: %(rc)dpx; }
+#sidebar { background: %(side)s; }
+#readerhead { background: transparent; border: none; border-bottom: 1px solid %(line)s; border-radius: 0; }
 #brand { font-size: 18px; font-weight: 800; color: %(text)s; }
 #caption { color: %(dim)s; font-size: 11px; font-weight: 700; }
 #dim { color: %(dim)s; }
@@ -68,12 +68,11 @@ QLabel { background: transparent; }
 #updatebanner { background: %(card)s; border-bottom: 1px solid %(line)s; }
 QProgressBar { background: %(line)s; border: none; border-radius: 3px; }
 QProgressBar::chunk { background: %(accent)s; border-radius: 3px; }
-#aicard { background: %(card)s; border: 1px solid %(line)s; border-radius: %(rs)dpx; margin: 6px 16px 0 16px; }
+#aicard { background: %(card)s; border: 1px solid %(line)s; border-radius: %(rc)dpx; margin: 8px 16px 0 16px; }
 #aiwarn { color: #dc2626; font-weight: 700; }
-#assistant { background: %(panel)s; border-left: 1px solid %(line)s; }
-#assistanthead { border-bottom: 1px solid %(line)s; }
-#bubble_user { background: %(accent)s; color: %(on)s; border-radius: 14px; padding: 9px 13px; }
-#bubble_ai { background: %(card)s; border: 1px solid %(line)s; border-radius: 14px; padding: 9px 13px; }
+#assistanthead { background: transparent; border: none; border-bottom: 1px solid %(line)s; border-radius: 0; }
+#bubble_user { background: %(accent)s; color: %(on)s; border-radius: 16px; border-bottom-right-radius: 4px; padding: 10px 14px; }
+#bubble_ai { background: %(card)s; border: 1px solid %(line)s; border-radius: 16px; border-bottom-left-radius: 4px; padding: 10px 14px; }
 #planrow { background: %(hover)s; border-radius: %(rs)dpx; }
 QListView, QListWidget { background: transparent; border: none; outline: 0; }
 QListView::item, QListWidget::item { border: none; }
@@ -86,25 +85,25 @@ QComboBox QAbstractItemView { background: %(card)s; border: 1px solid %(line)s; 
 QPushButton { background: %(card)s; border: 1px solid %(line)s; border-radius: %(rs)dpx; padding: 7px 14px; }
 QPushButton:hover { background: %(hover)s; }
 QPushButton:pressed { background: %(line)s; }
-QPushButton#primary { background: %(accent)s; color: %(on)s; border: none; border-radius: %(rp)dpx; padding: 11px 16px; font-weight: 700; }
+QPushButton#primary { background: %(accent)s; color: %(on)s; border: none; border-radius: %(rp)dpx; padding: 12px 18px; font-weight: 700; }
 QPushButton#primary:hover { background: %(accent)s; }
 QPushButton#flat, QToolButton#flat { background: transparent; border: none; border-radius: %(rs)dpx; padding: 7px 10px; color: %(dim)s; }
 QPushButton#flat:hover, QToolButton#flat:hover { background: %(hover)s; color: %(text)s; }
 QPushButton#flat:checked { background: %(hover)s; color: %(accent)s; }
 QPushButton#flat:disabled { color: %(line)s; }
 QPushButton#chip { background: %(hover)s; border: none; border-radius: %(rp)dpx; padding: 6px 14px; color: %(accent)s; font-weight: 600; }
-QMenu { background: %(card)s; border: 1px solid %(line)s; border-radius: %(rs)dpx; padding: 6px; }
-QMenu::item { padding: 7px 22px; border-radius: %(rs)dpx; }
+QMenu { background: %(card)s; border: 1px solid %(line)s; border-radius: %(rc)dpx; padding: 8px; }
+QMenu::item { padding: 8px 24px; border-radius: %(rs)dpx; margin: 1px 0; }
 QMenu::item:selected { background: %(accent)s; color: %(on)s; }
 QMenu::separator { height: 1px; background: %(line)s; margin: 5px 8px; }
-QToolTip { background: %(card)s; color: %(text)s; border: 1px solid %(line)s; padding: 5px 8px; }
-QScrollBar:vertical { background: transparent; width: 10px; margin: 2px; }
+QToolTip { background: %(card)s; color: %(text)s; border: 1px solid %(line)s; border-radius: %(rs)dpx; padding: 6px 10px; }
+QScrollBar:vertical { background: transparent; width: 12px; margin: 4px 2px; }
 QScrollBar::handle:vertical { background: %(line)s; border-radius: 4px; min-height: 36px; }
 QScrollBar::handle:vertical:hover { background: %(dim)s; }
 QScrollBar::add-line, QScrollBar::sub-line, QScrollBar::add-page, QScrollBar::sub-page { background: none; height: 0; width: 0; border: none; }
 QScrollBar:horizontal { height: 0; }
-QSplitter::handle { background: transparent; width: 1px; }
-QTabWidget::pane { border: 1px solid %(line)s; border-radius: %(rs)dpx; top: -1px; }
+QSplitter::handle { background: transparent; }
+QTabWidget::pane { border: 1px solid %(line)s; border-radius: %(rc)dpx; top: -1px; }
 QTabBar::tab { background: transparent; padding: 9px 16px; color: %(dim)s; border: none; }
 QTabBar::tab:selected { color: %(accent)s; border-bottom: 2px solid %(accent)s; }
 QCheckBox { spacing: 8px; background: transparent; }
@@ -114,4 +113,4 @@ QCalendarWidget QWidget { background: %(card)s; }
 QToolBar { background: transparent; border: none; spacing: 4px; padding: 6px 10px; }
 QStatusBar { background: transparent; color: %(dim)s; }
 QStatusBar::item { border: none; }
-""" % dict(t, r=r, rs=rs, rp=rp)
+""" % dict(t, r=r, rs=rs, rp=rp, rc=min(r, 18) + (4 if r > 8 else 0))

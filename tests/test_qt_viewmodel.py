@@ -921,3 +921,8 @@ def test_context_menu_labels_follow_the_message_state_and_palette_search_matches
     assert MN.search(cmds, "") == cmds and MN.search(cmds, "zzzz") == []
     assert MN.wants_ai("range mes factures", []) and not MN.wants_ai("ab", []) and not MN.wants_ai("archiver", [("a", "b")])
     assert all(k != "reply" for _l, k in MN.palette_commands(None))                      # sans message : pas d'actions de message
+
+
+def test_palette_offers_bulk_commands_even_without_a_message():
+    keys = [k for _l, k in MN.palette_commands(None)]
+    assert {"mark_all_read", "select_all", "select_mode"} <= set(keys)
