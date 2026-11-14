@@ -59,6 +59,9 @@ def build_report() -> str:
     add("Interpréteur: %s%s" % (sys.executable, "" if sys.executable == "/usr/bin/python3" else
                                 "   <-- PAS le Python du système : python3-gi n'y est peut-être pas visible"))
     add("Paquet      : %s" % os.path.dirname(os.path.abspath(__file__)))
+    from . import qtdeps as _QD
+    _miss = _QD.missing_libs()
+    add("Qt (libs)   : %s" % ("OK" if not _miss else "KO — manquent : %s  =>  %s" % (", ".join(_miss), _QD.apt_command(_QD.packages_for(_miss)))))
     add("Version dpkg: %s" % (_run(["dpkg-query", "-W", "-f=${Version}", "mintmail"]) or "non installé par dpkg"))
     shadows, seen = [], set()
     for d in os.environ.get("PATH", "").split(":"):

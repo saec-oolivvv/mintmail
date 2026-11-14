@@ -112,7 +112,7 @@ Version: $VER
 Section: mail
 Priority: optional
 Architecture: all
-Depends: python3 (>= 3.9), python3-venv, python3-gi, gir1.2-gtk-3.0, gir1.2-webkit2-4.1 | gir1.2-webkit2-4.0, openssl
+Depends: python3 (>= 3.9), python3-venv, python3-gi, gir1.2-gtk-3.0, gir1.2-webkit2-4.1 | gir1.2-webkit2-4.0, openssl, libxcb-cursor0, libxkbcommon-x11-0, libxcb-icccm4, libxcb-image0, libxcb-keysyms1, libxcb-render-util0, libxcb-xinerama0, libxcb-shape0, libxcb-xkb1, libegl1, libgl1, libfontconfig1, libdbus-1-3
 Recommends: python3-pyside6.qtwidgets, python3-pyside6.qtwebenginewidgets, python3-keyring, libnotify-bin, pkexec | policykit-1
 Installed-Size: $SIZE
 Maintainer: SAEC <contact@saec.me>

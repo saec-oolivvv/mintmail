@@ -33,6 +33,8 @@ from . import gestures as GS
 from . import menus as MN
 from . import ui_appicon as AI
 from . import savedsearch as SS
+from .. import qtdeps as QD
+from ..store import DATA_DIR
 from .ui_palette import Palette
 from .ui_widgets import (AccountRole, AvatarWidget, CountRole, DepthRole, FoldedRole, InfoRole, KeyRole, KindRole, LabelRole, MessageDelegate, MessageList, NameRole,
                          NavDelegate, NavList, ToggleRole)
@@ -1412,4 +1414,5 @@ def run(argv=None):
     app.setWindowIcon(AI.load())
     win = MainWindow()
     win.show()
+    QTimer.singleShot(0, lambda: QD.end_start(QD.start_marker(str(DATA_DIR))))       # la fenêtre est arrivée jusqu'à l'écran : le démarrage a réussi
     return app.exec()

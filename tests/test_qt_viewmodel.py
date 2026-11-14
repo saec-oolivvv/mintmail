@@ -1033,3 +1033,34 @@ def test_conversations_group_by_thread_expand_actions_to_the_whole_thread_and_fo
     assert [x.id for x in V.expand_threads(Cache(), [top], enabled=False)] == ["m11"]
     info = V.row_info(top)
     assert info["count"] == 3 and info["unread"] is True and V.row_info(solo)["count"] == 0
+
+
+def test_qtdeps_detects_missing_system_libraries_and_names_the_packages():
+    from mintmail import qtdeps as QD
+    out = "\tlinux-vdso.so.1 (0x1)\n\tlibxcb-cursor.so.0 => not found\n\tlibQt6Core.so.6 => /x/libQt6Core.so.6 (0x2)\n\tlibxcb-icccm.so.4 => not found\n\tlibxcb-cursor.so.0 => not found\n"
+    assert QD.parse_ldd(out) == ["libxcb-cursor.so.0", "libxcb-icccm.so.4"]
+    assert QD.packages_for(["libxcb-cursor.so.0", "libxcb-icccm.so.4", "libxcb-foo-bar.so.2", "libEGL.so.1", "libEGL.so.1"]) == ["libxcb-cursor0", "libxcb-icccm4", "libxcb-foo-bar2", "libegl1"]
+    assert QD.missing_libs(["/a"], ldd=lambda p: out, platform="linux") == ["libxcb-cursor.so.0", "libxcb-icccm.so.4"]
+    assert QD.missing_libs(["/a"], ldd=lambda p: "libx.so => /y (0x1)", platform="linux") == []
+    # Wayland : un plugin complet suffit (Qt retombe sur xcb)
+    assert QD.missing_libs(["/xcb", "/way"], ldd=lambda p: out if p == "/xcb" else "", platform="linux") == []
+    assert QD.missing_libs(["/a"], ldd=lambda p: out, platform="win32") == [] and QD.missing_libs([], platform="linux") == []
+    assert QD.apt_command(["a", "b"]) == "sudo apt install a b"
+    assert QD.install_command(["a"], which=lambda n: "/usr/bin/" + n) == ["pkexec", "apt-get", "install", "-y", "a"]
+    assert QD.install_command(["a"], which=lambda n: None) == []
+
+
+def test_qtdeps_attempt_throttle_and_startup_marker_detect_a_silent_crash():
+    import tempfile
+    from mintmail import qtdeps as QD
+    d = tempfile.mkdtemp()
+    m = os.path.join(d, "sub", "attempt")
+    assert QD.due(m, now=1000) is True and QD.due(m, now=1000 + 60) is False
+    os.utime(m, (1000, 1000))
+    assert QD.due(m, now=1000 + 90000) is True
+    mk = QD.start_marker(d)
+    assert QD.begin_start(mk) is True          # premier lancement
+    assert QD.begin_start(mk) is False         # le précédent n'a jamais atteint la fenêtre : arrêt brutal
+    QD.end_start(mk)
+    assert QD.begin_start(mk) is True
+    QD.end_start(mk); QD.end_start(mk)          # idempotent

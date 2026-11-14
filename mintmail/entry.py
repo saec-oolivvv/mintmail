@@ -40,6 +40,44 @@ def install_qt_cli() -> int:
     return 0 if ok else 1
 
 
+def _notify(text: str) -> None:
+    if shutil.which("notify-send"):
+        import subprocess
+        try:
+            subprocess.Popen(["notify-send", "-i", "mintmail", "MintMail", text], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        except OSError:
+            pass
+
+
+def _qt_libs_ok() -> bool:
+    """Qt exige des bibliothèques système (ex. libxcb-cursor0) : sans elles il s'arrête sans rien dire. On vérifie d'abord, on tente de les installer
+    (une fois par jour, mot de passe demandé par la fenêtre du système), sinon on explique et on laisse l'ancienne interface prendre le relais."""
+    from . import qtdeps as QD
+    miss = QD.missing_libs()
+    if not miss:
+        return True
+    pkgs = QD.packages_for(miss)
+    cmd = QD.install_command(pkgs)
+    if cmd and not os.environ.get("MINTMAIL_NO_AUTOINSTALL") and (os.environ.get("DISPLAY") or os.environ.get("WAYLAND_DISPLAY")) \
+            and QD.due(str(Path(DATA_DIR) / "qt-libs.attempt")):
+        import subprocess
+        sys.stderr.write(tr("Installation des bibliothèques système manquantes : %s") % " ".join(pkgs) + "\n")
+        _notify(tr("Installation des bibliothèques système manquantes : %s") % " ".join(pkgs))
+        try:
+            subprocess.run(cmd, stdin=subprocess.DEVNULL, timeout=900)
+        except (OSError, subprocess.SubprocessError):
+            pass
+        miss = QD.missing_libs()
+        if not miss:
+            return True
+        pkgs = QD.packages_for(miss)
+    msg = tr("Bibliothèques système manquantes pour l'interface Qt : %s") % ", ".join(miss) + "\n" + tr("Installez-les avec : %s") % QD.apt_command(pkgs)
+    sys.stderr.write(msg + "\n")
+    log("Qt : " + msg.replace("\n", " "))
+    _notify(msg)
+    return False
+
+
 def _auto_install_qt_in_background() -> None:
     """PySide6 manque et aucun venv n'existe : on installe en arrière-plan (une tentative par jour), MintMail démarre tout de suite avec l'ancienne interface."""
     if os.environ.get("MINTMAIL_NO_AUTOINSTALL"):
@@ -358,7 +396,20 @@ def main(argv=None) -> int:
             _auto_install_qt_in_background()
             sys.stderr.write(tr("Interface Qt indisponible (PySide6 absent) : l'ancienne interface GTK est utilisée à la place.") + "\n")
         else:
-            return run_qt([a for a in argv if a not in ("--qt", "--gtk")])
+            from . import qtdeps as QD
+            marker = QD.start_marker(str(DATA_DIR))
+            if not _qt_libs_ok():
+                if "--qt" in argv:
+                    return 1
+                sys.stderr.write(tr("L'interface précédente (GTK) est utilisée en attendant.") + "\n")
+            elif not QD.begin_start(marker) and "--qt" not in argv:
+                msg = tr("Le dernier démarrage de l'interface Qt s'est arrêté brutalement : l'interface précédente (GTK) est utilisée cette fois. Pour voir la cause : QT_DEBUG_PLUGINS=1 mintmail --qt")
+                sys.stderr.write(msg + "\n")
+                log("Qt : " + msg)
+                _notify(msg)
+                QD.end_start(marker)
+            else:
+                return run_qt([a for a in argv if a not in ("--qt", "--gtk")])
     from .store import harden_permissions
     harden_permissions()                    # dossiers 0700 / fichiers 0600, même pour les anciennes installations
     install_hook()

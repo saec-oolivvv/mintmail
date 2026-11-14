@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.32.2
+- Interface Qt : plus jamais de plantage silencieux au lancement — les bibliothèques système exigées par Qt (ex. libxcb-cursor0) sont vérifiées avant d'ouvrir la fenêtre ; si elles manquent, MintMail tente de les installer (une fois par jour, mot de passe demandé par la fenêtre du système), sinon il affiche la commande exacte (sudo apt install …) et ouvre l'ancienne interface ; un démarrage Qt qui s'arrête brutalement est détecté au lancement suivant (ancienne interface + indication QT_DEBUG_PLUGINS=1) ; le .deb installe ces bibliothèques d'office ; mintmail --diagnose les contrôle
+
 ## 1.32.1
 - Correctif interface Qt : la fenêtre principale ne s'ouvrait pas (« QTextBrowser » non importé dans qt/window.py, révélé par les tests chez vous avec le vrai PySide6) ; nouveau test qui détecte tout nom utilisé sans être défini ou importé, même sans PySide6
 
