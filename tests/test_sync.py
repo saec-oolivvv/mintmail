@@ -154,7 +154,7 @@ def test_two_engines_sync_automatically_and_encrypted():
     orig = socket.socket.send
     socket.socket.send = lambda self, data, *a: (sent.append(bytes(data)), orig(self, data, *a))[1]
     ca, a = _engine("EA", 55501, 55511, CODE, peers=["127.0.0.1:55502"], full=True)
-    cb, b = _engine("EB", 55502, 55512, CODE, peers=["127.0.0.1:55501"])
+    cb, b = _engine("EB", 55502, 55512, CODE, peers=["127.0.0.1:55501"], theme="system")   # réglage jamais modifié (date 0) : celui de A l'emporte à coup sûr, quel que soit l'ordre de démarrage
     try:
         assert b.start() and a.start()
         # 1) AUCUN clic : le compte, sa signature, le mot de passe, la clé IA, les modèles arrivent seuls

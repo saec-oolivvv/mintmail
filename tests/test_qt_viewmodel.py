@@ -268,3 +268,109 @@ def test_demo_account_sent_messages_land_in_the_sent_folder():
     assert [k for k, _o, _e in eng.process_outbox()] == ["sent"]
     assert any(m.subject == "Démo" for m in cache.query("sent", "all"))
     eng.snooze([_m(1)], time.time() + 3600)                                     # sans effet sur un message absent du cache, sans erreur
+
+
+# ------------------------------------------------------------------ thème
+from mintmail.qt import theme as TH
+from mintmail.style import STYLES
+
+
+def test_theme_builds_for_every_style_and_mode_with_colours_qt_can_read():
+    import re
+    for style in STYLES:
+        for mode in ("dark", "light"):
+            t = TH.resolve({"style": style, "theme": mode, "accent": "#7c8cff"})
+            q = TH.build_qss(t)
+            assert t["dark"] == (mode == "dark") and "rgba(" not in q and "%(" not in q
+            for k in ("bg", "side", "card", "panel", "hover", "text", "dim", "line", "field", "accent", "on"):
+                assert re.fullmatch(r"#[0-9a-fA-F]{6}", t[k]), (style, mode, k, t[k])      # aplats #rrggbb : Qt les lit tous
+    assert TH.resolve({"theme": "system"}, system_dark=True)["dark"] and not TH.resolve({"theme": "system"}, system_dark=False)["dark"]
+    assert TH.resolve({"style": "inconnu"})["style"] == "aurora"
+    assert TH.solid("rgba(255,255,255,0.5)") == "#80ffffff" and TH.solid("#123456") == "#123456"
+    assert TH.row_height("compact") < TH.row_height("comfortable") < TH.row_height("spacious")
+    assert V.row_info(_m(1, sender_email="Z@x.be"))["email"] == "Z@x.be"
+
+
+# ------------------------------------------------------------------ comptes et réglages
+from mintmail.qt import accounts as AC
+
+
+class _Cfg(dict):
+    def __init__(self, **kw):
+        super().__init__(accounts=[], **kw)
+        self.pw, self.saved = {}, 0
+
+    def password(self, aid):
+        return self.pw.get(aid, "")
+
+    def set_password(self, aid, pw):
+        self.pw[aid] = pw
+
+    def delete_password(self, aid):
+        self.pw.pop(aid, None)
+
+    def save(self):
+        self.saved += 1
+
+    def reset(self, keys):
+        for k in keys:
+            self.pop(k, None)
+
+
+FORM = dict(name="Moi", email="moi@exemple.be", username="", imap_host="imap.exemple.be", imap_port=993, smtp_host="smtp.exemple.be", smtp_port=587, imap_ssl=True)
+
+
+def test_account_form_validation_matches_the_gtk_rules():
+    assert AC.collect({}, dict(FORM, email="pas-un-mail"))[1] == "Adresse e-mail invalide."
+    assert "IMAP et SMTP" in AC.collect({}, dict(FORM, imap_host=""))[1]
+    assert AC.collect({}, dict(FORM, imap_port="abc"))[1] == "Les ports doivent être des nombres."
+    assert AC.collect({}, dict(FORM, smtp_port=70000))[1] == "Port invalide (1 à 65535)."
+    a, err = AC.collect({"demo": True}, FORM)
+    assert not err and a["email"] == "moi@exemple.be" and "demo" not in a and a["id"] and "auth" not in a
+    g, _ = AC.collect({}, FORM, oauth="google")
+    assert g["auth"] == "oauth2" and g["oauth_provider"] == "google"
+    assert AC.apply_preset("iCloud")["imap_host"] == "imap.mail.me.com" and AC.apply_preset("inconnu") == {}
+    assert len(AC.preset_choices()) == len(AC.PRESETS)
+
+
+def test_account_save_remove_and_password_handling():
+    cfg, cache = _Cfg(), Cache(os.path.join(tempfile.mkdtemp(), "c.db"))
+    a, _ = AC.collect({}, FORM)
+    assert AC.save_account(cfg, cache, dict(a)) == "Mot de passe requis." and not cfg["accounts"]
+    assert AC.save_account(cfg, cache, dict(a), "secret") == "" and cfg.pw[a["id"]] == "secret" and cfg["accounts"][0]["has_password"]
+    dup, _ = AC.collect({}, FORM)                                                       # même adresse, autre compte
+    assert AC.save_account(cfg, cache, dup, "x") == "Ce compte existe déjà."
+    edited, _ = AC.collect(cfg["accounts"][0], dict(FORM, name="Nouveau nom"))
+    assert AC.save_account(cfg, cache, edited) == "" and cfg["accounts"][0]["name"] == "Nouveau nom" and cfg.pw[a["id"]] == "secret"     # mot de passe conservé
+    og, _ = AC.collect({}, dict(FORM, email="g@gmail.com"), oauth="google")
+    assert "Se connecter" in AC.save_account(cfg, cache, og, "", "google")
+    assert AC.save_account(cfg, cache, og, "refresh-token", "google") == "" and len(cfg["accounts"]) == 2
+    cache.upsert(_m(1, account=a["id"]))
+    AC.remove_account(cfg, cache, a["id"])
+    assert len(cfg["accounts"]) == 1 and a["id"] not in cfg.pw and cache.get("m1") is None
+
+
+def test_connection_test_uses_the_typed_password_and_reports_errors(monkeypatch=None):
+    import mintmail.qt.accounts as mod
+    seen = {}
+
+    class B:
+        def __init__(self, acc, cfg): seen["pw"] = cfg.password(acc["id"])
+        def test(self): return None if seen["pw"] == "bon" else "authentification refusée"
+    real = mod.make_backend
+    mod.make_backend = lambda acc, cfg: B(acc, cfg)
+    try:
+        cfg = _Cfg()
+        cfg.pw["x"] = "bon"
+        assert AC.test_account(cfg, {"id": "x"}, "") is None and AC.test_account(cfg, {"id": "x"}, "mauvais") == "authentification refusée"
+    finally:
+        mod.make_backend = real
+
+
+def test_reset_appearance_restores_defaults():
+    from mintmail.store import DEFAULTS
+    cfg = _Cfg(theme="dark")
+    cfg["style"] = "terminal"
+    AC.reset_appearance(cfg)
+    assert "theme" not in cfg and "style" not in cfg and cfg.saved == 1
+    assert set(AC.APPEARANCE_KEYS) <= set(DEFAULTS)                                      # chaque clé réinitialisable existe vraiment

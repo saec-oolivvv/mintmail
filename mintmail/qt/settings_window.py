@@ -1,0 +1,354 @@
+"""Paramètres Qt : comptes (IMAP/SMTP, connexion OAuth Gmail / Microsoft, test, suppression) et apparence / messagerie.
+Toute la logique (validation, enregistrement, test) est dans accounts.py, testée sans Qt."""
+import threading
+
+from PySide6.QtCore import QObject, Qt, QUrl, Signal
+from PySide6.QtGui import QDesktopServices
+from PySide6.QtWidgets import (QCheckBox, QComboBox, QDialog, QDialogButtonBox, QFormLayout, QHBoxLayout, QLabel, QLineEdit, QListWidget,
+                               QListWidgetItem, QMessageBox, QPushButton, QSpinBox, QTabWidget, QVBoxLayout, QWidget)
+
+from .. import oauth
+from ..i18n import tr
+from ..style import ACCENTS, STYLES
+from . import accounts as A
+
+
+class _Signals(QObject):
+    say = Signal(str, bool)
+    oauth_done = Signal(object, str)
+
+
+class SettingsDialog(QDialog):
+    def __init__(self, main):
+        super().__init__(main)
+        self.main, self.cfg = main, main.config
+        self.setWindowTitle(tr("Paramètres"))
+        self.resize(860, 620)
+        self.sig = _Signals()
+        self.sig.say.connect(self._say)
+        self.sig.oauth_done.connect(self._oauth_done)
+        self.current, self._oauth, self._oauth_token = {}, None, None
+        tabs = QTabWidget()
+        tabs.addTab(self._accounts_tab(), tr("Comptes"))
+        tabs.addTab(self._look_tab(), tr("Apparence"))
+        close = QPushButton(tr("Fermer"))
+        close.clicked.connect(self.accept)
+        lay = QVBoxLayout(self)
+        lay.addWidget(tabs, 1)
+        row = QHBoxLayout()
+        row.addStretch(1)
+        row.addWidget(close)
+        lay.addLayout(row)
+        self._reload_accounts()
+
+    # ------------------------------------------------------------ comptes
+    def _accounts_tab(self):
+        w = QWidget()
+        h = QHBoxLayout(w)
+        left = QVBoxLayout()
+        self.acc_list = QListWidget()
+        self.acc_list.setFixedWidth(220)
+        self.acc_list.currentRowChanged.connect(self._acc_selected)
+        add = QPushButton(tr("＋ Ajouter un compte"))
+        add.clicked.connect(self._add_account)
+        left.addWidget(self.acc_list, 1)
+        left.addWidget(add)
+        h.addLayout(left)
+        form = QFormLayout()
+        self.f_preset = QComboBox()
+        for key, label in A.preset_choices():
+            self.f_preset.addItem(label, key)
+        self.f_preset.setCurrentIndex(-1)
+        self.f_preset.currentIndexChanged.connect(self._preset)
+        self.f_name, self.f_email, self.f_user = QLineEdit(), QLineEdit(), QLineEdit()
+        self.f_pass = QLineEdit()
+        self.f_pass.setEchoMode(QLineEdit.Password)
+        self.f_ihost, self.f_iport, self.f_shost, self.f_sport = QLineEdit(), QSpinBox(), QLineEdit(), QSpinBox()
+        for sp in (self.f_iport, self.f_sport):
+            sp.setRange(1, 65535)
+        self.f_ssl = QCheckBox(tr("IMAP en SSL/TLS direct (port 993)"))
+        form.addRow(tr("Fournisseur"), self.f_preset)
+        form.addRow(tr("Nom affiché"), self.f_name)
+        form.addRow(tr("Adresse e-mail"), self.f_email)
+        form.addRow(tr("Identifiant"), self.f_user)
+        form.addRow(tr("Mot de passe"), self.f_pass)
+        form.addRow(tr("Serveur IMAP"), self.f_ihost)
+        form.addRow(tr("Port IMAP"), self.f_iport)
+        form.addRow(tr("Serveur SMTP"), self.f_shost)
+        form.addRow(tr("Port SMTP"), self.f_sport)
+        form.addRow("", self.f_ssl)
+        self.oauth_btn = QPushButton()
+        self.oauth_btn.clicked.connect(self._oauth_login)
+        self.test_btn, self.save_btn, self.rm_btn = QPushButton(tr("Tester la connexion")), QPushButton(tr("Enregistrer")), QPushButton(tr("Supprimer ce compte"))
+        self.save_btn.setObjectName("primary")
+        self.test_btn.clicked.connect(self._test)
+        self.save_btn.clicked.connect(self._save)
+        self.rm_btn.clicked.connect(self._remove)
+        btns = QHBoxLayout()
+        for b in (self.oauth_btn, self.test_btn, self.save_btn, self.rm_btn):
+            btns.addWidget(b)
+        self.status = QLabel()
+        self.status.setWordWrap(True)
+        note = QLabel(tr("Gmail / Yahoo / iCloud : créez un « mot de passe d'application » dans les paramètres de sécurité du compte."))
+        note.setWordWrap(True)
+        note.setObjectName("dim")
+        right = QVBoxLayout()
+        right.addLayout(form)
+        right.addLayout(btns)
+        right.addWidget(self.status)
+        right.addWidget(note)
+        right.addStretch(1)
+        h.addLayout(right, 1)
+        return w
+
+    def _say(self, text, error=False):
+        self.status.setText(text)
+        self.status.setStyleSheet("color:#e5484d" if error else "")
+
+    def _reload_accounts(self, select=None):
+        self.acc_list.blockSignals(True)
+        self.acc_list.clear()
+        for a in self.cfg["accounts"]:
+            it = QListWidgetItem(a.get("name") or a["email"])
+            it.setData(Qt.UserRole, a)
+            self.acc_list.addItem(it)
+        self.acc_list.blockSignals(False)
+        row = next((i for i, a in enumerate(self.cfg["accounts"]) if a["id"] == select), 0) if self.cfg["accounts"] else -1
+        self.acc_list.setCurrentRow(row)
+        if row < 0:
+            self._acc_selected(-1)
+
+    def _acc_selected(self, row):
+        it = self.acc_list.item(row) if row >= 0 else None
+        a = it.data(Qt.UserRole) if it else None
+        self.current = dict(a) if a else {}
+        a = self.current
+        self.f_preset.blockSignals(True)
+        self.f_preset.setCurrentIndex(-1)
+        self.f_preset.blockSignals(False)
+        self.f_name.setText(a.get("name", ""))
+        self.f_email.setText(a.get("email", ""))
+        self.f_user.setText(a.get("username", ""))
+        self.f_pass.clear()
+        self.f_pass.setPlaceholderText(tr("Enregistré — laisser vide pour le conserver") if a.get("email") and a.get("has_password", True) else tr("Mot de passe"))
+        self.f_ihost.setText(a.get("imap_host", ""))
+        self.f_iport.setValue(int(a.get("imap_port", 993)))
+        self.f_shost.setText(a.get("smtp_host", ""))
+        self.f_sport.setValue(int(a.get("smtp_port", 587)))
+        self.f_ssl.setChecked(a.get("imap_ssl", True))
+        self._oauth = a.get("oauth_provider") if a.get("auth") == "oauth2" else None
+        self._oauth_token = None
+        self.rm_btn.setEnabled(bool(a.get("id")))
+        self._say("")
+        self._oauth_ui()
+
+    def _add_account(self):
+        self.acc_list.blockSignals(True)
+        self.acc_list.clearSelection()
+        self.acc_list.setCurrentRow(-1)
+        self.acc_list.blockSignals(False)
+        self._acc_selected(-1)
+        self.f_preset.setCurrentIndex(0)
+        self.f_email.setFocus()
+
+    def _preset(self, _i):
+        key = self.f_preset.currentData()
+        p = A.apply_preset(key)
+        self._oauth = p.get("oauth")
+        self._oauth_token = None
+        if p:
+            self.f_ihost.setText(p["imap_host"])
+            self.f_iport.setValue(p["imap_port"])
+            self.f_shost.setText(p["smtp_host"])
+            self.f_sport.setValue(p["smtp_port"])
+        self._oauth_ui()
+
+    def _oauth_ui(self):
+        prov = oauth.PROVIDERS.get(self._oauth or "")
+        self.oauth_btn.setVisible(bool(prov))
+        self.f_pass.setEnabled(not prov)
+        if prov:
+            connected = bool(self._oauth_token) or bool(self.current.get("auth") == "oauth2" and self.current.get("has_password", True)
+                                                        and self.cfg.password(self.current.get("id", "")))
+            self.oauth_btn.setText(tr("🔑 Reconnecter avec %s") % prov["label"] if connected else tr("🔑 Se connecter avec %s") % prov["label"])
+            self.f_pass.setPlaceholderText(tr("Connexion OAuth : pas de mot de passe"))
+
+    def _form(self):
+        return dict(name=self.f_name.text(), email=self.f_email.text(), username=self.f_user.text(), imap_host=self.f_ihost.text(),
+                    imap_port=self.f_iport.value(), smtp_host=self.f_shost.text(), smtp_port=self.f_sport.value(), imap_ssl=self.f_ssl.isChecked())
+
+    def _collect(self):
+        a, err = A.collect(self.current, self._form(), self._oauth)
+        if err:
+            self._say(err, True)
+        return a
+
+    def _test(self):
+        a = self._collect()
+        if not a:
+            return
+        typed = self._oauth_token or self.f_pass.text()
+        if not typed and not a.get("has_password", True):
+            self._say(tr("Saisissez le mot de passe (ou mot de passe d'application)."), True)
+            return
+        self._say(tr("Test de connexion en cours…"))
+
+        def work():
+            err = A.test_account(self.cfg, a, typed)
+            self.sig.say.emit(tr("Connexion réussie (IMAP + SMTP).") if not err else err, bool(err))
+        threading.Thread(target=work, daemon=True).start()
+
+    def _save(self):
+        a = self._collect()
+        if not a:
+            return
+        first = not [x for x in self.cfg["accounts"] if not x.get("demo")]
+        err = A.save_account(self.cfg, self.main.cache, a, self._oauth_token or self.f_pass.text(), self._oauth)
+        if err:
+            self._say(err, True)
+            return
+        self.main.accounts_changed()
+        self._reload_accounts(select=a["id"])
+        self._say(tr("Compte enregistré. Synchronisation en cours…"))
+
+    def _remove(self):
+        aid = self.current.get("id")
+        if not aid or not any(x["id"] == aid for x in self.cfg["accounts"]):
+            return
+        box = QMessageBox(QMessageBox.Question, tr("Paramètres"), tr("Supprimer ce compte de MintMail ?"), parent=self)
+        box.setInformativeText(tr("Les messages en cache seront effacés. Vos mails restent sur le serveur."))
+        yes = box.addButton(tr("Supprimer"), QMessageBox.DestructiveRole)
+        box.addButton(tr("Annuler"), QMessageBox.RejectRole)
+        box.exec()
+        if box.clickedButton() is yes:
+            A.remove_account(self.cfg, self.main.cache, aid)
+            self.main.accounts_changed()
+            self._reload_accounts()
+
+    # -- OAuth (Gmail, Microsoft)
+    def _oauth_client_dialog(self, provider):
+        prov = oauth.PROVIDERS[provider]
+        cur = oauth.client_for(self.cfg, provider)
+        dlg = QDialog(self)
+        dlg.setWindowTitle(tr("Configurer %s — une seule fois") % prov["label"])
+        lay = QVBoxLayout(dlg)
+        note = QLabel(tr("MintMail ne peut pas créer cet identifiant à votre place (Google exige que ce soit vous, connecté à votre compte). "
+                         "Suivez les étapes ci-dessous : chaque bouton ouvre la bonne page. Ensuite, collez l'ID client et le secret. "
+                         "C'est à faire UNE FOIS : le réglage se synchronise avec vos autres machines (ou voir l'aide F1 pour le déployer "
+                         "sur plusieurs postes)."))
+        note.setWordWrap(True)
+        lay.addWidget(note)
+        for i, (text, url) in enumerate(oauth.WIZARD.get(provider, []), 1):
+            row = QHBoxLayout()
+            lab = QLabel("%d. %s" % (i, text))
+            lab.setWordWrap(True)
+            b = QPushButton(tr("Ouvrir ↗"))
+            b.clicked.connect(lambda _c=False, u=url: QDesktopServices.openUrl(QUrl(u)))
+            row.addWidget(lab, 1)
+            row.addWidget(b)
+            lay.addLayout(row)
+        cid, secret = QLineEdit(cur.get("client_id", "")), QLineEdit(cur.get("client_secret", ""))
+        cid.setPlaceholderText(tr("ID client"))
+        secret.setPlaceholderText(tr("Secret client (facultatif selon le fournisseur)"))
+        lay.addWidget(cid)
+        lay.addWidget(secret)
+        bb = QDialogButtonBox()
+        bb.addButton(tr("Annuler"), QDialogButtonBox.RejectRole)
+        bb.addButton(tr("Enregistrer"), QDialogButtonBox.AcceptRole)
+        bb.accepted.connect(dlg.accept)
+        bb.rejected.connect(dlg.reject)
+        lay.addWidget(bb)
+        ok = dlg.exec() == QDialog.Accepted and cid.text().strip()
+        if ok:
+            clients = dict(self.cfg.get("oauth_clients") or {})
+            clients[provider] = {"client_id": cid.text().strip(), "client_secret": secret.text().strip()}
+            self.cfg["oauth_clients"] = clients
+            self.cfg.save()
+        return bool(ok)
+
+    def _oauth_login(self):
+        provider = self._oauth
+        if not provider:
+            return
+        client = oauth.client_for(self.cfg, provider)
+        if not client.get("client_id") and not self._oauth_client_dialog(provider):
+            return
+        client = oauth.client_for(self.cfg, provider)
+        self._say(tr("Connexion dans le navigateur… (3 minutes maximum)"))
+        self.oauth_btn.setEnabled(False)
+        hint = self.f_email.text().strip()
+
+        def work():
+            try:
+                res, err = oauth.run_loopback_flow(provider, client["client_id"], client.get("client_secret", ""),
+                                                   lambda url: QDesktopServices.openUrl(QUrl(url)), login_hint=hint), ""
+            except Exception as e:
+                res, err = None, str(e)
+            self.sig.oauth_done.emit(res, err)
+        threading.Thread(target=work, daemon=True).start()
+
+    def _oauth_done(self, res, err):
+        self.oauth_btn.setEnabled(True)
+        if err:
+            self._say(tr("Connexion OAuth : %s") % err, True)
+            return
+        if not res.get("refresh_token"):
+            self._say(tr("Le fournisseur n'a pas renvoyé de jeton durable (réessayez ; Google : consentement requis)."), True)
+            return
+        self._oauth_token = res["refresh_token"]
+        if res.get("email") and not self.f_email.text().strip():
+            self.f_email.setText(res["email"])
+        if not self.f_user.text().strip():
+            self.f_user.setText(self.f_email.text().strip())
+        self._oauth_ui()
+        self._say(tr("Connecté ✔ — cliquez sur « Enregistrer »."))
+
+    # ------------------------------------------------------------ apparence et messagerie
+    def _look_tab(self):
+        w = QWidget()
+        form = QFormLayout(w)
+        style = self._combo([(k, v["label"]) for k, v in STYLES.items()], "style")
+        mode = self._combo(A.THEMES, "theme")
+        dens = self._combo(A.DENSITIES, "density")
+        accent = self._combo([(c, n) for n, c in ACCENTS], "accent")
+        form.addRow(tr("Style visuel"), style)
+        form.addRow(tr("Mode"), mode)
+        form.addRow(tr("Densité de la liste"), dens)
+        form.addRow(tr("Couleur d'accent"), accent)
+        for key, label in (("load_images", tr("Charger les images distantes")), ("notifications", tr("Notifications de bureau"))):
+            c = QCheckBox(label)
+            c.setChecked(bool(self.cfg.get(key)))
+            c.toggled.connect(lambda v, k=key: self._set(k, bool(v)))
+            form.addRow("", c)
+        for key, label, lo, hi in (("refresh_minutes", tr("Actualiser toutes les (min)"), 1, 120), ("undo_seconds", tr("Délai d'annulation d'envoi (s)"), 0, 30)):
+            sp = QSpinBox()
+            sp.setRange(lo, hi)
+            sp.setValue(int(self.cfg.get(key) or lo))
+            sp.valueChanged.connect(lambda v, k=key: self._set(k, int(v)))
+            form.addRow(label, sp)
+        reset = QPushButton(tr("Rétablir l'apparence et la disposition par défaut"))
+        reset.clicked.connect(self._reset_look)
+        form.addRow("", reset)
+        return w
+
+    def _combo(self, items, key):
+        c = QComboBox()
+        for k, label in items:
+            c.addItem(label, k)
+        i = c.findData(self.cfg.get(key))
+        c.setCurrentIndex(i if i >= 0 else 0)
+        c.currentIndexChanged.connect(lambda _i, c=c, k=key: self._set(k, c.currentData()))
+        return c
+
+    def _set(self, key, value):
+        self.cfg[key] = value
+        self.cfg.save()
+        if key in ("theme", "style", "accent", "density", "load_images"):
+            self.main.apply_theme()
+            self.main.reload()
+
+    def _reset_look(self):
+        A.reset_appearance(self.cfg)
+        self.main.apply_theme()
+        self.main.reload()
+        self.accept()

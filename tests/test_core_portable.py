@@ -42,7 +42,7 @@ def test_every_module_is_classified_so_a_new_one_cannot_slip_through():
 
 
 def test_qt_view_logic_is_toolkit_free_and_only_window_imports_qt():
-    """mintmail/qt/viewmodel.py (testé sur les trois systèmes sans Qt) ne doit importer ni Qt ni GTK ; seuls les modules *window.py importent PySide6."""
+    """mintmail/qt/viewmodel.py (testé sur les trois systèmes sans Qt) ne doit importer ni Qt ni GTK ; seuls les modules *window.py et ui_*.py importent PySide6."""
     import ast
     d = os.path.join(ROOT, "mintmail", "qt")
     for f in sorted(os.listdir(d)):
@@ -54,5 +54,5 @@ def test_qt_view_logic_is_toolkit_free_and_only_window_imports_qt():
             mods = [a.name for a in node.names] if isinstance(node, ast.Import) else [node.module or ""] if isinstance(node, ast.ImportFrom) and not node.level else []
             tops |= {m.split(".")[0] for m in mods}
         assert "gi" not in tops, f
-        if not f.endswith("window.py"):
+        if not (f.endswith("window.py") or f.startswith("ui_")):
             assert not tops & {"PySide6", "PyQt6", "PyQt5"}, f

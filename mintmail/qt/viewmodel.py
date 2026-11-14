@@ -27,7 +27,7 @@ def accounts_of(config) -> List[dict]:
 
 def row_info(m) -> Dict:
     """Ce que la liste affiche pour un message (version allégée suffisante)."""
-    return {"id": m.id, "sender": m.display_sender, "subject": m.subject or "", "snippet": (m.snippet or "").replace("\n", " "),
+    return {"id": m.id, "sender": m.display_sender, "email": m.sender_email or "", "subject": m.subject or "", "snippet": (m.snippet or "").replace("\n", " "),
             "time": format_time(m.date) if m.date else "", "unread": bool(m.unread), "starred": bool(m.starred),
             "pinned": bool(m.pinned), "attachments": bool(m.attachments)}
 

@@ -1,26 +1,27 @@
-"""Fenêtre Qt (PySide6) : dossiers · liste des messages · lecteur. Seul module de l'interface Qt qui importe PySide6.
+"""Fenêtre Qt (PySide6) : dossiers · liste des messages · lecteur. Module principal de l'interface Qt.
 Le travail réseau tourne dans un fil de fond ; l'interface ne touche jamais le réseau."""
 import os
 import sys
 import threading
 import time
 
-from PySide6.QtCore import QAbstractListModel, QModelIndex, QObject, QRect, QSize, Qt, QTimer, QUrl, Signal
-from PySide6.QtGui import QAction, QColor, QDesktopServices, QFont, QKeySequence
-from PySide6.QtWidgets import (QApplication, QLabel, QMenu, QMessageBox, QLineEdit, QListView, QListWidget, QListWidgetItem, QMainWindow,
-                               QPushButton, QSplitter, QStyle, QStyledItemDelegate, QTextBrowser, QToolBar, QVBoxLayout, QWidget)
-
+from PySide6.QtCore import QAbstractListModel, QModelIndex, QObject, Qt, QTimer, QUrl, Signal
+from PySide6.QtGui import QAction, QDesktopServices, QKeySequence
+from PySide6.QtWidgets import (QApplication, QFrame, QHBoxLayout, QLabel, QLineEdit, QListView, QListWidget, QListWidgetItem, QMainWindow, QMenu,
+                               QMessageBox, QPushButton, QSplitter, QVBoxLayout, QWidget)
 
 from .. import APP_NAME, __version__
 from ..htmlsafe import safe_to_open
 from ..i18n import tr
 from ..store import Cache, Config
 from . import composing as C
+from . import theme as T
 from . import viewmodel as vm
 from .compose_window import ComposeWindow
+from .settings_window import SettingsDialog
+from .ui_widgets import AvatarWidget, CountRole, InfoRole, KeyRole, KindRole, LabelRole, MessageDelegate, NavDelegate
 
 IdRole = Qt.UserRole + 1
-InfoRole = Qt.UserRole + 2
 
 
 class MessageModel(QAbstractListModel):
@@ -53,50 +54,6 @@ class MessageModel(QAbstractListModel):
 
     def row_of(self, mid):
         return next((r for r, m in enumerate(self.msgs) if m.id == mid), -1)
-
-
-class MessageDelegate(QStyledItemDelegate):
-    """Trois lignes par message : expéditeur + heure, objet, extrait. Gras si non lu."""
-    H = 70
-
-    def sizeHint(self, option, index):
-        return QSize(option.rect.width(), self.H)
-
-    def paint(self, painter, option, index):
-        info = index.data(InfoRole)
-        painter.save()
-        pal = option.palette
-        if option.state & QStyle.State_Selected:
-            painter.fillRect(option.rect, pal.highlight())
-            fg, sub = pal.highlightedText().color(), pal.highlightedText().color()
-        else:
-            fg, sub = pal.text().color(), QColor(pal.text().color())
-            sub.setAlpha(150)
-        r = option.rect.adjusted(14, 8, -12, -6)
-        bold = QFont(option.font)
-        bold.setBold(bool(info["unread"]))
-        painter.setFont(bold)
-        painter.setPen(fg)
-        mark = ("📌 " if info["pinned"] else "") + ("★ " if info["starred"] else "")
-        w = painter.fontMetrics().horizontalAdvance(info["time"]) + 8
-        painter.drawText(QRect(r.left(), r.top(), r.width() - w, 20), Qt.AlignLeft | Qt.AlignVCenter,
-                         painter.fontMetrics().elidedText(mark + info["sender"], Qt.ElideRight, r.width() - w))
-        painter.setPen(sub)
-        painter.drawText(QRect(r.right() - w, r.top(), w, 20), Qt.AlignRight | Qt.AlignVCenter, info["time"])
-        painter.setFont(bold)
-        painter.setPen(fg)
-        subj = ("📎 " if info["attachments"] else "") + (info["subject"] or "")
-        painter.drawText(QRect(r.left(), r.top() + 21, r.width(), 20), Qt.AlignLeft | Qt.AlignVCenter,
-                         painter.fontMetrics().elidedText(subj, Qt.ElideRight, r.width()))
-        painter.setFont(option.font)
-        painter.setPen(sub)
-        painter.drawText(QRect(r.left(), r.top() + 41, r.width(), 20), Qt.AlignLeft | Qt.AlignVCenter,
-                         painter.fontMetrics().elidedText(info["snippet"], Qt.ElideRight, r.width()))
-        if info["unread"]:
-            painter.setPen(Qt.NoPen)
-            painter.setBrush(QColor("#1a73ff"))
-            painter.drawEllipse(option.rect.left() + 4, option.rect.top() + 14, 7, 7)
-        painter.restore()
 
 
 def _make_reader(on_link):
@@ -145,90 +102,193 @@ class MainWindow(QMainWindow):
         self.engine = vm.Engine(self.config, self.cache)
         self.view_key, self.account, self.load_images, self.current = "inbox", "all", False, None
         self._busy, self._kept, self._tick, self._sending, self._composers = False, set(), 0, False, []
+        self.t = T.resolve(self.config, QApplication.palette().window().color().lightness() < 128)
         self.setWindowTitle("%s %s (Qt)" % (APP_NAME, __version__))
-        self.resize(1280, 800)
+        self.resize(1360, 840)
+        self.setMinimumSize(900, 560)
 
+        # -- barre latérale : marque, « Nouveau message », vues et dossiers, pied (état de synchronisation)
+        side = QFrame()
+        side.setObjectName("sidebar")
+        side.setFixedWidth(250)
+        sl = QVBoxLayout(side)
+        sl.setContentsMargins(0, 18, 0, 10)
+        sl.setSpacing(8)
+        brand = QLabel(APP_NAME)
+        brand.setObjectName("brand")
+        brand.setContentsMargins(22, 0, 22, 4)
+        sl.addWidget(brand)
+        self.new_btn = QPushButton("✎   " + tr("Nouveau message"))
+        self.new_btn.setObjectName("primary")
+        self.new_btn.setCursor(Qt.PointingHandCursor)
+        self.new_btn.clicked.connect(lambda: self.compose())
+        nb = QHBoxLayout()
+        nb.setContentsMargins(14, 4, 14, 8)
+        nb.addWidget(self.new_btn)
+        sl.addLayout(nb)
         self.folders = QListWidget()
-        self.folders.setFixedWidth(210)
+        self.folders.setMouseTracking(True)
+        self.folders.setFrameShape(QFrame.NoFrame)
+        self.folders.setItemDelegate(NavDelegate(self.t))
+        self.folders.setVerticalScrollMode(QListWidget.ScrollPerPixel)
         self._build_sidebar()
         self.folders.currentRowChanged.connect(self._view_changed)
+        sl.addWidget(self.folders, 1)
+        foot = QHBoxLayout()
+        foot.setContentsMargins(20, 0, 14, 0)
+        self.status = QLabel()
+        self.status.setObjectName("footer")
+        self.status.setWordWrap(True)
+        foot.addWidget(self.status, 1)
+        self.undo_btn = QPushButton()
+        self.undo_btn.setObjectName("chip")
+        self.undo_btn.clicked.connect(self._undo_send)
+        self.undo_btn.hide()
+        foot.addWidget(self.undo_btn)
+        self.sync_btn = QPushButton("⟳")
+        self.sync_btn.setObjectName("flat")
+        self.sync_btn.setToolTip(tr("Synchronisation…").rstrip("…"))
+        self.sync_btn.clicked.connect(lambda: self.sync())
+        foot.addWidget(self.sync_btn)
+        self.settings_btn = QPushButton("⚙")
+        self.settings_btn.setObjectName("flat")
+        self.settings_btn.setToolTip(tr("Paramètres") + "  (Ctrl+,)")
+        self.settings_btn.clicked.connect(lambda: self.show_settings())
+        foot.addWidget(self.settings_btn)
+        sl.addLayout(foot)
 
+        # -- colonne liste : recherche, actions, messages
         self.model = MessageModel()
         self.list = QListView()
         self.list.setModel(self.model)
-        self.list.setItemDelegate(MessageDelegate())
+        self.list.setMouseTracking(True)
+        self.list.setFrameShape(QFrame.NoFrame)
+        self.list.setVerticalScrollMode(QListView.ScrollPerPixel)
+        self.list.setItemDelegate(MessageDelegate(self.t, T.row_height(self.config.get("density") or "comfortable")))
         self.list.setUniformItemSizes(True)
         self.list.setSelectionMode(QListView.ExtendedSelection)
         self.list.selectionModel().currentChanged.connect(self._row_changed)
         self.search = QLineEdit()
-        self.search.setPlaceholderText(tr("Rechercher"))
+        self.search.setObjectName("search")
+        self.search.setPlaceholderText("🔍  " + tr("Rechercher"))
         self.search.setClearButtonEnabled(True)
         self.search.textChanged.connect(lambda _t: self.reload())
+        self.title = QLabel()
+        self.title.setObjectName("subject")
+        self.count_lbl = QLabel()
+        self.count_lbl.setObjectName("dim")
         self.empty = QLabel(tr("Aucun message"))
+        self.empty.setObjectName("dim")
         self.empty.setAlignment(Qt.AlignCenter)
-        mid = QWidget()
-        lay = QVBoxLayout(mid)
-        lay.setContentsMargins(0, 0, 0, 0)
-        lay.setSpacing(0)
-        lay.addWidget(self.search)
-        lay.addWidget(self.list, 1)
-        lay.addWidget(self.empty)
+        listcol = QFrame()
+        listcol.setObjectName("listcol")
+        ll = QVBoxLayout(listcol)
+        ll.setContentsMargins(0, 18, 0, 0)
+        ll.setSpacing(6)
+        top = QHBoxLayout()
+        top.setContentsMargins(20, 0, 20, 0)
+        top.addWidget(self.title)
+        top.addStretch(1)
+        top.addWidget(self.count_lbl)
+        ll.addLayout(top)
+        self.demo_banner = QFrame()
+        dbl = QHBoxLayout(self.demo_banner)
+        dbl.setContentsMargins(20, 2, 16, 2)
+        dl = QLabel(tr("Mode démonstration"))
+        dl.setObjectName("dim")
+        dbl.addWidget(dl, 1)
+        db = QPushButton(tr("Ajouter mon compte"))
+        db.setObjectName("chip")
+        db.clicked.connect(lambda: self.show_settings(add=True))
+        dbl.addWidget(db)
+        ll.addWidget(self.demo_banner)
+        self.demo_banner.setVisible(not self.config["accounts"])
+        sb = QHBoxLayout()
+        sb.setContentsMargins(16, 4, 16, 2)
+        sb.addWidget(self.search)
+        ll.addLayout(sb)
+        self.actions_row = QHBoxLayout()
+        self.actions_row.setContentsMargins(14, 0, 14, 4)
+        self.actions_row.setSpacing(0)
+        ll.addLayout(self.actions_row)
+        ll.addWidget(self.list, 1)
+        ll.addWidget(self.empty, 1)
 
+        # -- lecteur : en-tête (avatar, objet, expéditeur, actions de réponse) puis corps
+        self.avatar = AvatarWidget(self.t)
+        self.avatar.hide()
         self.head = QLabel()
         self.head.setTextFormat(Qt.RichText)
         self.head.setWordWrap(True)
-        self.head.setContentsMargins(22, 14, 22, 6)
+        self.head.setTextInteractionFlags(Qt.TextSelectableByMouse)
+        rb = QHBoxLayout()
+        rb.setSpacing(2)
+        self.reply_buttons = [self._tool("↩", tr("Répondre"), "R", lambda: self.reply(), self_layout=rb, label=True),
+                              self._tool("↩↩", tr("Répondre à tous"), "A", lambda: self.reply(True), self_layout=rb),
+                              self._tool("→", tr("Transférer"), "F", lambda: self.forward(), self_layout=rb)]
+        headrow = QHBoxLayout()
+        headrow.setContentsMargins(24, 16, 18, 12)
+        headrow.setSpacing(14)
+        headrow.addWidget(self.avatar, 0, Qt.AlignTop)
+        headrow.addWidget(self.head, 1)
+        headrow.addLayout(rb)
+        readerhead = QFrame()
+        readerhead.setObjectName("readerhead")
+        readerhead.setLayout(headrow)
         self.images_btn = QPushButton(tr("Charger les images distantes"))
+        self.images_btn.setObjectName("chip")
         self.images_btn.clicked.connect(self._load_images)
         self.images_btn.hide()
         self.reader = _make_reader(self._open_link)
-        right = QWidget()
+        right = QFrame()
+        right.setObjectName("readerwrap")
         rl = QVBoxLayout(right)
         rl.setContentsMargins(0, 0, 0, 0)
         rl.setSpacing(0)
-        rl.addWidget(self.head)
-        rl.addWidget(self.images_btn)
+        rl.addWidget(readerhead)
+        ib = QHBoxLayout()
+        ib.setContentsMargins(22, 8, 22, 0)
+        ib.addWidget(self.images_btn)
+        ib.addStretch(1)
+        rl.addLayout(ib)
         rl.addWidget(self.reader, 1)
 
         split = QSplitter()
-        split.addWidget(self.folders)
-        split.addWidget(mid)
+        split.setHandleWidth(1)
+        split.addWidget(listcol)
         split.addWidget(right)
-        split.setStretchFactor(1, 2)
-        split.setStretchFactor(2, 3)
-        split.setSizes([210, 420, 650])
-        self.setCentralWidget(split)
+        split.setStretchFactor(0, 2)
+        split.setStretchFactor(1, 3)
+        split.setSizes([430, 680])
+        split.setChildrenCollapsible(False)
+        root = QFrame()
+        root.setObjectName("root")
+        rh = QHBoxLayout(root)
+        rh.setContentsMargins(0, 0, 0, 0)
+        rh.setSpacing(0)
+        rh.addWidget(side)
+        rh.addWidget(split, 1)
+        self.setCentralWidget(root)
 
-        bar = QToolBar()
-        bar.setMovable(False)
-        self.addToolBar(bar)
-        bar.addAction(tr("Synchronisation…").rstrip("…"), self.sync)
-        bar.addSeparator()
-        self._act(bar, tr("Nouveau message"), "C", lambda: self.compose())
-        self._act(bar, tr("Répondre"), "R", lambda: self.reply())
-        self._act(bar, tr("Répondre à tous"), "A", lambda: self.reply(True))
-        self._act(bar, tr("Transférer"), "F", lambda: self.forward())
-        bar.addSeparator()
-        self._act(bar, tr("Archiver"), "E", lambda: self.move_selected("archive"))
-        self._act(bar, tr("Supprimer"), "Delete", lambda: self.move_selected("trash"))
-        self._act(bar, tr("Signaler comme spam"), "!", lambda: self.move_selected("spam"))
-        self.notspam_act = self._act(bar, tr("Ce n'est pas du spam (retour en boîte de réception)"), None, lambda: self.move_selected("inbox"))
-        self.notspam_act.setVisible(False)
-        bar.addSeparator()
-        self._act(bar, tr("Favori"), "S", lambda: self.toggle_flag("starred"))
-        self._act(bar, tr("Épingler"), "P", lambda: self.toggle_flag("pinned"))
-        self._act(bar, tr("Marquer comme non lu"), "U", lambda: self.toggle_flag("unread"))
-        self.move_btn = QPushButton(tr("Déplacer vers…"))
-        self.move_btn.setShortcut(QKeySequence("V"))
-        self.move_btn.clicked.connect(self._move_menu)
-        bar.addWidget(self.move_btn)
-        self.status = QLabel()
-        self.statusBar().addWidget(self.status)
-        self.undo_btn = QPushButton()
-        self.undo_btn.setFlat(True)
-        self.undo_btn.clicked.connect(self._undo_send)
-        self.undo_btn.hide()
-        self.statusBar().addWidget(self.undo_btn)
+        # -- actions sur les messages (boutons de la colonne liste + raccourcis)
+        self._tool("🗄", tr("Archiver"), "E", lambda: self.move_selected("archive"), self_layout=self.actions_row)
+        self._tool("🗑", tr("Supprimer"), "Delete", lambda: self.move_selected("trash"), self_layout=self.actions_row)
+        self._tool("⚠", tr("Signaler comme spam"), "!", lambda: self.move_selected("spam"), self_layout=self.actions_row)
+        self.notspam_btn = self._tool("✔", tr("Ce n'est pas du spam (retour en boîte de réception)"), None, lambda: self.move_selected("inbox"),
+                                      self_layout=self.actions_row)
+        self.notspam_btn.hide()
+        self.actions_row.addSpacing(10)
+        self._tool("☆", tr("Favori"), "S", lambda: self.toggle_flag("starred"), self_layout=self.actions_row)
+        self._tool("📌", tr("Épingler"), "P", lambda: self.toggle_flag("pinned"), self_layout=self.actions_row)
+        self._tool("✉", tr("Marquer comme non lu"), "U", lambda: self.toggle_flag("unread"), self_layout=self.actions_row)
+        self.move_btn = self._tool("📁", tr("Déplacer vers…"), "V", self._move_menu, self_layout=self.actions_row)
+        self.actions_row.addStretch(1)
+        self._act(None, tr("Nouveau message"), "C", lambda: self.compose())
+        self._act(None, tr("Paramètres"), "Ctrl+,", lambda: self.show_settings())
+        self._act(None, tr("Rechercher"), "/", lambda: self.search.setFocus())
+        self._act(None, "", "H", self.snooze_tomorrow)
+        self._act(None, "", "J", lambda: self._step(1))
+        self._act(None, "", "K", lambda: self._step(-1))
 
         self.bridge = _Bridge()
         self.bridge.done.connect(self._task_done)
@@ -238,13 +298,42 @@ class MainWindow(QMainWindow):
         self.outbox_timer = QTimer(self)
         self.outbox_timer.timeout.connect(self.process_outbox)
         self.outbox_timer.start(2000)
+        self.apply_theme()
         self.reload()
         QTimer.singleShot(300, lambda: self.sync(quiet=True))
         QTimer.singleShot(600, self._refresh_folders)
 
+    def _tool(self, glyph, text, shortcut, fn, self_layout=None, label=False):
+        """Bouton plat (glyphe + info-bulle) lié à une action à raccourci clavier ; ajouté à la rangée donnée."""
+        a = self._act(None, text, shortcut, fn)
+        b = QPushButton(("%s  %s" % (glyph, text)) if label else glyph)
+        b.setObjectName("flat")
+        b.setCursor(Qt.PointingHandCursor)
+        b.setToolTip("%s  (%s)" % (text, shortcut.replace("Delete", "Suppr")) if shortcut else text)
+        b.clicked.connect(lambda _c=False: a.trigger())
+        if self_layout is not None:
+            self_layout.addWidget(b)
+        b.action = a
+        return b
+
+    def apply_theme(self):
+        """Applique le style (Aurora, Papier ou Terminal ; clair ou sombre ; accent) à toute l'application Qt."""
+        self.t = T.resolve(self.config, QApplication.palette().window().color().lightness() < 128)
+        app = QApplication.instance()
+        if app is not None:
+            app.setStyleSheet(T.build_qss(self.t))
+        self.list.itemDelegate().h = T.row_height(self.config.get("density") or "comfortable")
+        for view in (self.list, self.folders):
+            view.itemDelegate().t = self.t
+            view.viewport().update()
+        self.list.doItemsLayout()
+        self.avatar.t = self.t
+        self.avatar.update()
+
+
     # ------------------------------------------------------------ affichage
     def is_dark(self):
-        return QApplication.palette().window().color().lightness() < 128
+        return bool(self.t["dark"])
 
     def reload(self):
         keep = self.current
@@ -257,6 +346,8 @@ class MainWindow(QMainWindow):
                     msgs.append(m)
             msgs.sort(key=lambda m: m.date, reverse=True)
         self.model.set_messages(msgs)
+        self.title.setText(self._view_title())
+        self.count_lbl.setText("%d" % len(msgs) if msgs else "")
         self.empty.setVisible(not msgs)
         self.list.setVisible(bool(msgs))
         if keep:
@@ -269,36 +360,69 @@ class MainWindow(QMainWindow):
                 self.list.blockSignals(False)
         self._update_counts()
 
+    def _caption(self, text):
+        it = QListWidgetItem(text)
+        it.setData(KindRole, "caption")
+        it.setData(LabelRole, text)
+        it.setFlags(Qt.NoItemFlags)
+        self.folders.addItem(it)
+
     def _build_sidebar(self, keep_key=None):
+        """Vues intelligentes, dossiers de base, puis vos dossiers de rangement (avec leur hiérarchie)."""
         self.folders.blockSignals(True)
         self.folders.clear()
-        for key, label in vm.VIEWS:
-            it = QListWidgetItem(label)
-            it.setData(Qt.UserRole, key)
-            it.setData(Qt.UserRole + 1, label)
-            self.folders.addItem(it)
-        for dest, label, depth, _aid in self.engine.nav_folders():
-            it = QListWidgetItem("    " * min(depth, 3) + label)
-            it.setData(Qt.UserRole, dest)
-            it.setData(Qt.UserRole + 1, "    " * min(depth, 3) + label)
-            self.folders.addItem(it)
-        keep_key = keep_key or getattr(self, "view_key", "inbox")
-        row = next((i for i in range(self.folders.count()) if self.folders.item(i).data(Qt.UserRole) == keep_key), 0)
-        self.folders.setCurrentRow(row)
+        smart, base = vm.VIEWS[:6], vm.VIEWS[6:]
+        for group in (smart, base):
+            for key, label in group:
+                it = QListWidgetItem(label)
+                it.setData(KeyRole, key)
+                it.setData(LabelRole, label)
+                it.setData(CountRole, 0)
+                it.setData(KindRole, "view")
+                it.setData(KindRole + 1, 0)
+                self.folders.addItem(it)
+        custom = self.engine.nav_folders()
+        if custom:
+            self._caption(tr("Dossiers"))
+            for dest, label, depth, _aid in custom:
+                it = QListWidgetItem(label)
+                it.setData(KeyRole, dest)
+                it.setData(LabelRole, label)
+                it.setData(CountRole, 0)
+                it.setData(KindRole, "folder")
+                it.setData(KindRole + 1, depth)
+                self.folders.addItem(it)
+        self.select_view(keep_key or getattr(self, "view_key", "inbox"), quiet=True)
         self.folders.blockSignals(False)
+
+    def select_view(self, key, quiet=False):
+        row = next((i for i in range(self.folders.count()) if self.folders.item(i).data(KeyRole) == key), 0)
+        if quiet:
+            self.folders.blockSignals(True)
+        self.folders.setCurrentRow(row)
+        if quiet:
+            self.folders.blockSignals(False)
+
+    def _view_title(self):
+        for i in range(self.folders.count()):
+            it = self.folders.item(i)
+            if it.data(KeyRole) == self.view_key:
+                return it.data(LabelRole)
+        return ""
 
     def _update_counts(self):
         c = vm.counts(self.cache, self.account)
         for i in range(self.folders.count()):
             it = self.folders.item(i)
-            key, label = it.data(Qt.UserRole), it.data(Qt.UserRole + 1)
-            n = c.get(key, 0)
-            it.setText("%s  (%d)" % (label, n) if n and key != "drafts" else label)
-        self.notspam_act.setVisible(self.view_key == "spam")
+            key = it.data(KeyRole)
+            if key is not None:
+                it.setData(CountRole, c.get(key, 0))
+        self.folders.viewport().update()
+        self.notspam_btn.setVisible(self.view_key == "spam")
 
     def _view_changed(self, row):
-        if row >= 0:
-            self.view_key = self.folders.item(row).data(Qt.UserRole)
+        if row >= 0 and self.folders.item(row).data(KeyRole) is not None:
+            self.view_key = self.folders.item(row).data(KeyRole)
             self.current, self._kept = None, set()
             self.reload()
             self._show(None)
@@ -331,8 +455,6 @@ class MainWindow(QMainWindow):
         if shortcut:
             a.setShortcut(QKeySequence(shortcut))
         a.triggered.connect(lambda _c=False: fn())
-        if bar is not None:
-            bar.addAction(a)
         self.addAction(a)
         return a
 
@@ -395,6 +517,29 @@ class MainWindow(QMainWindow):
         for dest, label in self.engine.move_targets(msgs[0].account):
             menu.addAction(label, lambda d=dest: self.move_selected(d))
         menu.exec(self.move_btn.mapToGlobal(self.move_btn.rect().bottomLeft()))
+
+    # ------------------------------------------------------------ paramètres et comptes
+    def show_settings(self, add=False):
+        dlg = SettingsDialog(self)
+        if add or not [a for a in self.config["accounts"]]:
+            dlg._add_account()
+        dlg.exec()
+
+    def accounts_changed(self):
+        """Comptes ajoutés, modifiés ou retirés : on repart sur des serveurs neufs, on sort du mode démo et on resynchronise."""
+        for be in list(self.engine._backends.values()):
+            try:
+                be.close()
+            except Exception:
+                pass
+        self.engine._backends.clear()
+        if self.config["accounts"]:
+            self.cache.delete_account("demo")
+        self.demo_banner.setVisible(not self.config["accounts"])
+        self._build_sidebar(self.view_key)
+        self.reload()
+        QTimer.singleShot(200, self.sync)
+        QTimer.singleShot(1500, self._refresh_folders)
 
     # ------------------------------------------------------------ rédaction
     def compose(self, **kw):
@@ -482,13 +627,19 @@ class MainWindow(QMainWindow):
         self.shown = msg
         if msg is None:
             self.head.setText("")
+            self.avatar.set_sender("", "")
             self.images_btn.hide()
             self.reader.show_html("<html><body></body></html>")
             return
         h = vm.header_lines(msg)
-        esc = lambda s: (s or "").replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
-        self.head.setText("<b style='font-size:15px'>%s</b><br><span style='color:gray'>%s · %s<br>%s</span>"
-                          % (esc(h["subject"]), esc(h["from"]), esc(h["date"]), esc(h["to"])))
+        esc = lambda x: (x or "").replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+        dim = self.t["dim"]
+        self.head.setText("<div style='font-size:19px;font-weight:%s'>%s</div>"
+                          "<div style='margin-top:4px'><b>%s</b></div>"
+                          "<div style='color:%s;margin-top:2px'>%s &nbsp;·&nbsp; %s</div>"
+                          % (self.t["hw"], esc(h["subject"]) or "&nbsp;", esc(msg.display_sender), dim, esc(h["date"]), esc(msg.sender_email)))
+        self.head.setToolTip("%s\n%s" % (h["from"], h["to"]))
+        self.avatar.set_sender(msg.display_sender, msg.sender_email)
         from ..util import has_remote_content
         self.images_btn.setVisible(bool(msg.html) and has_remote_content(msg.html) and not self.load_images)
         self.reader.show_html(vm.render_html(msg, self.load_images, self.is_dark()))

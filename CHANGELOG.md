@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.21.0
+- Interface Qt (expérimentale, mintmail --qt) : refonte graphique aux couleurs de MintMail (styles Aurora, Papier et Terminal, clair ou sombre, couleur d'accent, densité de liste) avec pastilles d'initiales, barre latérale à compteurs et lecteur à en-tête ; fenêtre Paramètres (Ctrl+,) pour ajouter, tester, modifier et supprimer des comptes (mot de passe ou connexion Google / Microsoft) et régler l'apparence ; bannière du mode démonstration ; test de synchronisation rendu indépendant de l'ordre de démarrage des deux machines (échec aléatoire à la publication)
+
 ## 1.20.1
 - Correctif de démarrage : MintMail ne plante plus (« _nav_initial ») quand la dernière vue ouverte est Envoyés, Archives ou un dossier ; la barre latérale la retrouve toute seule
 

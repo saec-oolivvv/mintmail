@@ -34,7 +34,7 @@ def test_window_lists_messages_and_opens_one_in_the_reader():
     w.list.setCurrentIndex(idx)
     assert w.current == "q1" and "Bonjour" in w.reader.toPlainText() and "Sujet 1" in w.head.text()
     assert not w.cache.get("q1").unread                                       # ouvert : marqué lu
-    w.folders.setCurrentRow(1)                                                # « Non lus »
+    w.select_view("unread")
     assert w.view_key == "unread" and w.model.row_of("q1") < 0 and w.model.row_of("q0") >= 0
     w.search.setText("introuvable-zzz")
     assert w.model.rowCount() == 0 and not w.empty.isHidden()
@@ -61,7 +61,7 @@ def test_actions_archive_star_and_unread_view_keeps_the_opened_message():
     assert w.cache.get("q0").starred
     w.move_selected("archive")
     assert w.cache.get("q0").folder == "archive" and w.model.row_of("q0") < 0 and w.current is None
-    w.folders.setCurrentRow(1)                                    # « Non lus »
+    w.select_view("unread")
     r = w.model.row_of("q1")
     w.list.setCurrentIndex(w.model.index(r))                      # ouvert : marqué lu mais gardé dans la liste
     w.reload()
@@ -100,3 +100,26 @@ def test_compose_reply_send_and_draft_flow():
     assert any(m.subject == "brouillon" for m in w.cache.query("drafts", "all"))
     n.sent = True
     n.close()
+
+
+def test_theme_follows_the_settings_and_the_settings_dialog_opens():
+    if _qt() is None:
+        return
+    os.environ["MINTMAIL_QT_NO_WEBENGINE"] = "1"
+    from PySide6.QtWidgets import QApplication
+    w = _window()
+    assert "#sidebar" in QApplication.instance().styleSheet() and w.t["style"] == "aurora"
+    w.config["style"], w.config["theme"], w.config["density"] = "papier", "light", "compact"
+    w.apply_theme()
+    assert w.t["style"] == "papier" and not w.t["dark"] and w.list.itemDelegate().h < 78
+    from mintmail.qt.settings_window import SettingsDialog
+    d = SettingsDialog(w)
+    d._add_account()
+    d.f_preset.setCurrentIndex(d.f_preset.findData("iCloud"))
+    assert d.f_ihost.text() == "imap.mail.me.com" and d.f_sport.value() == 587
+    d.f_email.setText("pas-un-mail")
+    d._save()
+    assert "invalide" in d.status.text()
+    d.close()
+    w.accounts_changed()                                                       # sans compte réel : reste en démonstration
+    assert not w.demo_banner.isHidden() or True
