@@ -5,9 +5,9 @@ import os
 import time
 
 from PySide6.QtCore import QStringListModel, Qt
-from PySide6.QtGui import QAction, QKeySequence, QTextCharFormat, QFont
-from PySide6.QtWidgets import (QComboBox, QCompleter, QDialog, QDialogButtonBox, QFileDialog, QFormLayout, QHBoxLayout, QLabel, QLineEdit,
-                               QListWidget, QMainWindow, QMenu, QMessageBox, QPushButton, QSpinBox, QTextEdit, QToolBar, QVBoxLayout, QWidget,
+from PySide6.QtGui import QAction, QKeySequence, QShortcut, QTextCharFormat, QFont
+from PySide6.QtWidgets import (QComboBox, QCompleter, QDialog, QDialogButtonBox, QFileDialog, QFormLayout, QFrame, QHBoxLayout, QLabel, QLineEdit,
+                               QMainWindow, QMenu, QMessageBox, QPushButton, QScrollArea, QSpinBox, QTextEdit, QToolButton, QVBoxLayout, QWidget,
                                QCalendarWidget, QInputDialog)
 
 from ..i18n import tr
@@ -16,6 +16,7 @@ from .. import pgp
 from . import composing as C
 from . import sigimages as SI
 from . import ui_fetch as F
+from . import ui_icons as UI
 from . import personal as P
 from ..util import text_to_html
 
@@ -30,58 +31,159 @@ class ComposeWindow(QMainWindow):
         self.attachments, self.body_html, self.quote_html, self.raw = list(attachments or []), body_html, quote_html, raw
         self.ai_text, self.sent, self.initial = ai_suggested_text, False, None
         self.setWindowTitle(tr("Nouveau message"))
-        self.resize(800, 660)
+        self.resize(860, 720)
+        self.setMinimumSize(620, 480)
         self.setAttribute(Qt.WA_DeleteOnClose, True)
 
-        bar = QToolBar()
-        bar.setMovable(False)
-        self.addToolBar(bar)
-        self.send_btn = QPushButton(tr("Envoyer"))
-        self.send_btn.setDefault(True)
-        self.send_btn.clicked.connect(lambda: self.do_send(0))
-        later = QPushButton("▾")
-        later.setToolTip(tr("Envoyer plus tard"))
-        menu = QMenu(later)
-        menu.addAction(tr("Dans 1 heure"), lambda: self._schedule(lambda: time.time() + 3600))
-        menu.addAction(tr("Demain à 8 h"), lambda: self._schedule(lambda: C.at(1, 8)))
-        menu.addAction(tr("Lundi prochain à 8 h"), lambda: self._schedule(C.next_monday))
-        menu.addAction(tr("Choisir une date…"), lambda: self._schedule(None))
-        later.setMenu(menu)
-        bar.addWidget(self.send_btn)
-        bar.addWidget(later)
-        bar.addSeparator()
-        bar.addAction(tr("Joindre un fichier"), self._attach)
-        bar.addAction(tr("Supprimer le brouillon"), self._discard)
-        bar.addSeparator()
-        self.pgp_sign = self.pgp_encrypt = None
-        if pgp.available():                                        # gpg installé : signer / chiffrer en PGP/MIME (facultatif)
-            self.pgp_sign = bar.addAction(tr("🔏 Signer"))
-            self.pgp_sign.setCheckable(True)
-            self.pgp_sign.setToolTip(tr("Signer ce message avec votre clé OpenPGP (gpg)"))
-            self.pgp_encrypt = bar.addAction(tr("🔒 Chiffrer"))
-            self.pgp_encrypt.setCheckable(True)
-            self.pgp_encrypt.setToolTip(tr("Chiffrer ce message : il faut la clé publique de chaque destinataire"))
-            bar.addSeparator()
-        self._fmt_action(bar, tr("Gras"), "Ctrl+B", self._bold)
-        self._fmt_action(bar, tr("Italique"), "Ctrl+I", self._italic)
-        self._fmt_action(bar, tr("Souligné"), "Ctrl+U", self._underline)
-        self._fmt_action(bar, tr("Barré"), None, self._strike)
-        self._fmt_action(bar, tr("Liste à puces"), None, self._bullets)
-        self._fmt_action(bar, tr("Liste numérotée"), None, self._numbered)
-        self._fmt_action(bar, tr("Citation"), None, self._quote)
-        self._fmt_action(bar, tr("Effacer la mise en forme"), None, self._clear_format)
-        self._fmt_action(bar, tr("Insérer un lien"), "Ctrl+K", self._link)
+        th = self.main.t
+        dim, accent, on = th["dim"], th["accent"], th["on"]
+        self.setStyleSheet("""
+            #composeroot { background: %(bg)s; }
+            #composehead { background: %(card)s; border: 1px solid %(line)s; border-radius: %(rc)dpx; }
+            #composehead QLineEdit, #composehead QComboBox { background: transparent; border: none; padding: 10px 4px; font-size: 14px; }
+            #composehead QLineEdit:focus, #composehead QComboBox:focus { border: none; }
+            #composehead QComboBox::drop-down { width: 0; border: none; }
+            #composehead #subjectedit { font-weight: 600; font-size: 15px; }
+            #fieldlabel { color: %(dim)s; font-size: 13px; }
+            #rowsep { background: %(line)s; border: none; }
+            #composefmt { background: transparent; }
+            #composefmt QToolButton, #composebar QToolButton { background: transparent; border: none; border-radius: %(rs)dpx; padding: 6px; color: %(dim)s; }
+            #composefmt QToolButton:hover, #composebar QToolButton:hover { background: %(hover)s; color: %(text)s; }
+            #composebar QToolButton:checked { background: %(hover)s; color: %(accent)s; }
+            #fmtsep { background: %(line)s; border: none; }
+            #composeeditor { background: %(card)s; border: 1px solid %(line)s; border-radius: %(rc)dpx; padding: 14px 18px; font-size: 14px; }
+            #composeeditor:focus { border: 1px solid %(accent)s; }
+            #composebar { background: %(card)s; border: 1px solid %(line)s; border-radius: %(rc)dpx; }
+            #sendbtn { background: %(accent)s; color: %(on)s; border: none; border-radius: %(rp)dpx; padding: 9px 20px; font-weight: 700; }
+            #sendbtn:hover { background: %(accent)s; }
+            #linkbtn { background: transparent; border: none; color: %(dim)s; padding: 4px 8px; font-size: 13px; }
+            #linkbtn:hover { color: %(accent)s; }
+            #attchip { background: %(hover)s; border: none; border-radius: %(rp)dpx; padding: 5px 12px; color: %(text)s; }
+            #attchip:hover { background: %(line)s; }
+        """ % dict(th, rc=min(th["r"], 18) + (4 if th["r"] > 8 else 0)))
+
+        def tool(layout, icon, text, shortcut, fn, checkable=False, owner=None):
+            """Bouton à icône vectorielle + info-bulle (avec raccourci) lié à une action ; retourne l'action."""
+            a = QAction(self)
+            a.setText(text)
+            a.setIcon(UI.icon(icon, dim, accent, 18))
+            a.setCheckable(checkable)
+            a.setToolTip(text + ("  (%s)" % shortcut if shortcut else ""))
+            if shortcut:
+                a.setShortcut(QKeySequence(shortcut))
+                a.setShortcutContext(Qt.WindowShortcut)
+                self.addAction(a)
+            a.triggered.connect(lambda _c=False: fn())
+            btn = QToolButton()
+            btn.setDefaultAction(a)
+            btn.setIconSize(UI.icon_size(18))
+            btn.setToolButtonStyle(Qt.ToolButtonIconOnly if not a.icon().isNull() else Qt.ToolButtonTextOnly)
+            btn.setCursor(Qt.PointingHandCursor)
+            layout.addWidget(btn)
+            return a
+
+        def vsep(layout):
+            s = QFrame()
+            s.setObjectName("fmtsep")
+            s.setFixedSize(1, 18)
+            layout.addSpacing(4)
+            layout.addWidget(s)
+            layout.addSpacing(4)
+
+        self.from_box = QComboBox()
+        for key, label in C.from_choices(self.engine.config, self.accounts):
+            self.from_box.addItem(label, key)
+        i = self.from_box.findData(account_id)
+        self.from_box.setCurrentIndex(i if i >= 0 else 0)
+        self.to, self.cc, self.bcc, self.subject = QLineEdit(to), QLineEdit(cc), QLineEdit(), QLineEdit(subject)
+        self.subject.setObjectName("subjectedit")
+        self.to.setPlaceholderText(tr("Destinataires"))
+        self.subject.setPlaceholderText(tr("Objet"))
+        contacts = [("%s <%s>" % (n, e)) if n else e for n, e in self.engine.cache.contacts()]
+        for edit in (self.to, self.cc, self.bcc):
+            self._complete(edit, contacts)
+        self.editor = QTextEdit()
+        self.editor.setObjectName("composeeditor")
+        self.editor.setAcceptRichText(True)
+        self.editor.setFrameShape(QFrame.NoFrame)
+
+        # -- en-tête : De / À (+ Cc, Cci) / Objet, dans une seule carte à lignes séparées
+        def row(label, widget, extra=()):
+            w = QWidget()
+            h = QHBoxLayout(w)
+            h.setContentsMargins(14, 0, 8, 0)
+            h.setSpacing(6)
+            lb = QLabel(label)
+            lb.setObjectName("fieldlabel")
+            lb.setFixedWidth(54)
+            h.addWidget(lb)
+            h.addWidget(widget, 1)
+            for e in extra:
+                h.addWidget(e)
+            return w
+
+        def sep():
+            s = QFrame()
+            s.setObjectName("rowsep")
+            s.setFixedHeight(1)
+            return s
+        self.cc_btn, self.bcc_btn = QPushButton("Cc"), QPushButton(tr("Cci"))
+        for b_ in (self.cc_btn, self.bcc_btn):
+            b_.setObjectName("linkbtn")
+            b_.setCursor(Qt.PointingHandCursor)
+        self.cc_btn.clicked.connect(lambda: self._show_cc("cc"))
+        self.bcc_btn.clicked.connect(lambda: self._show_cc("bcc"))
+        head = QFrame()
+        head.setObjectName("composehead")
+        hl = QVBoxLayout(head)
+        hl.setContentsMargins(0, 2, 0, 2)
+        hl.setSpacing(0)
+        hl.addWidget(row(tr("De"), self.from_box))
+        hl.addWidget(sep())
+        hl.addWidget(row("À", self.to, (self.cc_btn, self.bcc_btn)))
+        self.cc_row, self.bcc_row = row("Cc", self.cc), row(tr("Cci"), self.bcc)
+        self.cc_sep, self.bcc_sep = sep(), sep()
+        for w_ in (self.cc_sep, self.cc_row, self.bcc_sep, self.bcc_row):
+            hl.addWidget(w_)
+            w_.setVisible(False)
+        hl.addWidget(sep())
+        hl.addWidget(row(tr("Objet"), self.subject))
+        if cc:
+            self._show_cc("cc")
+
+        # -- barre de mise en forme (au-dessus du texte)
+        fmt = QWidget()
+        fmt.setObjectName("composefmt")
+        fl = QHBoxLayout(fmt)
+        fl.setContentsMargins(6, 0, 6, 0)
+        fl.setSpacing(2)
+        tool(fl, "bold", tr("Gras"), "Ctrl+B", self._bold)
+        tool(fl, "italic", tr("Italique"), "Ctrl+I", self._italic)
+        tool(fl, "underline", tr("Souligné"), "Ctrl+U", self._underline)
+        tool(fl, "strike", tr("Barré"), None, self._strike)
+        vsep(fl)
+        tool(fl, "bullets", tr("Liste à puces"), None, self._bullets)
+        tool(fl, "numbered", tr("Liste numérotée"), None, self._numbered)
+        tool(fl, "quote", tr("Citation"), None, self._quote)
+        vsep(fl)
+        tool(fl, "link", tr("Insérer un lien"), "Ctrl+K", self._link)
+        tool(fl, "clear", tr("Effacer la mise en forme"), None, self._clear_format)
+        fl.addStretch(1)
         tpl = QPushButton(tr("Modèles"))
-        tpl.setFlat(True)
+        tpl.setObjectName("flat")
+        tpl.setIcon(UI.icon("template", dim, accent, 18))
+        tpl.setCursor(Qt.PointingHandCursor)
         tmenu = QMenu(tpl)
-        for i, t in enumerate(P.templates(self.engine.config)):
-            tmenu.addAction(t["name"], lambda i=i: self._insert_template(i))
+        for i, tp in enumerate(P.templates(self.engine.config)):
+            tmenu.addAction(tp["name"], lambda i=i: self._insert_template(i))
         if not P.templates(self.engine.config):
             tmenu.addAction(tr("Aucun modèle (voir Paramètres)")).setEnabled(False)
         tpl.setMenu(tmenu)
-        bar.addWidget(tpl)
-        self.ai_btn = QPushButton(tr("✨ IA"))
+        fl.addWidget(tpl)
+        self.ai_btn = QPushButton(tr("IA"))
         self.ai_btn.setObjectName("chip")                          # bien visible : même pastille que « Charger les images »
+        self.ai_btn.setIcon(UI.icon("sparkles", accent, accent, 16))
+        self.ai_btn.setCursor(Qt.PointingHandCursor)
         self.ai_btn.setToolTip(tr("Aide IA à l'écriture : rédiger, améliorer, corriger, traduire…") + "  (Ctrl+J)")
         self.ai_btn.setShortcut("Ctrl+J")
         aimenu = QMenu(self.ai_btn)
@@ -91,43 +193,67 @@ class ComposeWindow(QMainWindow):
             else:
                 aimenu.addAction(entry[0], lambda op=entry[1]: self._ai_op(op))
         self.ai_btn.setMenu(aimenu)
-        bar.addWidget(self.ai_btn)
+        fl.addWidget(self.ai_btn)
 
-        self.from_box = QComboBox()
-        for key, label in C.from_choices(self.engine.config, self.accounts):
-            self.from_box.addItem(label, key)
-        i = self.from_box.findData(account_id)
-        self.from_box.setCurrentIndex(i if i >= 0 else 0)
-        self.to, self.cc, self.bcc, self.subject = QLineEdit(to), QLineEdit(cc), QLineEdit(), QLineEdit(subject)
-        contacts = [("%s <%s>" % (n, e)) if n else e for n, e in self.engine.cache.contacts()]
-        for edit in (self.to, self.cc, self.bcc):
-            self._complete(edit, contacts)
-        self.editor = QTextEdit()
-        self.editor.setAcceptRichText(True)
-        self.att_list = QListWidget()
-        self.att_list.setMaximumHeight(70)
-        self.att_list.itemDoubleClicked.connect(self._remove_attachment)
+        # -- pièces jointes (pastilles) et barre d'envoi en bas
+        self.att_scroll = QScrollArea()
+        self.att_scroll.setWidgetResizable(True)
+        self.att_scroll.setFrameShape(QFrame.NoFrame)
+        self.att_scroll.setFixedHeight(44)
+        self.att_scroll.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        self.att_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAsNeeded)
+        self.att_box = QWidget()
+        self.att_lay = QHBoxLayout(self.att_box)
+        self.att_lay.setContentsMargins(2, 4, 2, 4)
+        self.att_lay.setSpacing(6)
+        self.att_scroll.setWidget(self.att_box)
 
-        form = QFormLayout()
-        form.addRow(tr("De"), self.from_box)
-        form.addRow("À", self.to)
-        self.cc_btn = QPushButton(tr("Cc / Cci"))
-        self.cc_btn.setFlat(True)
-        self.cc_btn.clicked.connect(self._show_cc)
-        form.addRow("", self.cc_btn)
-        self.cc_label, self.bcc_label = QLabel("Cc"), QLabel(tr("Cci"))
-        form.addRow(self.cc_label, self.cc)
-        form.addRow(self.bcc_label, self.bcc)
-        form.addRow(tr("Objet"), self.subject)
-        for w in (self.cc_label, self.cc, self.bcc_label, self.bcc):
-            w.setVisible(bool(cc))
-        if cc:
-            self.cc_btn.hide()
+        bottom = QFrame()
+        bottom.setObjectName("composebar")
+        bl = QHBoxLayout(bottom)
+        bl.setContentsMargins(10, 8, 10, 8)
+        bl.setSpacing(4)
+        self.send_btn = QPushButton(tr("Envoyer"))
+        self.send_btn.setObjectName("sendbtn")
+        self.send_btn.setIcon(UI.icon("send", on, on, 16))
+        self.send_btn.setDefault(True)
+        self.send_btn.setCursor(Qt.PointingHandCursor)
+        self.send_btn.setToolTip(tr("Envoyer") + "  (Ctrl+Entrée)")
+        self.send_btn.clicked.connect(lambda: self.do_send(0))
+        bl.addWidget(self.send_btn)
+        later = QToolButton()
+        later.setIcon(UI.icon("clock", dim, accent, 18))
+        later.setIconSize(UI.icon_size(18))
+        later.setToolTip(tr("Envoyer plus tard"))
+        later.setPopupMode(QToolButton.InstantPopup)
+        later.setCursor(Qt.PointingHandCursor)
+        menu = QMenu(later)
+        menu.addAction(tr("Dans 1 heure"), lambda: self._schedule(lambda: time.time() + 3600))
+        menu.addAction(tr("Demain à 8 h"), lambda: self._schedule(lambda: C.at(1, 8)))
+        menu.addAction(tr("Lundi prochain à 8 h"), lambda: self._schedule(C.next_monday))
+        menu.addAction(tr("Choisir une date…"), lambda: self._schedule(None))
+        later.setMenu(menu)
+        bl.addWidget(later)
+        vsep(bl)
+        tool(bl, "attach", tr("Joindre un fichier"), "Ctrl+Shift+A", self._attach)
+        self.pgp_sign = self.pgp_encrypt = None
+        if pgp.available():                                        # gpg installé : signer / chiffrer en PGP/MIME (facultatif)
+            self.pgp_sign = tool(bl, "sign", tr("Signer ce message avec votre clé OpenPGP (gpg)"), None, lambda: None, checkable=True)
+            self.pgp_encrypt = tool(bl, "lock", tr("Chiffrer ce message : il faut la clé publique de chaque destinataire"), None, lambda: None, checkable=True)
+        bl.addStretch(1)
+        tool(bl, "trash", tr("Supprimer le brouillon"), None, self._discard)
+        QShortcut(QKeySequence("Ctrl+Return"), self, activated=lambda: self.do_send(0))
+
         root = QWidget()
+        root.setObjectName("composeroot")
         lay = QVBoxLayout(root)
-        lay.addLayout(form)
+        lay.setContentsMargins(14, 12, 14, 12)
+        lay.setSpacing(8)
+        lay.addWidget(head)
+        lay.addWidget(fmt)
         lay.addWidget(self.editor, 1)
-        lay.addWidget(self.att_list)
+        lay.addWidget(self.att_scroll)
+        lay.addWidget(bottom)
         self.setCentralWidget(root)
         self.from_box.currentIndexChanged.connect(self._from_changed)
 
@@ -146,23 +272,18 @@ class ComposeWindow(QMainWindow):
         self.show()
 
     # -- éléments
-    def _fmt_action(self, bar, text, shortcut, fn):
-        a = QAction(text, self)
-        if shortcut:
-            a.setShortcut(QKeySequence(shortcut))
-        a.triggered.connect(lambda _c=False: fn())
-        bar.addAction(a)
-
     def _complete(self, edit, contacts):
         comp = QCompleter(QStringListModel(contacts), edit)
         comp.setCaseSensitivity(Qt.CaseInsensitive)
         comp.setFilterMode(Qt.MatchContains)
         edit.setCompleter(comp)
 
-    def _show_cc(self):
-        for w in (self.cc_label, self.cc, self.bcc_label, self.bcc):
-            w.show()
-        self.cc_btn.hide()
+    def _show_cc(self, which="cc"):
+        rows = {"cc": (self.cc_sep, self.cc_row, self.cc_btn), "bcc": (self.bcc_sep, self.bcc_row, self.bcc_btn)}[which]
+        rows[0].show()
+        rows[1].show()
+        rows[2].hide()
+        (self.cc if which == "cc" else self.bcc).setFocus()
 
     def _account_ident(self):
         return C.resolve_from(self.engine.config, self.accounts, self.from_box.currentData())
@@ -325,16 +446,26 @@ class ComposeWindow(QMainWindow):
         self._refresh_atts()
 
     def _refresh_atts(self):
-        self.att_list.clear()
-        for p in self.attachments:
+        while self.att_lay.count():
+            it = self.att_lay.takeAt(0)
+            if it.widget():
+                it.widget().deleteLater()
+        for i, p in enumerate(self.attachments):
             size = human_size(os.path.getsize(p)) if os.path.exists(p) else ""
-            self.att_list.addItem("📎 %s  %s" % (os.path.basename(p), size))
-        self.att_list.setVisible(bool(self.attachments))
+            name = os.path.basename(p)
+            chip = QPushButton("%s  ·  %s  ✕" % (name if len(name) <= 32 else name[:29] + "…", size) if size else "%s  ✕" % name)
+            chip.setObjectName("attchip")
+            chip.setIcon(UI.icon("attach", self.main.t["dim"], self.main.t["dim"], 14))
+            chip.setCursor(Qt.PointingHandCursor)
+            chip.setToolTip(tr("Cliquer pour retirer cette pièce jointe") + "\n" + p)
+            chip.clicked.connect(lambda _c=False, i=i: self._remove_attachment(i))
+            self.att_lay.addWidget(chip)
+        self.att_lay.addStretch(1)
+        self.att_scroll.setVisible(bool(self.attachments))
 
-    def _remove_attachment(self, item):
-        r = self.att_list.row(item)
-        if 0 <= r < len(self.attachments):
-            del self.attachments[r]
+    def _remove_attachment(self, i):
+        if 0 <= i < len(self.attachments):
+            del self.attachments[i]
             self._refresh_atts()
 
     # -- envoi

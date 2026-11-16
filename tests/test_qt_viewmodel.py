@@ -1117,3 +1117,26 @@ def test_signature_survives_qt_html_roundtrip_and_is_swapped_not_duplicated():
     assert C.clean_for_send(sig1 + C.QUOTE_MARK) == '<div id="sig">-- <br><b>A</b></div>'
     out = C.build_outgoing(a1, None, "t@x.be", "", "", "S", "x" + sig1, [])
     assert C.SIG_MARK not in out.html
+
+
+def test_push_threads_call_back_on_server_news_and_stop_cleanly():
+    import threading
+    eng, _cache, be = _eng()
+    got, started = threading.Event(), []
+
+    def watch(on_change, stop):
+        started.append(1)
+        on_change()                                   # le serveur annonce un nouveau message
+        stop.wait(5)
+    be.watch = watch
+    eng.start_push(got.set)
+    assert got.wait(3) and started
+    eng.stop_push()
+    for t in eng._push_threads:
+        t.join(3)
+        assert not t.is_alive()
+    eng2, _c2, be2 = _eng()                           # backend sans IDLE (ou démonstration) : aucun fil actif, aucune exception
+    eng2.start_push(lambda: None)
+    for t in eng2._push_threads:
+        t.join(3)
+        assert not t.is_alive()

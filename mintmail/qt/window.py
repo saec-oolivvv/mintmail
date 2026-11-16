@@ -15,6 +15,7 @@ from ..htmlsafe import safe_to_open
 from ..i18n import tr
 from ..store import Cache, Config
 from .. import updater
+from . import ui_icons as UI
 from . import assistant as AS
 from . import automation as AU
 from . import composing as C
@@ -124,6 +125,7 @@ class _Bridge(QObject):
     done = Signal(object)          # résultat d'une tâche de fond, remis dans le fil de l'interface
     progress = Signal(object)      # avancement d'une mise à jour (version, texte, fraction)
     p2p = Signal()                 # éléments reçus d'un autre poste à appliquer dans le fil de l'interface
+    newmail = Signal()             # le serveur annonce du nouveau (IMAP IDLE) : relever tout de suite
 
 
 class MainWindow(ExtrasMixin, OrganizerMixin, AIMixin, QMainWindow):
@@ -302,6 +304,16 @@ class MainWindow(ExtrasMixin, OrganizerMixin, AIMixin, QMainWindow):
         sb = QHBoxLayout()
         sb.setContentsMargins(16, 4, 16, 2)
         sb.addWidget(self.search)
+        self.refresh_btn = QPushButton("⟳")                       # relevé manuel du courrier (le serveur prévient déjà seul des nouveaux messages)
+        self.refresh_btn.setObjectName("flat")
+        self.refresh_btn.setIcon(UI.icon("refresh", self.t["dim"], self.t["accent"], 20))
+        self.refresh_btn.setIconSize(UI.icon_size(20))
+        if not self.refresh_btn.icon().isNull():
+            self.refresh_btn.setText("")
+        self.refresh_btn.setCursor(Qt.PointingHandCursor)
+        self.refresh_btn.setToolTip(tr("Relever le courrier maintenant") + "  (Ctrl+R)")
+        self.refresh_btn.clicked.connect(lambda: self.sync())
+        sb.addWidget(self.refresh_btn)
         ll.addLayout(sb)
         self.srv_btn = QPushButton("🔎  " + tr("Chercher aussi sur le serveur"))
         self.srv_btn.setObjectName("chip")
@@ -461,6 +473,7 @@ class MainWindow(ExtrasMixin, OrganizerMixin, AIMixin, QMainWindow):
         self.apply_theme()
         self.set_layout(self.config.get("layout") or "columns")
         self._act(None, "", "Escape", self._back_to_list)
+        self._act(None, "", "Ctrl+R", lambda: self.sync())
         self._act(None, "", "Ctrl+K", self.show_palette)
         self._act(None, "", "X", lambda: self.sel_btn.toggle())
         self._act(None, "", "Ctrl+A", self.select_all)
@@ -472,6 +485,13 @@ class MainWindow(ExtrasMixin, OrganizerMixin, AIMixin, QMainWindow):
         self._act(None, "", "Ctrl+0", lambda: self.zoom_reader(0))
         self._act(None, "", "Ctrl+B", self.toggle_rail)
         self.bridge.p2p.connect(self._p2p_run)
+        self._push_pending = False
+        self._push_timer = QTimer(self)
+        self._push_timer.setSingleShot(True)
+        self._push_timer.timeout.connect(lambda: self.sync(quiet=True))
+        self.bridge.newmail.connect(self._on_push)
+        if self.config.get("push") is not False:
+            self.engine.start_push(self.bridge.newmail.emit)             # réception instantanée : plus d'attente du relevé périodique
         self.reload()
         self.set_rail(self.rail)
         self.apply_zoom()
@@ -500,6 +520,8 @@ class MainWindow(ExtrasMixin, OrganizerMixin, AIMixin, QMainWindow):
     def apply_theme(self):
         """Applique le style (Aurora, Papier ou Terminal ; clair ou sombre ; accent) à toute l'application Qt."""
         self.t = T.resolve(self.config, QApplication.palette().window().color().lightness() < 128)
+        if hasattr(self, "refresh_btn"):
+            self.refresh_btn.setIcon(UI.icon("refresh", self.t["dim"], self.t["accent"], 20))
         app = QApplication.instance()
         if app is not None:
             app.setStyleSheet(T.build_qss(self.t))
@@ -1387,6 +1409,13 @@ class MainWindow(ExtrasMixin, OrganizerMixin, AIMixin, QMainWindow):
     def _refresh_folders(self):
         self._background(self.engine.refresh_folders, "folders")
 
+    def _on_push(self):
+        """Le serveur a signalé un changement : relevé dans la seconde (regroupe les rafales ; reporté si une synchro est déjà en cours)."""
+        if self._busy:
+            self._push_pending = True
+        else:
+            self._push_timer.start(800)
+
     def _on_timer(self):
         self._tick += 1
         self.sync(quiet=True)
@@ -1516,6 +1545,9 @@ class MainWindow(ExtrasMixin, OrganizerMixin, AIMixin, QMainWindow):
         if tag != "sync":
             return
         self._busy = False
+        if self._push_pending:
+            self._push_pending = False
+            self._push_timer.start(300)
         errors = [str(err)] if err else list(res[1][1])
         offline = bool(res and res[0] and res[0][2])
         fresh = 0 if err else int(res[1][0] or 0)

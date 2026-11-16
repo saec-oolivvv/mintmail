@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.38.0
+- Rédaction refaite : carte d'en-tête (De, À avec liens Cc/Cci, Objet), barre de mise en forme à icônes vectorielles, éditeur en carte, pièces jointes en pastilles, barre d'envoi en bas (Ctrl+Entrée).
+- Réception instantanée : connexion IMAP IDLE par compte, relevé dès que le serveur annonce un message (réglage push=false pour couper).
+- Bouton de relevé manuel à côté de la recherche, raccourci Ctrl+R.
+
 ## 1.37.0
 - OpenPGP (PGP/MIME via gpg) : boutons Signer / Chiffrer à la rédaction ; signatures vérifiées et messages chiffrés déchiffrés à la réception, état affiché dans le lecteur.
 - Recherche : index plein texte SQLite (FTS5) pour les termes de 3 lettres et plus, repli automatique sinon.

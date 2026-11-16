@@ -123,6 +123,37 @@ class Engine(OfflineMixin):
             self._backends[aid] = make_backend(acc, self.config)
         return self._backends[aid]
 
+    # -- réception instantanée (IMAP IDLE)
+    def start_push(self, on_change):
+        """Un fil par compte IMAP : le serveur prévient dès qu'un message arrive (IDLE) et `on_change()` est appelé (depuis ce fil : ne touchez pas à l'interface).
+        Sans effet pour les comptes de démonstration ou sans IDLE ; le relevé périodique reste le filet de sécurité."""
+        import threading
+        self.stop_push()
+        self._push_stop = threading.Event()
+        self._push_threads = []
+
+        def run(aid):
+            stop = self._push_stop
+            while not stop.is_set():
+                try:
+                    be = self.backend(aid)
+                    if getattr(be, "demo", False) or not hasattr(be, "watch"):
+                        return
+                    be.watch(on_change, stop)
+                except Exception:
+                    pass
+                stop.wait(30)                                        # mot de passe absent, réseau coupé… : on réessaie plus tard
+        for acc in self.accounts():
+            if not acc.get("demo"):
+                t = threading.Thread(target=run, args=(acc["id"],), daemon=True)
+                t.start()
+                self._push_threads.append(t)
+
+    def stop_push(self):
+        ev = getattr(self, "_push_stop", None)
+        if ev is not None:
+            ev.set()
+
     # -- lecture
     def open_message(self, mid):
         """Message complet ; s'il était non lu : marqué lu ici et sur le serveur (action en file, rejouée hors ligne si besoin)."""
