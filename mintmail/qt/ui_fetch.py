@@ -7,7 +7,19 @@ from . import sigimages as SI
 
 
 class _Done(QObject):
+    """Messager : le signal part du fil de téléchargement, mais la méthode `_fire` appartient à cet objet (créé dans le fil de l'interface) :
+    Qt l'exécute donc TOUJOURS dans le fil de l'interface (connexion en file d'attente), jamais dans le fil de téléchargement."""
     done = Signal()
+
+    def __init__(self, callback=None):
+        super().__init__()
+        self._callback = callback
+        self.done.connect(self._fire)
+
+    def _fire(self):
+        cb, self._callback = self._callback, None
+        if cb:
+            cb()
 
 
 _running = set()
@@ -22,8 +34,6 @@ def prefetch_async(html_text, on_done=None):
     if key in _running:
         return False
     _running.add(key)
-    hub = _Done()
-    _alive.add(hub)
 
     def finished():
         _alive.discard(hub)
@@ -33,7 +43,8 @@ def prefetch_async(html_text, on_done=None):
             except RuntimeError:                      # la fenêtre a été fermée entre-temps
                 pass
         hub.deleteLater()
-    hub.done.connect(finished)
+    hub = _Done(finished)
+    _alive.add(hub)
 
     def work():
         try:

@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.36.1
+- Images de signature : le signal de fin de téléchargement passe par une méthode d'un objet Qt du fil de l'interface (la rédaction et l'aperçu ne sont jamais touchés depuis le fil de téléchargement) ; nouveau « tools/diagnose-tests.sh » : lance tous les tests et écrit les échecs détaillés dans ~/mintmail-diagnostic.txt
+
 ## 1.36.0
 - Réglages refaits : colonne de navigation à gauche (Messagerie / Boîte de réception / Application) et une page par section, faite de cartes titrées et bien séparées (comptes : vos comptes, identité et connexion, serveurs, actions ; apparence : thème, langue, comportement ; IA, filtres, mises à jour, gestes, signatures avec carte d'aperçu séparée…) ; les pages défilent si la fenêtre est petite
 
