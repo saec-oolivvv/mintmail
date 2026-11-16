@@ -3,9 +3,9 @@ Toute la logique (validation, enregistrement, test) est dans accounts.py, testé
 import threading
 
 from PySide6.QtCore import QObject, Qt, QUrl, Signal
-from PySide6.QtGui import QDesktopServices
+from PySide6.QtGui import QDesktopServices, QFont, QPalette
 from PySide6.QtWidgets import (QCheckBox, QComboBox, QDialog, QDialogButtonBox, QFormLayout, QHBoxLayout, QLabel, QLineEdit, QListWidget,
-                               QListWidgetItem, QMenu, QMessageBox, QPushButton, QSpinBox, QTabWidget, QVBoxLayout, QWidget)
+                               QListWidgetItem, QMenu, QMessageBox, QPushButton, QSpinBox, QStackedWidget, QVBoxLayout, QWidget)
 
 from .. import oauth
 from ..i18n import tr
@@ -17,10 +17,14 @@ from . import gestures as GS
 from . import imagetrust as IT
 from . import maintenance as MT
 from . import ui_personal as UP
+from .ui_cards import Page
 from . import ui_calendar as UC
 from . import ui_sync as US
 from .gestures import LAYOUTS
 from .. import __version__, updater
+
+
+ROLE = Qt.UserRole
 
 
 class _Signals(QObject):
@@ -35,57 +39,97 @@ class SettingsDialog(QDialog):
         super().__init__(main)
         self.main, self.cfg = main, main.config
         self.setWindowTitle(tr("Paramètres"))
-        self.resize(860, 620)
+        self.resize(1040, 700)
+        self.setMinimumSize(820, 520)
         self.sig = _Signals()
         self.sig.say.connect(self._say)
         self.sig.ai_say.connect(self._ai_say)
         self.sig.ai_models.connect(self._ai_models)
         self.sig.oauth_done.connect(self._oauth_done)
         self.current, self._oauth, self._oauth_token = {}, None, None
-        tabs = QTabWidget()
-        tabs.addTab(self._accounts_tab(), tr("Comptes"))
-        tabs.addTab(self._look_tab(), tr("Apparence"))
-        tabs.addTab(self._filters_tab(), tr("Filtres & blocage"))
-        tabs.addTab(self._ai_tab(), "✨ IA")
-        tabs.addTab(self._updates_tab(), tr("Mises à jour"))
-        tabs.addTab(self._gestures_tab(), tr("Gestes & disposition"))
-        tabs.addTab(UP.signatures_tab(self), tr("Signatures"))
-        tabs.addTab(UP.identities_tab(self), tr("Identités d'envoi"))
-        tabs.addTab(UP.templates_tab(self), tr("Modèles de réponse"))
-        tabs.addTab(UP.contacts_tab(self), tr("Contacts"))
-        tabs.addTab(UC.calendar_tab(self), tr("Agenda"))
-        tabs.addTab(US.p2p_tab(self), tr("Synchronisation"))
-        self.tabs = tabs
+        pages = {                                         # ordre de la pile = ancien ordre des onglets (open_page et les tests s'y réfèrent)
+            "accounts": self._accounts_tab(), "look": self._look_tab(), "filters": self._filters_tab(), "ai": self._ai_tab(),
+            "updates": self._updates_tab(), "gestures": self._gestures_tab(),
+            "signatures": UP.signatures_tab(self),
+            "identities": Page.wrap(UP.identities_tab(self), tr("Identités d'envoi"), tr("Alias : une autre adresse d'expédition, avec sa signature."), tr("Vos identités"), 460),
+            "templates": Page.wrap(UP.templates_tab(self), tr("Modèles de réponse"), tr("Réponses toutes prêtes à insérer en un clic."), tr("Vos modèles"), 420),
+            "contacts": Page.wrap(UP.contacts_tab(self), tr("Contacts"), tr("Carnet d'adresses (import et export vCard)."), tr("Votre carnet"), 460),
+            "calendar": Page.wrap(UC.calendar_tab(self), tr("Agenda"), tr("Google Agenda ou CalDAV."), tr("Connexion à l'agenda"), 420),
+            "p2p": Page.wrap(US.p2p_tab(self), tr("Synchronisation"), tr("Vos comptes, signatures et règles entre vos machines, chiffrés et sans serveur."), tr("Entre vos machines"), 520)}
+        self.stack = self.tabs = QStackedWidget()          # « tabs » : ancien nom, conservé (currentIndex / setCurrentIndex)
+        for page in pages.values():
+            self.stack.addWidget(page)
+        self._order = list(pages)
+        self.nav = QListWidget()
+        self.nav.setObjectName("settingsnav")
+        self.nav.setFixedWidth(224)
+        self.nav.setFocusPolicy(Qt.NoFocus)
+        dim = self.palette().color(QPalette.ColorRole.PlaceholderText)
+        for caption, entries in ((tr("Messagerie"), (("accounts", tr("Comptes")), ("identities", tr("Identités d'envoi")), ("signatures", tr("Signatures")),
+                                                      ("templates", tr("Modèles de réponse")))),
+                                 (tr("Boîte de réception"), (("filters", tr("Filtres & blocage")), ("gestures", tr("Gestes & disposition")),
+                                                             ("contacts", tr("Contacts")), ("calendar", tr("Agenda")))),
+                                 (tr("Application"), (("look", tr("Apparence")), ("ai", "✨ IA"), ("p2p", tr("Synchronisation")),
+                                                      ("updates", tr("Mises à jour"))))):
+            head = QListWidgetItem(caption.upper())
+            f = QFont(self.font())
+            f.setPointSizeF(max(8.0, f.pointSizeF() * 0.78))
+            f.setBold(True)
+            head.setFont(f)
+            head.setForeground(dim)
+            head.setFlags(Qt.NoItemFlags)                  # titre de groupe : ni sélectionnable ni cliquable
+            self.nav.addItem(head)
+            for key, label in entries:
+                it = QListWidgetItem(label)
+                it.setData(ROLE, self._order.index(key))
+                self.nav.addItem(it)
+        self.nav.currentItemChanged.connect(lambda cur, _p=None: cur is not None and cur.data(ROLE) is not None and self.stack.setCurrentIndex(cur.data(ROLE)))
         close = QPushButton(tr("Fermer"))
         close.clicked.connect(self.accept)
-        lay = QVBoxLayout(self)
-        lay.addWidget(tabs, 1)
+        right = QVBoxLayout()
+        right.addWidget(self.stack, 1)
         row = QHBoxLayout()
         row.addStretch(1)
         row.addWidget(close)
-        lay.addLayout(row)
+        right.addLayout(row)
+        lay = QHBoxLayout(self)
+        lay.setContentsMargins(14, 14, 14, 12)
+        lay.setSpacing(14)
+        lay.addWidget(self.nav)
+        lay.addLayout(right, 1)
         self._reload_accounts()
+        self._goto(0)
+
+    def _goto(self, index):
+        """Affiche la page d'indice `index` de la pile et met la navigation en face."""
+        for r in range(self.nav.count()):
+            if self.nav.item(r).data(ROLE) == index:
+                self.nav.setCurrentRow(r)
+                return
+        self.stack.setCurrentIndex(index)
 
     def open_page(self, page):
-        """Ouvre l'onglet demandé (par l'assistant ou « réglages de l'IA ») : accounts, look, filters ou ai."""
+        """Ouvre la page demandée (par l'assistant ou « réglages de l'IA ») : accounts, look, filters ou ai."""
         idx = {"accounts": 0, "look": 1, "appearance": 1, "filters": 2, "ai": 3, "updates": 4, "gestures": 5, "layout": 5, "sig": 6, "signatures": 6, "identities": 7, "templates": 8, "contacts": 9, "calendar": 10, "agenda": 10, "p2p": 11, "sync": 11}.get(page)
         if idx is not None:
-            self.tabs.setCurrentIndex(idx)
+            self._goto(idx)
 
     # ------------------------------------------------------------ comptes
     def _accounts_tab(self):
-        w = QWidget()
-        h = QHBoxLayout(w)
-        left = QVBoxLayout()
+        page = Page(tr("Comptes"), tr("Vos adresses e-mail : choisissez un compte dans la liste pour le modifier, ou ajoutez-en un."))
+        c = page.card(tr("Vos comptes"))
         self.acc_list = QListWidget()
-        self.acc_list.setFixedWidth(220)
+        self.acc_list.setMinimumHeight(120)
+        self.acc_list.setMaximumHeight(170)
         self.acc_list.currentRowChanged.connect(self._acc_selected)
         add = QPushButton(tr("＋ Ajouter un compte"))
         add.clicked.connect(self._add_account)
-        left.addWidget(self.acc_list, 1)
-        left.addWidget(add)
-        h.addLayout(left)
-        form = QFormLayout()
+        c.add(self.acc_list)
+        row = QHBoxLayout()
+        row.addWidget(add)
+        row.addStretch(1)
+        c.addLayout(row)
+
         self.f_preset = QComboBox()
         for key, label in A.preset_choices():
             self.f_preset.addItem(label, key)
@@ -98,16 +142,23 @@ class SettingsDialog(QDialog):
         for sp in (self.f_iport, self.f_sport):
             sp.setRange(1, 65535)
         self.f_ssl = QCheckBox(tr("IMAP en SSL/TLS direct (port 993)"))
+
+        c = page.card(tr("Identité et connexion"), tr("Gmail / Yahoo / iCloud : créez un « mot de passe d'application » dans les paramètres de sécurité du compte."))
+        form = c.form()
         form.addRow(tr("Fournisseur"), self.f_preset)
         form.addRow(tr("Nom affiché"), self.f_name)
         form.addRow(tr("Adresse e-mail"), self.f_email)
         form.addRow(tr("Identifiant"), self.f_user)
         form.addRow(tr("Mot de passe"), self.f_pass)
+
+        c = page.card(tr("Serveurs"), tr("Préremplis quand vous choisissez un fournisseur ; à modifier seulement pour un serveur particulier."))
+        form = c.form()
         form.addRow(tr("Serveur IMAP"), self.f_ihost)
         form.addRow(tr("Port IMAP"), self.f_iport)
         form.addRow(tr("Serveur SMTP"), self.f_shost)
         form.addRow(tr("Port SMTP"), self.f_sport)
         form.addRow("", self.f_ssl)
+
         self.oauth_btn = QPushButton()
         self.oauth_btn.clicked.connect(self._oauth_login)
         self.test_btn, self.save_btn, self.rm_btn = QPushButton(tr("Tester la connexion")), QPushButton(tr("Enregistrer")), QPushButton(tr("Supprimer ce compte"))
@@ -115,22 +166,17 @@ class SettingsDialog(QDialog):
         self.test_btn.clicked.connect(self._test)
         self.save_btn.clicked.connect(self._save)
         self.rm_btn.clicked.connect(self._remove)
-        btns = QHBoxLayout()
-        for b in (self.oauth_btn, self.test_btn, self.save_btn, self.rm_btn):
-            btns.addWidget(b)
         self.status = QLabel()
         self.status.setWordWrap(True)
-        note = QLabel(tr("Gmail / Yahoo / iCloud : créez un « mot de passe d'application » dans les paramètres de sécurité du compte."))
-        note.setWordWrap(True)
-        note.setObjectName("dim")
-        right = QVBoxLayout()
-        right.addLayout(form)
-        right.addLayout(btns)
-        right.addWidget(self.status)
-        right.addWidget(note)
-        right.addStretch(1)
-        h.addLayout(right, 1)
-        return w
+        c = page.card(tr("Actions"))
+        btns = QHBoxLayout()
+        for b in (self.oauth_btn, self.test_btn, self.save_btn):
+            btns.addWidget(b)
+        btns.addStretch(1)
+        btns.addWidget(self.rm_btn)
+        c.addLayout(btns)
+        c.add(self.status)
+        return page.finish()
 
     def _say(self, text, error=False):
         self.status.setText(text)
@@ -336,18 +382,16 @@ class SettingsDialog(QDialog):
 
     # ------------------------------------------------------------ apparence et messagerie
     def _gestures_tab(self):
-        w = QWidget()
-        form = QFormLayout(w)
-        intro = QLabel(tr("Faites glisser un message vers la droite ou la gauche (souris, pavé tactile à deux doigts, écran tactile). Un glissement court déclenche l'action principale, un glissement long l'action secondaire."))
-        intro.setWordWrap(True)
-        intro.setObjectName("dim")
-        form.addRow(intro)
+        page = Page(tr("Gestes & disposition"), tr("Faites glisser un message vers la droite ou la gauche (souris, pavé tactile à deux doigts, écran tactile). Un glissement court déclenche l'action principale, un glissement long l'action secondaire."))
+        form = page.card(tr("Disposition")).form()
         lay = QComboBox()
         for k, label in LAYOUTS:
             lay.addItem(label, k)
         lay.setCurrentIndex(max(0, lay.findData(self.cfg.get("layout"))))
         lay.currentIndexChanged.connect(lambda _i: self.main.set_layout(lay.currentData()))
         form.addRow(tr("Disposition"), lay)
+        sw_in = page.card(tr("Glissements"))
+        form = sw_in.form()
         cur = GS.settings(self.cfg)
         for key, label in (("right", tr("Glisser vers la droite")), ("right_long", tr("… jusqu'au bout (droite)")),
                            ("left", tr("Glisser vers la gauche")), ("left_long", tr("… jusqu'au bout (gauche)"))):
@@ -357,12 +401,13 @@ class SettingsDialog(QDialog):
             c.setCurrentIndex(max(0, c.findData(cur[key])))
             c.currentIndexChanged.connect(lambda _i, c=c, k=key: self._set_swipe(k, c.currentData()))
             form.addRow(label, c)
+        form = page.card(tr("Options")).form()
         for key, label in (("swipe_invert", tr("Inverser le sens au pavé tactile")), ("threads", tr("Regrouper en conversations"))):
             sw = QCheckBox(label)
             sw.setChecked(bool(self.cfg.get(key, key == "threads")))
             sw.toggled.connect(lambda v, k=key: self._set(k, bool(v)))
             form.addRow("", sw)
-        return w
+        return page.finish()
 
     def _set_swipe(self, key, value):
         sw = dict(GS.settings(self.cfg))
@@ -370,8 +415,8 @@ class SettingsDialog(QDialog):
         self._set("swipe", sw)
 
     def _look_tab(self):
-        w = QWidget()
-        form = QFormLayout(w)
+        page = Page(tr("Apparence"), tr("L'aspect de MintMail et son comportement au quotidien. Les changements s'appliquent tout de suite."))
+        form = page.card(tr("Thème")).form()
         style = self._combo([(k, v["label"]) for k, v in STYLES.items()], "style")
         mode = self._combo(A.THEMES, "theme")
         dens = self._combo(A.DENSITIES, "density")
@@ -380,12 +425,14 @@ class SettingsDialog(QDialog):
         form.addRow(tr("Mode"), mode)
         form.addRow(tr("Densité de la liste"), dens)
         form.addRow(tr("Couleur d'accent"), accent)
+        form = page.card(tr("Langue")).form()
         lang = QComboBox()
         for code, label in MT.languages():
             lang.addItem(label, code)
         lang.setCurrentIndex(max(0, lang.findData(self.cfg.get("ui_lang") or "auto")))
         lang.currentIndexChanged.connect(lambda _i: self.main.say(MT.set_language(self.cfg, lang.currentData())))
         form.addRow(tr("Langue de l'interface"), lang)
+        form = page.card(tr("Comportement")).form()
         for key, label in (("load_images", tr("Charger les images distantes")), ("notifications", tr("Notifications de bureau")),
                            ("open_today_on_start", tr("Ouvrir la page Aujourd'hui au lancement"))):
             c = QCheckBox(label)
@@ -398,25 +445,27 @@ class SettingsDialog(QDialog):
             sp.setValue(int(self.cfg.get(key) or lo))
             sp.valueChanged.connect(lambda v, k=key: self._set(k, int(v)))
             form.addRow(label, sp)
+        c = page.card(tr("Valeurs par défaut"))
         reset = QPushButton(tr("Rétablir l'apparence et la disposition par défaut"))
         reset.clicked.connect(self._reset_look)
-        form.addRow("", reset)
-        return w
+        row = QHBoxLayout()
+        row.addWidget(reset)
+        row.addStretch(1)
+        c.addLayout(row)
+        return page.finish()
 
     # ------------------------------------------------------------ filtres, expéditeurs bloqués, règles
     def _filters_tab(self):
-        w = QWidget()
-        lay = QVBoxLayout(w)
+        page = Page(tr("Filtres & blocage"), tr("Qui peut vous écrire, et ce que MintMail fait automatiquement des nouveaux messages."))
         self._sender_lists = {}
         for kind, title, hint in (("blocked", tr("Expéditeurs bloqués"), ""),
                                   ("spam_senders", tr("Expéditeurs envoyés en spam"), tr("Leurs messages vont directement dans le dossier Spam.")),
                                   ("image_senders", tr("Expéditeurs dont les images sont toujours chargées"),
                                    tr("Les images distantes de leurs messages s'affichent sans confirmation (adresse ou @domaine)."))):
-            lay.addWidget(QLabel("<b>%s</b>" % title))
-            if hint:
-                lay.addWidget(QLabel(hint))
+            card = page.card(title, hint)
             lst = QListWidget()
-            lst.setMaximumHeight(90)
+            lst.setMinimumHeight(96)
+            lst.setMaximumHeight(130)
             self._sender_lists[kind] = lst
             row = QHBoxLayout()
             edit = QLineEdit()
@@ -427,12 +476,12 @@ class SettingsDialog(QDialog):
             rem.clicked.connect(lambda _=False, k=kind: self._remove_sender(k))
             for x in (edit, add, rem):
                 row.addWidget(x, 1 if x is edit else 0)
-            lay.addWidget(lst)
-            lay.addLayout(row)
-        lay.addWidget(QLabel(tr("<b>Règles automatiques</b>")))
-        lay.addWidget(QLabel(tr("Appliquées à chaque nouveau message de la boîte de réception.")))
+            card.add(lst)
+            card.addLayout(row)
+        card = page.card(tr("Règles automatiques"), tr("Appliquées à chaque nouveau message de la boîte de réception."))
         self._rules = QListWidget()
-        lay.addWidget(self._rules, 1)
+        self._rules.setMinimumHeight(140)
+        card.add(self._rules)
         row = QHBoxLayout()
         self._r_field, self._r_action = QComboBox(), QComboBox()
         for k, label in AU.RULE_FIELDS:
@@ -447,12 +496,15 @@ class SettingsDialog(QDialog):
         rem.clicked.connect(self._remove_rule)
         for x in (self._r_field, self._r_text, self._r_action, self._r_folder, add, rem):
             row.addWidget(x, 1 if x is self._r_text else 0)
-        lay.addLayout(row)
+        card.addLayout(row)
         now = QPushButton(tr("Appliquer maintenant à la boîte de réception"))
         now.clicked.connect(self._apply_rules_now)
-        lay.addWidget(now)
+        row = QHBoxLayout()
+        row.addWidget(now)
+        row.addStretch(1)
+        card.addLayout(row)
         self._fill_filters()
-        return w
+        return page.finish()
 
     def _fill_filters(self):
         for kind, lst in self._sender_lists.items():
@@ -502,9 +554,8 @@ class SettingsDialog(QDialog):
 
     # ------------------------------------------------------------ mises à jour
     def _updates_tab(self):
-        w = QWidget()
-        form = QFormLayout(w)
-        form.addRow(QLabel(tr("Version installée : %s") % __version__))
+        page = Page(tr("Mises à jour"), tr("Version installée : %s") % __version__)
+        form = page.card(tr("Recherche")).form()
         auto = QCheckBox(tr("Rechercher automatiquement (au démarrage, puis toutes les heures)"))
         auto.setChecked(bool(self.cfg.get("update_check", True)))
         auto.toggled.connect(lambda v: self._set("update_check", bool(v)))
@@ -519,9 +570,10 @@ class SettingsDialog(QDialog):
                 self.cfg.save()
         repo.textChanged.connect(repo_changed)
         form.addRow(tr("Dépôt GitHub"), repo)
+        card = page.card(tr("État"))
         self._up_status = QLabel()
         self._up_status.setWordWrap(True)
-        form.addRow(self._up_status)
+        card.add(self._up_status)
         row = QHBoxLayout()
         self._up_check = QPushButton(tr("Vérifier maintenant"))
         self._up_install = QPushButton(tr("Installer la mise à jour"))
@@ -534,21 +586,22 @@ class SettingsDialog(QDialog):
         for b in (self._up_check, self._up_install, self._up_restart):
             row.addWidget(b)
         row.addStretch(1)
-        form.addRow(row)
+        card.addLayout(row)
         self._up_key = QLabel()
         self._up_key.setObjectName("dim")
         self._up_key.setWordWrap(True)
-        form.addRow(self._up_key)
+        card.add(self._up_key)
+        card = page.card(tr("Sécurité"))
         note = QLabel(tr("Chaque version est signée par SAEC. MintMail refuse tout paquet dont la signature ne correspond pas à la clé de vérification installée avec le programme "
                          "(GitHub ne sert que de transport), refuse de revenir à une ancienne version, et demande votre mot de passe administrateur pour installer. "
                          "Seule une requête anonyme est envoyée à GitHub ; désactivez la recherche automatique si vous préférez ne rien envoyer."))
         note.setObjectName("dim")
         note.setWordWrap(True)
-        form.addRow(note)
+        card.add(note)
         self.main.update_views.append(self._updates_refresh)
         self.destroyed.connect(lambda *_: self._updates_refresh in self.main.update_views and self.main.update_views.remove(self._updates_refresh))
         self._updates_refresh()
-        return w
+        return page.finish()
 
     def _updates_refresh(self):
         st = self.main.updates
@@ -562,8 +615,8 @@ class SettingsDialog(QDialog):
 
     # ------------------------------------------------------------ intelligence artificielle
     def _ai_tab(self):
-        w = QWidget()
-        form = QFormLayout(w)
+        page = Page("✨ IA", tr("L'IA est désactivée par défaut. Aucune action n'est faite sans votre accord."))
+        form = page.card(tr("Fonctions")).form()
         for key, label, default in AS.AI_SWITCHES:
             c = QCheckBox(label)
             c.setChecked(bool(self.cfg.get(key, default)))
@@ -577,6 +630,7 @@ class SettingsDialog(QDialog):
             c.setCurrentIndex(i if i >= 0 else 0)
             c.currentIndexChanged.connect(lambda _i, c=c, k=key: self._set(k, c.currentData()))
             form.addRow(label, c)
+        form = page.card(tr("Fournisseur et modèle")).form()
         self._ai_prov = QComboBox()
         for k, (label, _b, _m, _n) in AS.PROVIDERS.items():
             self._ai_prov.addItem(label, k)
@@ -597,13 +651,22 @@ class SettingsDialog(QDialog):
         form.addRow(tr("Endpoint API"), self._ai_base)
         form.addRow(tr("Modèle"), self._ai_model)
         detect, test = QPushButton(tr("🔍 Détecter les modèles installés")), QPushButton(tr("Tester la connexion"))
-        self._ai_clear = QPushButton(tr("Vider le cache IA (%d éléments)") % self.main.cache.ai_count())
-        learn = QPushButton(tr("Oublier mes habitudes de rangement"))
-        for b in (detect, test, self._ai_clear, learn):
-            form.addRow("", b)
+        row = QHBoxLayout()
+        row.addWidget(detect)
+        row.addWidget(test)
+        row.addStretch(1)
+        form.addRow("", row)
         self._ai_status = QLabel("")
         self._ai_status.setWordWrap(True)
         form.addRow("", self._ai_status)
+        self._ai_clear = QPushButton(tr("Vider le cache IA (%d éléments)") % self.main.cache.ai_count())
+        learn = QPushButton(tr("Oublier mes habitudes de rangement"))
+        mcard = page.card(tr("Maintenance"))
+        row = QHBoxLayout()
+        row.addWidget(self._ai_clear)
+        row.addWidget(learn)
+        row.addStretch(1)
+        mcard.addLayout(row)
 
         def placeholders():
             base, model, needs = AS.set_provider(self.cfg, self._ai_prov.currentData())
@@ -665,7 +728,7 @@ class SettingsDialog(QDialog):
             self.main.reload()
         self._ai_clear.clicked.connect(clear)
         learn.clicked.connect(lambda: (self.main.cache.learn_clear(), self._ai_say(tr("Habitudes de rangement effacées."), False)))
-        return w
+        return page.finish()
 
     def _ai_say(self, text, error):
         self._ai_status.setText(text)

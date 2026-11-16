@@ -106,6 +106,16 @@ QScrollBar::handle:vertical:hover { background: %(dim)s; }
 QScrollBar::add-line, QScrollBar::sub-line, QScrollBar::add-page, QScrollBar::sub-page { background: none; height: 0; width: 0; border: none; }
 QScrollBar:horizontal { height: 0; }
 QSplitter::handle { background: transparent; }
+#settingsnav { background: %(side)s; border: 1px solid %(line)s; border-radius: %(rc)dpx; padding: 8px; }
+#settingsnav::item { padding: 9px 12px; border-radius: %(rs)dpx; margin: 1px 0; }
+#settingsnav::item:hover { background: %(hover)s; }
+#settingsnav::item:selected, #settingsnav::item:selected:active, #settingsnav::item:selected:!active { background: %(hover)s; color: %(accent)s; font-weight: 700; }
+#settingscard { background: %(card)s; border: 1px solid %(line)s; border-radius: %(rc)dpx; }
+#settingscard QCheckBox, #settingscard QLabel { background: transparent; }
+#cardtitle { font-size: 15px; font-weight: 700; }
+#pagetitle { font-size: 22px; font-weight: 800; }
+#settingspage { background: transparent; }
+QScrollArea { background: transparent; border: none; }
 QTabWidget::pane { border: 1px solid %(line)s; border-radius: %(rc)dpx; top: -1px; }
 QTabBar::tab { background: transparent; padding: 9px 16px; color: %(dim)s; border: none; }
 QTabBar::tab:selected { color: %(accent)s; border-bottom: 2px solid %(accent)s; }

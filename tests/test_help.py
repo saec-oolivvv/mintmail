@@ -47,7 +47,7 @@ def test_every_command_line_option_is_documented():
 
 
 def test_every_settings_page_is_described():
-    pages = [("", t) for t in re.findall(r'tabs\.addTab\([^\n]*?, (?:tr\()?"([^"]+)"\)', src("qt/settings_window.py"))]
+    pages = [("", t) for t in re.findall(r'\("(?:accounts|identities|signatures|templates|filters|gestures|contacts|calendar|look|ai|p2p|updates)", (?:tr\()?"([^"]+)"\)?\)', src("qt/settings_window.py"))]
     assert len(pages) >= 12
     text = H.full_text(CTX).lower()
     for ident, title in pages:

@@ -6,6 +6,7 @@ from PySide6.QtCore import Qt
 from ..i18n import tr
 from . import personal as P
 from . import ui_fetch as F
+from .ui_cards import Page
 
 ROLE = Qt.UserRole
 
@@ -26,26 +27,27 @@ def _accounts_combo(cfg):
 
 def signatures_tab(dlg):
     cfg = dlg.cfg
-    w = QWidget()
-    lay = QVBoxLayout(w)
+    page = Page(tr("Signatures"), tr("Texte ajouté à la fin de vos messages, par compte."))
+    card = page.card(tr("Signature"), tr("Signature HTML (balises <b>, <a>, <img>… autorisées) :"))
     top = QHBoxLayout()
     acc = _accounts_combo(cfg)
     tpl, save = QPushButton(tr("Insérer un modèle")), QPushButton(tr("Enregistrer la signature"))
+    save.setObjectName("primary")
     top.addWidget(QLabel(tr("Compte :")))
     top.addWidget(acc, 1)
     top.addWidget(tpl)
     top.addWidget(save)
-    lay.addLayout(top)
-    lay.addWidget(QLabel(tr("Signature HTML (balises <b>, <a>, <img>… autorisées) :")))
+    card.addLayout(top)
     edit = QPlainTextEdit()
-    edit.setMaximumHeight(170)
-    lay.addWidget(edit)
-    lay.addWidget(QLabel(tr("Aperçu :")))
+    edit.setMinimumHeight(170)
+    card.add(edit)
+    status = QLabel("")
+    card.add(status)
+    pv = page.card(tr("Aperçu"), tr("Les images distantes (https://…) sont téléchargées une fois, puis jointes au message à l'envoi."))
     view = QTextBrowser()
     view.setOpenLinks(False)
-    lay.addWidget(view, 1)
-    status = QLabel("")
-    lay.addWidget(status)
+    view.setMinimumHeight(240)
+    pv.add(view, 1)
 
     def load(_i=0):
         edit.setPlainText(P.get_signature(cfg, acc.currentData()) if acc.count() else "")
@@ -63,7 +65,7 @@ def signatures_tab(dlg):
     tpl.clicked.connect(lambda: edit.setPlainText(P.SIG_TEMPLATE))
     save.clicked.connect(do_save)
     load()
-    return w
+    return page.finish()
 
 
 def identities_tab(dlg):
