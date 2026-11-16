@@ -6,6 +6,7 @@ from PySide6.QtGui import QDesktopServices
 from PySide6.QtWidgets import (QCheckBox, QComboBox, QFormLayout, QHBoxLayout, QLabel, QLineEdit, QPushButton, QScrollArea, QVBoxLayout, QWidget)
 
 from ..i18n import tr
+from .ui_cards import Page
 from . import calendars as CA
 
 
@@ -18,11 +19,10 @@ class _Sig(QObject):
 
 def calendar_tab(dlg):
     cfg = dlg.cfg
-    page = QWidget()
-    lay = QVBoxLayout(page)
+    page = Page(tr("Agenda"), tr("Google Agenda ou CalDAV."))
+    lay = page.card(tr("Google Agenda"), tr("Avec votre compte Gmail connecté en OAuth."))
     sig = _Sig()
     sig.url.connect(lambda u: QDesktopServices.openUrl(QUrl(u)))
-    lay.addWidget(QLabel(tr("<b>Google Agenda</b> — avec votre compte Gmail connecté en OAuth")))
     form = QFormLayout()
     lay.addLayout(form)
     accs, chosen, on_ = CA.google_state(cfg)
@@ -90,7 +90,7 @@ def calendar_tab(dlg):
     auth.clicked.connect(do_auth)
     test.clicked.connect(do_test)
 
-    lay.addWidget(QLabel(tr("   <b>Autre calendrier : CalDAV</b> (Nextcloud, Radicale, Fastmail, iCloud…) — utilisé si Google Agenda est désactivé")))
+    lay = page.card(tr("Autre calendrier : CalDAV"), tr("Nextcloud, Radicale, Fastmail, iCloud… Utilisé si Google Agenda est désactivé."))
     f2 = QFormLayout()
     lay.addLayout(f2)
     url_, user_, has_pw = CA.caldav_state(cfg)
@@ -114,7 +114,6 @@ def calendar_tab(dlg):
     help2.setWordWrap(True)
     help2.setEnabled(False)
     lay.addWidget(help2)
-    lay.addStretch(1)
     sig.caldav.connect(lambda ok, msg: cstatus.setText(msg))
 
     def c_test():
@@ -135,7 +134,4 @@ def calendar_tab(dlg):
     ctest.clicked.connect(c_test)
     csave.clicked.connect(c_save)
     cclear.clicked.connect(c_clear)
-    sc = QScrollArea()
-    sc.setWidgetResizable(True)
-    sc.setWidget(page)
-    return sc
+    return page.finish()

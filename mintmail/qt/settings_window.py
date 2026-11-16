@@ -51,11 +51,11 @@ class SettingsDialog(QDialog):
             "accounts": self._accounts_tab(), "look": self._look_tab(), "filters": self._filters_tab(), "ai": self._ai_tab(),
             "updates": self._updates_tab(), "gestures": self._gestures_tab(),
             "signatures": UP.signatures_tab(self),
-            "identities": Page.wrap(UP.identities_tab(self), tr("Identités d'envoi"), tr("Alias : une autre adresse d'expédition, avec sa signature."), tr("Vos identités"), 460),
-            "templates": Page.wrap(UP.templates_tab(self), tr("Modèles de réponse"), tr("Réponses toutes prêtes à insérer en un clic."), tr("Vos modèles"), 420),
-            "contacts": Page.wrap(UP.contacts_tab(self), tr("Contacts"), tr("Carnet d'adresses (import et export vCard)."), tr("Votre carnet"), 460),
-            "calendar": Page.wrap(UC.calendar_tab(self), tr("Agenda"), tr("Google Agenda ou CalDAV."), tr("Connexion à l'agenda"), 420),
-            "p2p": Page.wrap(US.p2p_tab(self), tr("Synchronisation"), tr("Vos comptes, signatures et règles entre vos machines, chiffrés et sans serveur."), tr("Entre vos machines"), 520)}
+            "identities": UP.identities_tab(self),
+            "templates": UP.templates_tab(self),
+            "contacts": UP.contacts_tab(self),
+            "calendar": UC.calendar_tab(self),
+            "p2p": US.p2p_tab(self)}
         self.stack = self.tabs = QStackedWidget()          # « tabs » : ancien nom, conservé (currentIndex / setCurrentIndex)
         for page in pages.values():
             self.stack.addWidget(page)

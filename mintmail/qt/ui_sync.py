@@ -6,6 +6,7 @@ from PySide6.QtCore import QObject, QTimer, Qt, Signal
 from PySide6.QtWidgets import (QCheckBox, QFormLayout, QHBoxLayout, QLabel, QLineEdit, QPushButton, QScrollArea, QVBoxLayout, QWidget)
 
 from ..i18n import tr
+from .ui_cards import Page
 from ..p2p import MIN_SECRET, generate_code, local_ip
 from . import syncing as SY
 
@@ -17,16 +18,9 @@ class _Say(QObject):
 
 def p2p_tab(dlg):
     main, cfg = dlg.main, dlg.cfg
-    page = QWidget()
-    lay = QVBoxLayout(page)
-    title = QLabel("<b>%s</b>" % tr("Synchronisation entre machines"))
-    lay.addWidget(title)
-    intro = QLabel(SY.INTRO)
-    intro.setWordWrap(True)
-    intro.setEnabled(False)
-    lay.addWidget(intro)
-    form = QFormLayout()
-    lay.addLayout(form)
+    page = Page(tr("Synchronisation"), tr("Vos comptes, signatures et règles entre vos machines, chiffrés et sans serveur."))
+    lay = page.card(tr("Jumelage"), SY.INTRO)
+    form = lay.form()
     secret = QLineEdit(cfg.get("p2p_secret") or "")
     secret.setEchoMode(QLineEdit.Password)
     secret.setPlaceholderText(tr("%d caractères minimum, identique sur les deux machines") % MIN_SECRET)
@@ -38,6 +32,8 @@ def p2p_tab(dlg):
     enabled = QCheckBox(tr("Synchronisation activée"))
     enabled.setChecked(bool(cfg["p2p_enabled"]))
     form.addRow("", enabled)
+    lay = page.card(tr("État de la synchronisation"))
+    form = lay.form()
     state, ident, peers = QLabel(), QLabel(), QLabel()
     ident.setTextInteractionFlags(Qt.TextSelectableByMouse)
     for w in (state, peers):
@@ -52,11 +48,8 @@ def p2p_tab(dlg):
     brow.addWidget(scan_btn)
     brow.addStretch(1)
     form.addRow("", brow)
-    hint = QLabel(tr("Secours si la découverte automatique est bloquée (isolation Wi-Fi de certaines box) : "
-                     "adresse IP de l'autre machine. Votre adresse : %s") % local_ip())
-    hint.setWordWrap(True)
-    hint.setEnabled(False)
-    lay.addWidget(hint)
+    lay = page.card(tr("Adresse de l'autre machine"), tr("Secours si la découverte automatique est bloquée (isolation Wi-Fi de certaines box) : "
+                                                         "adresse IP de l'autre machine. Votre adresse : %s") % local_ip())
     peer_entry = QLineEdit(", ".join(cfg.get("p2p_static_peers") or []))
     peer_entry.setPlaceholderText(tr("192.168.1.42 ou 192.168.1.42:54322"))
     save_peers, test_peer = QPushButton(tr("Enregistrer")), QPushButton(tr("Tester"))
@@ -72,9 +65,8 @@ def p2p_tab(dlg):
     diag = QLabel()
     diag.setWordWrap(True)
     diag.setTextInteractionFlags(Qt.TextSelectableByMouse)
-    lay.addWidget(QLabel("<b>%s</b>" % tr("Diagnostic réseau")))
+    lay = page.card(tr("Diagnostic réseau"))
     lay.addWidget(diag)
-    lay.addStretch(1)
     say = _Say()
     say.text.connect(lambda t: main.status.setText(t))
     say.done.connect(lambda: (sync_btn.setEnabled(True), scan_btn.setEnabled(True), refresh()))
@@ -152,7 +144,4 @@ def p2p_tab(dlg):
     timer.timeout.connect(refresh)
     timer.start(5000)
     refresh()
-    sc = QScrollArea()
-    sc.setWidgetResizable(True)
-    sc.setWidget(page)
-    return sc
+    return page.finish()

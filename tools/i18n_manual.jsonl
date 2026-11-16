@@ -73,3 +73,4 @@
 {"f": "p2p.py", "s": "port TCP %d indisponible (%s)"}
 {"f": "ai_service.py", "s": "Autre service compatible OpenAI"}
 {"f": "ai_service.py", "s": "service injoignable"}
+{"f": "syncdata.py", "s": "relance(s) programmée(s)"}

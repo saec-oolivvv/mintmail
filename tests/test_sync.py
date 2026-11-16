@@ -123,6 +123,24 @@ def test_db_only_and_auto_contacts_and_rules_reach_the_other_machine():
     assert not rnd(a, ca, b, cb) and not rnd(b, cb, a, ca)
 
 
+def test_followups_sync_both_ways_and_stay_valid():
+    a = cfg("FA", followups=[{"id": "acc1:INBOX:42", "at": time.time() + 86400, "subject": "Devis", "date": 1700000000.0, "to": "x@y.be"}])
+    b = cfg("FB")
+    w = syncdata.merge_items(syncdata.local_items(b), syncdata.to_wire(syncdata.local_items(a)))
+    assert "followup:acc1:INBOX:42" in w
+    syncdata.apply_items(b, w)
+    assert b["followups"] == a["followups"]
+    assert not syncdata.merge_items(syncdata.local_items(b), syncdata.to_wire(syncdata.local_items(a)))
+    b["followups"] = []                    # relance échue ou annulée sur B : A la retire aussi
+    time.sleep(0.01)
+    w = syncdata.merge_items(syncdata.local_items(a), syncdata.to_wire(syncdata.local_items(b)))
+    assert w["followup:acc1:INBOX:42"]["del"]
+    syncdata.apply_items(a, w)
+    assert a["followups"] == []
+    bad = {"followup:x": {"ts": 1, "v": {"id": "x", "at": "demain", "subject": "s"}}, "followup:y": {"ts": 1, "v": {"id": "z", "at": 1}}}
+    assert not any(syncdata.valid_item(k, v) for k, v in bad.items())
+
+
 def test_secure_channel_encrypts_authenticates_and_orders():
     class Pipe:
         def __init__(self): self.buf = bytearray()

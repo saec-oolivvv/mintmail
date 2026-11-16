@@ -70,15 +70,14 @@ def signatures_tab(dlg):
 
 def identities_tab(dlg):
     cfg = dlg.cfg
-    w = QWidget()
-    row = QHBoxLayout(w)
+    page = Page(tr("Identités d'envoi"), tr("Alias : une autre adresse d'expédition, avec sa signature."))
     left = QVBoxLayout()
     lst = QListWidget()
     lst.setMinimumWidth(230)
     add = QPushButton(tr("＋ Ajouter une identité"))
     left.addWidget(lst, 1)
     left.addWidget(add)
-    row.addLayout(left)
+    page.card(tr("Vos identités")).addLayout(left)
     form = QFormLayout()
     acc, name, email = _accounts_combo(cfg), QLineEdit(), QLineEdit()
     sig = QPlainTextEdit()
@@ -98,7 +97,7 @@ def identities_tab(dlg):
     form.addRow("", _note(tr("Une identité est une adresse supplémentaire (alias) depuis laquelle vous pouvez écrire, avec sa propre signature. "
                              "Le serveur du compte doit autoriser cet alias. Quand un message reçu était adressé à un alias, la réponse part "
                              "automatiquement de cet alias. Choix possible dans le champ « De » de la rédaction.")))
-    row.addLayout(form, 1)
+    page.card(tr("Identité sélectionnée")).addLayout(form)
     cur = {"id": None}
 
     def refresh(select=None):
@@ -146,20 +145,19 @@ def identities_tab(dlg):
     save.clicked.connect(do_save)
     rm.clicked.connect(do_rm)
     refresh()
-    return w
+    return page.finish()
 
 
 def templates_tab(dlg):
     cfg = dlg.cfg
-    w = QWidget()
-    row = QHBoxLayout(w)
+    page = Page(tr("Modèles de réponse"), tr("Réponses toutes prêtes à insérer en un clic."))
     left = QVBoxLayout()
     lst = QListWidget()
     lst.setMinimumWidth(200)
     new = QPushButton(tr("＋ Nouveau modèle"))
     left.addWidget(lst, 1)
     left.addWidget(new)
-    row.addLayout(left)
+    page.card(tr("Vos modèles")).addLayout(left)
     right = QVBoxLayout()
     name = QLineEdit()
     name.setPlaceholderText(tr("Nom du modèle"))
@@ -173,7 +171,8 @@ def templates_tab(dlg):
     btns.addWidget(rm)
     btns.addStretch(1)
     right.addLayout(btns)
-    row.addLayout(right, 1)
+    body.setMinimumHeight(220)
+    page.card(tr("Modèle sélectionné")).addLayout(right)
     cur = {"i": None}
 
     def refresh(select=None):
@@ -213,14 +212,13 @@ def templates_tab(dlg):
     save.clicked.connect(on_save)
     rm.clicked.connect(on_rm)
     refresh(0)
-    return w
+    return page.finish()
 
 
 def contacts_tab(dlg):
     cfg, main = dlg.cfg, dlg.main
     cache = main.engine.cache
-    w = QWidget()
-    row = QHBoxLayout(w)
+    page = Page(tr("Contacts"), tr("Carnet d'adresses (import et export vCard)."))
     left = QVBoxLayout()
     search = QLineEdit()
     search.setPlaceholderText(tr("Rechercher un contact"))
@@ -233,7 +231,7 @@ def contacts_tab(dlg):
     left.addWidget(search)
     left.addWidget(lst, 1)
     left.addLayout(io)
-    row.addLayout(left)
+    page.card(tr("Votre carnet")).addLayout(left)
     form = QFormLayout()
     f = {k: QLineEdit() for k in ("name", "email", "phone", "org", "notes")}
     for k, lab in (("name", tr("Nom")), ("email", tr("Adresse e-mail")), ("phone", tr("Téléphone")), ("org", tr("Société")), ("notes", tr("Notes"))):
@@ -248,7 +246,7 @@ def contacts_tab(dlg):
     form.addRow("", status)
     form.addRow("", _note(tr("Les fiches enregistrées ici se synchronisent entre vos machines. Les autres correspondants (marqués auto) sont "
                              "repérés dans vos messages et servent à l'auto-complétion.")))
-    row.addLayout(form, 1)
+    page.card(tr("Fiche du contact")).addLayout(form)
 
     def fill(c):
         for k in f:
@@ -284,7 +282,7 @@ def contacts_tab(dlg):
             refresh()
 
     def do_import():
-        path, _ = QFileDialog.getOpenFileName(w, tr("Importer des contacts (vCard)"), "", "vCard (*.vcf)")
+        path, _ = QFileDialog.getOpenFileName(page, tr("Importer des contacts (vCard)"), "", "vCard (*.vcf)")
         if not path:
             return
         try:
@@ -296,7 +294,7 @@ def contacts_tab(dlg):
         refresh()
 
     def do_export():
-        path, _ = QFileDialog.getSaveFileName(w, tr("Exporter les contacts"), "contacts-mintmail.vcf", "vCard (*.vcf)")
+        path, _ = QFileDialog.getSaveFileName(page, tr("Exporter les contacts"), "contacts-mintmail.vcf", "vCard (*.vcf)")
         if not path:
             return
         try:
@@ -314,4 +312,4 @@ def contacts_tab(dlg):
     imp.clicked.connect(do_import)
     exp.clicked.connect(do_export)
     refresh()
-    return w
+    return page.finish()

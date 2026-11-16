@@ -26,6 +26,8 @@ class Card(QFrame):
         self._lay.addWidget(widget, stretch)
         return widget
 
+    addWidget = add
+
     def addLayout(self, layout, stretch=0):
         self._lay.addLayout(layout, stretch)
         return layout

@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.36.3
+- Réglages : les 5 dernières pages (identités, modèles, contacts, agenda, synchronisation) sont découpées en cartes titrées distinctes.
+- Synchro : les relances programmées sont synchronisées entre postes (y compris leur retrait une fois échues).
+
 ## 1.36.2
 - Synchro : les contacts présents seulement dans la base locale et les contacts collectés (avec nom) sont maintenant envoyés à l'autre poste (contacts manquants sur Mac).
 - Synchro : l'intervalle d'actualisation (1-120 min) et le délai d'annulation (0-30 s) n'étaient plus acceptés par le poste récepteur pour certaines valeurs.

@@ -107,7 +107,7 @@ def valid_item(key: str, item: Any) -> bool:
     if not isinstance(item.get("ts"), (int, float)) or not _b(item.get("del", False)):
         return False
     if item.get("del"):
-        return kind_of(key) in ("acct", "set", "secret", "rule", "blocked", "spam", "imgs", "search", "tpl", "ident", "contact", "task")
+        return kind_of(key) in ("acct", "set", "secret", "rule", "blocked", "spam", "imgs", "search", "tpl", "ident", "contact", "task", "followup")
     v, kind, rest = item.get("v"), kind_of(key), key.split(":", 1)[-1]
     if kind == "acct":
         a = clean_account(v)
@@ -127,6 +127,10 @@ def valid_item(key: str, item: Any) -> bool:
                 and (v.get("due", "") == "" or (isinstance(v.get("due"), str) and re.match(r"^\d{4}-\d{2}-\d{2}$", v["due"]) is not None))
                 and _b(v.get("done", False)) and _str(200)(v.get("msg", "")) and _str(40)(v.get("account", ""))
                 and isinstance(v.get("created", 0), (int, float)) and not isinstance(v.get("created", 0), bool))
+    if kind == "followup":
+        num = lambda x: isinstance(x, (int, float)) and not isinstance(x, bool)
+        return (isinstance(v, dict) and 0 < len(rest) <= 250 and v.get("id") == rest and set(v) <= {"id", "at", "subject", "date", "to"}
+                and num(v.get("at")) and num(v.get("date", 0)) and _str(500)(v.get("subject", "")) and _str(500)(v.get("to", "")))
     if kind == "contact":
         return (isinstance(v, dict) and EMAIL_RE.match(rest) is not None and len(rest) <= 200 and set(v) <= {"name", "phone", "org", "notes", "auto"}
                 and _b(v.get("auto", False)) and all(isinstance(x, str) and len(x) <= 500 for k, x in v.items() if k != "auto"))
@@ -171,6 +175,9 @@ def collect(config, cache=None) -> Dict[str, Tuple[Any, Optional[str]]]:
     for t in config.get("tasks", []):
         if isinstance(t, dict) and t.get("id"):
             out["task:" + t["id"]] = (t, None)
+    for f in config.get("followups", []):
+        if isinstance(f, dict) and f.get("id"):
+            out["followup:" + str(f["id"])] = (f, None)
     for r in config.get("rules", []):
         out["rule:" + hash_value(r)] = (r, None)
     for v in config.get("blocked", []):
@@ -359,6 +366,9 @@ def _apply_list_item(config, kind, rest, v, deleted, cache=None):
     elif kind == "ident":
         lst = [i for i in config.get("identities", []) if i.get("id") != rest]
         config["identities"] = lst if deleted else lst + [v]
+    elif kind == "followup":
+        lst = [f for f in config.get("followups", []) if str(f.get("id")) != rest]
+        config["followups"] = lst if deleted else lst + [v]
     elif kind == "task":
         lst = [t for t in config.get("tasks", []) if t.get("id") != rest]
         config["tasks"] = lst if deleted else lst + [v]
@@ -382,4 +392,5 @@ def _apply_list_item(config, kind, rest, v, deleted, cache=None):
 def describe(res: dict) -> str:
     names = {"acct": tr("compte(s)"), "set": tr("réglage(s)"), "secret": tr("clé IA"), "rule": tr("règle(s)"), "blocked": tr("blocage(s)"),
              "spam": tr("expéditeur(s) en spam"), "imgs": tr("expéditeur(s) aux images chargées"), "search": tr("recherche(s)"), "tpl": tr("modèle(s)"), "ident": tr("identité(s)"), "contact": tr("contact(s)"), "task": tr("tâche(s)")}
+    names["followup"] = tr("relance(s) programmée(s)")
     return ", ".join("%d %s" % (n, names.get(k, k)) for k, n in res.get("kinds", {}).items()) or tr("à jour")
