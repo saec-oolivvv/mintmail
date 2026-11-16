@@ -8,7 +8,9 @@ Rien de ce que reçoit ce programme n'est cru sur parole :
   4. la signature RSA / SHA-256 doit correspondre à la clé publique ; sinon : refus ;
   5. le paquet doit s'appeler « mintmail », être de type « all » et avoir une version STRICTEMENT plus récente que celle installée
      (pas de retour en arrière vers une ancienne version vulnérable) ;
-  6. l'installation passe par apt (dépendances résolues) avec un environnement minimal ; le dossier privé est toujours supprimé.
+  6. l'installation passe par apt (dépendances résolues) avec un environnement minimal ; le dossier privé est toujours supprimé ;
+  7. filet de sécurité : les fichiers de la version installée sont copiés avant l'installation ; si la nouvelle version ne s'importe pas
+     après installation, ils sont remis en place (« ERR:rolled_back »).
 Sortie : « OK:<version> » ou « ERR:<code>:<détail> » (l'interface traduit le code). Aucun texte n'est destiné à être affiché tel quel.
 """
 import os
@@ -78,7 +80,50 @@ def _out(run, cmd):
     return (r.stdout or "").strip() if r.returncode == 0 else ""
 
 
-def main(argv=None, *, euid=None, pubkey=PUBKEY, key_ok=key_trusted, run=subprocess.run, installer=None, tmp_root=None, out=print):
+BACKUP_PREFIXES = ("/usr/lib/python3/dist-packages/mintmail/", "/usr/share/mintmail/", "/usr/bin/mintmail")
+MAX_BACKUP = 200_000_000
+
+
+def snapshot_installed(run, dest, root="/"):
+    """Copie (sans suivre les liens) les fichiers de la version installée dans dest ; retourne la liste de leurs chemins."""
+    r = run(["dpkg", "-L", "mintmail"], capture_output=True, text=True, timeout=60, env=SAFE_ENV)
+    if r.returncode != 0:
+        return []
+    saved, total = [], 0
+    for path in (r.stdout or "").splitlines():
+        src = os.path.join(root, path.lstrip("/"))
+        if not path.startswith(BACKUP_PREFIXES) or ".." in path.split("/") or os.path.islink(src) or not os.path.isfile(src):
+            continue
+        total += os.path.getsize(src)
+        if total > MAX_BACKUP:
+            return []                                        # trop gros : pas de filet plutôt qu'un disque plein
+        target = os.path.join(dest, path.lstrip("/"))
+        os.makedirs(os.path.dirname(target), exist_ok=True)
+        shutil.copy2(src, target)
+        saved.append(path)
+    return saved
+
+
+def restore_installed(saved, src_dir, root="/"):
+    """Remet en place les fichiers sauvegardés ; retourne le nombre de fichiers restaurés."""
+    n = 0
+    for path in saved:
+        shutil.copy2(os.path.join(src_dir, path.lstrip("/")), os.path.join(root, path.lstrip("/")))
+        n += 1
+    return n
+
+
+def import_ok(run):
+    """La version qui vient d'être installée s'importe-t-elle (modules sans interface graphique) ?"""
+    try:
+        r = run(["python3", "-I", "-c", "import mintmail.store, mintmail.syncdata, mintmail.updater, mintmail.backend"],
+                capture_output=True, text=True, timeout=120, env=SAFE_ENV, cwd="/")
+    except (OSError, subprocess.SubprocessError):
+        return False
+    return r.returncode == 0
+
+
+def main(argv=None, *, euid=None, pubkey=PUBKEY, key_ok=key_trusted, run=subprocess.run, installer=None, tmp_root=None, out=print, guard=None, root="/"):
     argv = list(sys.argv[1:] if argv is None else argv)
     try:
         if (os.geteuid() if euid is None else euid) != 0:
@@ -102,10 +147,16 @@ def main(argv=None, *, euid=None, pubkey=PUBKEY, key_ok=key_trusted, run=subproc
             current = _out(run, ["dpkg-query", "-W", "-f=${Version}", "mintmail"])
             if current and run(["dpkg", "--compare-versions", version, "gt", current], capture_output=True, text=True, timeout=60, env=SAFE_ENV).returncode != 0:
                 raise Refuse("not_newer", "%s <= %s" % (version, current))
+            guarded = (installer is None) if guard is None else guard      # filet de retour arrière : actif en production, à la demande dans les tests
+            backup = os.path.join(work, "backup")
+            saved = snapshot_installed(run, backup, root) if guarded and current else []
             cmd = installer(deb) if installer else ["apt-get", "install", "-y", "-o", "Dpkg::Options::=--force-confold", deb]
             r = run(cmd, cwd=work, capture_output=True, text=True, timeout=1800, env=SAFE_ENV)
             if r.returncode != 0:
                 raise Refuse("install_failed", " | ".join(((r.stderr or r.stdout or "")[-300:]).splitlines()[-3:]))
+            if guarded and saved and not import_ok(run):
+                restore_installed(saved, backup, root)
+                raise Refuse("rolled_back", "%s -> %s" % (version, current))
         finally:
             shutil.rmtree(work, ignore_errors=True)
         out("OK:%s" % version)

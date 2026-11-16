@@ -451,6 +451,7 @@
 "La clé de vérification installée n'est pas protégée : refusé.": "De geïnstalleerde verificatiesleutel is niet beveiligd: geweigerd.",
 "La mise à jour a échoué": "De update is mislukt",
 "La mise à jour du dépôt de sources a échoué (modifications locales ou historique divergent) : lancez « sh mintmail-sync.sh » dans le terminal.": "Het bijwerken van de bronrepository is mislukt (lokale wijzigingen of afwijkende geschiedenis): voer “sh mintmail-sync.sh” uit in een terminal.",
+"La nouvelle version ne démarre pas : l'ancienne a été remise en place automatiquement. Rien n'est perdu.": "De nieuwe versie start niet: de vorige is automatisch hersteld. Er gaat niets verloren.",
 "La version publiée ne contient pas le paquet attendu.": "De gepubliceerde versie bevat niet het verwachte pakket.",
 "Langue": "Taal",
 "Langue de l'IA": "AI-taal",

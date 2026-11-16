@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.36.4
+- Mises à jour : retour arrière automatique si la nouvelle version ne s'importe pas après installation (anciens fichiers remis en place).
+- macOS : signature Apple Developer ID et notarisation facultatives (si les secrets GitHub existent), signature ad hoc sinon.
+
 ## 1.36.3
 - Réglages : les 5 dernières pages (identités, modèles, contacts, agenda, synchronisation) sont découpées en cartes titrées distinctes.
 - Synchro : les relances programmées sont synchronisées entre postes (y compris leur retrait une fois échues).

@@ -451,6 +451,7 @@
 "La clé de vérification installée n'est pas protégée : refusé.": "Der installierte Prüfschlüssel ist nicht geschützt: abgelehnt.",
 "La mise à jour a échoué": "Das Update ist fehlgeschlagen",
 "La mise à jour du dépôt de sources a échoué (modifications locales ou historique divergent) : lancez « sh mintmail-sync.sh » dans le terminal.": "Die Aktualisierung des Quell-Repositorys ist fehlgeschlagen (lokale Änderungen oder abweichender Verlauf): Führen Sie „sh mintmail-sync.sh“ in einem Terminal aus.",
+"La nouvelle version ne démarre pas : l'ancienne a été remise en place automatiquement. Rien n'est perdu.": "Die neue Version startet nicht: die vorherige wurde automatisch wiederhergestellt. Nichts geht verloren.",
 "La version publiée ne contient pas le paquet attendu.": "Die veröffentlichte Version enthält nicht das erwartete Paket.",
 "Langue": "Sprache",
 "Langue de l'IA": "KI-Sprache",

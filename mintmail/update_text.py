@@ -27,6 +27,7 @@ def explain(code, detail=""):
         "bad_file": tr("Fichier de mise à jour invalide : refusé."),
         "key_untrusted": tr("La clé de vérification installée n'est pas protégée : refusé."),
         "install_failed": tr("L'installation a échoué (le détail est dans le journal)."),
+        "rolled_back": tr("La nouvelle version ne démarre pas : l'ancienne a été remise en place automatiquement. Rien n'est perdu."),
         "cancelled": tr("Authentification annulée : rien n'a été installé."),
         "nohelper": tr("Installation automatique indisponible sur cette machine (pkexec ou programme d'installation absent)."),
         "not_root": tr("Droits administrateur requis."),

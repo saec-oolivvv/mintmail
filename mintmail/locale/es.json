@@ -451,6 +451,7 @@
 "La clé de vérification installée n'est pas protégée : refusé.": "La clave de verificación instalada no está protegida: rechazado.",
 "La mise à jour a échoué": "La actualización ha fallado",
 "La mise à jour du dépôt de sources a échoué (modifications locales ou historique divergent) : lancez « sh mintmail-sync.sh » dans le terminal.": "Falló la actualización del repositorio de código (cambios locales o historial divergente): ejecute «sh mintmail-sync.sh» en un terminal.",
+"La nouvelle version ne démarre pas : l'ancienne a été remise en place automatiquement. Rien n'est perdu.": "La nueva versión no arranca: se restauró automáticamente la anterior. No se pierde nada.",
 "La version publiée ne contient pas le paquet attendu.": "La versión publicada no contiene el paquete esperado.",
 "Langue": "Idioma",
 "Langue de l'IA": "Idioma de la IA",

@@ -51,7 +51,21 @@ for D in VERSION locale icons; do [ -e "$PKG/$D" ] || cp -R "$SRC/mintmail/$D" "
 for KEY in CFBundleShortVersionString CFBundleVersion; do
     /usr/libexec/PlistBuddy -c "Set :$KEY $VER" "$APP/Contents/Info.plist" 2>/dev/null || /usr/libexec/PlistBuddy -c "Add :$KEY string $VER" "$APP/Contents/Info.plist"
 done
+ENT="$WORK/entitlements.plist"
+cat > "$ENT" <<'PLIST'
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0"><dict>
+<key>com.apple.security.cs.allow-unsigned-executable-memory</key><true/>
+<key>com.apple.security.cs.disable-library-validation</key><true/>
+</dict></plist>
+PLIST
+if [ -n "$MACOS_SIGN_IDENTITY" ]; then               # signature Apple « Developer ID » (facultative : variables fournies par le workflow GitHub quand les secrets existent)
+    codesign --force --deep --options runtime --timestamp --entitlements "$ENT" --sign "$MACOS_SIGN_IDENTITY" "$APP" || { echo "Échec : signature Developer ID."; exit 1; }
+    codesign --verify --deep --strict "$APP" || { echo "Échec : la signature ne se vérifie pas."; exit 1; }
+else
 codesign --force --deep --sign - "$APP" || echo "avertissement : signature ad hoc impossible (l'application se lancera quand même avec clic droit → Ouvrir)"        # signature « ad hoc » : nécessaire pour démarrer sur les Mac Apple Silicon (ce n'est pas une signature Apple)
+fi
 STAGE="$WORK/dmg"; mkdir -p "$STAGE" && cp -R "$APP" "$STAGE/" && ln -s /Applications "$STAGE/Applications"
 case "$(uname -m)" in arm64) ARCH=arm64 ;; *) ARCH=x86_64 ;; esac
 DMG="$OUT/MintMail-$VER-macos-$ARCH.dmg"        # le nom est celui que la mise à jour intégrée cherche dans la Release
@@ -61,5 +75,15 @@ for TRY in 1 2 3; do                              # hdiutil échoue parfois (« 
     echo "hdiutil : essai $TRY échoué"; rm -f "$DMG"; sleep 5
 done
 [ -f "$DMG" ] || { echo "Échec : image disque non créée."; exit 1; }
+if [ -n "$MACOS_SIGN_IDENTITY" ]; then
+    codesign --force --timestamp --sign "$MACOS_SIGN_IDENTITY" "$DMG" || echo "avertissement : signature de l'image disque impossible"
+    if [ -n "$APPLE_ID" ] && [ -n "$APPLE_TEAM_ID" ] && [ -n "$APPLE_APP_PASSWORD" ]; then       # notarisation Apple : après elle, Gatekeeper accepte l'application sans « clic droit → Ouvrir »
+        if xcrun notarytool submit "$DMG" --apple-id "$APPLE_ID" --team-id "$APPLE_TEAM_ID" --password "$APPLE_APP_PASSWORD" --wait; then
+            xcrun stapler staple "$DMG" || echo "avertissement : agrafage impossible"
+        else
+            echo "avertissement : notarisation refusée ou impossible (image signée mais non notariée)"
+        fi
+    fi
+fi
 ( cd "$OUT" && shasum -a 256 "$(basename "$DMG")" > "$(basename "$DMG").sha256" )     # vérifié par la mise à jour intégrée
 echo "construit : $DMG"

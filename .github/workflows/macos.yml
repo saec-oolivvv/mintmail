@@ -25,8 +25,35 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+      - name: Certificat Apple (facultatif)
+        # Actif seulement si les secrets existent (Settings → Secrets → Actions) : MACOS_CERT_P12 (certificat « Developer ID Application » .p12 en base64),
+        # MACOS_CERT_PASSWORD, MACOS_SIGN_IDENTITY ; pour la notarisation en plus : APPLE_ID, APPLE_TEAM_ID, APPLE_APP_PASSWORD. Sans eux : signature ad hoc.
+        shell: bash
+        env:
+          CERT_P12: ${{ secrets.MACOS_CERT_P12 }}
+          CERT_PASSWORD: ${{ secrets.MACOS_CERT_PASSWORD }}
+        run: |
+          if [ -n "$CERT_P12" ]; then
+            KC="$RUNNER_TEMP/mintmail.keychain-db"; KCPW="$(uuidgen)"
+            echo "$CERT_P12" | base64 --decode > "$RUNNER_TEMP/cert.p12"
+            security create-keychain -p "$KCPW" "$KC"
+            security set-keychain-settings -lut 21600 "$KC"
+            security unlock-keychain -p "$KCPW" "$KC"
+            security import "$RUNNER_TEMP/cert.p12" -P "$CERT_PASSWORD" -A -t cert -f pkcs12 -k "$KC"
+            security set-key-partition-list -S apple-tool:,apple: -s -k "$KCPW" "$KC" >/dev/null
+            security list-keychains -d user -s "$KC" login.keychain-db
+            rm -f "$RUNNER_TEMP/cert.p12"
+            echo "Certificat Apple importé."
+          else
+            echo "Pas de certificat Apple : signature ad hoc."
+          fi
       - name: Construire le .dmg
         shell: bash
+        env:
+          MACOS_SIGN_IDENTITY: ${{ secrets.MACOS_SIGN_IDENTITY }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          APPLE_APP_PASSWORD: ${{ secrets.APPLE_APP_PASSWORD }}
         run: |
           set -o pipefail
           sh packaging/build-macos.sh 2>&1 | tee build.log

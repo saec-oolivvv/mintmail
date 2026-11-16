@@ -311,6 +311,42 @@ def helper_run(deb, sig, system=None, pubkey=GOOD_PUB, euid=0, argv=None, key_ok
     return code, out[-1], system
 
 
+def test_root_helper_puts_the_old_version_back_when_the_new_one_cannot_be_imported():
+    work, root, fs = tempfile.mkdtemp(), tempfile.mkdtemp(), tempfile.mkdtemp()
+    pkg = os.path.join(fs, "usr/lib/python3/dist-packages/mintmail")
+    os.makedirs(pkg)
+    target = os.path.join(pkg, "store.py")
+    open(target, "w").write("ANCIEN")
+    listing = "/usr/lib/python3/dist-packages/mintmail/store.py\n/etc/autre\n/usr/lib/python3/dist-packages/mintmail/../../evil\n"
+
+    class Guarded(Sys):
+        def __init__(self, broken, **kw):
+            super().__init__(**kw)
+            self.broken = broken
+
+        def __call__(self, cmd, **kw):
+            if cmd[:2] == ["dpkg", "-L"]:
+                return subprocess.CompletedProcess(cmd, 0, listing, "")
+            if cmd[0] == "python3":
+                return subprocess.CompletedProcess(cmd, 1 if self.broken else 0, "", "")
+            return super().__call__(cmd, **kw)
+
+        def installer(self, deb):
+            open(target, "w").write("NOUVEAU")                                      # l'installation remplace le fichier
+            return super().installer(deb)
+
+    deb = fake_deb(os.path.join(work, "u.deb"), version="1:1.99.0")
+    sig = sign(deb)
+    for broken, want_code, want_text in ((True, 3, "ANCIEN"), (False, 0, "NOUVEAU")):
+        open(target, "w").write("ANCIEN")
+        sy, out = Guarded(broken), []
+        code = A.main([deb, sig], euid=0, pubkey=GOOD_PUB, key_ok=lambda p: True, run=sy, installer=sy.installer, tmp_root=root, out=out.append, guard=True, root=fs)
+        assert code == want_code and open(target).read() == want_text, (broken, code, out)
+        assert (out[-1].startswith("ERR:rolled_back:") if broken else out[-1] == "OK:1:1.99.0")
+    assert os.listdir(root) == []
+    assert "remise en place" in UI.explain("rolled_back")
+
+
 def test_root_helper_installs_only_a_signed_newer_mintmail_package_from_a_private_copy():
     work = tempfile.mkdtemp()
     root = tempfile.mkdtemp()
@@ -438,7 +474,7 @@ def test_packaging_installs_helper_policy_and_key_with_safe_permissions():
 
 def test_every_update_error_code_has_a_translated_explanation():
     codes = ["macos", "nodmg", "network", "ratelimit", "norelease", "badrepo", "badjson", "badversion", "noasset", "badurl", "toobig", "badsize", "checksum", "http", "nokey", "unsigned",
-             "bad_signature", "bad_package", "not_newer", "bad_file", "key_untrusted", "install_failed", "cancelled", "nohelper", "not_root", "usage", "internal"]
+             "bad_signature", "bad_package", "not_newer", "bad_file", "key_untrusted", "install_failed", "rolled_back", "cancelled", "nohelper", "not_root", "usage", "internal"]
     texts = {c: UI.explain(c) for c in codes}
     assert all(t and "(%s)" not in t for t in texts.values()) and len(set(texts.values())) == len(codes)
     assert "zzz" in UI.explain("zzz")                                                                 # code inconnu : message générique avec le code
