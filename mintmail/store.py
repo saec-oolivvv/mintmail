@@ -646,7 +646,7 @@ class Cache:
             return self.db.execute("SELECT COUNT(*) FROM ops").fetchone()[0]
 
     # ------------------------------------------------------------------- contacts
-    def contact_upsert(self, email, name="", phone="", org="", notes="", source="auto", bump=0):
+    def contact_upsert(self, email, name="", phone="", org="", notes="", source="auto", bump=0, force_name=False):
         email = (email or "").strip().lower()
         if not email:
             return
@@ -660,7 +660,7 @@ class Cache:
                                 (name, phone, org, notes, time.time(), email))
             else:
                 self.db.execute("UPDATE contacts SET name=?, n=n+?, ts=? WHERE email=?",
-                                (old[0] or name, bump, time.time(), email))
+                                ((name or old[0]) if force_name else (old[0] or name), bump, time.time(), email))
             self.db.commit()
 
     def contact_delete(self, email):

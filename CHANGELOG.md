@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.36.2
+- Synchro : les contacts présents seulement dans la base locale et les contacts collectés (avec nom) sont maintenant envoyés à l'autre poste (contacts manquants sur Mac).
+- Synchro : l'intervalle d'actualisation (1-120 min) et le délai d'annulation (0-30 s) n'étaient plus acceptés par le poste récepteur pour certaines valeurs.
+- Synchro des règles (dont « déplacer vers un dossier ») couverte par un test deux postes ; échange stable dans les deux sens.
+
 ## 1.36.1
 - Images de signature : le signal de fin de téléchargement passe par une méthode d'un objet Qt du fil de l'interface (la rédaction et l'aperçu ne sont jamais touchés depuis le fil de téléchargement) ; nouveau « tools/diagnose-tests.sh » : lance tous les tests et écrit les échecs détaillés dans ~/mintmail-diagnostic.txt
 

@@ -43,7 +43,7 @@ SYNC_SETTINGS = {
     "theme": _enum("system", "light", "dark"), "style": _enum("aurora", "papier", "terminal"),
     "accent": lambda v: isinstance(v, str) and re.match(r"^#[0-9a-fA-F]{6}$", v) is not None,
     "density": _enum("compact", "comfortable", "spacious"), "load_images": _b, "notifications": _b,
-    "refresh_minutes": _int(1, 60), "undo_seconds": _int(3, 30), "swipe": _swipe, "swipe_invert": _b,
+    "refresh_minutes": _int(1, 120), "undo_seconds": _int(0, 30), "swipe": _swipe, "swipe_invert": _b,
     "ai_enabled": _b, "ai_auto": _b, "ai_triage": _b, "ai_digest": _b, "ai_privacy": _enum("full", "minimal"),
     "ai_lang": _enum("fr", "en", "nl", "de", "es"), "ai_tone": _enum("neutral", "formal", "friendly"),
     "nvidia_api_base": lambda v: isinstance(v, str) and len(v) <= 200 and (v == "" or v.startswith("https://") or (
@@ -128,8 +128,8 @@ def valid_item(key: str, item: Any) -> bool:
                 and _b(v.get("done", False)) and _str(200)(v.get("msg", "")) and _str(40)(v.get("account", ""))
                 and isinstance(v.get("created", 0), (int, float)) and not isinstance(v.get("created", 0), bool))
     if kind == "contact":
-        return (isinstance(v, dict) and EMAIL_RE.match(rest) is not None and len(rest) <= 200 and set(v) <= {"name", "phone", "org", "notes"}
-                and all(isinstance(x, str) and len(x) <= 500 for x in v.values()))
+        return (isinstance(v, dict) and EMAIL_RE.match(rest) is not None and len(rest) <= 200 and set(v) <= {"name", "phone", "org", "notes", "auto"}
+                and _b(v.get("auto", False)) and all(isinstance(x, str) and len(x) <= 500 for k, x in v.items() if k != "auto"))
     if kind == "rule":
         return (isinstance(v, dict) and v.get("field") in RULE_FIELDS and v.get("action") in RULE_ACTIONS
                 and _str(200)(v.get("text")) and bool(v.get("text"))
@@ -144,8 +144,9 @@ def valid_item(key: str, item: Any) -> bool:
 
 
 # ------------------------------------------------------------------- collecte
-def collect(config) -> Dict[str, Tuple[Any, Optional[str]]]:
-    """État local : {clé: (valeur non secrète, mot de passe/secret ou None)}."""
+def collect(config, cache=None) -> Dict[str, Tuple[Any, Optional[str]]]:
+    """État local : {clé: (valeur non secrète, mot de passe/secret ou None)}. `cache` : carnet d'adresses en base (contacts saisis ou importés
+    qui ne seraient pas dans les réglages, contacts collectés automatiquement)."""
     out: Dict[str, Tuple[Any, Optional[str]]] = {}
     for a in config.get("accounts", []):
         if a.get("demo") or not a.get("id"):
@@ -165,6 +166,8 @@ def collect(config) -> Dict[str, Tuple[Any, Optional[str]]]:
             out["ident:" + i["id"]] = (i, None)
     for email, c in (config.get("contacts") or {}).items():
         out["contact:" + email] = (c, None)
+    for email, c in _db_contacts(cache).items():
+        out.setdefault("contact:" + email, (c, None))        # les réglages (fiches saisies) l'emportent sur la base
     for t in config.get("tasks", []):
         if isinstance(t, dict) and t.get("id"):
             out["task:" + t["id"]] = (t, None)
@@ -183,12 +186,39 @@ def collect(config) -> Dict[str, Tuple[Any, Optional[str]]]:
     return out
 
 
-def local_items(config, now: Optional[float] = None) -> Dict[str, dict]:
+AUTO_CONTACTS_MAX = 3000
+
+
+def _db_contacts(cache) -> Dict[str, dict]:
+    """Contacts de la base locale à synchroniser : fiches « manual » (saisies, importées, ajoutées depuis un message) et contacts collectés
+    automatiquement qui ont un nom (marqués auto) ; l'ordre est stable pour que l'ensemble ne bouge pas d'un échange à l'autre."""
+    out: Dict[str, dict] = {}
+    if cache is None:
+        return out
+    try:
+        rows = cache.contacts_list(limit=100000)
+    except Exception:
+        return out
+    n_auto = 0
+    for r in sorted(rows, key=lambda r: r["email"]):
+        email = (r.get("email") or "").strip().lower()
+        if not email or len(email) > 200 or not EMAIL_RE.match(email):
+            continue
+        if r.get("source") == "manual":
+            out[email] = {"name": (r.get("name") or "")[:200], "phone": (r.get("phone") or "")[:60],
+                          "org": (r.get("org") or "")[:120], "notes": (r.get("notes") or "")[:500]}
+        elif r.get("name") and n_auto < AUTO_CONTACTS_MAX:
+            n_auto += 1
+            out[email] = {"name": r["name"][:200], "auto": True}
+    return out
+
+
+def local_items(config, now: Optional[float] = None, cache=None) -> Dict[str, dict]:
     """Éléments locaux datés. Détecte les modifications / suppressions locales depuis le dernier état connu."""
     now = time.time() if now is None else now
     with config.sync_lock:
         meta = config.data.setdefault("sync_meta", {})
-        current = collect(config)
+        current = collect(config, cache)
         changed, items = False, {}
         for key, (v, secret) in current.items():
             h, m = hash_value(v), meta.get(key)
@@ -332,6 +362,9 @@ def _apply_list_item(config, kind, rest, v, deleted, cache=None):
     elif kind == "task":
         lst = [t for t in config.get("tasks", []) if t.get("id") != rest]
         config["tasks"] = lst if deleted else lst + [v]
+    elif kind == "contact" and not deleted and v.get("auto"):
+        if cache is not None and not any(c["email"] == rest and c["source"] == "manual" for c in cache.contacts_list(rest, limit=5)):
+            cache.contact_upsert(rest, v.get("name", ""), source="auto", force_name=True)        # contact collecté (nom du pair : sinon les deux machines se renverraient leur nom sans fin) : dans le carnet seulement (pas dans les réglages)
     elif kind == "contact":
         contacts = dict(config.get("contacts") or {})
         if deleted:

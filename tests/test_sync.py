@@ -95,6 +95,34 @@ def test_full_roundtrip_between_two_machines_incl_secrets_and_deletion():
     assert a["accounts"] == [] and a.password("acc1234") == ""
 
 
+def test_db_only_and_auto_contacts_and_rules_reach_the_other_machine():
+    from mintmail.store import Cache
+    a = cfg("CA", rules=[{"field": "from", "text": "promo", "action": "move", "folder": "Promos"},
+                         {"field": "subject", "text": "facture", "action": "star"}],
+             refresh_minutes=1, undo_seconds=0)
+    b = cfg("CB")
+    ca, cb = Cache(os.path.join(tmp, "ca.db")), Cache(os.path.join(tmp, "cb.db"))
+    ca.contact_upsert("seul@x.be", "Seul en base", "123", "Org", "", source="manual")
+    ca.contact_upsert("auto@x.be", "Auto D.", "", "", "", source="auto", bump=3)
+    ca.contact_upsert("anon@x.be", "", "", "", "", source="auto", bump=1)       # sans nom : non synchronisé
+    cb.contact_upsert("auto@x.be", "Auto", "", "", "", source="auto", bump=1)
+
+    def rnd(src, sc, dst, dc):
+        w = syncdata.merge_items(syncdata.local_items(dst, cache=dc), syncdata.to_wire(syncdata.local_items(src, cache=sc)))
+        if w:
+            syncdata.apply_items(dst, w, dc)
+        return w
+    w = rnd(a, ca, b, cb)
+    assert "contact:seul@x.be" in w and "contact:auto@x.be" in w and "contact:anon@x.be" not in w
+    rows = {c["email"]: c for c in cb.contacts_list()}
+    assert rows["seul@x.be"]["name"] == "Seul en base" and rows["seul@x.be"]["source"] == "manual"
+    assert rows["auto@x.be"]["name"] == "Auto D." and rows["auto@x.be"]["source"] == "auto"
+    assert b["rules"] == a["rules"] and b["rules"][0]["folder"] == "Promos"
+    assert b["refresh_minutes"] == 1 and b["undo_seconds"] == 0
+    # stable : plus rien à échanger dans aucun sens
+    assert not rnd(a, ca, b, cb) and not rnd(b, cb, a, ca)
+
+
 def test_secure_channel_encrypts_authenticates_and_orders():
     class Pipe:
         def __init__(self): self.buf = bytearray()

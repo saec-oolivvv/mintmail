@@ -208,7 +208,7 @@ class SyncEngine:
         }
 
     def local_items(self):
-        return syncdata.local_items(self.config)
+        return syncdata.local_items(self.config, cache=self.cache)
 
     # --------------------------------------------------------------- cycle de vie
     def start(self) -> bool:
