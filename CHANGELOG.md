@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.35.13
+- Signatures : les images distantes (logo hébergé sur votre site…) fonctionnent : téléchargées en arrière-plan (adresses publiques seulement, 2 Mo maximum, contenu vérifié), gardées dans un cache local privé, affichées dans l'aperçu et dans la rédaction, jointes en ligne à l'envoi ; la signature enregistrée garde l'adresse d'origine et une image introuvable ne bloque jamais l'envoi
+
 ## 1.35.12
 - Nouvelle commande « mintmail --test-login » : essaie la connexion IMAP de chaque compte (trois variantes) et affiche la réponse exacte du serveur, avec un test d'écriture du trousseau sur Mac ; n'affiche jamais un mot de passe
 

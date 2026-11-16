@@ -127,3 +127,42 @@ if __name__ == "__main__":
         if n.startswith("test_"):
             f()
     print("ok")
+
+
+def test_remote_signature_images_are_downloaded_once_cached_and_embedded_for_display_and_sending():
+    import os
+    import tempfile
+    PNG = b"\x89PNG\r\n\x1a\n" + b"0" * 40
+    URL = "https://saec.me/img/logo.png"
+    SIGR = '<p><img src="%s" alt="SAEC" width="140" style="filter: invert(1)"></p><img src="https://x.test/a.png?a=1&amp;b=2">' % URL
+    calls = []
+
+    def fetch(u):
+        calls.append(u)
+        return PNG if "saec.me" in u else b"<html>pas une image</html>"
+    old_fetch, old_dir = SI.FETCH, SI._cache_dir
+    SI._mem.clear()
+    SI._misses.clear()
+    with tempfile.TemporaryDirectory() as d:
+        SI.set_cache_dir(d)
+        SI.FETCH = fetch
+        try:
+            assert SI.pending(SIGR) and SI.to_display(SIGR) == SIGR           # affichage : jamais de réseau, adresse d'origine conservée
+            assert calls == []
+            assert SI.prefetch(SIGR, fetch) == 1                              # le logo est récupéré ; la page HTML n'est pas une image : refusée
+            assert sorted(calls) == ["https://saec.me/img/logo.png", "https://x.test/a.png?a=1&b=2"]
+            assert not SI.pending(SIGR)                                       # l'échec est retenu : pas de nouvelle tentative immédiate
+            disp = SI.to_display(SIGR)
+            assert "data:image/png;base64," in disp and URL not in disp and 'width="140"' in disp and "https://x.test/a.png" in disp
+            n = len(calls)
+            html, inline = SI.to_mail(SIGR)                                   # envoi : image jointe en ligne, aucun nouveau téléchargement
+            assert len(calls) == n and len(inline) == 1 and inline[0][1] == "png" and 'src="cid:img' in html and URL not in html
+            assert os.listdir(d) and all(oct(os.stat(os.path.join(d, f)).st_mode)[-3:] == "600" for f in os.listdir(d))
+            SI._mem.clear()                                                   # redémarrage : le cache disque suffit
+            assert SI.cached(URL) == (PNG, "png")
+        finally:
+            SI.FETCH, SI._cache_dir = old_fetch, old_dir
+            SI._mem.clear()
+            SI._misses.clear()
+    assert SI.sniff(b"\xff\xd8\xff\xe0xx") == "jpeg" and SI.sniff(b"GIF89a..") == "gif" and SI.sniff(b"<?xml?><svg></svg>") == "svg" and SI.sniff(b"MZ\x90") is None
+    assert SI.http_fetch("http://127.0.0.1/x.png") is None and SI.http_fetch("https://user:pw@example.com/x.png") is None      # réseau interne et identifiants refusés (SSRF)

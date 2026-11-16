@@ -5,6 +5,7 @@ from PySide6.QtCore import Qt
 
 from ..i18n import tr
 from . import personal as P
+from . import ui_fetch as F
 
 ROLE = Qt.UserRole
 
@@ -51,8 +52,10 @@ def signatures_tab(dlg):
 
     def preview():
         view.setHtml(P.signature_preview(edit.toPlainText()))
+        F.prefetch_async(edit.toPlainText(), preview)        # images distantes : téléchargées en arrière-plan, l'aperçu se met à jour ensuite
 
     def do_save():
+        F.prefetch_async(edit.toPlainText())                 # images distantes prêtes pour la rédaction et l'envoi
         ok = P.set_signature(cfg, acc.currentData(), edit.toPlainText())
         status.setText(tr("Signature enregistrée") if ok else "")
     acc.currentIndexChanged.connect(load)
