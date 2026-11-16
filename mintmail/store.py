@@ -359,6 +359,38 @@ class Cache:
             self.db.execute("""CREATE TABLE IF NOT EXISTS ai (
                 msg_id TEXT, kind TEXT, data TEXT, ts REAL, PRIMARY KEY (msg_id, kind))""")
             self.db.commit()
+        self._init_fts()
+
+    # ------------------------------------------------------------ recherche plein texte
+    def _init_fts(self):
+        """Index de recherche (FTS5, découpage en trigrammes = recherche de fragments de mots, comme avant, mais sans parcourir toute la table).
+        Facultatif : si SQLite n'a pas FTS5 / trigram, `self.fts` reste faux et la recherche utilise LIKE comme auparavant."""
+        self.fts = False
+        with self.lock:
+            try:
+                fresh = self.db.execute("SELECT 1 FROM sqlite_master WHERE name='msg_fts'").fetchone() is None
+                if fresh:
+                    self.db.execute("CREATE VIRTUAL TABLE msg_fts USING fts5(search, tokenize='trigram')")
+                    self.db.execute("INSERT INTO msg_fts(rowid, search) SELECT rowid, search FROM messages")
+                    self.db.commit()
+                self.fts = True
+            except sqlite3.DatabaseError:
+                self.db.rollback()
+                try:
+                    self.db.execute("DROP TABLE IF EXISTS msg_fts")
+                    self.db.commit()
+                except sqlite3.DatabaseError:
+                    pass
+
+    def _fts_put(self, old_rowid, rowid, search):
+        if not self.fts:
+            return
+        try:
+            for rid in {r for r in (old_rowid, rowid) if r}:
+                self.db.execute("DELETE FROM msg_fts WHERE rowid=?", (rid,))
+            self.db.execute("INSERT INTO msg_fts(rowid, search) VALUES (?,?)", (rowid, search))
+        except sqlite3.DatabaseError:
+            self.fts = False                         # index inutilisable : retour à LIKE (aucune perte de résultats)
 
     # ------------------------------------------------------------ conversions
     @staticmethod
@@ -390,12 +422,14 @@ class Cache:
                                     (m.account, nsubj)).fetchone()
                 thread = r[0] if r else thread
             m.thread_id = thread
-            self.db.execute(
+            old = self.db.execute("SELECT rowid FROM messages WHERE id=?", (m.id,)).fetchone()
+            cur = self.db.execute(
                 "INSERT OR REPLACE INTO messages (id,account,folder,uid,date,unread,starred,pinned,snoozed,"
                 "has_att,category,sender,search,data,meta,thread,nsubj) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
                 (m.id, m.account, m.folder, m.uid, m.date, int(m.unread), int(m.starred),
                  int(m.pinned), m.snoozed_until, int(bool(m.attachments)), m.category,
                  sender, search, json.dumps(m.to_dict(), ensure_ascii=False), self._meta_of(m), thread, nsubj))
+            self._fts_put(old[0] if old else None, cur.lastrowid, search)
             if commit:
                 self.db.commit()
 
@@ -523,8 +557,12 @@ class Cache:
         if terms or flt:
             where.append("folder NOT IN ('trash','spam')")
             for t in terms:
-                where.append("search LIKE ?")
-                args.append("%" + t + "%")
+                if self.fts and len(t) >= 3:         # index : fragment de 3 lettres ou plus ; en dessous, LIKE (comportement inchangé)
+                    where.append("rowid IN (SELECT rowid FROM msg_fts WHERE msg_fts MATCH ?)")
+                    args.append('"' + t.replace('"', '""') + '"')
+                else:
+                    where.append("search LIKE ?")
+                    args.append("%" + t + "%")
             if "from" in flt:
                 where.append("sender LIKE ?")
                 args.append("%" + flt["from"] + "%")

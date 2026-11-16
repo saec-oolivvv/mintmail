@@ -19,7 +19,7 @@ from email.utils import formataddr, make_msgid, parsedate_to_datetime, parseaddr
 
 from .models import Message
 from .store import DATA_DIR, private_dir, write_private
-from . import ical, oauth
+from . import ical, oauth, pgp
 from .util import html_to_text, split_addresses, text_to_html, thread_key
 from .i18n import tr
 
@@ -150,8 +150,32 @@ def _safe(name):
     return re.sub(r"[^\w.\- ]", "_", name or "fichier")[:120] or "fichier"
 
 
+def _open_pgp(em, raw):
+    """(message à analyser, état PGP) : vérifie une signature PGP/MIME, déchiffre un message chiffré (gpg ; jamais d'échec bloquant)."""
+    kind = pgp.kind_of(em)
+    if not kind or not pgp.available():
+        return em, ""
+    try:
+        if kind == "signed":
+            return em, pgp.label(pgp.verify(raw), kind)
+        inner_raw, st = pgp.decrypt(raw)
+        if inner_raw is None:
+            return em, pgp.label(st, kind)
+        inner = email.message_from_bytes(inner_raw, policy=policy.default)
+        for k in set(em.keys()):
+            if not k.lower().startswith("content-") and k.lower() != "mime-version" and inner[k] is None:
+                for v in em.get_all(k):
+                    inner[k] = v
+        if pgp.kind_of(inner) == "signed":                                       # chiffré puis signé à part : on vérifie aussi
+            st["sig"] = pgp.verify(inner_raw)["sig"]
+        return inner, pgp.label(st, kind)
+    except Exception:
+        return em, ""
+
+
 def parse_message(raw, account, logical, real_folder, uid, flags):
     em = email.message_from_bytes(raw, policy=policy.default)
+    em, security = _open_pgp(em, raw)
     name, addr = parseaddr(str(em.get("From", "")))
     subject = str(em.get("Subject", "") or "") or "(Sans objet)"
     try:
@@ -170,6 +194,8 @@ def parse_message(raw, account, logical, real_folder, uid, flags):
         pass
     if not text_body and html_body:
         text_body = html_to_text(html_body)
+    if not text_body and not html_body and security.startswith("🔒"):
+        text_body = tr("Message chiffré avec OpenPGP : il n'a pas pu être déchiffré ici (clé secrète absente ou phrase secrète refusée).")
     mid = "%s|%s|%d" % (account, real_folder, uid)
     atts = []
     for part in em.walk():
@@ -219,7 +245,7 @@ def parse_message(raw, account, logical, real_folder, uid, flags):
         starred="\\flagged" in flags, pinned=PIN_KEYWORD_LOW in flags, category=classify(addr, em), attachments=atts,
         message_id=message_id, references=references, unsubscribe=str(em.get("List-Unsubscribe", "") or ""),
         unsub_post="one-click" in str(em.get("List-Unsubscribe-Post", "") or "").lower(),
-        thread_id=thread_key(message_id, references, subject), invite=invite)
+        thread_id=thread_key(message_id, references, subject), invite=invite, security=security)
 
 
 def build_imap_search(text):
@@ -877,9 +903,21 @@ class IMAPBackend:
         rcpt = split_addresses(out.to) + split_addresses(out.cc) + split_addresses(out.bcc)
         if not rcpt:
             raise BackendError(tr("Aucun destinataire valide."))
+        raw = None
+        if out.pgp_sign or out.pgp_encrypt:
+            try:
+                miss = pgp.public_key_missing(rcpt) if out.pgp_encrypt else []
+                if miss:
+                    raise pgp.PGPError(tr("Clé publique introuvable pour : %s") % ", ".join(miss))
+                raw = pgp.protect(em, out.pgp_sign, out.pgp_encrypt, from_email, rcpt)
+            except pgp.PGPError as e:
+                raise BackendError(tr("Envoi impossible : %s") % e)                     # rien n'est envoyé en clair par erreur
         try:
             s = self._smtp()
-            s.send_message(em, from_addr=from_email, to_addrs=rcpt)
+            if raw is not None:
+                s.sendmail(from_email, rcpt, raw)
+            else:
+                s.send_message(em, from_addr=from_email, to_addrs=rcpt)
             s.quit()
         except (smtplib.SMTPAuthenticationError, smtplib.SMTPRecipientsRefused, smtplib.SMTPSenderRefused, smtplib.SMTPDataError) as e:
             raise BackendError(tr("Envoi impossible : %s") % e)                       # refus définitif : inutile de réessayer
@@ -892,7 +930,7 @@ class IMAPBackend:
                 imap = self._connect()
                 sent = self._folders(imap).get("sent")
                 if sent:
-                    imap.append(_q(sent), "\\Seen", imaplib.Time2Internaldate(time.time()), em.as_bytes())
+                    imap.append(_q(sent), "\\Seen", imaplib.Time2Internaldate(time.time()), raw if raw is not None else em.as_bytes())
                 imap.logout()
             except Exception:
                 pass

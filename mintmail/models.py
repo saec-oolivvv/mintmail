@@ -30,6 +30,7 @@ class Message:
     unsub_post: bool = False      # List-Unsubscribe-Post : désabonnement en un clic (RFC 8058)
     thread_id: str = ""           # clé de conversation (racine des References)
     invite: dict = field(default_factory=dict)   # invitation iCalendar reçue
+    security: str = ""            # état PGP/MIME affiché dans le lecteur (« ✔ Signature valide », « 🔒 Chiffré »…) ; vide : message ordinaire
 
     light = False   # True : version allégée (sans corps) issue de la liste — jamais réécrite en base
 
@@ -63,6 +64,8 @@ class Outgoing:
     ics: str = ""                 # partie text/calendar (réponse à une invitation)
     ics_method: str = ""
     inline: list = field(default_factory=list)   # images en ligne [[cid, sous-type, base64]] (logos de signature…)
+    pgp_sign: bool = False        # signer en PGP/MIME (gpg)
+    pgp_encrypt: bool = False     # chiffrer en PGP/MIME (gpg) : une clé publique par destinataire est nécessaire
 
     def to_dict(self):
         return asdict(self)

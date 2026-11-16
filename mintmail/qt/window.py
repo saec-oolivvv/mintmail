@@ -1416,10 +1416,12 @@ class MainWindow(ExtrasMixin, OrganizerMixin, AIMixin, QMainWindow):
         h = vm.header_lines(msg)
         esc = lambda x: (x or "").replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
         dim = self.t["dim"]
+        sec = getattr(msg, "security", "")                                     # état PGP/MIME : vert si signature valide, rouge si invalide
+        sec_html = ("<div style='color:%s;margin-top:3px'><b>%s</b></div>" % ("#dc2626" if ("invalide" in sec.lower() or "invalid" in sec.lower()) else "#16a34a" if "✔" in sec else dim, esc(sec))) if sec else ""
         self.head.setText("<div style='font-size:19px;font-weight:%s'>%s</div>"
                           "<div style='margin-top:4px'><b>%s</b></div>"
-                          "<div style='color:%s;margin-top:2px'>%s &nbsp;·&nbsp; %s</div>"
-                          % (self.t["hw"], esc(h["subject"]) or "&nbsp;", esc(msg.display_sender), dim, esc(h["date"]), esc(msg.sender_email)))
+                          "<div style='color:%s;margin-top:2px'>%s &nbsp;·&nbsp; %s</div>%s"
+                          % (self.t["hw"], esc(h["subject"]) or "&nbsp;", esc(msg.display_sender), dim, esc(h["date"]), esc(msg.sender_email), sec_html))
         self.head.setToolTip("%s\n%s" % (h["from"], h["to"]))
         self.avatar.set_sender(msg.display_sender, msg.sender_email)
         from ..util import has_remote_content

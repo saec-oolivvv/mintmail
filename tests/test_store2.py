@@ -98,3 +98,21 @@ def test_outbox_claim_is_atomic_and_reschedules():
     assert c.outbox_list()[0][3] == 1                                                     # une tentative comptée
     c.outbox_remove("o1")
     assert c.outbox_count() == 0
+
+
+def test_full_text_index_matches_fragments_follows_updates_and_falls_back_to_like():
+    c = cache("fts1")
+    if not c.fts:
+        return                                                                            # SQLite sans FTS5/trigram : repli LIKE, rien à vérifier ici
+    c.upsert_many([msg(1, "Facture de décembre"), msg(2, "Rendez-vous client"), msg(3, "Autre", sender="marie@x.be", name="Marie")])
+    ids = lambda s: sorted(m.id for m in c.query("inbox", search=s))
+    assert ids("factur") == ["m1"] and ids("vous") == ["m2"] and ids("ous cli") == ["m2"]   # fragment de mot ; deux termes : les deux doivent figurer
+    assert ids("MARIE") == ["m3"] and ids("from:marie") == ["m3"] and ids("co") == ["m1", "m2", "m3"]   # 2 lettres : repli LIKE (« corps »)
+    m = msg(1, "Devis accepté")                                                           # le message change : l'index le suit (pas d'ancien résultat)
+    c.upsert(m)
+    assert ids("factur") == [] and ids("devis") == ["m1"]
+    c.db.execute("DROP TABLE msg_fts")
+    c.fts = False                                                                         # repli : mêmes résultats par LIKE
+    assert ids("devis") == ["m1"] and ids("vous") == ["m2"]
+    c2 = Cache(os.path.join(tmp, "fts1.db"))                                               # réouverture : l'index est reconstruit depuis les messages
+    assert c2.fts and sorted(x.id for x in c2.query("inbox", search="rendez")) == ["m2"]

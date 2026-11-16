@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.37.0
+- OpenPGP (PGP/MIME via gpg) : boutons Signer / Chiffrer à la rédaction ; signatures vérifiées et messages chiffrés déchiffrés à la réception, état affiché dans le lecteur.
+- Recherche : index plein texte SQLite (FTS5) pour les termes de 3 lettres et plus, repli automatique sinon.
+- Windows (expérimental, non essayé) : script de construction, installateur Inno Setup et workflow GitHub.
+
 ## 1.36.4
 - Mises à jour : retour arrière automatique si la nouvelle version ne s'importe pas après installation (anciens fichiers remis en place).
 - macOS : signature Apple Developer ID et notarisation facultatives (si les secrets GitHub existent), signature ad hoc sinon.

@@ -12,6 +12,7 @@ from PySide6.QtWidgets import (QComboBox, QCompleter, QDialog, QDialogButtonBox,
 
 from ..i18n import tr
 from ..util import human_size
+from .. import pgp
 from . import composing as C
 from . import sigimages as SI
 from . import ui_fetch as F
@@ -52,6 +53,15 @@ class ComposeWindow(QMainWindow):
         bar.addAction(tr("Joindre un fichier"), self._attach)
         bar.addAction(tr("Supprimer le brouillon"), self._discard)
         bar.addSeparator()
+        self.pgp_sign = self.pgp_encrypt = None
+        if pgp.available():                                        # gpg installé : signer / chiffrer en PGP/MIME (facultatif)
+            self.pgp_sign = bar.addAction(tr("🔏 Signer"))
+            self.pgp_sign.setCheckable(True)
+            self.pgp_sign.setToolTip(tr("Signer ce message avec votre clé OpenPGP (gpg)"))
+            self.pgp_encrypt = bar.addAction(tr("🔒 Chiffrer"))
+            self.pgp_encrypt.setCheckable(True)
+            self.pgp_encrypt.setToolTip(tr("Chiffrer ce message : il faut la clé publique de chaque destinataire"))
+            bar.addSeparator()
         self._fmt_action(bar, tr("Gras"), "Ctrl+B", self._bold)
         self._fmt_action(bar, tr("Italique"), "Ctrl+I", self._italic)
         self._fmt_action(bar, tr("Souligné"), "Ctrl+U", self._underline)
@@ -369,6 +379,8 @@ class ComposeWindow(QMainWindow):
         acc, ident = self._account_ident()
         out = C.build_outgoing(acc, ident, self.to.text(), self.cc.text(), self.bcc.text(), self.subject.text(), self._body(), self.attachments,
                                self.in_reply_to, self.references)
+        out.pgp_sign = bool(self.pgp_sign and self.pgp_sign.isChecked())
+        out.pgp_encrypt = bool(self.pgp_encrypt and self.pgp_encrypt.isChecked())
         self.sent = True
         if self.draft_id:
             self.engine.cache.delete(self.draft_id)
