@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.38.1
+- Correctif : le contrôle des traductions bloquait la publication à cause du libellé « IA » de la rédaction ; la rédaction réutilise désormais le libellé existant « ✨ IA ».
+
 ## 1.38.0
 - Rédaction refaite : carte d'en-tête (De, À avec liens Cc/Cci, Objet), barre de mise en forme à icônes vectorielles, éditeur en carte, pièces jointes en pastilles, barre d'envoi en bas (Ctrl+Entrée).
 - Réception instantanée : connexion IMAP IDLE par compte, relevé dès que le serveur annonce un message (réglage push=false pour couper).
