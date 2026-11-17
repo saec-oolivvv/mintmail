@@ -176,3 +176,22 @@ def quick_reply_outgoing(config, accounts, msg, text, default_account="") -> Out
     return Outgoing(account=acc["id"], to=(msg.reply_to or msg.sender_email), subject="Re: " + normalize_subject(msg.subject), html=body,
                     from_email=ident["email"] if ident else "", from_name=ident.get("name", "") if ident else "",
                     in_reply_to=msg.message_id, references=msg.references, inline=inline)
+
+
+def absence_outgoing(config, accounts, a, msg):
+    """Réponse d'absence à `msg` : envoyée par la boîte qui l'a reçu, de l'adresse à laquelle on a écrit (alias compris), avec la signature
+    de cette boîte ou de cet alias. `a` : réglage normalisé (absence.settings)."""
+    from .. import absence as AB
+    acc = next((x for x in accounts if x["id"] == msg.account), None)
+    if acc is None:
+        return None
+    to = ((msg.to or "") + " " + (msg.cc or "")).lower()
+    ident = addressed_identity(config, msg)
+    if ident is None and acc["email"].lower() not in to:
+        return None
+    sig = signature_html(acc, ident)
+    body = text_to_html(AB.body_of(a)) + ("<br><br>" + clean_for_send(sig) if sig else "")
+    body, inline = SI.to_mail(body)
+    return Outgoing(account=acc["id"], to=(msg.reply_to or msg.sender_email), subject="%s : %s" % (AB.subject_of(a), normalize_subject(msg.subject)),
+                    html=body, from_email=ident["email"] if ident else "", from_name=ident.get("name", "") if ident else "",
+                    in_reply_to=msg.message_id, references=msg.references, inline=inline, auto_reply=True)

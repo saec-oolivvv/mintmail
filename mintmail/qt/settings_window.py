@@ -23,6 +23,8 @@ from . import ui_sync as US
 from . import ui_groups as UG
 from . import ui_integrations as UI_INTEG
 from . import ui_shortcuts as USC
+from . import ui_absence as UAB
+from . import ui_import as UIM
 from .gestures import LAYOUTS
 from .. import __version__, updater
 
@@ -61,7 +63,8 @@ class SettingsDialog(QDialog):
             "p2p": US.p2p_tab(self),
             "groups": UG.groups_tab(self),
             "integrations": UI_INTEG.integrations_tab(self),
-            "shortcuts": USC.shortcuts_tab(self)}
+            "shortcuts": USC.shortcuts_tab(self),
+            "absence": UAB.absence_tab(self)}
         self.stack = self.tabs = QStackedWidget()          # « tabs » : ancien nom, conservé (currentIndex / setCurrentIndex)
         for page in pages.values():
             self.stack.addWidget(page)
@@ -72,7 +75,7 @@ class SettingsDialog(QDialog):
         self.nav.setFocusPolicy(Qt.NoFocus)
         dim = self.palette().color(QPalette.ColorRole.PlaceholderText)
         for caption, entries in ((tr("Messagerie"), (("accounts", tr("Comptes")), ("identities", tr("Identités d'envoi")), ("signatures", tr("Signatures")),
-                                                      ("templates", tr("Modèles de réponse")))),
+                                                      ("templates", tr("Modèles de réponse")), ("absence", tr("Absence")))),
                                  (tr("Boîte de réception"), (("groups", tr("Groupes")), ("filters", tr("Filtres & blocage")), ("gestures", tr("Gestes & disposition")),
                                                              ("contacts", tr("Contacts")), ("calendar", tr("Agenda")), ("integrations", tr("Intégrations")))),
                                  (tr("Application"), (("look", tr("Apparence")), ("shortcuts", tr("Raccourcis")), ("ai", "✨ IA"), ("p2p", tr("Synchronisation")),
@@ -117,6 +120,8 @@ class SettingsDialog(QDialog):
     def open_page(self, page):
         """Ouvre la page demandée (par l'assistant ou « réglages de l'IA ») : accounts, look, filters ou ai."""
         idx = {"accounts": 0, "look": 1, "appearance": 1, "filters": 2, "ai": 3, "updates": 4, "gestures": 5, "layout": 5, "sig": 6, "signatures": 6, "identities": 7, "templates": 8, "contacts": 9, "calendar": 10, "agenda": 10, "p2p": 11, "sync": 11}.get(page)
+        if page in ("absence", "vacation", "vacances"):
+            idx = self._order.index("absence")
         if idx is not None:
             self._goto(idx)
 
@@ -133,6 +138,9 @@ class SettingsDialog(QDialog):
         c.add(self.acc_list)
         row = QHBoxLayout()
         row.addWidget(add)
+        imp = QPushButton(tr("⇩ Importer depuis un autre logiciel…"))
+        imp.clicked.connect(lambda: UIM.ImportDialog(self).exec())
+        row.addWidget(imp)
         row.addStretch(1)
         c.addLayout(row)
 

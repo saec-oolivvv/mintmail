@@ -247,7 +247,14 @@ def parse_message(raw, account, logical, real_folder, uid, flags):
         receipt_for=receipt_for, receipt_request=receipts.requested_address(em),
         message_id=message_id, references=references, unsubscribe=str(em.get("List-Unsubscribe", "") or ""),
         unsub_post="one-click" in str(em.get("List-Unsubscribe-Post", "") or "").lower(),
-        thread_id=thread_key(message_id, references, subject), invite=invite, security=security)
+        thread_id=thread_key(message_id, references, subject), invite=invite, security=security, auto=_is_auto(em))
+
+
+def _is_auto(em) -> bool:
+    """Message émis par une machine (réponse automatique, liste, courrier en masse) : MintMail n'y répond jamais automatiquement."""
+    sub = str(em.get("Auto-Submitted", "") or "").strip().lower()
+    return bool((sub and sub != "no") or str(em.get("Precedence", "") or "").strip().lower() in ("bulk", "junk", "list", "auto_reply")
+                or em.get("List-Id") or em.get("X-Auto-Response-Suppress"))
 
 
 def build_imap_search(text):
@@ -919,6 +926,8 @@ class IMAPBackend:
             em["Cc"] = out.cc
         em["Date"] = formatdate(localtime=True)
         em["Message-ID"] = make_msgid(domain=from_email.split("@")[-1])
+        if getattr(out, "auto_reply", False):
+            em["Auto-Submitted"], em["Precedence"], em["X-Auto-Response-Suppress"] = "auto-replied", "bulk", "All"
         if getattr(out, "request_receipt", False):
             em["Disposition-Notification-To"] = from_email                  # demande d'accusé de lecture (RFC 8098)
         if out.in_reply_to:

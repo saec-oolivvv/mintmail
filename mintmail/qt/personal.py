@@ -131,6 +131,14 @@ def import_vcf(config, cache, text: str) -> int:
     return sum(1 for c in found if contact_save(config, cache, c["email"], c["name"], c["phone"], c["org"], c["notes"]))
 
 
+def import_contacts(config, cache, text: str) -> int:
+    """Contacts d'un fichier vCard (.vcf) ou CSV (Outlook, Google Contacts, Spark, Apple) : le format est reconnu au contenu."""
+    if "BEGIN:VCARD" in (text or "")[:5000].upper():
+        return import_vcf(config, cache, text)
+    from .. import importer
+    return sum(1 for c in importer.parse_contacts_csv(text) if contact_save(config, cache, c["email"], c["name"]))
+
+
 def export_vcf(cache) -> str:
     return vcf.to_vcf(cache.contacts_list(source="manual", limit=5000))
 

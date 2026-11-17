@@ -296,6 +296,35 @@ class Engine(OfflineMixin):
                     self.folder_unread[(a["id"], name)], changed = unseen, True
         return changed
 
+    def run_absence(self, limit=40):
+        """Réponses d'absence : pour chaque message reçu pendant l'absence sur une boîte concernée, une seule réponse par expéditeur.
+        Retourne le nombre de réponses envoyées ; un échec d'envoi n'est pas noté (nouvel essai à la synchronisation suivante)."""
+        from .. import absence as AB
+        from . import composing as C
+        a = AB.settings(self.config)
+        if AB.state(a) != "active":
+            return 0
+        log = AB.prune(self.config.get("absence_log"), a)
+        sent = 0
+        accounts = self.accounts()
+        for acc in AB.targets(a, accounts):
+            own = AB.own_addresses(self.config, acc)
+            for msg in self.cache.query("inbox", acc["id"], limit=200):
+                if sent >= limit or not AB.should_reply(a, msg, own, self.config, log):
+                    continue
+                out = C.absence_outgoing(self.config, accounts, a, msg)
+                if out is None:
+                    continue
+                try:
+                    self.backend(acc["id"]).send(out)
+                except Exception:                                   # hors ligne, refus : on réessaiera
+                    continue
+                log[AB.log_key(msg)] = time.time()                 # noté tout de suite : jamais deux réponses au même expéditeur
+                sent += 1
+        self.config["absence_log"] = log
+        self.config.save()
+        return sent
+
     def sync_changed_folders(self, budget=8):
         """Tous les dossiers de toutes les boîtes (Archive, Spam, Corbeille, vos dossiers…) : interroge l'état de chacun (STATUS, léger) ; un dossier jamais lu
         ou dont l'état a changé (tri fait sur un autre poste) est relu en entier — messages récents et TOUS les non lus ; ceux partis ailleurs disparaissent d'ici.

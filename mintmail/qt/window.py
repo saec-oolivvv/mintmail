@@ -2045,6 +2045,7 @@ class MainWindow(ExtrasMixin, OrganizerMixin, AIMixin, QMainWindow):
         self._synced_once = True
         self.check_followups()
         self.after_sync_pins()                               # mémorise si le serveur garde les épingles ; envoie une fois les épingles locales
+        self.absence_after_sync()
         self.ai_after_sync()                                 # pastilles des dossiers de rangement (non lus annoncés par le serveur)
 
 

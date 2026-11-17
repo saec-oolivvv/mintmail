@@ -191,6 +191,14 @@
      "• Sorting: new messages get a priority (colored bar, “Important” badge) and suspicious ones are flagged “Suspicious”. Each feature has its own switch in the AI settings."
     ],
     [
+     "Out of office and vacation",
+     "Settings → Mail → Away: choose the type (out of office or vacation), the period (dates or number of days), tick the mailbox(es) concerned (all by default), check the suggested message (variables {debut} {fin} {retour} {jours}) then turn it on.\n• Each reply is sent from the mailbox that received the message, with ITS signature (the alias's if you were written to on an alias).\n• One reply per sender and per absence; never to newsletters, notifications, mailing lists, robots or blocked senders; option “only my contacts”.\n• MintMail must stay open: replies go out at the next sync. The absence ends by itself the day after the end date."
+    ],
+    [
+     "Import your mailboxes from another app",
+     "Settings → Accounts → “Import from another mail app…”.\n• Thunderbird and Evolution: MintMail finds your mailboxes on this computer (read-only), with name, signature and aliases.\n• Outlook, Spark, Apple Mail, Gmail, others: paste your e-mail addresses, MintMail finds the servers (Gmail and Outlook sign in with “Sign in”).\n• Passwords are never imported (each app encrypts them): enter them afterwards in each account.\n• Contacts: “Import contacts (CSV / vCard)” accepts exports from Outlook, Google Contacts, Spark and Apple."
+    ],
+    [
      "Message translation",
      "When a message is written in a language other than yours, a bar offers “Translate to …” (can be turned off: Settings → Appearance → Language). When replying to a foreign message, the ✨ menu in the composer offers “Translate my text to …” in the sender's language. The language is detected locally; the text is only sent to the AI when you ask (set up the AI in Settings → AI)."
     ],

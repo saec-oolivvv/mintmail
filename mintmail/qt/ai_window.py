@@ -66,6 +66,19 @@ class AIMixin:
             self.digest_lbl.setText(local + (tr("  (IA : %s)") % str(err)[:60]) if err else text)
         self.run_bg(lambda: AW.digest_ai(self.engine, acc, force), done)
 
+    # ------------------------------------------------------------ absence du bureau / vacances
+    def absence_after_sync(self):
+        from .. import absence as AB
+        if AB.state(AB.settings(self.config)) != "active" or getattr(self, "_absence_busy", False):
+            return
+        self._absence_busy = True
+
+        def done(n, err):
+            self._absence_busy = False
+            if n and not err:
+                self.status.setText(tr("🌴 %d réponse(s) d'absence envoyée(s)") % n)
+        self.run_bg(lambda: self.engine.run_absence(), done)
+
     # ------------------------------------------------------------ tri automatique après chaque synchronisation
     def ai_after_sync(self):
         if not AW.enabled(self.engine) or getattr(self, "_triaging", False):

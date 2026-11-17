@@ -1,4 +1,4 @@
-# Aide de MintMail 1.44.3
+# Aide de MintMail 1.45.0
 _Généré par `make docs` depuis l'aide intégrée (touche F1 dans l'application)._
 
 ## Premiers pas
@@ -276,6 +276,21 @@ Quand vous rangez des messages à la main dans un dossier, MintMail retient « e
 
 • Tri : les nouveaux messages reçoivent une priorité (barre colorée, pastille « Important ») et les suspects sont signalés « Suspect ». Chaque fonction a son interrupteur dans les réglages de l'IA.
 
+### Absence du bureau et vacances
+
+Paramètres → Messagerie → Absence : choisissez le type (absence du bureau ou vacances), la période (dates ou nombre de jours), cochez la ou les boîtes mail concernées (par défaut toutes), vérifiez le message proposé (variables {debut} {fin} {retour} {jours}) puis activez.  
+• Chaque réponse part de la boîte qui a reçu le message, avec SA signature (celle de l'alias si on vous a écrit sur un alias).  
+• Une seule réponse par expéditeur et par absence ; jamais aux newsletters, notifications, listes de diffusion, robots ni expéditeurs bloqués ; option « seulement mes contacts ».  
+• MintMail doit rester ouvert : les réponses partent à la synchronisation suivante. L'absence s'arrête seule le lendemain de la date de fin.
+
+### Importer ses boîtes depuis un autre logiciel
+
+Paramètres → Comptes → « Importer depuis un autre logiciel… ».  
+• Thunderbird et Evolution : MintMail retrouve vos boîtes sur cet ordinateur (lecture seule), avec nom, signature et alias.  
+• Outlook, Spark, Apple Mail, Gmail, autres : collez vos adresses e-mail, MintMail retrouve les serveurs (Gmail et Outlook se connectent par « Se connecter »).  
+• Les mots de passe ne sont jamais importés (chaque logiciel les chiffre) : saisissez-les ensuite dans chaque compte.  
+• Contacts : « Importer des contacts (CSV / vCard) » accepte les exports d'Outlook, Google Contacts, Spark et Apple.
+
 ### Traduction des messages
 
 Quand un message est écrit dans une autre langue que la vôtre, un bandeau propose « Traduire en … » (désactivable : Paramètres → Apparence → Langue). Dans la rédaction, en répondant à un message étranger, le menu ✨ propose « Traduire mon texte en … » dans la langue de l'expéditeur. La langue est reconnue localement ; le texte n'est envoyé à l'IA qu'à votre demande (IA à configurer dans Paramètres → IA).
@@ -528,7 +543,7 @@ Mise à jour : sudo apt install ./mintmail_X.Y.Z_all.deb (vos réglages et votre
 
 ## À propos et crédits
 
-### MintMail 1.44.3
+### MintMail 1.45.0
 
 Le client mail pour Linux Mint dont l'IA est l'ADN : il lit, trie, résume, classe, rédige et agit avec vous — toujours avec votre accord.  
 Développé par SAEC — https://saec.me · Logiciel libre sous licence MIT (© 2026 SAEC) : vous pouvez l'utiliser, le modifier et le redistribuer. Application Qt (PySide6) / Python, sans service cloud imposé : vos mails, vos clés et vos réglages restent chez vous.

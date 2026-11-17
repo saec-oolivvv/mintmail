@@ -256,6 +256,18 @@ SECTIONS: List[Dict] = [
          "il suggère ce dossier (« selon vos habitudes ») ; à la 3e, il propose de créer une règle automatique. Paramètres → IA → « Oublier mes habitudes de rangement » efface tout."),
         ("Tri automatique",
          "• Tri : les nouveaux messages reçoivent une priorité (barre colorée, pastille « Important ») et les suspects sont signalés « Suspect ». Chaque fonction a son interrupteur dans les réglages de l'IA."),
+        ("Absence du bureau et vacances",
+         "Paramètres → Messagerie → Absence : choisissez le type (absence du bureau ou vacances), la période (dates ou nombre de jours), cochez la ou les boîtes mail concernées "
+         "(par défaut toutes), vérifiez le message proposé (variables {debut} {fin} {retour} {jours}) puis activez.\n"
+         "• Chaque réponse part de la boîte qui a reçu le message, avec SA signature (celle de l'alias si on vous a écrit sur un alias).\n"
+         "• Une seule réponse par expéditeur et par absence ; jamais aux newsletters, notifications, listes de diffusion, robots ni expéditeurs bloqués ; option « seulement mes contacts ».\n"
+         "• MintMail doit rester ouvert : les réponses partent à la synchronisation suivante. L'absence s'arrête seule le lendemain de la date de fin."),
+        ("Importer ses boîtes depuis un autre logiciel",
+         "Paramètres → Comptes → « Importer depuis un autre logiciel… ».\n"
+         "• Thunderbird et Evolution : MintMail retrouve vos boîtes sur cet ordinateur (lecture seule), avec nom, signature et alias.\n"
+         "• Outlook, Spark, Apple Mail, Gmail, autres : collez vos adresses e-mail, MintMail retrouve les serveurs (Gmail et Outlook se connectent par « Se connecter »).\n"
+         "• Les mots de passe ne sont jamais importés (chaque logiciel les chiffre) : saisissez-les ensuite dans chaque compte.\n"
+         "• Contacts : « Importer des contacts (CSV / vCard) » accepte les exports d'Outlook, Google Contacts, Spark et Apple."),
         ('Traduction des messages',
          "Quand un message est écrit dans une autre langue que la vôtre, un bandeau propose « Traduire en … » (désactivable : Paramètres → Apparence → Langue). Dans la rédaction, en répondant à un message étranger, le menu ✨ propose « Traduire mon texte en … » dans la langue de l'expéditeur. La langue est reconnue localement ; le texte n'est envoyé à l'IA qu'à votre demande (IA à configurer dans Paramètres → IA)."),
         ("Traduction, questions, agenda",

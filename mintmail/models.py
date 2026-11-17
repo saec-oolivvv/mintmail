@@ -32,6 +32,7 @@ class Message:
     invite: dict = field(default_factory=dict)   # invitation iCalendar reçue
     receipt_request: str = ""     # adresse à qui l'expéditeur demande un accusé de lecture (Disposition-Notification-To, RFC 8098)
     receipt_for: str = ""         # message-id du message d'origine quand CE message est un accusé de lecture reçu
+    auto: bool = False            # message automatique (Auto-Submitted, Precedence: bulk, liste) : jamais de réponse d'absence
     security: str = ""            # état PGP/MIME affiché dans le lecteur (« ✔ Signature valide », « 🔒 Chiffré »…) ; vide : message ordinaire
 
     light = False   # True : version allégée (sans corps) issue de la liste — jamais réécrite en base
@@ -68,6 +69,7 @@ class Outgoing:
     inline: list = field(default_factory=list)   # images en ligne [[cid, sous-type, base64]] (logos de signature…)
     request_receipt: bool = False   # demander un accusé de lecture (Disposition-Notification-To)
     pgp_sign: bool = False        # signer en PGP/MIME (gpg)
+    auto_reply: bool = False      # réponse automatique d'absence : en-têtes Auto-Submitted / Precedence (pas de boucle entre robots)
     pgp_encrypt: bool = False     # chiffrer en PGP/MIME (gpg) : une clé publique par destinataire est nécessaire
 
     def to_dict(self):

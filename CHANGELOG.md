@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.45.0
+- Absence du bureau / vacances (Paramètres → Messagerie → Absence) : type, période (dates ou nombre de jours), une ou plusieurs boîtes mail, message modifiable ({debut} {fin} {retour} {jours}). Chaque réponse part de la boîte qui a reçu le message avec SA signature (ou celle de l'alias), une seule fois par expéditeur, jamais aux newsletters, notifications, listes, robots ni bloqués ; option « seulement mes contacts ». MintMail doit rester ouvert pour répondre.
+- Import depuis un autre logiciel (Paramètres → Comptes) : boîtes de Thunderbird et Evolution lues sur l'ordinateur (nom, signature, alias), ou adresses collées pour Outlook, Spark, Apple Mail, Gmail… (serveurs retrouvés). Les mots de passe ne sont jamais importés. Les contacts s'importent aussi depuis un CSV (Outlook, Google, Spark, Apple) ou une vCard.
+
 ## 1.44.3
 - Réglages de l'IA : l'interrupteur « Résumé En bref » (devenu sans objet) est retiré, ainsi que sa mention dans l'aide.
 

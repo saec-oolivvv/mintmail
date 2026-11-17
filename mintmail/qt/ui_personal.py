@@ -282,12 +282,12 @@ def contacts_tab(dlg):
             refresh()
 
     def do_import():
-        path, _ = QFileDialog.getOpenFileName(page, tr("Importer des contacts (vCard)"), "", "vCard (*.vcf)")
+        path, _ = QFileDialog.getOpenFileName(page, tr("Importer des contacts (vCard ou CSV)"), "", "Contacts (*.vcf *.csv)")
         if not path:
             return
         try:
             with open(path, encoding="utf-8", errors="replace") as fh:
-                n = P.import_vcf(cfg, cache, fh.read())
+                n = P.import_contacts(cfg, cache, fh.read())
             status.setText(tr("%d contact(s) importé(s).") % n)
         except OSError as e:
             status.setText(tr("Lecture impossible : %s") % e)
