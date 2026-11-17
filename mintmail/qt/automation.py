@@ -161,11 +161,11 @@ def apply_rules_now(engine):
     return len(keep), apply_moves(engine, plan)
 
 
-def sync_and_route(engine, folders=("inbox", "sent")):
+def sync_and_route(engine, folders=("inbox", "sent"), only=None):
     """Synchronise puis applique blocages, listes et règles aux seuls NOUVEAUX messages de la boîte (comme la version GTK).
     Retourne (nouveaux non lus restants, erreurs, groupes déplacés terminés)."""
     before = {m.id for m in engine.cache.query("inbox", "all")}
-    fresh, errors = engine.sync(folders=folders)
+    fresh, errors = engine.sync(folders=folders, only=only)
     new = [m for m in engine.cache.query("inbox", "all") if m.id not in before]
     keep, plan = route(engine, new)
     done = []

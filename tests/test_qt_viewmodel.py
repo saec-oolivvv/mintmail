@@ -1129,7 +1129,7 @@ def test_push_threads_call_back_on_server_news_and_stop_cleanly():
         on_change()                                   # le serveur annonce un nouveau message
         stop.wait(5)
     be.watch = watch
-    eng.start_push(got.set)
+    eng.start_push(lambda aid: got.set())
     assert got.wait(3) and started
     eng.stop_push()
     for t in eng._push_threads:

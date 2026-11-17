@@ -798,19 +798,23 @@ class IMAPBackend:
             self._run("act", fn)
 
     # ------------------------------------------------------------ push (IMAP IDLE)
-    def watch(self, on_change, stop):
-        """Boucle IDLE sur la boîte de réception : on_change() à l'arrivée, au départ ou au changement d'un message (y compris les drapeaux posés depuis un autre poste). Bloquant (thread dédié)."""
+    def watch(self, on_change, stop, on_state=None):
+        """Boucle IDLE sur la boîte de réception : on_change() à l'arrivée, au départ ou au changement d'un message (y compris les drapeaux posés depuis un autre poste). Bloquant (thread dédié).
+        on_state("ok" | "message d'erreur") : suivi de l'état de la connexion."""
+        state = on_state or (lambda s: None)
         backoff = 5
         while not stop.is_set():
             imap = None
             try:
                 imap = self._connect()
                 imap.select("INBOX", readonly=True)
+                state("ok")
                 backoff = 5
                 while not stop.is_set():
                     if self._idle_once(imap, stop):
                         on_change()
-            except Exception:
+            except Exception as e:
+                state("%s" % str(e)[:80])
                 if stop.wait(backoff):
                     break
                 backoff = min(backoff * 2, 300)
@@ -1078,7 +1082,9 @@ class DemoBackend:
     def delete_many(self, msgs):
         pass
 
-    def watch(self, on_change, stop):
+    def watch(self, on_change, stop, on_state=None):
+        if on_state:
+            on_state("ok")
         stop.wait()
 
     def close(self):

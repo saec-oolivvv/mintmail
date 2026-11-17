@@ -16,6 +16,7 @@ from ..i18n import tr
 from ..store import Cache, Config
 from .. import updater
 from . import ui_icons as UI
+from .. import suspect as SU
 from . import assistant as AS
 from . import automation as AU
 from . import composing as C
@@ -125,7 +126,7 @@ class _Bridge(QObject):
     done = Signal(object)          # résultat d'une tâche de fond, remis dans le fil de l'interface
     progress = Signal(object)      # avancement d'une mise à jour (version, texte, fraction)
     p2p = Signal()                 # éléments reçus d'un autre poste à appliquer dans le fil de l'interface
-    newmail = Signal()             # le serveur annonce du nouveau (IMAP IDLE) : relever tout de suite
+    newmail = Signal(str)          # le serveur annonce du nouveau pour ce compte (IMAP IDLE) : relever tout de suite
 
 
 class MainWindow(ExtrasMixin, OrganizerMixin, AIMixin, QMainWindow):
@@ -386,6 +387,29 @@ class MainWindow(ExtrasMixin, OrganizerMixin, AIMixin, QMainWindow):
         ib.addWidget(self.images_btn)
         ib.addStretch(1)
         rl.addLayout(ib)
+        self.suspect_bar = QFrame()                          # « Ce message semble suspect : le mettre en spam ? »
+        self.suspect_bar.setObjectName("suspectbar")
+        self.suspect_bar.setStyleSheet("#suspectbar { background: rgba(220,38,38,0.10); border: 1px solid rgba(220,38,38,0.45); border-radius: 10px; }"
+                                       "#suspectbar QLabel { color: #dc2626; font-weight: 600; }")
+        sbl = QHBoxLayout(self.suspect_bar)
+        sbl.setContentsMargins(14, 8, 10, 8)
+        sbl.setSpacing(8)
+        self.suspect_label = QLabel()
+        self.suspect_label.setWordWrap(True)
+        sbl.addWidget(self.suspect_label, 1)
+        self.suspect_spam = QPushButton(tr("Mettre en spam"))
+        self.suspect_spam.setObjectName("primary")
+        self.suspect_ok = QPushButton(tr("Je lui fais confiance"))
+        self.suspect_ok.setObjectName("flat")
+        self.suspect_spam.clicked.connect(self._suspect_to_spam)
+        self.suspect_ok.clicked.connect(self._suspect_trust)
+        sbl.addWidget(self.suspect_spam)
+        sbl.addWidget(self.suspect_ok)
+        self.suspect_bar.hide()
+        sw = QHBoxLayout()
+        sw.setContentsMargins(22, 8, 22, 0)
+        sw.addWidget(self.suspect_bar)
+        rl.addLayout(sw)
         self.extras = MessageExtras()
         self._wire_extras()
         rl.addWidget(self.extras)
@@ -486,9 +510,10 @@ class MainWindow(ExtrasMixin, OrganizerMixin, AIMixin, QMainWindow):
         self._act(None, "", "Ctrl+B", self.toggle_rail)
         self.bridge.p2p.connect(self._p2p_run)
         self._push_pending = False
+        self._push_accounts = set()
         self._push_timer = QTimer(self)
         self._push_timer.setSingleShot(True)
-        self._push_timer.timeout.connect(lambda: self.sync(quiet=True))
+        self._push_timer.timeout.connect(self._push_run)
         self.bridge.newmail.connect(self._on_push)
         if self.config.get("push") is not False:
             self.engine.start_push(self.bridge.newmail.emit)             # réception instantanée : plus d'attente du relevé périodique
@@ -1409,15 +1434,31 @@ class MainWindow(ExtrasMixin, OrganizerMixin, AIMixin, QMainWindow):
     def _refresh_folders(self):
         self._background(self.engine.refresh_folders, "folders")
 
-    def _on_push(self):
-        """Le serveur a signalé un changement : relevé dans la seconde (regroupe les rafales ; reporté si une synchro est déjà en cours)."""
+    def _on_push(self, aid):
+        """Le serveur a signalé un changement sur ce compte : relevé RAPIDE de sa boîte de réception (regroupe les rafales ; reporté si une synchro est en cours)."""
+        self._push_accounts.add(aid)
+        self.refresh_btn.setToolTip(tr("Relever le courrier maintenant") + "  (Ctrl+R)\n" + self.engine.push_summary())
         if self._busy:
             self._push_pending = True
-        else:
-            self._push_timer.start(800)
+        elif not self._push_timer.isActive():
+            self._push_timer.start(150)
+
+    def _push_run(self):
+        """Relevé rapide : seulement la boîte de réception des comptes annoncés (règles et blocages appliqués), sans attendre la synchronisation complète."""
+        aids = sorted(self._push_accounts)
+        self._push_accounts = set()
+        if not aids:
+            return
+        if self._busy:
+            self._push_accounts |= set(aids)
+            self._push_pending = True
+            return
+        self._busy = True
+        self._background(lambda: (None, AU.sync_and_route(self.engine, ("inbox",), only=aids), self.engine.refresh_folder_counts()), "sync")
 
     def _on_timer(self):
         self._tick += 1
+        self.refresh_btn.setToolTip(tr("Relever le courrier maintenant") + "  (Ctrl+R)\n" + self.engine.push_summary())
         self.sync(quiet=True)
         if self._tick % 5 == 0:
             self._refresh_folders()
@@ -1434,6 +1475,7 @@ class MainWindow(ExtrasMixin, OrganizerMixin, AIMixin, QMainWindow):
             self.head.setText("")
             self.avatar.set_sender("", "")
             self.images_btn.hide()
+            self.suspect_bar.hide()
             self.extras.clear()
             self.ai_card.idle()
             self.quick.hide()
@@ -1447,16 +1489,26 @@ class MainWindow(ExtrasMixin, OrganizerMixin, AIMixin, QMainWindow):
         dim = self.t["dim"]
         sec = getattr(msg, "security", "")                                     # état PGP/MIME : vert si signature valide, rouge si invalide
         sec_html = ("<div style='color:%s;margin-top:3px'><b>%s</b></div>" % ("#dc2626" if ("invalide" in sec.lower() or "invalid" in sec.lower()) else "#16a34a" if "✔" in sec else dim, esc(sec))) if sec else ""
+        rc = vm.recipients_text(msg, self.engine.accounts())
+        rc_html = ""
+        for label, val in ((tr("À"), rc["to"]), (tr("Copie"), rc["cc"])):
+            if val:
+                rc_html += "<div style='color:%s;margin-top:2px'>%s : %s</div>" % (dim, esc(label), esc(val))
+        if rc["box"] and rc["box"].lower() not in (rc["to"] + " " + rc["cc"]).lower():       # reçu via un alias, une liste ou en copie cachée : on dit quelle boîte l'a reçu
+            rc_html += "<div style='color:%s;margin-top:2px'>%s : %s</div>" % (dim, esc(tr("Reçu sur")), esc(rc["box"]))
+        elif rc["box"] and not rc_html:
+            rc_html = "<div style='color:%s;margin-top:2px'>%s : %s</div>" % (dim, esc(tr("Reçu sur")), esc(rc["box"]))
         self.head.setText("<div style='font-size:19px;font-weight:%s'>%s</div>"
                           "<div style='margin-top:4px'><b>%s</b></div>"
                           "<div style='color:%s;margin-top:2px'>%s &nbsp;·&nbsp; %s</div>%s"
-                          % (self.t["hw"], esc(h["subject"]) or "&nbsp;", esc(msg.display_sender), dim, esc(h["date"]), esc(msg.sender_email), sec_html))
+                          % (self.t["hw"], esc(h["subject"]) or "&nbsp;", esc(msg.display_sender), dim, esc(h["date"]), esc(msg.sender_email), rc_html + sec_html))
         self.head.setToolTip("%s\n%s" % (h["from"], h["to"]))
         self.avatar.set_sender(msg.display_sender, msg.sender_email)
         from ..util import has_remote_content
         load = self.load_images or IT.trusted(self.config, msg.sender_email)        # expéditeur de confiance : images chargées d'office
         self.images_btn.setVisible(bool(msg.html) and has_remote_content(msg.html) and not load)
         self._fill_images_menu(msg)
+        self._suspect_check(msg)
         self.reader.show_html(vm.render_html(msg, load, self.is_dark()))
         self.apply_zoom()
         self.fill_extras(msg)
@@ -1464,6 +1516,33 @@ class MainWindow(ExtrasMixin, OrganizerMixin, AIMixin, QMainWindow):
         self.quick.set_ai(AS.ai_engine(self.engine).enabled())
         if msg.folder != "drafts":
             self.ai_open(msg)
+
+    def _suspect_check(self, msg):
+        """Message de la boîte de réception qui ressemble à de l'hameçonnage : on demande s'il faut le mettre en spam (jamais d'action automatique)."""
+        why = []
+        try:
+            if msg.folder == "inbox":
+                cache = self.engine.cache
+                known = any(c.get("source") == "manual" for c in cache.contacts_list((msg.sender_email or "").lower(), limit=5)
+                            if (c.get("email") or "").lower() == (msg.sender_email or "").lower())
+                why = SU.should_ask(msg, cache.ai_get(msg.id, "analysis"), bool(cache.ai_get(msg.id, "suspect_ok")), known)
+        except Exception:
+            why = []
+        if why:
+            self.suspect_label.setText(tr("⚠ Ce message semble suspect : %s. Voulez-vous le mettre en spam ?") % "; ".join(why))
+        self.suspect_bar.setVisible(bool(why))
+
+    def _suspect_to_spam(self):
+        msg = getattr(self, "shown", None)
+        self.suspect_bar.hide()
+        if msg is not None:
+            self.move_messages([msg], "spam")
+
+    def _suspect_trust(self):
+        msg = getattr(self, "shown", None)
+        self.suspect_bar.hide()
+        if msg is not None:
+            self.engine.cache.ai_set(msg.id, "suspect_ok", {"ok": True})
 
     def _fill_images_menu(self, msg):
         m = self.images_menu
@@ -1547,7 +1626,7 @@ class MainWindow(ExtrasMixin, OrganizerMixin, AIMixin, QMainWindow):
         self._busy = False
         if self._push_pending:
             self._push_pending = False
-            self._push_timer.start(300)
+            self._push_timer.start(100)
         errors = [str(err)] if err else list(res[1][1])
         offline = bool(res and res[0] and res[0][2])
         fresh = 0 if err else int(res[1][0] or 0)

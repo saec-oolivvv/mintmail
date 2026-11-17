@@ -91,6 +91,22 @@ def header_lines(msg) -> Dict[str, str]:
             "to": msg.to, "subject": msg.subject, "date": time.strftime("%d/%m/%Y %H:%M", time.localtime(msg.date)) if msg.date else ""}
 
 
+def recipients_text(msg, accounts) -> Dict[str, str]:
+    """Destinataires affichés dans le lecteur : « À », « Cc » et la boîte (adresse du compte) qui a reçu le message."""
+    from email.utils import getaddresses
+    def fmt(h):
+        out = []
+        for name, addr in getaddresses([h or ""]):
+            if addr:
+                out.append("%s <%s>" % (name, addr) if name and name.lower() != addr.lower() else addr)
+        return ", ".join(out)
+    box = ""
+    for a in accounts or []:
+        if a.get("id") == msg.account:
+            box = a.get("email", "") or ""
+    return {"to": fmt(msg.to), "cc": fmt(getattr(msg, "cc", "")), "box": box}
+
+
 SPECIAL = {"INBOX": "inbox", "Drafts": "drafts", "Sent": "sent", "Archive": "archive", "Spam": "spam", "Trash": "trash"}
 LOGICAL = {"inbox", "sent", "drafts", "archive", "spam", "trash"}
 
@@ -132,22 +148,36 @@ class Engine(OfflineMixin):
         self._push_stop = threading.Event()
         self._push_threads = []
 
+        self.push_state = {}
+
         def run(aid):
             stop = self._push_stop
+            state = lambda s: self.push_state.__setitem__(aid, s)
             while not stop.is_set():
                 try:
                     be = self.backend(aid)
                     if getattr(be, "demo", False) or not hasattr(be, "watch"):
                         return
-                    be.watch(on_change, stop)
-                except Exception:
-                    pass
+                    try:
+                        be.watch(lambda: on_change(aid), stop, state)
+                    except TypeError:                                # moteur sans suivi d'état (démonstration, tests)
+                        be.watch(lambda: on_change(aid), stop)
+                except Exception as e:
+                    state("erreur : %s" % str(e)[:80])
                 stop.wait(30)                                        # mot de passe absent, réseau coupé… : on réessaie plus tard
         for acc in self.accounts():
             if not acc.get("demo"):
                 t = threading.Thread(target=run, args=(acc["id"],), daemon=True)
                 t.start()
                 self._push_threads.append(t)
+
+    def push_summary(self):
+        """Texte d'état de la réception instantanée, par compte (info-bulle du bouton de relevé)."""
+        names = {a["id"]: a.get("name") or a["email"] for a in self.accounts()}
+        st = getattr(self, "push_state", {})
+        if not st:
+            return tr("Réception instantanée : inactive")
+        return tr("Réception instantanée :") + "\n" + "\n".join("%s %s" % ("✔" if v == "ok" else "✖", names.get(k, k) + ("" if v == "ok" else " — " + v)) for k, v in sorted(st.items()))
 
     def stop_push(self):
         ev = getattr(self, "_push_stop", None)
@@ -174,10 +204,13 @@ class Engine(OfflineMixin):
         """Rejoue les actions en attente. Retourne (réussies, erreurs, hors_ligne)."""
         return self.op_run(self.cache.ops_pending()) if self.cache.ops_count() else ([], [], False)
 
-    def sync(self, folders=("inbox", "sent"), limit=60):
-        """Nouveaux messages, drapeaux et suppressions du serveur. Retourne (nombre de nouveaux messages non lus, erreurs)."""
+    def sync(self, folders=("inbox", "sent"), limit=60, only=None):
+        """Nouveaux messages, drapeaux et suppressions du serveur. Retourne (nombre de nouveaux messages non lus, erreurs).
+        only : identifiants de comptes à relever (relevé rapide déclenché par le serveur) ; None : tous."""
         fresh, errors = 0, []
         for a in self.accounts():
+            if only is not None and a["id"] not in only:
+                continue
             try:
                 be = self.backend(a["id"])
             except Exception as e:

@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.38.3
+- Messages suspects : à l'ouverture d'un message de la boîte de réception qui ressemble à de l'hameçonnage (nom affiché cachant une autre adresse, marque imitée, texte de lien différent de sa vraie destination, lien raccourci, texte d'arnaque, analyse IA suspecte), un bandeau propose de le mettre en spam ; « Je lui fais confiance » l'écarte. Les expéditeurs de vos contacts ne sont jamais questionnés.
+- Réception plus réactive : à chaque annonce IDLE, le compte concerné relève aussitôt sa boîte de réception ; le survol du bouton de relevé indique l'état de la réception instantanée de chaque compte.
+- Lecteur : l'en-tête affiche les destinataires (À, Copie) et, si l'adresse du compte n'y figure pas (alias, liste, copie cachée), la boîte qui a reçu le message (« Reçu sur »).
+
 ## 1.38.1
 - Correctif : le contrôle des traductions bloquait la publication à cause du libellé « IA » de la rédaction ; la rédaction réutilise désormais le libellé existant « ✨ IA ».
 
