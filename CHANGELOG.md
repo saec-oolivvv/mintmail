@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.45.1
+- Relevé du courrier plus fiable avec plusieurs boîtes : les boîtes sont relevées en parallèle (une boîte lente ou en panne ne bloque plus les autres), chaque boîte s'affiche dès qu'elle a du nouveau sans attendre la fin du relevé, les chiffres des dossiers sont relevés après coup, et les erreurs indiquent la boîte en cause.
+
 ## 1.45.0
 - Absence du bureau / vacances (Paramètres → Messagerie → Absence) : type, période (dates ou nombre de jours), une ou plusieurs boîtes mail, message modifiable ({debut} {fin} {retour} {jours}). Chaque réponse part de la boîte qui a reçu le message avec SA signature (ou celle de l'alias), une seule fois par expéditeur, jamais aux newsletters, notifications, listes, robots ni bloqués ; option « seulement mes contacts ». MintMail doit rester ouvert pour répondre.
 - Import depuis un autre logiciel (Paramètres → Comptes) : boîtes de Thunderbird et Evolution lues sur l'ordinateur (nom, signature, alias), ou adresses collées pour Outlook, Spark, Apple Mail, Gmail… (serveurs retrouvés). Les mots de passe ne sont jamais importés. Les contacts s'importent aussi depuis un CSV (Outlook, Google, Spark, Apple) ou une vCard.

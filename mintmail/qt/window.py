@@ -141,6 +141,7 @@ class _Bridge(QObject):
     done = Signal(object)          # résultat d'une tâche de fond, remis dans le fil de l'interface
     progress = Signal(object)      # avancement d'une mise à jour (version, texte, fraction)
     p2p = Signal()                 # éléments reçus d'un autre poste à appliquer dans le fil de l'interface
+    partial = Signal()             # une boîte vient de recevoir du nouveau pendant un relevé : afficher tout de suite
     newmail = Signal(str)          # le serveur annonce du nouveau pour ce compte (IMAP IDLE) : relever tout de suite
 
 
@@ -619,6 +620,11 @@ class MainWindow(ExtrasMixin, OrganizerMixin, AIMixin, QMainWindow):
         self._push_timer.setSingleShot(True)
         self._push_timer.timeout.connect(self._push_run)
         self.bridge.newmail.connect(self._on_push)
+        self._partial_timer = QTimer(self)
+        self._partial_timer.setSingleShot(True)
+        self._partial_timer.timeout.connect(self._show_partial)
+        self.bridge.partial.connect(lambda: self._partial_timer.start(250))
+        self.engine.on_progress = self.bridge.partial.emit                     # appelé depuis les fils de relevé
         if self.config.get("push") is not False:
             self.engine.start_push(self.bridge.newmail.emit)             # réception instantanée : plus d'attente du relevé périodique
         self.reload()
@@ -1725,7 +1731,12 @@ class MainWindow(ExtrasMixin, OrganizerMixin, AIMixin, QMainWindow):
             self._push_pending = True
             return
         self._busy = True
-        self._background(lambda: (None, AU.sync_and_route(self.engine, ("inbox",), only=aids), self.engine.refresh_folder_counts()), "sync")
+        self._background(lambda: (None, AU.sync_and_route(self.engine, ("inbox",), only=aids), None), "sync")
+
+    def _show_partial(self):
+        """Une boîte a fini de se relever : la liste et les compteurs sont rafraîchis sans attendre les autres boîtes."""
+        self.reload()
+        self._update_counts()
 
     def _folders_live(self):
         if self._busy or getattr(self, "_folders_busy", False):
@@ -1991,7 +2002,7 @@ class MainWindow(ExtrasMixin, OrganizerMixin, AIMixin, QMainWindow):
         self._busy = True
         if not quiet:
             self.status.setText(tr("Synchronisation…"))
-        self._background(lambda: (self.engine.flush(), AU.sync_and_route(self.engine), self.engine.refresh_folder_counts()), "sync")
+        self._background(lambda: (self.engine.flush(), AU.sync_and_route(self.engine), None), "sync")
 
     def run_bg(self, fn, cb):
         """Travail en fond puis cb(résultat, erreur) dans le fil de l'interface."""
@@ -2036,7 +2047,7 @@ class MainWindow(ExtrasMixin, OrganizerMixin, AIMixin, QMainWindow):
         errors = [str(err)] if err else list(res[1][1])
         offline = bool(res and res[0] and res[0][2])
         fresh = 0 if err else int(res[1][0] or 0)
-        self.status.setText(("⚠ " + errors[0][:120]) if errors else (self.offline_text(offline) or tr("Synchronisé à ") + time.strftime("%H:%M")))
+        self.status.setText(("⚠ " + errors[0][:110] + ("  (+%d)" % (len(errors) - 1) if len(errors) > 1 else "")) if errors else (self.offline_text(offline) or tr("Synchronisé à ") + time.strftime("%H:%M")))
         self.reload()
         self._update_counts()
         self.p2p_footer()
@@ -2046,6 +2057,7 @@ class MainWindow(ExtrasMixin, OrganizerMixin, AIMixin, QMainWindow):
         self.check_followups()
         self.after_sync_pins()                               # mémorise si le serveur garde les épingles ; envoie une fois les épingles locales
         self.absence_after_sync()
+        self.run_bg(self.engine.refresh_folder_counts, lambda r, e: r and not e and self._update_counts())      # chiffres des dossiers : après coup, sans retenir le relevé suivant
         self.ai_after_sync()                                 # pastilles des dossiers de rangement (non lus annoncés par le serveur)
 
 

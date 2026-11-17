@@ -222,32 +222,49 @@ class Engine(OfflineMixin):
 
     def sync(self, folders=("inbox", "sent"), limit=60, only=None):
         """Nouveaux messages, drapeaux et suppressions du serveur. Retourne (nombre de nouveaux messages non lus, erreurs).
-        only : identifiants de comptes à relever (relevé rapide déclenché par le serveur) ; None : tous."""
-        fresh, errors = 0, []
-        for a in self.accounts():
-            if only is not None and a["id"] not in only:
-                continue
+        only : identifiants de comptes à relever (relevé rapide déclenché par le serveur) ; None : tous.
+        Les comptes sont relevés EN PARALLÈLE : un serveur lent ou en panne ne retarde plus les autres, et `on_progress` (si défini) est appelé dès qu'une boîte
+        a reçu du nouveau, pour que l'interface l'affiche sans attendre la fin. Chaque erreur est précédée de l'adresse de la boîte concernée."""
+        from concurrent.futures import ThreadPoolExecutor
+        accounts = [a for a in self.accounts() if only is None or a["id"] in only]
+
+        def one(a):
+            fresh, errors = 0, []
+            who = a.get("email") or a.get("name") or a["id"]
             try:
                 be = self.backend(a["id"])
             except Exception as e:
-                errors.append(str(e))
-                continue
+                return 0, ["%s : %s" % (who, e)]
+            changed = False
             for f in folders:
                 try:
                     kn = self.cache.uids(a["id"], f)
                     msgs, flags, present, minuid = be.sync(f, kn, limit=limit)
                 except Exception as e:
-                    errors.append(str(e))
+                    errors.append("%s : %s" % (who, e))
                     continue
                 self.cache.upsert_many(msgs)
                 self._apply_flags(kn, flags)
+                changed = changed or bool(msgs)
                 if present is not None:
                     gone = [mid for uid, mid in kn.items() if uid >= minuid and uid not in present]
                     if gone:
                         self.cache.delete_many(gone)
+                        changed = True
                 if kn:
                     fresh += sum(1 for m in msgs if m.unread and m.folder == "inbox")
-        return fresh, errors
+            if changed and getattr(self, "on_progress", None):
+                try:
+                    self.on_progress()
+                except Exception:
+                    pass
+            return fresh, errors
+
+        if not accounts:
+            return 0, []
+        with ThreadPoolExecutor(max_workers=min(8, len(accounts))) as pool:
+            results = list(pool.map(one, accounts))
+        return sum(r[0] for r in results), [e for r in results for e in r[1]]
 
     def _apply_flags(self, kn, flags):
         """Lu / favori lus sur le serveur. L'épingle n'est pas touchée ici (gérée par l'interface GTK jusqu'à l'étape suivante)."""
