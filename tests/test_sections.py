@@ -48,7 +48,7 @@ def test_digest_lists_only_sender_names_unread_first_without_duplicates():
     msgs = [msg("1", "news", "Le Soir", unread=False), msg("2", "news", "Medium"), msg("3", "news", "Medium"), msg("4", "notif", "GitHub"),
             msg("5", "pinned", "Ana"), msg("6", None, "Bob")]
     d = G.digest(gr, msgs)
-    assert d["news"] == {"n": 3, "unread": 2, "senders": ["Medium", "Le Soir"]}
+    assert (d["news"]["n"], d["news"]["unread"], d["news"]["senders"]) == (3, 2, ["Medium", "Le Soir"]) and len(d["news"]["keys"]) == 2
     assert d["notif"]["senders"] == ["GitHub"] and d["pinned"]["n"] == 1
     assert "mine" not in d and None not in d                             # la boîte principale n'a pas de rangée
     assert G.ROW_ORDER[:4] == ["pinned", "notif", "news", "invite"]

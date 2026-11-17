@@ -128,8 +128,8 @@ def filter_view(grouper: Grouper, msgs, key: Optional[str]) -> list:
 
 
 def digest(grouper: Grouper, msgs, per: int = 4) -> Dict[str, Dict]:
-    """Rangées de groupes de la boîte unifiée : {groupe: {'n': messages, 'unread': non lus, 'senders': [noms]}} pour les groupes en mode « grouper ».
-    Les noms des expéditeurs (sans doublon, non lus d'abord, puis les plus récents) sont tout ce que la rangée affiche."""
+    """Rangées de groupes de la boîte unifiée : {groupe: {'n': messages, 'unread': non lus, 'senders': [noms], 'keys': [adresses]}} pour les groupes
+    en mode « grouper ». Seuls les expéditeurs (sans doublon, non lus d'abord, puis les plus récents) sont montrés : la rangée n'affiche rien d'autre."""
     out: Dict[str, Dict] = {}
     for m in msgs:
         g = grouper.group(m)
@@ -138,17 +138,18 @@ def digest(grouper: Grouper, msgs, per: int = 4) -> Dict[str, Dict]:
         d = out.setdefault(g, {"n": 0, "unread": 0, "new": [], "old": []})
         d["n"] += 1
         name = (getattr(m, "display_sender", "") or "").strip()
-        if getattr(m, "unread", False):
-            d["unread"] += 1
-        bucket = d["new"] if getattr(m, "unread", False) else d["old"]
-        if name and name not in bucket:
-            bucket.append(name)
+        key = (getattr(m, "sender_email", "") or name).lower()
+        unread = bool(getattr(m, "unread", False))
+        d["unread"] += unread
+        bucket = d["new"] if unread else d["old"]
+        if name and all(n != name for n, _k in bucket):
+            bucket.append((name, key))
     for d in out.values():
-        names = d.pop("new") + [n for n in d.pop("old")]
-        seen, d["senders"] = set(), []
-        for n in names:
+        seen, people = set(), []
+        for n, k in d.pop("new") + d.pop("old"):
             if n not in seen:
                 seen.add(n)
-                d["senders"].append(n)
-        d["senders"] = d["senders"][:per]
+                people.append((n, k))
+        people = people[:per]
+        d["senders"], d["keys"] = [n for n, _k in people], [k for _n, k in people]
     return out

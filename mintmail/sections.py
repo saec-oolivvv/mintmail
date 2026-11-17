@@ -22,7 +22,7 @@ def section_of(ts: float, now: Optional[float] = None) -> Tuple[str, str]:
     if days == 1:
         return "yesterday", tr("Hier")
     if days <= 7:
-        return "week", tr("Semaine dernière")
+        return "week", tr("La semaine dernière")
     if d.year == today.year:
         return "m%04d%02d" % (d.year, d.month), month_names()[d.month - 1]
     return "y%04d" % d.year, str(d.year)

@@ -361,8 +361,9 @@ class OrganizerMixin:
         """Barre des groupes : visible dans la boîte de réception ; chaque groupe montre ses non lus ; seuls les groupes utiles sont proposés."""
         info = getattr(self, "_group_info", None)
         on_inbox = self.view_key == "inbox" and info is not None
-        self.group_rows.update_rows(getattr(info[1], "digest", {}) if on_inbox and self.category is None else {})      # boîte unifiée : rangées de groupes en haut
-        self.cat_bar.setVisible(on_inbox and self.category is not None)                                            # dans un groupe : pastilles pour revenir
+        self.group_rows.update_rows(getattr(info[1], "digest", {}) if on_inbox and self.category is None else {}, getattr(self.model, "lead", ""))
+        self.cat_bar.setVisible(False)                                                                             # remplacées par les rangées de groupes
+        self.back_bar.setVisible(on_inbox and self.category is not None)                                           # dans un groupe : retour à la boîte de réception
         if info is None:
             return
         from .. import groups as G
@@ -380,7 +381,7 @@ class OrganizerMixin:
                 n = counts.get(key, 0)
                 b.setText("%s  %d" % (labels[key], n) if n else labels[key])
                 b.setVisible(n > 0 or key in grouped_keys or self.category == key)
-        if self.category not in self.cat_buttons or not self.cat_buttons[self.category].isVisible():
+        if self.category not in self.cat_buttons or self.cat_buttons[self.category].isHidden():
             self.category = None
             for k, b in self.cat_buttons.items():
                 b.setChecked(k is None)

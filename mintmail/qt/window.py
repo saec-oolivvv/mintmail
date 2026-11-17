@@ -17,6 +17,7 @@ from ..i18n import tr
 from .. import receipts as RC
 from .. import shortcuts as SC
 from .. import sections as SEC
+from ..groups import label as G_label
 from ..store import Cache, Config
 from .. import updater
 from . import ui_icons as UI
@@ -63,9 +64,9 @@ class MessageModel(QAbstractListModel):
 
     def __init__(self):
         super().__init__()
-        self.msgs, self.infos = [], []
+        self.msgs, self.infos, self.lead = [], [], ""
 
-    def set_messages(self, msgs, meta=None, reads=None):
+    def set_messages(self, msgs, meta=None, reads=None, lead=False):
         self.beginResetModel()
         self.msgs = list(msgs)
         self.infos = [vm.row_info(m) for m in self.msgs]
@@ -73,6 +74,9 @@ class MessageModel(QAbstractListModel):
             AW.decorate(self.infos, self.msgs, meta)                       # résumé IA, « Important », « Suspect »
         for info, head in zip(self.infos, SEC.headings([m.date or 0 for m in self.msgs])):
             info["section"] = head                                        # titre de période (Aujourd'hui, Hier, mois…) au-dessus de la première ligne de chaque période
+        self.lead = ""
+        if lead and self.infos:                                           # rangées de groupes au-dessus : elles portent le titre de la 1re période
+            self.lead, self.infos[0]["section"] = self.infos[0]["section"], ""
         for info, m in zip(self.infos, self.msgs):
             r = (reads or {}).get(m.id)
             info["read_by"] = RC.eye_title(r) if r else ""                 # accusé de lecture reçu : œil dans la liste
@@ -356,7 +360,17 @@ class MainWindow(ExtrasMixin, OrganizerMixin, AIMixin, QMainWindow):
             self.cat_buttons[key] = b
         cb.addStretch(1)
         ll.addWidget(self.cat_bar)
-        self.group_rows = GroupRows()
+        self.back_bar = QWidget()
+        bb = QHBoxLayout(self.back_bar)
+        bb.setContentsMargins(16, 0, 16, 2)
+        self.back_btn = QPushButton("←  " + tr("Boîte de réception"))
+        self.back_btn.setObjectName("flat")
+        self.back_btn.clicked.connect(lambda: self.set_category(None))
+        bb.addWidget(self.back_btn)
+        bb.addStretch(1)
+        ll.addWidget(self.back_bar)
+        self.back_bar.hide()
+        self.group_rows = GroupRows(lambda: self.t)
         self.group_rows.opened.connect(self.set_category)
         ll.addWidget(self.group_rows)
         ll.addWidget(self.build_digest_card())
@@ -648,11 +662,12 @@ class MainWindow(ExtrasMixin, OrganizerMixin, AIMixin, QMainWindow):
                     msgs.append(m)
             msgs.sort(key=lambda m: m.date, reverse=True)
         reads = RC.read_ids(self.cache, [m.id for m in msgs if m.folder == "sent"]) if msgs else {}
-        self.model.set_messages(msgs, self.cache.ai_meta([m.id for m in msgs]) if msgs else None, reads)
+        lead = bool(self._group_info and self.category is None and getattr(self._group_info[1], "digest", None))
+        self.model.set_messages(msgs, self.cache.ai_meta([m.id for m in msgs]) if msgs else None, reads, lead=lead)
         self.srv_btn.setVisible(bool(q.strip()) and not AW.is_ai_query(raw) and not any(a.get("demo") for a in self.engine.accounts()))
         self.update_digest_visibility()
         self.update_category_bar()
-        self.title.setText(self._view_title() + self._scope_suffix())
+        self.title.setText((G_label(self.category) if self.category and self.view_key == "inbox" and self.category != "all" else self._view_title()) + self._scope_suffix())
         self.count_lbl.setText("%d" % len(msgs) if msgs else "")
         self.empty.setVisible(not msgs)
         self.list.setVisible(bool(msgs))

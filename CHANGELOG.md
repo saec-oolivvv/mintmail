@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.42.3
+- Boîte unifiée comme dans Spark : les rangées de groupes (Épinglés, Notifications, Newsletters, Invitations…) s'insèrent dans la liste sous le titre « Aujourd'hui », avec icône, nombre de messages, point bleu s'il y a des non lus, et seulement les expéditeurs (avatar + nom) ; un clic ouvre le groupe, avec une flèche de retour. Les groupes sont eux aussi découpés par période.
+- Période « La semaine dernière ».
+
 ## 1.42.2
 - Barre latérale façon Spark : sous « Boîte de réception » et « Envoyés », une ligne par boîte mail (avatar, adresse, non lus), repliable par son chevron ; un clic n'affiche que cette boîte.
 - Nouveau style « Ardoise » (Paramètres → Apparence → Style visuel), sobre comme Spark : gris ardoise, bleu franc, panneaux à plat, lignes de messages sans bulles, sélection pleine, avatars cerclés. Choisir un style applique aussi sa couleur d'accent (modifiable ensuite) ; nouvel accent « Bleu ».

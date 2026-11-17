@@ -1,4 +1,4 @@
-# Aide de MintMail 1.42.2
+# Aide de MintMail 1.42.3
 _Généré par `make docs` depuis l'aide intégrée (touche F1 dans l'application)._
 
 ## Premiers pas
@@ -53,7 +53,7 @@ Désactivation : Paramètres → Gestes & disposition → « Regrouper en conver
 
 ### Catégories
 
-Comme dans Spark, la boîte de réception range automatiquement vos messages en groupes : Épinglés, Attribués à moi (vous êtes le seul destinataire d'une vraie personne, ou une tâche ou une relance est posée dessus), Invitations reçues, Réponses aux invitations, Notifications et Newsletters. En haut de la boîte unifiée, une rangée par groupe (Épinglés, Notifications, Newsletters, Invitations…) affiche son nombre de non lus et seulement les noms des expéditeurs ; un clic ouvre le groupe, « Principal » en revient. Sous les rangées, la liste est découpée par période : Aujourd'hui, Hier, Semaine dernière, puis chaque mois, puis chaque année.  
+Comme dans Spark, la boîte de réception range automatiquement vos messages en groupes : Épinglés, Attribués à moi (vous êtes le seul destinataire d'une vraie personne, ou une tâche ou une relance est posée dessus), Invitations reçues, Réponses aux invitations, Notifications et Newsletters. En haut de la boîte unifiée, une rangée par groupe (Épinglés, Notifications, Newsletters, Invitations…) affiche son nombre de non lus et seulement les noms des expéditeurs ; un clic ouvre le groupe, « Principal » en revient. Sous les rangées, la liste est découpée par période : Aujourd'hui, Hier, La semaine dernière, puis chaque mois, puis chaque année.  
 • Paramètres → Groupes : pour chaque groupe, « Grouper » (pastille à part) ou « Afficher tout dans la boîte principale », et un interrupteur général.  
 • Chaque boîte mail peut avoir ses propres réglages (carte « Boîte mail » de la même page) : regrouper ou non, et mode de chaque groupe.
 
@@ -528,7 +528,7 @@ Mise à jour : sudo apt install ./mintmail_X.Y.Z_all.deb (vos réglages et votre
 
 ## À propos et crédits
 
-### MintMail 1.42.2
+### MintMail 1.42.3
 
 Le client mail pour Linux Mint dont l'IA est l'ADN : il lit, trie, résume, classe, rédige et agit avec vous — toujours avec votre accord.  
 Développé par SAEC — https://saec.me · Logiciel libre sous licence MIT (© 2026 SAEC) : vous pouvez l'utiliser, le modifier et le redistribuer. Application Qt (PySide6) / Python, sans service cloud imposé : vos mails, vos clés et vos réglages restent chez vous.
