@@ -31,8 +31,16 @@ class FakeResp:
 
 class _Patch:
     """Remplace pytest.monkeypatch quand le test est lancé par tests/run_all.py (sans pytest)."""
+    def __init__(self):
+        self.saved = []
+
     def setattr(self, obj, name, value):
+        self.saved.append((obj, name, getattr(obj, name)))
         setattr(obj, name, value)
+
+    def undo(self):
+        for obj, name, old in reversed(self.saved):
+            setattr(obj, name, old)
 
 
 def capture(monkeypatch, status=200, body=b"{}"):
@@ -62,7 +70,14 @@ def test_webhook_addresses_must_be_public_https():
 
 
 def test_teams_and_slack_payloads(monkeypatch=None):
-    monkeypatch = monkeypatch or _Patch()
+    patch = None if monkeypatch else _Patch()
+    try:
+        _test_teams_and_slack_payloads(monkeypatch or patch)
+    finally:
+        patch and patch.undo()
+
+
+def _test_teams_and_slack_payloads(monkeypatch):
     calls = capture(monkeypatch)
     assert I.send_webhook("slack", "https://8.8.8.8/hook", msg())[0]
     body = json.loads(calls[0].data)
@@ -74,14 +89,28 @@ def test_teams_and_slack_payloads(monkeypatch=None):
 
 
 def test_http_errors_are_explained(monkeypatch=None):
-    monkeypatch = monkeypatch or _Patch()
+    patch = None if monkeypatch else _Patch()
+    try:
+        _test_http_errors_are_explained(monkeypatch or patch)
+    finally:
+        patch and patch.undo()
+
+
+def _test_http_errors_are_explained(monkeypatch):
     capture(monkeypatch, status=401)
     ok, why = I.todoist_task("tok", msg())
     assert not ok and "401" in why
 
 
 def test_todoist_and_notion_requests(monkeypatch=None):
-    monkeypatch = monkeypatch or _Patch()
+    patch = None if monkeypatch else _Patch()
+    try:
+        _test_todoist_and_notion_requests(monkeypatch or patch)
+    finally:
+        patch and patch.undo()
+
+
+def _test_todoist_and_notion_requests(monkeypatch):
     calls = capture(monkeypatch)
     assert I.todoist_task("tok", msg(), project="123", due="demain")[0]
     r = calls[0]
