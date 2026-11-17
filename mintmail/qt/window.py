@@ -198,6 +198,7 @@ class MainWindow(ExtrasMixin, OrganizerMixin, AIMixin, QMainWindow):
         self.folders.setVerticalScrollMode(QListWidget.ScrollPerPixel)
         self._build_sidebar()
         self.folders.currentRowChanged.connect(self._view_changed)
+        self.folders.itemClicked.connect(self._nav_clicked)               # re-clic sur la ligne déjà choisie : le filtre de boîte suit quand même
         sl.addWidget(self.folders, 1)
         self.p2p_lbl = QLabel()
         self.p2p_lbl.setObjectName("footer")
@@ -643,7 +644,7 @@ class MainWindow(ExtrasMixin, OrganizerMixin, AIMixin, QMainWindow):
         self.srv_btn.setVisible(bool(q.strip()) and not AW.is_ai_query(raw) and not any(a.get("demo") for a in self.engine.accounts()))
         self.update_digest_visibility()
         self.update_category_bar()
-        self.title.setText(self._view_title())
+        self.title.setText(self._view_title() + self._scope_suffix())
         self.count_lbl.setText("%d" % len(msgs) if msgs else "")
         self.empty.setVisible(not msgs)
         self.list.setVisible(bool(msgs))
@@ -718,6 +719,12 @@ class MainWindow(ExtrasMixin, OrganizerMixin, AIMixin, QMainWindow):
         if quiet:
             self.folders.blockSignals(False)
 
+    def _scope_suffix(self):
+        if self.account == "all":
+            return ""
+        acc = next((a for a in self.engine.accounts() if a["id"] == self.account), None)
+        return "  ·  " + (acc.get("name") or acc["email"]) if acc else ""
+
     def _view_title(self):
         for i in range(self.folders.count()):
             it = self.folders.item(i)
@@ -753,11 +760,23 @@ class MainWindow(ExtrasMixin, OrganizerMixin, AIMixin, QMainWindow):
         self.folders.viewport().update()
         self.notspam_btn.setVisible(self.view_key == "spam")
 
+    def _scope_of(self, it):
+        """Boîte affichée pour une ligne de la barre latérale : « all » (boîte unifiée) pour les vues, la boîte du dossier pour un dossier de rangement."""
+        return it.data(AccountRole) if it.data(KindRole) == "folder" and it.data(AccountRole) else "all"
+
+    def _nav_clicked(self, it):
+        if it is None or it.data(KeyRole) is None or self._scope_of(it) == self.account:
+            return
+        self.account, self.current, self._kept = self._scope_of(it), None, set()
+        self.view_key = it.data(KeyRole)
+        self.reload()
+        self._show(None)
+
     def _view_changed(self, row):
         if row >= 0 and self.folders.item(row).data(KeyRole) is not None:
             it = self.folders.item(row)
             self.view_key = it.data(KeyRole)
-            self.account = it.data(AccountRole) if it.data(KindRole) == "folder" and it.data(AccountRole) else "all"     # dossier d'une boîte : ses messages seulement
+            self.account = self._scope_of(it)                  # vues = toutes les boîtes (unifiées) ; dossier d'une boîte : ses messages seulement
             self.current, self._kept = None, set()
             self.reload()
             self._show(None)

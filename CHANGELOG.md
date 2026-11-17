@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.41.2
+- Boîte unifiée : un clic sur « Boîte de réception » (ou toute autre vue) revient toujours à toutes les adresses, même après avoir cliqué une boîte ; le titre indique la boîte affichée quand une seule l'est.
+- macOS Apple Silicon : construction sur macos-15 ; relance possible pour une Release existante.
+
 ## 1.41.1
 - Aide intégrée (F1, FR/EN) et docs : intégrations, raccourcis personnalisables, traduction des messages, relevé des dossiers.
 
