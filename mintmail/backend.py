@@ -455,6 +455,24 @@ class IMAPBackend:
             return self._list_raw(conn.imap)
         return self._run("meta", fn)
 
+    def folder_signature(self, names):
+        """{nom: (messages, non lus, uidnext)} : change dès qu'un message arrive, part, est déplacé ou change d'état (STATUS, connexion dédiée)."""
+        def fn(conn):
+            out = {}
+            for n in names:
+                try:
+                    typ, d = conn.imap.status(_q(n), "(MESSAGES UNSEEN UIDNEXT)")
+                except imaplib.IMAP4.abort:
+                    raise
+                except imaplib.IMAP4.error:
+                    continue
+                if typ == "OK" and d and d[0]:
+                    t = d[0].decode("utf-8", "replace") if isinstance(d[0], bytes) else str(d[0])
+                    g = lambda k: (re.search(k + r" (\d+)", t) or [None, 0])[1]
+                    out[n] = (int(g("MESSAGES")), int(g("UNSEEN")), int(g("UIDNEXT")))
+            return out
+        return self._run("meta", fn)
+
     def folder_status(self, names):
         """{nom: (messages, non lus)} par la commande STATUS (connexion dédiée : n'attend pas les actions)."""
         def fn(conn):
@@ -1015,6 +1033,9 @@ class DemoBackend:
 
     def list_folders(self):
         return [dict(f) for f in self.folders]
+
+    def folder_signature(self, names):
+        return {n: v + (0,) for n, v in self.folder_status(names).items()}
 
     def folder_status(self, names):
         out = {}

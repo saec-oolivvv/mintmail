@@ -184,3 +184,12 @@ Raccourcis essentiels
 Parcourir l'aide
 Connexion : OK
 Remarque : %s
+anglais
+allemand
+espagnol
+italien
+portugais
+adresse introuvable
+Navigation
+Application
+Suppr

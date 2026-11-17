@@ -75,3 +75,42 @@ def test_status_crud_and_custom_sync_move():
     be.move_many(msgs([3]), "f:Clients/Alpha")
     assert ("MOVE", "3", '"Clients/Alpha"') in log
 
+
+
+def test_sync_changed_folders_picks_up_sorting_done_elsewhere():
+    """Tri fait sur un autre poste dans « Archive » : repéré par STATUS, relu en entier (messages partis supprimés du cache)."""
+    from types import SimpleNamespace as NS
+    from mintmail.qt import viewmodel as vm
+
+    class Cache:
+        def __init__(self):
+            self.kn, self.deleted = {1: "m1", 2: "m2"}, []
+        def uids(self, a, f):
+            return dict(self.kn)
+        def upsert_many(self, m):
+            pass
+        def delete_many(self, ids):
+            self.deleted += ids
+        def ops_pending(self, limit=0):
+            return []
+        def update_many(self, *a, **k):
+            pass
+
+    class BE:
+        sig = (2, 0, 3)
+        def folder_signature(self, names):
+            return {"Archive": self.sig}
+        def sync(self, lg, kn, limit=60, unseen=False):
+            assert unseen and lg == "archive"
+            return [], {}, {1}, 0
+
+    e = vm.Engine.__new__(vm.Engine)
+    e.cache, e.folder_unread, be = Cache(), {}, BE()
+    e.accounts = lambda: [{"id": "a1"}]
+    e.folder_entries = lambda aid: [{"name": "Archive", "special": "archive", "selectable": True}]
+    e.backend = lambda aid: be
+    assert e.sync_changed_folders() is False             # premier passage : on mémorise seulement
+    assert e.sync_changed_folders() is False             # rien n'a changé
+    be.sig = (1, 0, 3)
+    assert e.sync_changed_folders() is True
+    assert e.cache.deleted == ["m2"]

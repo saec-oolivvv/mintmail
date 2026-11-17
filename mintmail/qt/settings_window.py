@@ -21,6 +21,8 @@ from .ui_cards import Page
 from . import ui_calendar as UC
 from . import ui_sync as US
 from . import ui_groups as UG
+from . import ui_integrations as UI_INTEG
+from . import ui_shortcuts as USC
 from .gestures import LAYOUTS
 from .. import __version__, updater
 
@@ -57,7 +59,9 @@ class SettingsDialog(QDialog):
             "contacts": UP.contacts_tab(self),
             "calendar": UC.calendar_tab(self),
             "p2p": US.p2p_tab(self),
-            "groups": UG.groups_tab(self)}
+            "groups": UG.groups_tab(self),
+            "integrations": UI_INTEG.integrations_tab(self),
+            "shortcuts": USC.shortcuts_tab(self)}
         self.stack = self.tabs = QStackedWidget()          # « tabs » : ancien nom, conservé (currentIndex / setCurrentIndex)
         for page in pages.values():
             self.stack.addWidget(page)
@@ -70,8 +74,8 @@ class SettingsDialog(QDialog):
         for caption, entries in ((tr("Messagerie"), (("accounts", tr("Comptes")), ("identities", tr("Identités d'envoi")), ("signatures", tr("Signatures")),
                                                       ("templates", tr("Modèles de réponse")))),
                                  (tr("Boîte de réception"), (("groups", tr("Groupes")), ("filters", tr("Filtres & blocage")), ("gestures", tr("Gestes & disposition")),
-                                                             ("contacts", tr("Contacts")), ("calendar", tr("Agenda")))),
-                                 (tr("Application"), (("look", tr("Apparence")), ("ai", "✨ IA"), ("p2p", tr("Synchronisation")),
+                                                             ("contacts", tr("Contacts")), ("calendar", tr("Agenda")), ("integrations", tr("Intégrations")))),
+                                 (tr("Application"), (("look", tr("Apparence")), ("shortcuts", tr("Raccourcis")), ("ai", "✨ IA"), ("p2p", tr("Synchronisation")),
                                                       ("updates", tr("Mises à jour"))))):
             head = QListWidgetItem(caption.upper())
             f = QFont(self.font())
@@ -438,6 +442,10 @@ class SettingsDialog(QDialog):
         form.addRow("", note)
         form.addRow(tr("Quand on me demande un accusé"), self._combo([("ask", tr("Me demander")), ("never", tr("Ne jamais envoyer")), ("always", tr("Toujours envoyer"))], "receipt_reply"))
         form = page.card(tr("Langue")).form()
+        offer = QCheckBox(tr("Proposer de traduire les messages écrits dans une autre langue (nécessite l'IA)"))
+        offer.setChecked(bool(self.cfg.get("translate_offer", True)))
+        offer.toggled.connect(lambda v: self._set("translate_offer", bool(v)))
+        form.addRow("", offer)
         lang = QComboBox()
         for code, label in MT.languages():
             lang.addItem(label, code)

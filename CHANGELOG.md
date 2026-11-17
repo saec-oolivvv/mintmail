@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.41.0
+- Synchronisation des dossiers en temps réel : un tri fait dans Archive ou un autre dossier sur un poste apparaît sur les autres en une vingtaine de secondes (relevé léger de l'état de chaque dossier, relecture de ceux qui ont changé).
+- Un clic sur une boîte mail dans la barre latérale la déplie ET affiche sa boîte de réception ; ses dossiers n'affichent plus que ses propres messages.
+- Intégrations façon Spark : Microsoft Teams et Slack (webhook), notes Markdown (dossier), Obsidian, Bear (Mac), Todoist, Notion ; clic droit sur un message ou palette Ctrl+K ; clés gardées dans le trousseau. Paramètres → Intégrations.
+- Raccourcis clavier configurables : liste complète dans Paramètres → Raccourcis (conflits refusés, désactivation, retour aux valeurs d'origine).
+- Traduction par l'IA : bandeau « Traduire en … » pour un message reçu dans une autre langue, et « Traduire mon texte » dans la rédaction vers la langue de l'expéditeur.
+
 ## 1.40.0
 - Accusés de lecture (RFC 8098) : bouton œil dans la rédaction (ou demande d'office dans Paramètres → Apparence), œil 👁 sur le message dans « Envoyés » dès que le destinataire a lu (infobulle : qui, quand), notification facultative ; quand on vous demande un accusé : demander / ne jamais envoyer / toujours envoyer. Aucune image espion.
 - Impression : Ctrl+P, clic droit ou palette (Imprimer, Enregistrer en PDF) ; en-têtes, pièces jointes, corps assaini sans images distantes.

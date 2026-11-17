@@ -5,6 +5,7 @@ import os
 import time
 
 from PySide6.QtCore import QStringListModel, Qt
+from .. import shortcuts as SC
 from PySide6.QtGui import QAction, QKeySequence, QShortcut, QTextCharFormat, QFont
 from PySide6.QtWidgets import (QComboBox, QCompleter, QDialog, QDialogButtonBox, QFileDialog, QFormLayout, QFrame, QHBoxLayout, QLabel, QLineEdit,
                                QMainWindow, QMenu, QMessageBox, QPushButton, QScrollArea, QSpinBox, QTextEdit, QToolButton, QVBoxLayout, QWidget,
@@ -68,6 +69,7 @@ class ComposeWindow(QMainWindow):
             a.setText(text)
             a.setIcon(UI.icon(icon, dim, accent, 18))
             a.setCheckable(checkable)
+            shortcut = SC.resolve(self.engine.config, shortcut, SC.COMPOSE) if shortcut else shortcut
             a.setToolTip(text + ("  (%s)" % shortcut if shortcut else ""))
             if shortcut:
                 a.setShortcut(QKeySequence(shortcut))
@@ -184,8 +186,14 @@ class ComposeWindow(QMainWindow):
         self.ai_btn.setObjectName("chip")                          # bien visible : même pastille que « Charger les images »
         self.ai_btn.setCursor(Qt.PointingHandCursor)
         self.ai_btn.setToolTip(tr("Aide IA à l'écriture : rédiger, améliorer, corriger, traduire…") + "  (Ctrl+J)")
-        self.ai_btn.setShortcut("Ctrl+J")
+        self.ai_btn.setShortcut(SC.resolve(self.engine.config, "Ctrl+J", SC.COMPOSE) or QKeySequence())
         aimenu = QMenu(self.ai_btn)
+        from .. import langdetect as LD
+        from ..util import html_to_text as _h2t
+        their = LD.language_of(type("Q", (), {"subject": "", "text": _h2t(quote_html or ""), "html": "", "snippet": ""})()) if quote_html else None
+        if their and their != self.engine.config.get("ai_lang", "fr"):
+            aimenu.addAction(tr("🌐 Traduire mon texte en %s (langue de l'expéditeur)") % LD.name(their), lambda c=their: self._ai_op("translate:" + c))
+            aimenu.addSeparator()
         for entry in P.AI_OPS:
             if entry is None:
                 aimenu.addSeparator()
@@ -243,7 +251,9 @@ class ComposeWindow(QMainWindow):
         self.receipt_btn.setChecked(bool(self.engine.config.get("receipt_request", False)))
         bl.addStretch(1)
         tool(bl, "trash", tr("Supprimer le brouillon"), None, self._discard)
-        QShortcut(QKeySequence("Ctrl+Return"), self, activated=lambda: self.do_send(0))
+        send_seq = SC.resolve(self.engine.config, "Ctrl+Return", SC.COMPOSE)
+        if send_seq:
+            QShortcut(QKeySequence(send_seq), self, activated=lambda: self.do_send(0))
 
         root = QWidget()
         root.setObjectName("composeroot")

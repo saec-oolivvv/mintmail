@@ -15,6 +15,7 @@ from .. import APP_NAME, __version__
 from ..htmlsafe import safe_to_open
 from ..i18n import tr
 from .. import receipts as RC
+from .. import shortcuts as SC
 from ..store import Cache, Config
 from .. import updater
 from . import ui_icons as UI
@@ -429,6 +430,24 @@ class MainWindow(ExtrasMixin, OrganizerMixin, AIMixin, QMainWindow):
         rbl.addWidget(self.receipt_yes)
         rbl.addWidget(self.receipt_no)
         self.receipt_bar.hide()
+        self.translate_bar = QFrame()                        # « Ce message est écrit en … : le traduire ? »
+        self.translate_bar.setObjectName("translatebar")
+        self.translate_bar.setStyleSheet("#translatebar { background: rgba(124,58,237,0.10); border: 1px solid rgba(124,58,237,0.45); border-radius: 10px; }")
+        tbl = QHBoxLayout(self.translate_bar)
+        tbl.setContentsMargins(14, 8, 10, 8)
+        tbl.setSpacing(8)
+        self.translate_label = QLabel()
+        self.translate_label.setWordWrap(True)
+        tbl.addWidget(self.translate_label, 1)
+        self.translate_yes = QPushButton("")
+        self.translate_yes.setObjectName("primary")
+        self.translate_no = QPushButton(tr("Pas maintenant"))
+        self.translate_no.setObjectName("flat")
+        self.translate_yes.clicked.connect(self._translate_now)
+        self.translate_no.clicked.connect(self.translate_bar.hide)
+        tbl.addWidget(self.translate_yes)
+        tbl.addWidget(self.translate_no)
+        self.translate_bar.hide()
         sw = QHBoxLayout()
         sw.setContentsMargins(22, 8, 22, 0)
         sw.addWidget(self.suspect_bar)
@@ -437,6 +456,10 @@ class MainWindow(ExtrasMixin, OrganizerMixin, AIMixin, QMainWindow):
         rw.setContentsMargins(22, 6, 22, 0)
         rw.addWidget(self.receipt_bar)
         rl.addLayout(rw)
+        tw = QHBoxLayout()
+        tw.setContentsMargins(22, 6, 22, 0)
+        tw.addWidget(self.translate_bar)
+        rl.addLayout(tw)
         self.extras = MessageExtras()
         self._wire_extras()
         rl.addWidget(self.extras)
@@ -518,6 +541,9 @@ class MainWindow(ExtrasMixin, OrganizerMixin, AIMixin, QMainWindow):
         self.timer = QTimer(self)
         self.timer.timeout.connect(self._on_timer)
         self.timer.start(60_000)
+        self.folder_timer = QTimer(self)
+        self.folder_timer.timeout.connect(self._folders_live)
+        self.folder_timer.start(20_000)                                   # dossiers de rangement : tri fait ailleurs repris en ~20 s
         self.outbox_timer = QTimer(self)
         self.outbox_timer.timeout.connect(self.process_outbox)
         self.outbox_timer.start(2000)
@@ -563,7 +589,9 @@ class MainWindow(ExtrasMixin, OrganizerMixin, AIMixin, QMainWindow):
         b = QPushButton(("%s  %s" % (glyph, text)) if label else glyph)
         b.setObjectName("flat")
         b.setCursor(Qt.PointingHandCursor)
-        b.setToolTip("%s  (%s)" % (text, shortcut.replace("Delete", "Suppr")) if shortcut else text)
+        b._tip_text = text
+        self.__dict__.setdefault("_tool_buttons", []).append(b)
+        b.setToolTip(self._tip(text, a))
         b.clicked.connect(lambda _c=False: a.trigger())
         if self_layout is not None:
             self_layout.addWidget(b)
@@ -700,7 +728,13 @@ class MainWindow(ExtrasMixin, OrganizerMixin, AIMixin, QMainWindow):
     def _toggle_folder(self, key):
         """Plie / déplie un dossier ou une boîte (chevron) ; l'état est mémorisé comme dans la version GTK."""
         NT.toggle(self.config, key)
-        self._build_sidebar(self.view_key)
+        if key.startswith("acc:"):                            # un clic sur une boîte : elle se déplie ET ses messages s'affichent
+            self.account, self.view_key, self.current, self._kept = key[4:], "inbox", None, set()
+            self._build_sidebar("inbox")
+            self.reload()
+            self._show(None)
+        else:
+            self._build_sidebar(self.view_key)
         self._update_counts()
 
     def _update_counts(self):
@@ -721,7 +755,9 @@ class MainWindow(ExtrasMixin, OrganizerMixin, AIMixin, QMainWindow):
 
     def _view_changed(self, row):
         if row >= 0 and self.folders.item(row).data(KeyRole) is not None:
-            self.view_key = self.folders.item(row).data(KeyRole)
+            it = self.folders.item(row)
+            self.view_key = it.data(KeyRole)
+            self.account = it.data(AccountRole) if it.data(KindRole) == "folder" and it.data(AccountRole) else "all"     # dossier d'une boîte : ses messages seulement
             self.current, self._kept = None, set()
             self.reload()
             self._show(None)
@@ -751,12 +787,31 @@ class MainWindow(ExtrasMixin, OrganizerMixin, AIMixin, QMainWindow):
 
     # ------------------------------------------------------------ actions
     def _act(self, bar, text, shortcut, fn):
+        """Action à raccourci : le raccourci du code est celui par défaut, remplacé par celui de Réglages → Raccourcis s'il existe."""
         a = QAction(text, self)
-        if shortcut:
-            a.setShortcut(QKeySequence(shortcut))
+        a._default_shortcut = shortcut
+        seq = SC.resolve(self.config, shortcut) if shortcut else ""
+        if seq:
+            a.setShortcut(QKeySequence(seq))
         a.triggered.connect(lambda _c=False: fn())
         self.addAction(a)
+        self.__dict__.setdefault("_sc_actions", []).append(a)
         return a
+
+    @staticmethod
+    def _tip(text, action):
+        seq = action.shortcut().toString(QKeySequence.NativeText)
+        return "%s  (%s)" % (text, seq.replace("Delete", "Suppr")) if seq else text
+
+    def reapply_shortcuts(self):
+        """Applique tout de suite les raccourcis de Réglages → Raccourcis (fenêtre principale)."""
+        for a in self.__dict__.get("_sc_actions", []):
+            d = getattr(a, "_default_shortcut", None)
+            if d:
+                seq = SC.resolve(self.config, d)
+                a.setShortcut(QKeySequence(seq) if seq else QKeySequence())
+        for b in self.__dict__.get("_tool_buttons", []):
+            b.setToolTip(self._tip(b._tip_text, b.action))
 
     def set_layout(self, layout):
         """Disposition : columns (liste | lecture), bottom (lecture en bas) ou list (liste seule, la lecture prend tout l'écran)."""
@@ -1305,7 +1360,7 @@ class MainWindow(ExtrasMixin, OrganizerMixin, AIMixin, QMainWindow):
             return
         m = msgs[0]
         menu = QMenu(self)
-        for it in MN.context_items(m, m.sender_email.lower() in {x.lower() for x in self.config["blocked"]}):
+        for it in MN.context_items(m, m.sender_email.lower() in {x.lower() for x in self.config["blocked"]}, self._integrations()):
             if it is None:
                 menu.addSeparator()
             else:
@@ -1324,7 +1379,7 @@ class MainWindow(ExtrasMixin, OrganizerMixin, AIMixin, QMainWindow):
     def show_palette(self):
         sel = self.selected_msgs()
         m = getattr(self, "shown", None) or (sel[0] if sel else None)
-        dlg = Palette(self, MN.palette_commands(m, self.engine))
+        dlg = Palette(self, MN.palette_commands(m, self.engine, self._integrations()))
         dlg.chosen.connect(lambda k: QTimer.singleShot(0, lambda: self._run_cmd(k, m)))
         dlg.asked.connect(lambda t: QTimer.singleShot(0, lambda: (self.toggle_assistant(True), self.assistant_ask(t))))
         dlg.exec()
@@ -1339,6 +1394,8 @@ class MainWindow(ExtrasMixin, OrganizerMixin, AIMixin, QMainWindow):
                 return self.move_selected(key)
             if key in ("read", "star", "pin"):
                 return self.toggle_flag({"read": "unread", "star": "starred", "pin": "pinned"}[key])
+            if head == "integ":
+                return self.send_to(arg, m)
             if key in ("print", "print_pdf"):
                 return self.print_message(pdf=(key == "print_pdf"))
             if key == "notspam":
@@ -1492,6 +1549,18 @@ class MainWindow(ExtrasMixin, OrganizerMixin, AIMixin, QMainWindow):
         self._busy = True
         self._background(lambda: (None, AU.sync_and_route(self.engine, ("inbox",), only=aids), self.engine.refresh_folder_counts()), "sync")
 
+    def _folders_live(self):
+        if self._busy or getattr(self, "_folders_busy", False):
+            return
+        self._folders_busy = True
+
+        def done(res, err):
+            self._folders_busy = False
+            if res and not err:
+                self.reload()
+                self._update_counts()
+        self._background(self.engine.sync_changed_folders, done)
+
     def _on_timer(self):
         self._tick += 1
         self.refresh_btn.setToolTip(tr("Relever le courrier maintenant") + "  (Ctrl+R)\n" + self.engine.push_summary())
@@ -1513,6 +1582,7 @@ class MainWindow(ExtrasMixin, OrganizerMixin, AIMixin, QMainWindow):
             self.images_btn.hide()
             self.suspect_bar.hide()
             self.receipt_bar.hide()
+            self.translate_bar.hide()
             self.extras.clear()
             self.ai_card.idle()
             self.quick.hide()
@@ -1547,6 +1617,7 @@ class MainWindow(ExtrasMixin, OrganizerMixin, AIMixin, QMainWindow):
         self._fill_images_menu(msg)
         self._suspect_check(msg)
         self._receipt_check(msg)
+        self._translate_check(msg)
         self.reader.show_html(vm.render_html(msg, load, self.is_dark()))
         self.apply_zoom()
         self.fill_extras(msg)
@@ -1554,6 +1625,40 @@ class MainWindow(ExtrasMixin, OrganizerMixin, AIMixin, QMainWindow):
         self.quick.set_ai(AS.ai_engine(self.engine).enabled())
         if msg.folder != "drafts":
             self.ai_open(msg)
+
+    def _integrations(self):
+        from .. import integrations as IG
+        try:
+            return IG.available(self.config, self.config.password)
+        except Exception:
+            return []
+
+    def send_to(self, service, msg):
+        """Envoie le message vers un service réglé (Réglages → Intégrations) ; le résultat s'affiche dans la barre d'état."""
+        from .. import integrations as IG
+        full = self.cache.get(msg.id) or msg
+        s = IG.settings(self.config)
+        if service in ("obsidian", "bear"):
+            from PySide6.QtCore import QUrl
+            from PySide6.QtGui import QDesktopServices
+            uri = IG.obsidian_uri(s.get("obsidian_vault", ""), full) if service == "obsidian" else IG.bear_uri(full)
+            ok = QDesktopServices.openUrl(QUrl(uri))
+            self.status.setText(tr("Ouvert dans %s") % IG.labels()[service] if ok else tr("%s n'a pas pu être ouvert") % IG.labels()[service])
+            return
+        if service == "notes":
+            try:
+                self.status.setText(tr("Note enregistrée : %s") % IG.export_markdown(full, s.get("notes_dir", "")))
+            except OSError as e:
+                self.status.setText(tr("Note impossible : %s") % e)
+            return
+        secret = self.config.password(IG.SECRET_KEYS.get(service, ""))
+        jobs = {"teams": lambda: IG.send_webhook("teams", secret, full), "slack": lambda: IG.send_webhook("slack", secret, full),
+                "todoist": lambda: IG.todoist_task(secret, full, s.get("todoist_project", "")),
+                "notion": lambda: IG.notion_page(secret, s.get("notion_db", ""), full)}
+        if service not in jobs:
+            return
+        self.status.setText(tr("Envoi vers %s…") % IG.labels()[service])
+        self._background(jobs[service], lambda res, err: self.status.setText(("✔ " if res and res[0] else "✖ ") + (res[1] if res else str(err)[:100])))
 
     def print_message(self, pdf=False):
         """Imprime le message affiché (boîte de dialogue d'impression du système) ou l'enregistre en PDF."""
@@ -1583,6 +1688,25 @@ class MainWindow(ExtrasMixin, OrganizerMixin, AIMixin, QMainWindow):
         doc.setHtml(printing.printable_html(full))
         doc.print_(printer)
         self.status.setText(tr("Enregistré en PDF : %s") % printer.outputFileName() if pdf else tr("Message envoyé à l'imprimante"))
+
+    def _translate_check(self, msg):
+        """Message écrit dans une autre langue que la vôtre (détection locale) : propose de le traduire avec l'IA."""
+        self.translate_bar.hide()
+        if not self.config.get("translate_offer", True) or msg.folder in ("sent", "drafts"):
+            return
+        from .. import langdetect as LD
+        from . import assistant as AS
+        mine = self.config.get("ai_lang", "fr")
+        lang = LD.language_of(msg)
+        if lang and lang != mine and AS.ai_engine(self.engine).enabled():
+            self.translate_label.setText(tr("Ce message est écrit en %s.") % LD.name(lang))
+            self.translate_yes.setText(tr("Traduire en %s") % LD.name(mine))
+            self.translate_bar.show()
+
+    def _translate_now(self):
+        self.translate_bar.hide()
+        if self.shown is not None:
+            self._on_ai_action("translate", "")
 
     def _receipt_check(self, msg):
         """L'expéditeur demande un accusé de lecture : on répond selon le réglage (jamais / demander / toujours) ; une seule réponse par message."""
