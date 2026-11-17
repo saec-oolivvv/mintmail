@@ -74,7 +74,8 @@ SECTIONS: List[Dict] = [
          "Ajouter un vrai compte remplace automatiquement la démo."),
         ("Découvrir la fenêtre",
          "• Barre latérale : vues intelligentes (Boîte de réception, Non lus, Favoris, Épinglés, Reportés, Brouillons), comptes et leurs dossiers, "
-         "recherches enregistrées, voyant de synchronisation entre machines (⇄) en pied.\n"
+         "recherches enregistrées, voyant de synchronisation entre machines (⇄) en pied. Avec plusieurs boîtes mail, chacune apparaît sous "
+         "« Boîte de réception » et « Envoyés » avec ses non lus (un clic n'affiche qu'elle ; le chevron replie la liste).\n"
          "• « Non lus » réunit les messages non lus de la boîte de réception ET de tous vos dossiers de rangement et archives (règles, IA, rangement manuel), "
          "sauf Spam, Corbeille, Envoyés et Brouillons : un message important rangé dans un dossier ne passe pas inaperçu. MintMail relit ces dossiers "
          "en arrière-plan, environ chaque minute, sans télécharger ce qui est déjà lu. Un message que vous ouvrez dans « Non lus » y reste affiché "
@@ -370,7 +371,7 @@ SECTIONS: List[Dict] = [
     ]},
     {"id": "look", "title": "Apparence et réglages", "items": [
         ("Styles et thème",
-         "Paramètres → Apparence : trois styles — Aurora (sombre lumineux, défaut), Papier (clair chaleureux), Terminal (vert sur noir) — chacun en clair ou "
+         "Paramètres → Apparence : quatre styles — Aurora (sombre lumineux, défaut), Papier (clair chaleureux), Terminal (vert sur noir), Ardoise (sobre, façon Spark : lignes à plat, sélection pleine) — chacun en clair ou "
          "sombre (ou selon le système), couleur d'accent, densité de la liste (compacte, confortable, aérée), zoom du texte des messages. "
          "☰ → « Basculer clair / sombre » pour changer en un clic."),
         ("Autres réglages",
@@ -468,7 +469,7 @@ SECTION_META: Dict[str, Tuple[str, str]] = {
     "attach": ("📎", "Pièces jointes, invitations, contacts et agendas."),
     "sync": ("🔄", "Retrouvez tout, à l'identique, sur vos autres machines."),
     "offline": ("📶", "Travaillez sans réseau : rien n'est perdu, tout part au retour du réseau."),
-    "look": ("🎨", "Styles Aurora, Papier et Terminal, thème clair ou sombre, densité de la liste."),
+    "look": ("🎨", "Styles Aurora, Papier, Terminal et Ardoise, thème clair ou sombre, densité de la liste."),
     "updates": ("⬆", "Mises à jour signées, annoncées par un bandeau, installées en un clic."),
     "security": ("🔒", "Où sont vos données, ce qui les protège, comment signaler une faille."),
     "cli": ("🧰", "Options de la commande mintmail et solutions aux problèmes courants."),
@@ -496,7 +497,7 @@ HOME: Dict = {
         "\\ bascule entre les colonnes et la liste seule : pratique sur un petit écran.",
         "Ctrl+J ouvre l'assistant IA.",
         "P épingle un message ; sur les serveurs qui l'acceptent, l'épingle suit vos autres postes.",
-        "Paramètres → Apparence : choisissez Aurora, Papier ou Terminal, en clair ou en sombre.",
+        "Paramètres → Apparence : choisissez Aurora, Papier, Terminal ou Ardoise, en clair ou en sombre.",
         "« mintmail --check-update », dans un terminal, indique si une nouvelle version vous attend.",
         "Quand une nouvelle version existe, un bandeau s'affiche à chaque démarrage ; « Plus tard » le cache 24 h.",
         "F1 ouvre cette aide à tout moment ; la recherche accepte un mot ou un bout de mot, sans accent.",

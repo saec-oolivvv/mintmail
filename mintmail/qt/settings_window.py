@@ -775,6 +775,8 @@ class SettingsDialog(QDialog):
 
     def _set(self, key, value):
         self.cfg[key] = value
+        if key == "style" and value in STYLES:
+            self.cfg["accent"] = STYLES[value]["accent"]          # chaque style arrive avec sa couleur d'accent (modifiable ensuite)
         self.cfg.save()
         if key in ("threads", "swipe", "swipe_invert"):
             self.main.reload()

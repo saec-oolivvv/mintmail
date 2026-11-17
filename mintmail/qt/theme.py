@@ -26,7 +26,8 @@ def resolve(config, system_dark=False) -> dict:
     meta = STYLES[style]
     t = {k: solid(v) for k, v in meta["dark" if dark else "light"].items() if k != "canvas"}
     t.update(accent=config.get("accent") or meta["accent"], style=style, dark=dark, r=meta["r"], rs=meta["rs"], rp=min(meta["rp"], 18),
-             font=meta["font"], head=meta["head"], hw=meta["hw"], tints=dict(NAV_TINTS), avatars=list(AVATARS))
+             font=meta["font"], head=meta["head"], hw=meta["hw"], tints=dict(NAV_TINTS), avatars=list(AVATARS),
+             flat=bool(meta.get("flat")))                    # lignes à plat (sans bulles), sélection pleine : style Ardoise
     # Qt ne superpose pas les teintes translucides sur un dégradé : on les compose sur le fond pour obtenir des aplats lisibles
     t["canvas"] = t["bg"]
     for k in ("side", "card", "panel", "hover", "field"):
@@ -126,4 +127,16 @@ QCalendarWidget QWidget { background: %(card)s; }
 QToolBar { background: transparent; border: none; spacing: 4px; padding: 6px 10px; }
 QStatusBar { background: transparent; color: %(dim)s; }
 QStatusBar::item { border: none; }
-""" % dict(t, r=r, rs=rs, rp=rp, rc=min(r, 18) + (4 if r > 8 else 0))
+""" % dict(t, r=r, rs=rs, rp=rp, rc=min(r, 18) + (4 if r > 8 else 0)) + (_FLAT_QSS % t if t.get("flat") else "")
+
+
+# Ardoise (façon Spark) : panneaux à plat sans filet, barre latérale plus sombre collée au bord, titre de vue plus grand
+_FLAT_QSS = """
+#sidebar, #listcol, #readerwrap, #assistant { border: none; }
+#listcol { background: %(bg)s; }
+#readerwrap { background: %(panel)s; }
+#subject { font-size: 20px; }
+QLineEdit#search { background: %(field)s; border: 1px solid transparent; }
+QLineEdit#search:focus { border: 1px solid %(accent)s; }
+QPushButton#primary { border-radius: 10px; }
+"""

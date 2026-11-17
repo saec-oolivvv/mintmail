@@ -1,9 +1,10 @@
 """Identités visuelles de MintMail (données seules : l'interface Qt les traduit en feuille de style, voir qt/theme.py).
 
-Trois styles, chacun en clair et en sombre :
+Quatre styles, chacun en clair et en sombre :
 - Aurora   : verre dépoli sur dégradé nuit, lueurs de l'IA, formes très arrondies (par défaut)
 - Papier   : éditorial, encre sur papier chaud, titres en empattement, filets fins, aucune carte
 - Terminal : monospace, angles droits, vert phosphore, densité maximale
+- Ardoise  : sobre et dense comme Spark — gris ardoise, bleu franc, lignes à plat sans bulles, sélection pleine
 """
 from .i18n import tr
 
@@ -50,8 +51,17 @@ STYLES = {
                       text="#10301c", dim="#4f7a5f", line="#b9d2bf", field="#f8fcf8", ai1="#0b8f45",
                       ai2="#0a6b8f", on="#ffffff", canvas="#eef5ee"),
     },
+    "ardoise": {
+        "label": tr("Ardoise — sobre, façon Spark"), "accent": "#3478f6", "r": 12, "rs": 9, "rp": 999, "ra": 999, "flat": True,
+        "font": '"Inter", "SF Pro Text", "Segoe UI", "Cantarell", "Ubuntu", "Helvetica Neue", sans-serif',
+        "head": '"Inter", "SF Pro Display", "Segoe UI", "Cantarell", sans-serif', "hw": 700,
+        "dark": dict(bg="#1b1c21", side="#18191d", card="#222329", panel="#1f2025", hover="#2a2c33", text="#eceef3",
+                     dim="#8d919e", line="#2c2e35", field="#26272e", ai1="#9b8cff", ai2="#3478f6", on="#ffffff", canvas="#1b1c21"),
+        "light": dict(bg="#f3f4f7", side="#eceef2", card="#ffffff", panel="#ffffff", hover="#e9edf4", text="#1d1f24",
+                      dim="#6b7180", line="#e2e5eb", field="#ffffff", ai1="#6d5cf6", ai2="#2563eb", on="#ffffff", canvas="#f3f4f7"),
+    },
 }
 DEFAULT_STYLE = "aurora"
 DEFAULT_ACCENT = STYLES[DEFAULT_STYLE]["accent"]
-ACCENTS = [(tr("Indigo"), "#7c8cff"), (tr("Cyan"), "#22b8f0"), (tr("Menthe"), "#2fd6a1"), (tr("Vert"), "#16a34a"),
+ACCENTS = [(tr("Indigo"), "#7c8cff"), (tr("Bleu"), "#3478f6"), (tr("Cyan"), "#22b8f0"), (tr("Menthe"), "#2fd6a1"), (tr("Vert"), "#16a34a"),
            (tr("Orange"), "#f97316"), (tr("Rose"), "#ec4899"), (tr("Terracotta"), "#b4472f"), (tr("Phosphore"), "#3dff8a")]

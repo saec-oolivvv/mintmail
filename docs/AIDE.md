@@ -1,4 +1,4 @@
-# Aide de MintMail 1.42.1
+# Aide de MintMail 1.42.2
 _Généré par `make docs` depuis l'aide intégrée (touche F1 dans l'application)._
 
 ## Premiers pas
@@ -28,7 +28,7 @@ Sans compte configuré, MintMail affiche des messages d'exemple pour essayer l'i
 
 ### Découvrir la fenêtre
 
-• Barre latérale : vues intelligentes (Boîte de réception, Non lus, Favoris, Épinglés, Reportés, Brouillons), comptes et leurs dossiers, recherches enregistrées, voyant de synchronisation entre machines (⇄) en pied.  
+• Barre latérale : vues intelligentes (Boîte de réception, Non lus, Favoris, Épinglés, Reportés, Brouillons), comptes et leurs dossiers, recherches enregistrées, voyant de synchronisation entre machines (⇄) en pied. Avec plusieurs boîtes mail, chacune apparaît sous « Boîte de réception » et « Envoyés » avec ses non lus (un clic n'affiche qu'elle ; le chevron replie la liste).  
 • « Non lus » réunit les messages non lus de la boîte de réception ET de tous vos dossiers de rangement et archives (règles, IA, rangement manuel), sauf Spam, Corbeille, Envoyés et Brouillons : un message important rangé dans un dossier ne passe pas inaperçu. MintMail relit ces dossiers en arrière-plan, environ chaque minute, sans télécharger ce qui est déjà lu. Un message que vous ouvrez dans « Non lus » y reste affiché (liste et lecteur) tant que vous ne passez pas à un autre ; il en sort seulement à ce moment-là, ou si vous agissez dessus (archiver, supprimer…).  
 • Liste des messages au centre, lecteur à droite. Les séparateurs se déplacent à la souris et la position est retenue.  
 • Un clic ouvre toujours le message. Le mode sélection (touche X ou bouton) affiche des cases à cocher pour agir sur plusieurs messages.  
@@ -400,7 +400,7 @@ Connexions IMAP persistantes, chargement progressif, liste mise à jour sans rec
 
 ### Styles et thème
 
-Paramètres → Apparence : trois styles — Aurora (sombre lumineux, défaut), Papier (clair chaleureux), Terminal (vert sur noir) — chacun en clair ou sombre (ou selon le système), couleur d'accent, densité de la liste (compacte, confortable, aérée), zoom du texte des messages. ☰ → « Basculer clair / sombre » pour changer en un clic.
+Paramètres → Apparence : quatre styles — Aurora (sombre lumineux, défaut), Papier (clair chaleureux), Terminal (vert sur noir), Ardoise (sobre, façon Spark : lignes à plat, sélection pleine) — chacun en clair ou sombre (ou selon le système), couleur d'accent, densité de la liste (compacte, confortable, aérée), zoom du texte des messages. ☰ → « Basculer clair / sombre » pour changer en un clic.
 
 ### Autres réglages
 
@@ -528,7 +528,7 @@ Mise à jour : sudo apt install ./mintmail_X.Y.Z_all.deb (vos réglages et votre
 
 ## À propos et crédits
 
-### MintMail 1.42.1
+### MintMail 1.42.2
 
 Le client mail pour Linux Mint dont l'IA est l'ADN : il lit, trie, résume, classe, rédige et agit avec vous — toujours avec votre accord.  
 Développé par SAEC — https://saec.me · Logiciel libre sous licence MIT (© 2026 SAEC) : vous pouvez l'utiliser, le modifier et le redistribuer. Application Qt (PySide6) / Python, sans service cloud imposé : vos mails, vos clés et vos réglages restent chez vous.

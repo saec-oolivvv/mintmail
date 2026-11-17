@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.42.2
+- Barre latérale façon Spark : sous « Boîte de réception » et « Envoyés », une ligne par boîte mail (avatar, adresse, non lus), repliable par son chevron ; un clic n'affiche que cette boîte.
+- Nouveau style « Ardoise » (Paramètres → Apparence → Style visuel), sobre comme Spark : gris ardoise, bleu franc, panneaux à plat, lignes de messages sans bulles, sélection pleine, avatars cerclés. Choisir un style applique aussi sa couleur d'accent (modifiable ensuite) ; nouvel accent « Bleu ».
+- Liste large (disposition « liste seule » ou fenêtre très large) : un message par ligne — avatar, expéditeur, objet suivi de l'extrait, date à droite —, avec les titres de période de la 1.42.0.
+
 ## 1.42.1
 - Tous les dossiers de toutes les boîtes (Archive, Spam, Corbeille, vos dossiers) sont lus en fond dès le démarrage : messages récents et tous les non lus, pastilles à jour sans ouvrir chaque dossier ; ensuite relevé toutes les ~20 s.
 

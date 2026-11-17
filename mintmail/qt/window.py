@@ -678,6 +678,8 @@ class MainWindow(ExtrasMixin, OrganizerMixin, AIMixin, QMainWindow):
         self.folders.blockSignals(True)
         self.folders.clear()
         smart, base = vm.VIEWS[:6], vm.VIEWS[6:]
+        accounts = [a for a in self.engine.accounts() if not a.get("demo")]
+        collapsed = set(self.config.get("collapsed_folders") or [])
         for group in (smart, base):
             for key, label in group:
                 it = QListWidgetItem(label)
@@ -687,6 +689,22 @@ class MainWindow(ExtrasMixin, OrganizerMixin, AIMixin, QMainWindow):
                 it.setData(KindRole, "view")
                 it.setData(KindRole + 1, 0)
                 self.folders.addItem(it)
+                if key in ("inbox", "sent") and len(accounts) > 1:            # comme Spark : chaque boîte mail sous la vue unifiée
+                    tkey = "view:" + key
+                    it.setData(ToggleRole, tkey)
+                    it.setData(FoldedRole, tkey in collapsed)
+                    if tkey in collapsed:
+                        continue
+                    for a in accounts:
+                        sub = QListWidgetItem(a.get("email") or a.get("name") or a["id"])
+                        sub.setData(KeyRole, key)
+                        sub.setData(LabelRole, a.get("email") or a.get("name") or a["id"])
+                        sub.setData(CountRole, 0)
+                        sub.setData(KindRole, "acctview")
+                        sub.setData(DepthRole, 1)
+                        sub.setData(AccountRole, a["id"])
+                        sub.setToolTip(a.get("name") or "")
+                        self.folders.addItem(sub)
         saved = SS.rows(self.config)
         if saved:
             self._caption(tr("Recherches"))
@@ -720,7 +738,9 @@ class MainWindow(ExtrasMixin, OrganizerMixin, AIMixin, QMainWindow):
         self.folders.blockSignals(False)
 
     def select_view(self, key, quiet=False):
-        row = next((i for i in range(self.folders.count()) if self.folders.item(i).data(KeyRole) == key), 0)
+        rows = [i for i in range(self.folders.count()) if self.folders.item(i).data(KeyRole) == key]
+        # plusieurs lignes pour une même vue (unifiée + une par boîte) : celle de la boîte affichée
+        row = next((i for i in rows if self._scope_of(self.folders.item(i)) == getattr(self, "account", "all")), rows[0] if rows else 0)
         if quiet:
             self.folders.blockSignals(True)
         self.folders.setCurrentRow(row)
@@ -743,7 +763,12 @@ class MainWindow(ExtrasMixin, OrganizerMixin, AIMixin, QMainWindow):
     def _toggle_folder(self, key):
         """Plie / déplie un dossier ou une boîte (chevron) ; l'état est mémorisé comme dans la version GTK."""
         NT.toggle(self.config, key)
-        if key.startswith("acc:"):                            # un clic sur une boîte : elle se déplie ET ses messages s'affichent
+        if key.startswith("view:") and self.account != "all":    # boîtes repliées sous la vue : on revient à la vue unifiée
+            self.account, self.current, self._kept = "all", None, set()
+            self._build_sidebar(self.view_key)
+            self.reload()
+            self._show(None)
+        elif key.startswith("acc:"):                            # un clic sur une boîte : elle se déplie ET ses messages s'affichent
             self.account, self.view_key, self.current, self._kept = key[4:], "inbox", None, set()
             self._build_sidebar("inbox")
             self.reload()
@@ -754,7 +779,7 @@ class MainWindow(ExtrasMixin, OrganizerMixin, AIMixin, QMainWindow):
 
     def _update_counts(self):
         c = vm.counts(self.cache, self.account)
-        unread = self.engine.folder_unread
+        unread, per = self.engine.folder_unread, {}
         for i in range(self.folders.count()):
             it = self.folders.item(i)
             kind, key = it.data(KindRole), it.data(KeyRole)
@@ -763,6 +788,11 @@ class MainWindow(ExtrasMixin, OrganizerMixin, AIMixin, QMainWindow):
             elif kind == "account":
                 aid = it.data(AccountRole)
                 it.setData(CountRole, sum(int(v or 0) for (a, n), v in unread.items() if a == aid and n not in vm.SPECIAL))
+            elif kind == "acctview":                                  # non lus de la boîte de réception de cette boîte mail
+                aid = it.data(AccountRole)
+                if aid not in per:
+                    per[aid] = vm.counts(self.cache, aid)
+                it.setData(CountRole, per[aid].get(key, 0) if key == "inbox" else 0)
             elif key is not None:
                 it.setData(CountRole, c.get(key, 0))
         self.folders.viewport().update()
@@ -770,7 +800,7 @@ class MainWindow(ExtrasMixin, OrganizerMixin, AIMixin, QMainWindow):
 
     def _scope_of(self, it):
         """Boîte affichée pour une ligne de la barre latérale : « all » (boîte unifiée) pour les vues, la boîte du dossier pour un dossier de rangement."""
-        return it.data(AccountRole) if it.data(KindRole) == "folder" and it.data(AccountRole) else "all"
+        return it.data(AccountRole) if it.data(KindRole) in ("folder", "acctview") and it.data(AccountRole) else "all"
 
     def _nav_clicked(self, it):
         if it is None or it.data(KeyRole) is None or self._scope_of(it) == self.account:

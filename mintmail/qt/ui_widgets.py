@@ -8,6 +8,7 @@ from ..i18n import tr
 from . import gestures as GS
 
 InfoRole = Qt.UserRole + 2
+WIDE_MIN = 820                                   # liste plus large que ceci (disposition « liste seule ») : messages sur une ligne, comme Spark
 KeyRole, LabelRole, CountRole, KindRole = Qt.UserRole, Qt.UserRole + 1, Qt.UserRole + 2, Qt.UserRole + 3
 DepthRole, ToggleRole, FoldedRole, AccountRole, NameRole = (KindRole + n for n in (1, 2, 3, 4, 5))
 CHEVRON_X = 8                                   # le chevron des dossiers occupe [CHEVRON_X, CHEVRON_X + 22] à droite de la marge de la ligne
@@ -23,7 +24,8 @@ class NavList(QListWidget):
         if key:
             r = self.visualItemRect(it)
             left = r.left() + CHEVRON_X + 14 * min(int(it.data(DepthRole) or 0), 3)
-            if it.data(KindRole) == "account" or left <= e.position().x() <= left + 24:
+            zone = 13 if it.data(KindRole) == "view" else 24          # vue (Boîte de réception, Envoyés) : seul le chevron plie, la pastille ouvre la vue
+            if it.data(KindRole) == "account" or left <= e.position().x() <= left + zone:
                 self.toggled.emit(key)
                 e.accept()
                 return
@@ -37,12 +39,18 @@ def _c(hex_, alpha=None):
     return c
 
 
-def draw_avatar(p: QPainter, rect: QRect, name: str, key: str, t: dict):
-    """Disque coloré (couleur stable par expéditeur) avec les initiales."""
+def draw_avatar(p: QPainter, rect: QRect, name: str, key: str, t: dict, ring: bool = False):
+    """Disque coloré (couleur stable par expéditeur) avec les initiales ; ring=True : cerclé d'un anneau, comme les avatars de Spark."""
     p.save()
     p.setRenderHint(QPainter.Antialiasing, True)
+    color = _c(t["avatars"][color_index(key or name or "?", len(t["avatars"]))])
+    if ring and rect.width() >= 24:
+        p.setPen(QPen(color, 2))
+        p.setBrush(Qt.NoBrush)
+        p.drawEllipse(QRectF(rect).adjusted(1, 1, -1, -1))
+        rect = rect.adjusted(4, 4, -4, -4)
     p.setPen(Qt.NoPen)
-    p.setBrush(_c(t["avatars"][color_index(key or name or "?", len(t["avatars"]))]))
+    p.setBrush(color)
     p.drawEllipse(rect)
     f = QFont(p.font())
     f.setBold(True)
@@ -96,6 +104,13 @@ class MessageList(QListView):
         if act and row >= 0:
             self.swiped.emit(row, act)
 
+    def resizeEvent(self, e):
+        super().resizeEvent(e)
+        wide = self.viewport().width() >= WIDE_MIN
+        if wide != self._d.wide:                                   # bascule ligne unique (large) / trois lignes (colonne étroite)
+            self._d.wide = wide
+            self.doItemsLayout()
+
     def mousePressEvent(self, e):
         idx = self.indexAt(e.position().toPoint())
         self._press = (e.position().toPoint(), idx.row()) if idx.isValid() and e.button() == Qt.LeftButton else None
@@ -141,7 +156,11 @@ class MessageDelegate(QStyledItemDelegate):
         super().__init__()
         self.t, self.h = t, height
         self.select_mode = False
+        self.wide = False                            # liste large : une ligne par message (expéditeur · objet — extrait · date)
         self.swipe = None                            # (ligne, décalage, action) pendant un geste
+
+    def row_h(self):
+        return max(48, self.h - 24) if self.wide else self.h
 
     HEAD = 30                                        # hauteur du titre de période (Aujourd'hui, Hier, mois…) au-dessus de la 1re ligne d'une période
 
@@ -150,7 +169,7 @@ class MessageDelegate(QStyledItemDelegate):
         return info.get("section", "") if isinstance(info, dict) else ""
 
     def sizeHint(self, option, index):
-        return QSize(option.rect.width(), self.h + (self.HEAD if self._head(index) else 0))
+        return QSize(option.rect.width(), self.row_h() + (self.HEAD if self._head(index) else 0))
 
     def paint(self, p, option, index):
         head = self._head(index)
@@ -168,17 +187,18 @@ class MessageDelegate(QStyledItemDelegate):
         opt.rect = option.rect.adjusted(0, self.HEAD, 0, 0)
         self._paint_row(p, opt, index)
 
-    def _paint_row(self, p, option, index):
-        info, t = index.data(InfoRole), self.t
-        p.save()
-        sw = self.swipe
-        if sw and sw[0] == index.row():
-            self._paint_swipe(p, option.rect, sw[1], sw[2])
-            p.translate(max(-option.rect.width(), min(option.rect.width(), sw[1])) * 0.9, 0)
-        p.setRenderHint(QPainter.Antialiasing, True)
-        card = QRectF(option.rect).adjusted(10, 3, -10, -3)
-        selected, hover = bool(option.state & QStyle.State_Selected), bool(option.state & QStyle.State_MouseOver)
+    def _background(self, p, option, selected, hover):
+        """Fond d'une ligne : bulle arrondie avec filet (Aurora, Papier, Terminal) ou ligne à plat, sélection pleine (Ardoise)."""
+        t = self.t
         rad = min(t["r"], 16) if t["r"] > 8 else t["rs"]
+        if t.get("flat"):
+            card = QRectF(option.rect).adjusted(8, 1, -8, -1)
+            if selected or hover:
+                path = QPainterPath()
+                path.addRoundedRect(card, rad, rad)
+                p.fillPath(path, _c(t["accent"], 70) if selected else _c(t["hover"]))
+            return card
+        card = QRectF(option.rect).adjusted(10, 3, -10, -3)
         path = QPainterPath()
         path.addRoundedRect(card, rad, rad)                                    # chaque message est une bulle : fond, filet, accent à la sélection
         p.fillPath(path, _c(t["hover"]) if hover and not selected else _c(t["card"]))
@@ -191,6 +211,20 @@ class MessageDelegate(QStyledItemDelegate):
             p.setPen(Qt.NoPen)
             p.setBrush(_c(t["accent"]))
             p.drawRoundedRect(QRectF(card.left(), card.top() + 14, 3, card.height() - 28), 1.5, 1.5)
+        return card
+
+    def _paint_row(self, p, option, index):
+        info, t = index.data(InfoRole), self.t
+        if self.wide:
+            return self._paint_wide(p, option, index, info)
+        p.save()
+        sw = self.swipe
+        if sw and sw[0] == index.row():
+            self._paint_swipe(p, option.rect, sw[1], sw[2])
+            p.translate(max(-option.rect.width(), min(option.rect.width(), sw[1])) * 0.9, 0)
+        p.setRenderHint(QPainter.Antialiasing, True)
+        selected, hover = bool(option.state & QStyle.State_Selected), bool(option.state & QStyle.State_MouseOver)
+        self._background(p, option, selected, hover)
         r = option.rect.adjusted(20, 0, -20, 0)
         if self.select_mode:                                                   # case ronde à cocher, l'avatar se décale
             cy = option.rect.center().y()
@@ -203,7 +237,7 @@ class MessageDelegate(QStyledItemDelegate):
                 p.drawLine(r.left() + 6, cy + 4, r.left() + 12, cy - 4)
             r = r.adjusted(26, 0, 0, 0)
         av = QRect(r.left(), option.rect.top() + (self.h - 40) // 2, 40, 40)
-        draw_avatar(p, av, info["sender"], info["email"] or info["sender"], t)
+        draw_avatar(p, av, info["sender"], info["email"] or info["sender"], t, ring=bool(t.get("flat")))
         x, w = av.right() + 13, r.right() - av.right() - 13
         top = option.rect.top() + 11
         unread = info["unread"]
@@ -248,6 +282,80 @@ class MessageDelegate(QStyledItemDelegate):
             p.drawEllipse(QRectF(option.rect.left() + 8 + 3, option.rect.top() + self.h / 2 - 3.5, 7, 7))
         p.restore()
 
+
+    def _marks(self, info):
+        badge = (tr("⚠ Suspect") + "  ") if info.get("spam") else (tr("⚡ Important") + "  ") if info.get("prio") == 3 else ""
+        return badge + ("%d✉  " % info["count"] if info.get("count") else "") + ("👁 " if info.get("read_by") else "") + ("📌 " if info["pinned"] else "") \
+            + ("★ " if info["starred"] else "") + ("📎" if info["attachments"] else "")
+
+    def _paint_wide(self, p, option, index, info):
+        """Liste large (comme Spark) : une ligne — avatar, expéditeur, objet suivi de l'extrait, marques, date."""
+        t = self.t
+        p.save()
+        sw = self.swipe
+        if sw and sw[0] == index.row():
+            self._paint_swipe(p, option.rect, sw[1], sw[2])
+            p.translate(max(-option.rect.width(), min(option.rect.width(), sw[1])) * 0.9, 0)
+        p.setRenderHint(QPainter.Antialiasing, True)
+        selected, hover = bool(option.state & QStyle.State_Selected), bool(option.state & QStyle.State_MouseOver)
+        self._background(p, option, selected, hover)
+        rect = option.rect
+        h = rect.height()
+        cy = rect.top() + h // 2
+        unread = info["unread"]
+        if unread:
+            p.setPen(Qt.NoPen)
+            p.setBrush(_c(t["accent"]))
+            p.drawEllipse(QRectF(rect.left() + 11, cy - 3.5, 7, 7))
+        x = rect.left() + 26
+        if self.select_mode:
+            p.setPen(QPen(_c(t["accent"]) if selected else _c(t["dim"]), 1.6))
+            p.setBrush(_c(t["accent"]) if selected else Qt.NoBrush)
+            p.drawEllipse(QRectF(x, cy - 9, 18, 18))
+            x += 28
+        draw_avatar(p, QRect(x, cy - 17, 34, 34), info["sender"], info["email"] or info["sender"], t, ring=bool(t.get("flat")))
+        x += 34 + 14
+        bold, plain, small = QFont(option.font), QFont(option.font), QFont(option.font)
+        bold.setPixelSize(14)
+        bold.setBold(True)
+        plain.setPixelSize(14)
+        small.setPixelSize(12)
+        small.setBold(True)
+        p.setFont(small)
+        tw = p.fontMetrics().horizontalAdvance(info["time"]) + 6
+        p.setPen(_c(t["accent"]) if unread else _c(t["dim"]))
+        p.drawText(QRect(rect.right() - 24 - tw, rect.top(), tw, h), Qt.AlignRight | Qt.AlignVCenter, info["time"])
+        end = rect.right() - 24 - tw - 12
+        marks = self._marks(info)
+        if marks:
+            sm = QFont(option.font)
+            sm.setPixelSize(12)
+            p.setFont(sm)
+            mw = p.fontMetrics().horizontalAdvance(marks) + 4
+            p.setPen(_c("#dc2626") if info.get("spam") else _c("#f5b301") if info["starred"] else _c(t["dim"]))
+            p.drawText(QRect(end - mw, rect.top(), mw, h), Qt.AlignRight | Qt.AlignVCenter, marks)
+            end -= mw + 8
+        p.setFont(bold if unread else plain)
+        p.setPen(_c(t["text"]))
+        sw_ = min(230, max(120, (end - x) // 4))
+        p.drawText(QRect(x, rect.top(), sw_, h), Qt.AlignLeft | Qt.AlignVCenter, p.fontMetrics().elidedText(info["sender"], Qt.ElideRight, sw_))
+        x += sw_ + 18
+        if end - x > 40:
+            subj = info["subject"] or ""
+            p.setFont(bold if unread else plain)
+            fm = p.fontMetrics()
+            subj_t = fm.elidedText(subj, Qt.ElideRight, end - x)
+            sw2 = fm.horizontalAdvance(subj_t)
+            p.setPen(_c(t["text"]))
+            p.drawText(QRect(x, rect.top(), sw2 + 2, h), Qt.AlignLeft | Qt.AlignVCenter, subj_t)
+            rest = end - x - sw2 - 14
+            ai = info.get("ai")
+            line = ("✨ " + ai) if ai else info["snippet"]
+            if rest > 40 and line:
+                p.setFont(plain)
+                p.setPen(_c(t["accent"]) if ai else _c(t["dim"]))
+                p.drawText(QRect(x + sw2 + 14, rect.top(), rest, h), Qt.AlignLeft | Qt.AlignVCenter, p.fontMetrics().elidedText(line, Qt.ElideRight, rest))
+        p.restore()
 
     def _paint_swipe(self, p, rect, dx, act):
         """Fond coloré de l'action visée sous la ligne qui glisse (gris tant que le seuil n'est pas atteint)."""
@@ -349,10 +457,12 @@ class NavDelegate(QStyledItemDelegate):
             return
         selected, hover = bool(option.state & QStyle.State_Selected), bool(option.state & QStyle.State_MouseOver)
         card = QRectF(rect).adjusted(10, 2, -10, -2)
+        flat = bool(t.get("flat"))
         if selected or hover:
             path = QPainterPath()
             path.addRoundedRect(card, t["rs"] + 2, t["rs"] + 2)
-            p.fillPath(path, _c(t["accent"], 40) if selected else _c(t["hover"]))
+            p.fillPath(path, (_c(t["accent"]) if flat else _c(t["accent"], 40)) if selected else _c(t["hover"]))   # Ardoise : sélection pleine
+        sel_text = _c(t["on"]) if flat else _c(t["accent"])
         key, count, depth = index.data(KeyRole), index.data(CountRole) or 0, index.data(DepthRole) or 0
         toggle, folded = index.data(ToggleRole), bool(index.data(FoldedRole))
         left = rect.left() + 22 + 14 * min(int(depth), 3)
@@ -366,15 +476,18 @@ class NavDelegate(QStyledItemDelegate):
             p.setPen(Qt.NoPen)
             p.setBrush(_c(t["dim"]))
             p.drawPath(path)
-        tint = t["tints"].get(key) or t["dim"]
-        p.setPen(Qt.NoPen)
-        p.setBrush(_c(tint if selected or key in t["tints"] else t["dim"]))
-        p.drawEllipse(QRectF(left, rect.center().y() - 4.5, 9, 9))
+        if kind == "acctview":                                                         # une boîte mail sous « Boîte de réception » / « Envoyés »
+            draw_avatar(p, QRect(int(left) - 4, rect.center().y() - 9, 18, 18), label, label, t)
+        else:
+            tint = t["tints"].get(key) or t["dim"]
+            p.setPen(Qt.NoPen)
+            p.setBrush(_c(tint if selected or key in t["tints"] else t["dim"]))
+            p.drawEllipse(QRectF(left, rect.center().y() - 4.5, 9, 9))
         f = QFont(option.font)
         f.setPixelSize(14)
-        f.setBold(selected or bool(count) and key != "drafts")
+        f.setBold(selected or bool(count) and key != "drafts" and kind != "acctview")
         p.setFont(f)
-        p.setPen(_c(t["accent"]) if selected else _c(t["text"]))
+        p.setPen(sel_text if selected else _c(t["text"]))
         pill_w = 0
         if count and key != "drafts":
             txt = str(count) if count < 1000 else "999+"
@@ -384,15 +497,15 @@ class NavDelegate(QStyledItemDelegate):
             p.setFont(pf)
             pill_w = p.fontMetrics().horizontalAdvance(txt) + 14
             pill = QRectF(rect.right() - 18 - pill_w, rect.center().y() - 9, pill_w, 18)
-            p.setPen(Qt.NoPen)
-            p.setBrush(_c(t["accent"]) if key in ("inbox", "unread") else _c(t["line"]))
-            p.drawRoundedRect(pill, 9, 9)
-            p.setPen(QColor(t["on"]) if key in ("inbox", "unread") else _c(t["dim"]))
+            loud = key in ("inbox", "unread") and kind != "acctview"
+            if not (flat and kind == "acctview"):
+                p.setPen(Qt.NoPen)
+                p.setBrush(_c(t["accent"]) if loud else _c(t["line"]))
+                p.drawRoundedRect(pill, 9, 9)
+            p.setPen(QColor(t["on"]) if loud or (flat and selected) else _c(t["dim"]))
             p.drawText(pill, Qt.AlignCenter, txt)
-            p.setFont(f)
-            p.setPen(_c(t["accent"]) if selected else _c(t["text"]))
         p.setFont(f)
-        p.setPen(_c(t["accent"]) if selected else _c(t["text"]))
+        p.setPen(sel_text if selected else _c(t["text"]))
         text_rect = QRect(left + 20, rect.top(), rect.right() - left - 20 - pill_w - 24, rect.height())
         p.drawText(text_rect, Qt.AlignLeft | Qt.AlignVCenter, p.fontMetrics().elidedText(label, Qt.ElideRight, text_rect.width()))
         p.restore()

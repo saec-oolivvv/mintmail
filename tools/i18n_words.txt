@@ -69,6 +69,7 @@ Nom
 Notes
 Adresse (alias)
 Indigo
+Bleu
 Cyan
 Menthe
 Vert
