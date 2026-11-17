@@ -86,6 +86,7 @@ SECTIONS: List[Dict] = [
          "• Fenêtre étroite : la barre latérale se replie et le lecteur passe en pleine largeur (bouton Retour). F11 : plein écran."),
         ("Disposition de la liste et du lecteur",
          "Paramètres → Gestes & disposition : colonnes (liste à gauche, lecteur à droite), liste en haut / lecteur en bas, ou liste seule. "
+         "Par défaut (comme Spark), la liste occupe toute la largeur et le message s'ouvre au clic : la barre d'actions passe alors en haut du message, la flèche ← (ou Échap) revient à la liste. "
          "La touche \\ bascule rapidement entre colonnes et liste seule. Le panneau latéral peut être réduit en rail d'icônes."),
     ]},
     {"id": "read", "title": "Lire et organiser", "items": [

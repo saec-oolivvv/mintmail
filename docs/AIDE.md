@@ -1,4 +1,4 @@
-# Aide de MintMail 1.43.1
+# Aide de MintMail 1.44.0
 _Généré par `make docs` depuis l'aide intégrée (touche F1 dans l'application)._
 
 ## Premiers pas
@@ -38,7 +38,7 @@ Astuce : Ctrl+K ouvre la palette de commandes ; tapez quelques lettres pour trou
 
 ### Disposition de la liste et du lecteur
 
-Paramètres → Gestes & disposition : colonnes (liste à gauche, lecteur à droite), liste en haut / lecteur en bas, ou liste seule. La touche \ bascule rapidement entre colonnes et liste seule. Le panneau latéral peut être réduit en rail d'icônes.
+Paramètres → Gestes & disposition : colonnes (liste à gauche, lecteur à droite), liste en haut / lecteur en bas, ou liste seule. Par défaut (comme Spark), la liste occupe toute la largeur et le message s'ouvre au clic : la barre d'actions passe alors en haut du message, la flèche ← (ou Échap) revient à la liste. La touche \ bascule rapidement entre colonnes et liste seule. Le panneau latéral peut être réduit en rail d'icônes.
 
 ## Lire et organiser
 
@@ -529,7 +529,7 @@ Mise à jour : sudo apt install ./mintmail_X.Y.Z_all.deb (vos réglages et votre
 
 ## À propos et crédits
 
-### MintMail 1.43.1
+### MintMail 1.44.0
 
 Le client mail pour Linux Mint dont l'IA est l'ADN : il lit, trie, résume, classe, rédige et agit avec vous — toujours avec votre accord.  
 Développé par SAEC — https://saec.me · Logiciel libre sous licence MIT (© 2026 SAEC) : vous pouvez l'utiliser, le modifier et le redistribuer. Application Qt (PySide6) / Python, sans service cloud imposé : vos mails, vos clés et vos réglages restent chez vous.

@@ -350,7 +350,11 @@ class MainWindow(ExtrasMixin, OrganizerMixin, AIMixin, QMainWindow):
         self.actions_row = QHBoxLayout()
         self.actions_row.setContentsMargins(14, 0, 14, 4)
         self.actions_row.setSpacing(0)
-        ll.addLayout(self.actions_row)
+        self.actions_bar = QWidget()
+        self.actions_bar.setLayout(self.actions_row)
+        ll.addWidget(self.actions_bar)
+        self._ll = ll
+        self._actions_index = ll.count() - 1
         self.cat_bar = QWidget()
         cb = QHBoxLayout(self.cat_bar)
         cb.setContentsMargins(16, 0, 16, 2)
@@ -404,6 +408,12 @@ class MainWindow(ExtrasMixin, OrganizerMixin, AIMixin, QMainWindow):
         headrow = QHBoxLayout()
         headrow.setContentsMargins(24, 16, 18, 12)
         headrow.setSpacing(14)
+        self.reader_back = QPushButton("←")
+        self.reader_back.setObjectName("flat")
+        self.reader_back.setCursor(Qt.PointingHandCursor)
+        self.reader_back.setToolTip(tr("Retour à la liste / annuler") + "  (Échap)")
+        self.reader_back.clicked.connect(self._back_to_list)
+        headrow.addWidget(self.reader_back, 0, Qt.AlignTop)
         headrow.addWidget(self.avatar, 0, Qt.AlignTop)
         headrow.addWidget(self.head, 1)
         headrow.addLayout(rb)
@@ -421,6 +431,7 @@ class MainWindow(ExtrasMixin, OrganizerMixin, AIMixin, QMainWindow):
         rl = QVBoxLayout(right)
         rl.setContentsMargins(6, 6, 6, 6)                    # marge intérieure : les coins du lecteur web restent dans l'arrondi
         rl.setSpacing(0)
+        self._rl = rl
         rl.addWidget(readerhead)
         ib = QHBoxLayout()
         ib.setContentsMargins(22, 8, 22, 0)
@@ -584,7 +595,10 @@ class MainWindow(ExtrasMixin, OrganizerMixin, AIMixin, QMainWindow):
         self.outbox_timer.timeout.connect(self.process_outbox)
         self.outbox_timer.start(2000)
         self.apply_theme()
-        self.set_layout(self.config.get("layout") or "columns")
+        if not self.config.get("layout_spark"):                          # une seule fois : lecture au clic (liste pleine largeur), comme Spark ; modifiable dans Paramètres → Gestes & disposition
+            self.config["layout"], self.config["layout_spark"] = "list", True
+            self.config.save()
+        self.set_layout(self.config.get("layout") or "list")
         self._act(None, "", "Escape", self._back_to_list)
         self._act(None, "", "Ctrl+R", lambda: self.sync())
         self._act(None, "", "Ctrl+P", lambda: self.print_message())
@@ -681,7 +695,11 @@ class MainWindow(ExtrasMixin, OrganizerMixin, AIMixin, QMainWindow):
         self.sort_btn.setText("⇅  " + (tr("Par priorité") if by_priority else tr("Par date")))
         reads = RC.read_ids(self.cache, [m.id for m in msgs if m.folder == "sent"]) if msgs else {}
         lead = bool(self._group_info and self.category is None and getattr(self._group_info[1], "digest", None))
-        self.model.set_messages(msgs, meta, reads, lead=lead and not by_priority, sections=not by_priority)
+        self._reloading = True                                               # la remise à zéro du modèle vide la sélection : ce n'est pas un « message fermé »
+        try:
+            self.model.set_messages(msgs, meta, reads, lead=lead and not by_priority, sections=not by_priority)
+        finally:
+            self._reloading = False
         self.srv_btn.setVisible(bool(q.strip()) and not AW.is_ai_query(raw) and not any(a.get("demo") for a in self.engine.accounts()))
         self.update_digest_visibility()
         self.update_category_bar()
@@ -856,6 +874,8 @@ class MainWindow(ExtrasMixin, OrganizerMixin, AIMixin, QMainWindow):
             self._show(None)
 
     def _row_changed(self, cur, _prev):
+        if not cur.isValid() and getattr(self, "_reloading", False):
+            return
         mid = cur.data(IdRole) if cur.isValid() else None
         old = self.current
         self.current, self.load_images = mid, False
@@ -914,6 +934,8 @@ class MainWindow(ExtrasMixin, OrganizerMixin, AIMixin, QMainWindow):
         self.split.setOrientation(Qt.Vertical if layout == "bottom" else Qt.Horizontal)
         self.listcol.show()
         self.right.setVisible(layout != "list")
+        self.reader_back.setVisible(layout == "list")
+        self._place_actions(False)
         if layout == "bottom":
             self.split.setSizes([320, 520])
 
@@ -996,9 +1018,24 @@ class MainWindow(ExtrasMixin, OrganizerMixin, AIMixin, QMainWindow):
         cur = self.config.get("layout") or "columns"
         self.set_layout(order[(order.index(cur) + 1) % 3 if cur in order else 0])
 
+    def _place_actions(self, reading):
+        """Disposition « liste seule » (comme Spark) : pendant la lecture, la barre d'actions (archiver, supprimer, déplacer, ⋯…) passe en haut du message ;
+        de retour à la liste, elle revient au-dessus de la liste."""
+        bar, here = self.actions_bar, self._rl if reading else self._ll
+        there = self._ll if reading else self._rl
+        if here.indexOf(bar) >= 0:
+            return
+        there.removeWidget(bar)
+        if reading:
+            self._rl.insertWidget(0, bar)
+        else:
+            self._ll.insertWidget(min(getattr(self, "_actions_index", 4), self._ll.count()), bar)
+        bar.show()
+
     def _back_to_list(self):
         if (self.config.get("layout") == "list") and self.listcol.isHidden():
             self.right.hide()
+            self._place_actions(False)
             self.listcol.show()
 
     def _step(self, d):
@@ -1718,6 +1755,8 @@ class MainWindow(ExtrasMixin, OrganizerMixin, AIMixin, QMainWindow):
     def _show(self, msg):
         self.shown = msg
         if msg is None:
+            if self.config.get("layout") == "list":
+                self._back_to_list()                                         # liste seule : plus de message ouvert → retour à la liste
             self.head.setText("")
             self.avatar.set_sender("", "")
             self.images_btn.hide()
@@ -1730,6 +1769,7 @@ class MainWindow(ExtrasMixin, OrganizerMixin, AIMixin, QMainWindow):
             self.reader.show_html("<html><body style='margin:0;background:%s'></body></html>" % ("#1f2229" if self.is_dark() else "#ffffff"))
             return
         if self.config.get("layout") == "list":                      # liste seule : la lecture remplace la liste (Échap pour revenir)
+            self._place_actions(True)
             self.listcol.hide()
             self.right.show()
         h = vm.header_lines(msg)

@@ -22,7 +22,7 @@
     ],
     [
      "List and reader layout",
-     "Settings → Gestures & layout: columns (list on the left, reader on the right), list on top / reader at the bottom, or list only. The \\ key quickly switches between columns and list only. The side panel can be collapsed to an icon rail."
+     "Settings → Gestures & layout: columns (list on the left, reader on the right), list on top / reader at the bottom, or list only. By default (as in Spark) the list uses the full width and the message opens on click: the action bar then moves to the top of the message, the ← arrow (or Esc) goes back to the list. The \\ key quickly switches between columns and list only. The side panel can be collapsed to an icon rail."
     ]
    ]
   },

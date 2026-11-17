@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.44.0
+- Lecture au clic, comme Spark : la liste prend toute la largeur (plus de 3e colonne) et le message s'ouvre au clic, avec la barre d'actions (archiver, supprimer, déplacer, ⋯…) en haut du message et une flèche ← (ou Échap) pour revenir. C'est la disposition par défaut ; à la première ouverture de cette version, elle remplace l'ancienne disposition (Paramètres → Gestes & disposition pour revenir aux colonnes).
+- La liste ne se vide plus en pleine lecture quand elle est rechargée par une synchronisation.
+
 ## 1.43.1
 - Lecteur vide : fond sombre (au lieu d'un grand carré blanc) quand aucun message n'est ouvert.
 - Rangées de groupes placées juste au-dessus des messages, sous la carte « En bref » ; titres de période en casse normale, comme dans Spark.
