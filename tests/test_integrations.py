@@ -29,6 +29,12 @@ class FakeResp:
         return False
 
 
+class _Patch:
+    """Remplace pytest.monkeypatch quand le test est lancé par tests/run_all.py (sans pytest)."""
+    def setattr(self, obj, name, value):
+        setattr(obj, name, value)
+
+
 def capture(monkeypatch, status=200, body=b"{}"):
     calls = []
 
@@ -55,7 +61,8 @@ def test_webhook_addresses_must_be_public_https():
     assert I.public_https("https://8.8.8.8/x")
 
 
-def test_teams_and_slack_payloads(monkeypatch):
+def test_teams_and_slack_payloads(monkeypatch=None):
+    monkeypatch = monkeypatch or _Patch()
     calls = capture(monkeypatch)
     assert I.send_webhook("slack", "https://8.8.8.8/hook", msg())[0]
     body = json.loads(calls[0].data)
@@ -66,13 +73,15 @@ def test_teams_and_slack_payloads(monkeypatch):
     assert not ok and len(calls) == 2                                       # refusé avant tout envoi
 
 
-def test_http_errors_are_explained(monkeypatch):
+def test_http_errors_are_explained(monkeypatch=None):
+    monkeypatch = monkeypatch or _Patch()
     capture(monkeypatch, status=401)
     ok, why = I.todoist_task("tok", msg())
     assert not ok and "401" in why
 
 
-def test_todoist_and_notion_requests(monkeypatch):
+def test_todoist_and_notion_requests(monkeypatch=None):
+    monkeypatch = monkeypatch or _Patch()
     calls = capture(monkeypatch)
     assert I.todoist_task("tok", msg(), project="123", due="demain")[0]
     r = calls[0]
