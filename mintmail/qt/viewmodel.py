@@ -296,15 +296,16 @@ class Engine(OfflineMixin):
                     self.folder_unread[(a["id"], name)], changed = unseen, True
         return changed
 
-    def sync_changed_folders(self):
-        """Temps réel des dossiers de rangement : interroge (STATUS, léger) tous les dossiers de chaque boîte ; ceux dont la signature a changé
-        depuis le dernier passage (tri fait sur un autre poste) sont relus (liste complète : les messages déplacés ou supprimés ailleurs
-        disparaissent d'ici). Le premier passage ne fait que mémoriser l'état. Retourne True si le cache a changé."""
+    def sync_changed_folders(self, budget=8):
+        """Tous les dossiers de toutes les boîtes (Archive, Spam, Corbeille, vos dossiers…) : interroge l'état de chacun (STATUS, léger) ; un dossier jamais lu
+        ou dont l'état a changé (tri fait sur un autre poste) est relu en entier — messages récents et TOUS les non lus ; ceux partis ailleurs disparaissent d'ici.
+        `budget` dossiers relus au plus par passage, pour ne pas retarder la boîte de réception : le reste suit aux passages suivants.
+        Retourne True si le cache a changé."""
         sigs, changed = self.__dict__.setdefault("_folder_sigs", {}), False
         for a in self.accounts():
             if a.get("demo"):
                 continue
-            ents = [e for e in self.folder_entries(a["id"]) if e.get("selectable", True)][:60]
+            ents = [e for e in self.folder_entries(a["id"]) if e.get("selectable", True)][:80]
             logical = {e["name"]: dest_of(e) for e in ents}
             try:
                 be = self.backend(a["id"])
@@ -313,22 +314,27 @@ class Engine(OfflineMixin):
                 continue
             for name, sig in status.items():
                 key, lg = (a["id"], name), logical[name]
-                old, sigs[key] = sigs.get(key), sig
-                if old is None or old == sig or lg == "inbox":            # première observation / inchangé / boîte de réception (déjà suivie par IDLE)
+                self.folder_unread[key] = sig[1]
+                if sigs.get(key) == sig:
                     continue
+                if lg in ("inbox", "sent"):                                 # déjà relevés par la synchronisation principale (et IDLE pour la boîte de réception)
+                    sigs[key] = sig
+                    continue
+                if budget <= 0:
+                    continue
+                budget -= 1
                 try:
                     kn = self.cache.uids(a["id"], lg)
                     msgs, flags, present, _min = be.sync(lg, kn, limit=60, unseen=True)
                 except Exception:
-                    sigs[key] = old                                           # on réessaiera au prochain passage
-                    continue
+                    continue                                                 # on réessaiera au prochain passage
+                sigs[key] = sig
                 self.cache.upsert_many(msgs)
                 self._apply_flags(kn, flags)
                 gone = [mid for uid, mid in kn.items() if present is not None and uid not in present]
                 if gone:
                     self.cache.delete_many(gone)
                 changed = changed or bool(msgs or gone or flags)
-                self.folder_unread[key] = sig[1]
         return changed
 
     def refresh_folders(self):

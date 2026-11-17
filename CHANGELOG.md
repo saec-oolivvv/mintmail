@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.42.1
+- Tous les dossiers de toutes les boîtes (Archive, Spam, Corbeille, vos dossiers) sont lus en fond dès le démarrage : messages récents et tous les non lus, pastilles à jour sans ouvrir chaque dossier ; ensuite relevé toutes les ~20 s.
+
 ## 1.42.0
 - Boîte unifiée façon Spark : en haut, une rangée par groupe (Épinglés, Notifications, Newsletters, Invitations…) avec son nombre de non lus et seulement les noms des expéditeurs ; un clic ouvre le groupe. Les épinglés sont désormais un groupe comme les autres (réglable dans Paramètres → Groupes).
 - La liste est découpée par période : Aujourd'hui, Hier, Semaine dernière, puis chaque mois de l'année, puis chaque année.

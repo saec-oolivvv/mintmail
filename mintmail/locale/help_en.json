@@ -296,7 +296,7 @@
     ],
     [
      "Real-time reception",
-     "MintMail uses IMAP IDLE: new messages arrive within seconds, with a desktop notification (can be turned off). A full refresh happens every N minutes (Appearance, 1 to 60) or on demand (Ctrl+R). The other folders (Archive, your folders) are polled about every 20 seconds: sorting done on another machine shows up there almost at once."
+     "MintMail uses IMAP IDLE: new messages arrive within seconds, with a desktop notification (can be turned off). A full refresh happens every N minutes (Appearance, 1 to 60) or on demand (Ctrl+R). All folders of all mailboxes (Archive, Spam, Trash, your folders) are read in the background at startup (recent messages and all unread ones), then polled about every 20 seconds: sorting done on another machine shows up there almost at once."
     ],
     [
      "Performance",

@@ -98,19 +98,61 @@ def test_sync_changed_folders_picks_up_sorting_done_elsewhere():
 
     class BE:
         sig = (2, 0, 3)
+        calls = 0
         def folder_signature(self, names):
             return {"Archive": self.sig}
         def sync(self, lg, kn, limit=60, unseen=False):
             assert unseen and lg == "archive"
-            return [], {}, {1}, 0
+            self.calls += 1
+            return [], {}, ({1, 2} if self.sig[0] == 2 else {1}), 0
 
     e = vm.Engine.__new__(vm.Engine)
     e.cache, e.folder_unread, be = Cache(), {}, BE()
     e.accounts = lambda: [{"id": "a1"}]
     e.folder_entries = lambda aid: [{"name": "Archive", "special": "archive", "selectable": True}]
     e.backend = lambda aid: be
-    assert e.sync_changed_folders() is False             # premier passage : on mémorise seulement
-    assert e.sync_changed_folders() is False             # rien n'a changé
+    assert e.sync_changed_folders() is False             # premier passage : le dossier est lu (rien de neuf)
+    assert be.calls == 1 and e.folder_unread[("a1", "Archive")] == 0
+    assert e.sync_changed_folders() is False and be.calls == 1      # rien n'a changé : pas de relecture
     be.sig = (1, 0, 3)
     assert e.sync_changed_folders() is True
     assert e.cache.deleted == ["m2"]
+
+
+def test_every_folder_of_every_mailbox_is_read_a_few_per_pass():
+    """Premier passage : chaque dossier jamais lu est relu (non lus compris), `budget` par passage pour laisser la main à la boîte de réception."""
+    from mintmail.qt import viewmodel as vm
+
+    class Cache:
+        def uids(self, a, f):
+            return {}
+        def upsert_many(self, m):
+            pass
+        def delete_many(self, ids):
+            pass
+        def ops_pending(self, limit=0):
+            return []
+        def update_many(self, *a, **k):
+            pass
+
+    class BE:
+        def __init__(self):
+            self.read = []
+        def folder_signature(self, names):
+            return {n: (3, 2, 9) for n in names}
+        def sync(self, lg, kn, limit=60, unseen=False):
+            assert unseen
+            self.read.append(lg)
+            return [], {}, set(), 0
+
+    be, e = BE(), vm.Engine.__new__(vm.Engine)
+    e.cache, e.folder_unread = Cache(), {}
+    e.accounts = lambda: [{"id": "a1"}]
+    e.folder_entries = lambda aid: [{"name": n, "special": s, "selectable": True} for n, s in (("INBOX", "inbox"), ("Sent", "sent"), ("Archive", "archive"), ("Spam", "spam"), ("Clients", None))]
+    e.backend = lambda aid: be
+    e.sync_changed_folders(budget=2)
+    assert be.read == ["archive", "spam"]                          # boîte de réception et envoyés : déjà couverts ; 2 dossiers par passage
+    e.sync_changed_folders(budget=2)
+    assert be.read == ["archive", "spam", "f:Clients"] and e.folder_unread[("a1", "Clients")] == 2
+    e.sync_changed_folders(budget=2)
+    assert len(be.read) == 3                                       # tout est lu : plus rien à relire

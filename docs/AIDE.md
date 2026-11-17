@@ -1,4 +1,4 @@
-# Aide de MintMail 1.42.0
+# Aide de MintMail 1.42.1
 _Généré par `make docs` depuis l'aide intégrée (touche F1 dans l'application)._
 
 ## Premiers pas
@@ -390,7 +390,7 @@ Un message dont l'envoi échoue à cause du réseau est conservé et réessayé 
 
 ### Réception en temps réel
 
-MintMail utilise IMAP IDLE : les nouveaux messages arrivent en quelques secondes, avec une notification de bureau (désactivable). Une actualisation complète a lieu toutes les N minutes (Apparence, 1 à 60) ou à la demande (Ctrl+R). Les autres dossiers (Archive, vos dossiers) sont relevés toutes les ~20 secondes : un tri fait sur un autre poste y apparaît presque aussitôt.
+MintMail utilise IMAP IDLE : les nouveaux messages arrivent en quelques secondes, avec une notification de bureau (désactivable). Une actualisation complète a lieu toutes les N minutes (Apparence, 1 à 60) ou à la demande (Ctrl+R). Tous les dossiers de toutes les boîtes (Archive, Spam, Corbeille, vos dossiers) sont lus en fond au démarrage (messages récents et tous les non lus), puis relevés toutes les ~20 secondes : un tri fait sur un autre poste y apparaît presque aussitôt.
 
 ### Performances
 
@@ -528,7 +528,7 @@ Mise à jour : sudo apt install ./mintmail_X.Y.Z_all.deb (vos réglages et votre
 
 ## À propos et crédits
 
-### MintMail 1.42.0
+### MintMail 1.42.1
 
 Le client mail pour Linux Mint dont l'IA est l'ADN : il lit, trie, résume, classe, rédige et agit avec vous — toujours avec votre accord.  
 Développé par SAEC — https://saec.me · Logiciel libre sous licence MIT (© 2026 SAEC) : vous pouvez l'utiliser, le modifier et le redistribuer. Application Qt (PySide6) / Python, sans service cloud imposé : vos mails, vos clés et vos réglages restent chez vous.

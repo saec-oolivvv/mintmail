@@ -363,7 +363,7 @@ SECTIONS: List[Dict] = [
         ("Réception en temps réel",
          "MintMail utilise IMAP IDLE : les nouveaux messages arrivent en quelques secondes, avec une notification de bureau (désactivable). "
          "Une actualisation complète a lieu toutes les N minutes (Apparence, 1 à 60) ou à la demande (Ctrl+R). "
-         "Les autres dossiers (Archive, vos dossiers) sont relevés toutes les ~20 secondes : un tri fait sur un autre poste y apparaît presque aussitôt."),
+         "Tous les dossiers de toutes les boîtes (Archive, Spam, Corbeille, vos dossiers) sont lus en fond au démarrage (messages récents et tous les non lus), puis relevés toutes les ~20 secondes : un tri fait sur un autre poste y apparaît presque aussitôt."),
         ("Performances",
          "Connexions IMAP persistantes, chargement progressif, liste mise à jour sans reconstruction, actions groupées en une transaction : archiver ou "
          "mettre un expéditeur en spam se fait en quelques millisecondes dans l'interface, le serveur suit en arrière-plan."),

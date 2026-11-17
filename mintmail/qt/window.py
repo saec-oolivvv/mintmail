@@ -551,6 +551,7 @@ class MainWindow(ExtrasMixin, OrganizerMixin, AIMixin, QMainWindow):
         self.timer.start(60_000)
         self.folder_timer = QTimer(self)
         self.folder_timer.timeout.connect(self._folders_live)
+        QTimer.singleShot(4000, self._folders_live)                       # premier passage peu après le démarrage : tous les dossiers sont lus en fond
         self.folder_timer.start(20_000)                                   # dossiers de rangement : tri fait ailleurs repris en ~20 s
         self.outbox_timer = QTimer(self)
         self.outbox_timer.timeout.connect(self.process_outbox)
