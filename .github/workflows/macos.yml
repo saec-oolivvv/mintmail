@@ -4,6 +4,10 @@ name: Application macOS
 # (la mise à jour intégrée de MintMail les y cherche). Non signé par Apple : clic droit → Ouvrir au premier lancement.
 on:
   workflow_dispatch:
+    inputs:
+      tag:
+        description: "Étiquette d'une Release existante (ex. v1.41.1) : construit CETTE version et joint les .dmg à la Release (facultatif)"
+        required: false
   release:
     types: [published]
 permissions:
@@ -21,7 +25,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ github.event_name == 'release' && github.event.release.tag_name || github.ref }}
+          ref: ${{ github.event_name == 'release' && github.event.release.tag_name || inputs.tag || github.ref }}
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
@@ -70,7 +74,7 @@ jobs:
             dist/*.dmg
             dist/*.dmg.sha256
       - name: Joindre à la Release
-        if: github.event_name == 'release'
+        if: github.event_name == 'release' || inputs.tag != ''
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release upload "${{ github.event.release.tag_name }}" dist/*.dmg dist/*.dmg.sha256 --clobber
+        run: gh release upload "${{ github.event.release.tag_name || inputs.tag }}" dist/*.dmg dist/*.dmg.sha256 --clobber
