@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.41.1
+- Aide intégrée (F1, FR/EN) et docs : intégrations, raccourcis personnalisables, traduction des messages, relevé des dossiers.
+
 ## 1.41.0
 - Synchronisation des dossiers en temps réel : un tri fait dans Archive ou un autre dossier sur un poste apparaît sur les autres en une vingtaine de secondes (relevé léger de l'état de chaque dossier, relecture de ceux qui ont changé).
 - Un clic sur une boîte mail dans la barre latérale la déplie ET affiche sa boîte de réception ; ses dossiers n'affichent plus que ses propres messages.

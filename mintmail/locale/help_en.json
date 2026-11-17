@@ -47,6 +47,10 @@
      "In the composer, the eye button requests a read receipt (Settings → Appearance → Read receipts to request one by default). When the recipient reads your message and their software sends the receipt, an eye 👁 appears on the message in “Sent” (tooltip: who and when) and, if you wish, a notification tells you.\n• When someone asks you for a receipt, MintMail offers to send it, never sends it, or always sends it (setting).\n• Limit: only the recipient's software decides whether to send the receipt (Gmail sends none). MintMail uses no tracking pixel."
     ],
     [
+     "Integrations (Teams, Slack, notes…)",
+     "As in Spark, send a message to your other tools: right-click a message, or the Ctrl+K palette (“Send to…”). Settings → Integrations:\n• Microsoft Teams and Slack: paste your channel's incoming webhook address.\n• Markdown notes (folder) and Obsidian: the message is saved as a note; Obsidian opens it in your vault.\n• Bear (Mac): “Open in Bear”.\n• Todoist: a task is created (API token, optional project). Notion: a page is added to your database (token and database ID).\n• “Send a test” button to check. Nothing is sent without your action; keys and addresses are kept in the system keyring, and only public HTTPS addresses are accepted."
+    ],
+    [
      "Your mailbox folders",
      "All IMAP folders of each account are visible in the side panel (collapsible tree, unread counts). • Click a folder to browse it; the “older messages” button loads further back in the history.\n• Move: V key, right-click menu or ☰, palette (“Move to…”), or the AI.\n• Create, rename, delete a folder or subfolder: right-click a folder or an account.\n• Special folders (Sent, Drafts, Archive, Spam, Trash) are recognized whatever the server's language."
     ],
@@ -105,6 +109,10 @@
     [
      "Command palette (Ctrl+K)",
      "Type a few letters to find an action: reply, archive, move to a folder, spam / block the sender or their domain, unsubscribe, summarize, translate, open contacts or identities, calendar and new event, outbox, search the server, change view, style, layout, display… Enter runs, Esc closes."
+    ],
+    [
+     "Customizable shortcuts",
+     "Settings → Shortcuts: the complete list of actions (messages, navigation, composing, application). Click in the “Shortcut” column then press the combination you want; a key already used by another action is refused. The cross disables the action, the arrow restores the original value, “Reset everything to the original values” restores all. Composing shortcuts only apply in the compose window."
     ],
     [
      "All keyboard shortcuts",
@@ -181,6 +189,10 @@
     [
      "Automatic sorting and “In brief”",
      "• Sorting: new messages get a priority (colored bar, “Important” badge) and suspicious ones are flagged “Suspicious”.\n• “In brief”: at the top of the inbox, a summary of what matters today. Each feature has its own switch in the AI settings."
+    ],
+    [
+     "Message translation",
+     "When a message is written in a language other than yours, a bar offers “Translate to …” (can be turned off: Settings → Appearance → Language). When replying to a foreign message, the ✨ menu in the composer offers “Translate my text to …” in the sender's language. The language is detected locally; the text is only sent to the AI when you ask (set up the AI in Settings → AI)."
     ],
     [
      "Translation, questions, calendar",
@@ -284,7 +296,7 @@
     ],
     [
      "Real-time reception",
-     "MintMail uses IMAP IDLE: new messages arrive within seconds, with a desktop notification (can be turned off). A full refresh happens every N minutes (Appearance, 1 to 60) or on demand (Ctrl+R)."
+     "MintMail uses IMAP IDLE: new messages arrive within seconds, with a desktop notification (can be turned off). A full refresh happens every N minutes (Appearance, 1 to 60) or on demand (Ctrl+R). The other folders (Archive, your folders) are polled about every 20 seconds: sorting done on another machine shows up there almost at once."
     ],
     [
      "Performance",

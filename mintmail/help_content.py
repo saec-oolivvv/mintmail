@@ -101,6 +101,8 @@ SECTIONS: List[Dict] = [
          "Comme dans Spark, la boîte de réception range automatiquement vos messages en groupes : Épinglés, Attribués à moi (vous êtes le seul destinataire d'une vraie personne, ou une tâche ou une relance est posée dessus), Invitations reçues, Réponses aux invitations, Notifications et Newsletters. Au-dessus de la liste, une pastille par groupe affiche son nombre de non lus ; « Principal » montre le reste, « Tout » montre tout.\n• Paramètres → Groupes : pour chaque groupe, « Grouper » (pastille à part) ou « Afficher tout dans la boîte principale », et un interrupteur général.\n• Chaque boîte mail peut avoir ses propres réglages (carte « Boîte mail » de la même page) : regrouper ou non, et mode de chaque groupe."),
         ("Accusés de lecture",
          "Dans la rédaction, le bouton œil demande un accusé de lecture (Paramètres → Apparence → Accusés de lecture pour le demander d'office). Quand le destinataire lit votre message et que son logiciel envoie l'accusé, un œil 👁 apparaît sur le message dans « Envoyés » (infobulle : qui, quand) et, si vous le souhaitez, une notification vous prévient.\n• Quand on vous demande un accusé, MintMail vous propose de l'envoyer, ne l'envoie jamais, ou l'envoie toujours (réglage).\n• Limite : seul le logiciel du destinataire décide d'envoyer l'accusé (Gmail n'en envoie pas). MintMail n'utilise aucune image espion."),
+        ('Intégrations (Teams, Slack, notes…)',
+         "Comme dans Spark, envoyez un message vers vos autres outils : clic droit sur un message, ou palette Ctrl+K (« Envoyer vers… »). Paramètres → Intégrations :\n• Microsoft Teams et Slack : collez l'adresse du webhook entrant de votre canal.\n• Notes Markdown (dossier) et Obsidian : le message est enregistré en note ; Obsidian l'ouvre dans votre coffre.\n• Bear (Mac) : « Ouvrir dans Bear ».\n• Todoist : une tâche est créée (jeton d'API, projet facultatif). Notion : une page est ajoutée à votre base (jeton et identifiant de la base).\n• Bouton « Envoyer un test » pour vérifier. Rien n'est envoyé sans votre geste ; les clés et adresses sont gardées dans le trousseau du système, et seules des adresses HTTPS publiques sont acceptées."),
         ("Dossiers de vos boîtes",
          "Tous les dossiers IMAP de chaque compte sont visibles dans la barre latérale (arborescence repliable, nombre de non lus). "
          "• Cliquez un dossier pour le parcourir ; le bouton « anciens messages » charge plus loin dans l'historique.\n"
@@ -176,6 +178,8 @@ SECTIONS: List[Dict] = [
          "Tapez quelques lettres pour retrouver une action : répondre, archiver, déplacer vers un dossier, spam / bloquer l'expéditeur ou son domaine, "
          "se désabonner, résumer, traduire, ouvrir les contacts ou les identités, agenda et nouvel événement, boîte d'envoi, chercher sur le serveur, changer de vue, de style, "
          "de disposition, d'affichage… Entrée exécute, Échap ferme."),
+        ('Raccourcis personnalisables',
+         "Paramètres → Raccourcis : la liste complète des actions (messages, navigation, rédaction, application). Cliquez dans la colonne « Raccourci » puis tapez la combinaison voulue ; une touche déjà prise par une autre action est refusée. La croix désactive l'action, la flèche remet la valeur d'origine, « Tout remettre à la valeur d'origine » rétablit tout. Les raccourcis de rédaction ne valent que dans la fenêtre de rédaction."),
         ("Tous les raccourcis clavier",
          "@SHORTCUTS@"),
     ]},
@@ -250,6 +254,8 @@ SECTIONS: List[Dict] = [
         ("Tri automatique et « En bref »",
          "• Tri : les nouveaux messages reçoivent une priorité (barre colorée, pastille « Important ») et les suspects sont signalés « Suspect ».\n"
          "• « En bref » : en haut de la boîte, un résumé de ce qui compte aujourd'hui. Chaque fonction a son interrupteur dans les réglages de l'IA."),
+        ('Traduction des messages',
+         "Quand un message est écrit dans une autre langue que la vôtre, un bandeau propose « Traduire en … » (désactivable : Paramètres → Apparence → Langue). Dans la rédaction, en répondant à un message étranger, le menu ✨ propose « Traduire mon texte en … » dans la langue de l'expéditeur. La langue est reconnue localement ; le texte n'est envoyé à l'IA qu'à votre demande (IA à configurer dans Paramètres → IA)."),
         ("Traduction, questions, agenda",
          "Clic droit → Traduire ce message (dans la langue réglée). Assistant ou « ? » : posez une question sur le message ouvert. "
          "Si l'IA détecte un rendez-vous : « Ajouter à l'agenda » (voir « Invitations et agenda »)."),
@@ -356,7 +362,8 @@ SECTIONS: List[Dict] = [
          "(adresse refusée, identifiants…) vous est rendu avec « Rouvrir » pour corriger. Les messages programmés partent aussi fenêtre fermée (voir « Envoi annulable et envoi différé »)."),
         ("Réception en temps réel",
          "MintMail utilise IMAP IDLE : les nouveaux messages arrivent en quelques secondes, avec une notification de bureau (désactivable). "
-         "Une actualisation complète a lieu toutes les N minutes (Apparence, 1 à 60) ou à la demande (Ctrl+R)."),
+         "Une actualisation complète a lieu toutes les N minutes (Apparence, 1 à 60) ou à la demande (Ctrl+R). "
+         "Les autres dossiers (Archive, vos dossiers) sont relevés toutes les ~20 secondes : un tri fait sur un autre poste y apparaît presque aussitôt."),
         ("Performances",
          "Connexions IMAP persistantes, chargement progressif, liste mise à jour sans reconstruction, actions groupées en une transaction : archiver ou "
          "mettre un expéditeur en spam se fait en quelques millisecondes dans l'interface, le serveur suit en arrière-plan."),

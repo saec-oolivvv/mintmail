@@ -1,4 +1,4 @@
-# Aide de MintMail 1.35.11
+# Aide de MintMail 1.41.1
 _Généré par `make docs` depuis l'aide intégrée (touche F1 dans l'application)._
 
 ## Premiers pas
@@ -53,28 +53,39 @@ Désactivation : Paramètres → Gestes & disposition → « Regrouper en conver
 
 ### Catégories
 
-Comme dans Spark, la boîte de réception range automatiquement vos messages en groupes : Épinglés, Attribués à moi (vous êtes le seul destinataire d'une vraie personne, ou une tâche ou une relance est posée dessus), Invitations reçues, Réponses aux invitations, Notifications et Newsletters. Au-dessus de la liste, une pastille par groupe affiche son nombre de non lus ; « Principal » montre le reste, « Tout » montre tout.
-• Paramètres → Groupes : pour chaque groupe, « Grouper » (pastille à part) ou « Afficher tout dans la boîte principale », et un interrupteur général.
+Comme dans Spark, la boîte de réception range automatiquement vos messages en groupes : Épinglés, Attribués à moi (vous êtes le seul destinataire d'une vraie personne, ou une tâche ou une relance est posée dessus), Invitations reçues, Réponses aux invitations, Notifications et Newsletters. Au-dessus de la liste, une pastille par groupe affiche son nombre de non lus ; « Principal » montre le reste, « Tout » montre tout.  
+• Paramètres → Groupes : pour chaque groupe, « Grouper » (pastille à part) ou « Afficher tout dans la boîte principale », et un interrupteur général.  
 • Chaque boîte mail peut avoir ses propres réglages (carte « Boîte mail » de la même page) : regrouper ou non, et mode de chaque groupe.
 
 ### Accusés de lecture
 
-Dans la rédaction, le bouton œil demande un accusé de lecture (Paramètres → Apparence → Accusés de lecture pour le demander d'office). Quand le destinataire lit votre message et que son logiciel envoie l'accusé, un œil 👁 apparaît sur le message dans « Envoyés » (infobulle : qui, quand) et, si vous le souhaitez, une notification vous prévient.
-• Quand on vous demande un accusé, MintMail vous propose de l'envoyer, ne l'envoie jamais, ou l'envoie toujours (réglage).
+Dans la rédaction, le bouton œil demande un accusé de lecture (Paramètres → Apparence → Accusés de lecture pour le demander d'office). Quand le destinataire lit votre message et que son logiciel envoie l'accusé, un œil 👁 apparaît sur le message dans « Envoyés » (infobulle : qui, quand) et, si vous le souhaitez, une notification vous prévient.  
+• Quand on vous demande un accusé, MintMail vous propose de l'envoyer, ne l'envoie jamais, ou l'envoie toujours (réglage).  
 • Limite : seul le logiciel du destinataire décide d'envoyer l'accusé (Gmail n'en envoie pas). MintMail n'utilise aucune image espion.
+
+### Intégrations (Teams, Slack, notes…)
+
+Comme dans Spark, envoyez un message vers vos autres outils : clic droit sur un message, ou palette Ctrl+K (« Envoyer vers… »). Paramètres → Intégrations :  
+• Microsoft Teams et Slack : collez l'adresse du webhook entrant de votre canal.  
+• Notes Markdown (dossier) et Obsidian : le message est enregistré en note ; Obsidian l'ouvre dans votre coffre.  
+• Bear (Mac) : « Ouvrir dans Bear ».  
+• Todoist : une tâche est créée (jeton d'API, projet facultatif). Notion : une page est ajoutée à votre base (jeton et identifiant de la base).  
+• Bouton « Envoyer un test » pour vérifier. Rien n'est envoyé sans votre geste ; les clés et adresses sont gardées dans le trousseau du système, et seules des adresses HTTPS publiques sont acceptées.
 
 ### Dossiers de vos boîtes
 
 Tous les dossiers IMAP de chaque compte sont visibles dans la barre latérale (arborescence repliable, nombre de non lus). • Cliquez un dossier pour le parcourir ; le bouton « anciens messages » charge plus loin dans l'historique.  
 • Déplacer : touche V, menu clic droit ou ☰, palette (« Déplacer vers… »), ou l'IA.  
 • Créer, renommer, supprimer un dossier ou un sous-dossier : clic droit sur un dossier ou un compte.  
-• Les dossiers spéciaux (Envoyés, Brouillons, Archives, Spam, Corbeille) sont reconnus quelle que soit la langue du serveur.
+• Les dossiers spéciaux (Envoyés, Brouillons, Archives, Spam, Corbeille) sont reconnus quelle que soit la langue du serveur.  
+Astuce : commencez la recherche par ? pour poser une question à l'IA (par exemple « ? factures de mars »).
 
 ### Favoris, épingles, reports, relances
 
 • Favori (S) : étoile synchronisée avec le serveur. Épingle (P) : garde le message en haut de la liste ; elle est AUSSI enregistrée sur la boîte (mot-clé IMAP), donc visible sur vos autres postes à leur prochaine synchronisation. Sur Gmail, c'est une ÉTIQUETTE « MintMail-Epingles », visible dans Gmail (web et mobile) ; sur un serveur IMAP standard, un mot-clé IMAP, invisible dans la plupart des messageries web mais vu par vos autres postes MintMail. Si le serveur ne peut pas la garder, MintMail vous prévient au premier essai et l'épingle reste sur ce poste seulement ; « mintmail --check-pins » donne le verdict exact. Palette → « Envoyer mes épingles vers la boîte » envoie celles faites avant la 1.13.2.  
 • Reporter (H = demain 8 h, ou clic droit → Reporter) : le message disparaît puis revient en haut de la boîte à l'heure choisie (plus tard aujourd'hui, demain, ce week-end, lundi, la semaine prochaine…).  
-• « Me rappeler si pas de réponse » (menu ⋯ du lecteur ou clic droit) : MintMail vous prévient si le destinataire n'a pas répondu après 3 jours.
+• « Me rappeler si pas de réponse » (menu ⋯ du lecteur ou clic droit) : MintMail vous prévient si le destinataire n'a pas répondu après 3 jours.  
+Astuce : X active le mode sélection, Ctrl+A sélectionne tout.
 
 ### Rechercher
 
@@ -82,13 +93,11 @@ Ctrl+F ou / : la recherche est instantanée sur l'objet, l'expéditeur, les dest
 Opérateurs combinables : from:marie · is:unread · is:starred · has:attachment (ex. « from:marie facture is:unread »).  
 • « 🔎 Chercher aussi sur le serveur » (sous la recherche, ou palette) interroge tout le serveur, même les messages jamais téléchargés, et ajoute les résultats à la liste.  
 • Recherche en langage naturel : commencez par « ? » (ex. « ? les mails non lus de Marie cette semaine ») — l'IA traduit votre phrase en critères.  
-• « Enregistrer la recherche » en fait une vue permanente dans la barre latérale.  
-Astuce : commencez la recherche par ? pour poser une question à l'IA (par exemple « ? factures de mars »).
+• « Enregistrer la recherche » en fait une vue permanente dans la barre latérale.
 
 ### Actions sur plusieurs messages
 
-Mode sélection (X) → cochez ou Ctrl+A, puis archiver (E), supprimer, marquer, déplacer (V), spam (!)… Une barre d'actions groupées s'affiche. Les actions sont instantanées ; un bandeau « Annuler » reste disponible quelques secondes.  
-Astuce : X active le mode sélection, Ctrl+A sélectionne tout.
+Mode sélection (X) → cochez ou Ctrl+A, puis archiver (E), supprimer, marquer, déplacer (V), spam (!)… Une barre d'actions groupées s'affiche. Les actions sont instantanées ; un bandeau « Annuler » reste disponible quelques secondes.
 
 ### Gestes de balayage (swipe)
 
@@ -141,6 +150,10 @@ Répondre, Répondre à tous, Transférer, Archiver, Supprimer, ✨ Répondre av
 ### Palette de commandes (Ctrl+K)
 
 Tapez quelques lettres pour retrouver une action : répondre, archiver, déplacer vers un dossier, spam / bloquer l'expéditeur ou son domaine, se désabonner, résumer, traduire, ouvrir les contacts ou les identités, agenda et nouvel événement, boîte d'envoi, chercher sur le serveur, changer de vue, de style, de disposition, d'affichage… Entrée exécute, Échap ferme.
+
+### Raccourcis personnalisables
+
+Paramètres → Raccourcis : la liste complète des actions (messages, navigation, rédaction, application). Cliquez dans la colonne « Raccourci » puis tapez la combinaison voulue ; une touche déjà prise par une autre action est refusée. La croix désactive l'action, la flèche remet la valeur d'origine, « Tout remettre à la valeur d'origine » rétablit tout. Les raccourcis de rédaction ne valent que dans la fenêtre de rédaction.
 
 ### Tous les raccourcis clavier
 
@@ -263,6 +276,10 @@ Quand vous rangez des messages à la main dans un dossier, MintMail retient « e
 • Tri : les nouveaux messages reçoivent une priorité (barre colorée, pastille « Important ») et les suspects sont signalés « Suspect ».  
 • « En bref » : en haut de la boîte, un résumé de ce qui compte aujourd'hui. Chaque fonction a son interrupteur dans les réglages de l'IA.
 
+### Traduction des messages
+
+Quand un message est écrit dans une autre langue que la vôtre, un bandeau propose « Traduire en … » (désactivable : Paramètres → Apparence → Langue). Dans la rédaction, en répondant à un message étranger, le menu ✨ propose « Traduire mon texte en … » dans la langue de l'expéditeur. La langue est reconnue localement ; le texte n'est envoyé à l'IA qu'à votre demande (IA à configurer dans Paramètres → IA).
+
 ### Traduction, questions, agenda
 
 Clic droit → Traduire ce message (dans la langue réglée). Assistant ou « ? » : posez une question sur le message ouvert. Si l'IA détecte un rendez-vous : « Ajouter à l'agenda » (voir « Invitations et agenda »).
@@ -373,7 +390,7 @@ Un message dont l'envoi échoue à cause du réseau est conservé et réessayé 
 
 ### Réception en temps réel
 
-MintMail utilise IMAP IDLE : les nouveaux messages arrivent en quelques secondes, avec une notification de bureau (désactivable). Une actualisation complète a lieu toutes les N minutes (Apparence, 1 à 60) ou à la demande (Ctrl+R).
+MintMail utilise IMAP IDLE : les nouveaux messages arrivent en quelques secondes, avec une notification de bureau (désactivable). Une actualisation complète a lieu toutes les N minutes (Apparence, 1 à 60) ou à la demande (Ctrl+R). Les autres dossiers (Archive, vos dossiers) sont relevés toutes les ~20 secondes : un tri fait sur un autre poste y apparaît presque aussitôt.
 
 ### Performances
 
@@ -511,7 +528,7 @@ Mise à jour : sudo apt install ./mintmail_X.Y.Z_all.deb (vos réglages et votre
 
 ## À propos et crédits
 
-### MintMail 1.35.11
+### MintMail 1.41.1
 
 Le client mail pour Linux Mint dont l'IA est l'ADN : il lit, trie, résume, classe, rédige et agit avec vous — toujours avec votre accord.  
 Développé par SAEC — https://saec.me · Logiciel libre sous licence MIT (© 2026 SAEC) : vous pouvez l'utiliser, le modifier et le redistribuer. Application Qt (PySide6) / Python, sans service cloud imposé : vos mails, vos clés et vos réglages restent chez vous.
