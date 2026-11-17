@@ -16,6 +16,7 @@ from ..htmlsafe import safe_to_open
 from ..i18n import tr
 from .. import receipts as RC
 from .. import shortcuts as SC
+from .. import sections as SEC
 from ..store import Cache, Config
 from .. import updater
 from . import ui_icons as UI
@@ -32,6 +33,7 @@ from .help_window import HelpDialog
 from .updating import UpdateState, restart_command
 from .ui_updates import UpdateBanner
 from .ui_assistant import AssistantPanel
+from .ui_grouprows import GroupRows
 from .ui_readercard import QuickReply, ReaderCard
 from . import navtree as NT
 from . import gestures as GS
@@ -69,6 +71,8 @@ class MessageModel(QAbstractListModel):
         self.infos = [vm.row_info(m) for m in self.msgs]
         if meta:
             AW.decorate(self.infos, self.msgs, meta)                       # résumé IA, « Important », « Suspect »
+        for info, head in zip(self.infos, SEC.headings([m.date or 0 for m in self.msgs])):
+            info["section"] = head                                        # titre de période (Aujourd'hui, Hier, mois…) au-dessus de la première ligne de chaque période
         for info, m in zip(self.infos, self.msgs):
             r = (reads or {}).get(m.id)
             info["read_by"] = RC.eye_title(r) if r else ""                 # accusé de lecture reçu : œil dans la liste
@@ -352,6 +356,9 @@ class MainWindow(ExtrasMixin, OrganizerMixin, AIMixin, QMainWindow):
             self.cat_buttons[key] = b
         cb.addStretch(1)
         ll.addWidget(self.cat_bar)
+        self.group_rows = GroupRows()
+        self.group_rows.opened.connect(self.set_category)
+        ll.addWidget(self.group_rows)
         ll.addWidget(self.build_digest_card())
         ll.addWidget(self.list, 1)
         ll.addWidget(self.empty, 1)

@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.42.0
+- Boîte unifiée façon Spark : en haut, une rangée par groupe (Épinglés, Notifications, Newsletters, Invitations…) avec son nombre de non lus et seulement les noms des expéditeurs ; un clic ouvre le groupe. Les épinglés sont désormais un groupe comme les autres (réglable dans Paramètres → Groupes).
+- La liste est découpée par période : Aujourd'hui, Hier, Semaine dernière, puis chaque mois de l'année, puis chaque année.
+
 ## 1.41.2
 - Boîte unifiée : un clic sur « Boîte de réception » (ou toute autre vue) revient toujours à toutes les adresses, même après avoir cliqué une boîte ; le titre indique la boîte affichée quand une seule l'est.
 - macOS Apple Silicon : construction sur macos-15 ; relance possible pour une Release existante.

@@ -51,7 +51,7 @@ def cfg(**kw):
 def test_default_modes_group_the_automatic_mail_and_keep_the_personal_mail_inline():
     s = G.settings_for(cfg(), "a1")
     assert s["on"] is True and s["modes"]["news"] == G.GROUP and s["modes"]["notif"] == G.GROUP
-    assert s["modes"]["pinned"] == G.ALL and s["modes"]["mine"] == G.ALL
+    assert s["modes"]["pinned"] == G.GROUP and s["modes"]["mine"] == G.ALL
 
 
 def test_general_then_per_mailbox_overrides():
@@ -74,7 +74,7 @@ def test_main_inbox_hides_grouped_groups_per_account_and_group_chips_show_them()
     perso = msg(id="3", account="a2", to="pro@x.be, x@y.be")
     pinned = msg(id="4", account="a2", pinned=True, to="pro@x.be")
     allm = [news_a1, news_a2, perso, pinned]
-    assert [m.id for m in G.filter_view(gr, allm, None)] == ["1", "3", "4"]      # a2/news est sorti ; épinglés restent (mode afficher tout)
+    assert [m.id for m in G.filter_view(gr, allm, None)] == ["1", "3"]      # a2/news et l'épinglé de a2 sont sortis (groupés) ; a1 montre tout
     assert [m.id for m in G.filter_view(gr, allm, "news")] == ["1", "2"]
     assert [m.id for m in G.filter_view(gr, allm, "all")] == ["1", "2", "3", "4"]
     assert gr.counts(allm)["news"] == 2 and gr.counts(allm)["pinned"] == 1

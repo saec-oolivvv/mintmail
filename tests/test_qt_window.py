@@ -248,3 +248,12 @@ def test_settings_have_a_left_navigation_with_one_page_per_section():
     d.nav.setCurrentRow(1)
     assert d.stack.currentIndex() == 0
     d.close()
+
+
+def test_list_shows_period_headings_and_group_rows_on_top():
+    if _qt() is None:
+        return
+    os.environ["MINTMAIL_QT_NO_WEBENGINE"] = "1"
+    w = _window()
+    heads = [i["section"] for i in w.model.infos]
+    assert heads[0] and sum(1 for h in heads if h) >= 1                       # la 1re ligne ouvre une période (Aujourd'hui…)

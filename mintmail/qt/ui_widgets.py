@@ -1,7 +1,7 @@
 """Éléments visuels Qt : pastille d'initiales, lignes de la liste des messages, lignes de la barre latérale (peints à la main, aux couleurs du thème)."""
 from PySide6.QtCore import QRect, QRectF, QSize, Qt, QTimer, Signal
 from PySide6.QtGui import QColor, QFont, QPainter, QPainterPath, QPen
-from PySide6.QtWidgets import QListView, QListWidget, QStyle, QStyledItemDelegate, QWidget
+from PySide6.QtWidgets import QListView, QListWidget, QStyle, QStyledItemDelegate, QStyleOptionViewItem, QWidget
 
 from ..util import color_index, initials
 from ..i18n import tr
@@ -143,10 +143,32 @@ class MessageDelegate(QStyledItemDelegate):
         self.select_mode = False
         self.swipe = None                            # (ligne, décalage, action) pendant un geste
 
+    HEAD = 30                                        # hauteur du titre de période (Aujourd'hui, Hier, mois…) au-dessus de la 1re ligne d'une période
+
+    def _head(self, index):
+        info = index.data(InfoRole)
+        return info.get("section", "") if isinstance(info, dict) else ""
+
     def sizeHint(self, option, index):
-        return QSize(option.rect.width(), self.h)
+        return QSize(option.rect.width(), self.h + (self.HEAD if self._head(index) else 0))
 
     def paint(self, p, option, index):
+        head = self._head(index)
+        if not head:
+            return self._paint_row(p, option, index)
+        p.save()
+        f = QFont(option.font)
+        f.setBold(True)
+        f.setPixelSize(12)
+        p.setFont(f)
+        p.setPen(_c(self.t["dim"]))
+        p.drawText(QRect(option.rect.left() + 20, option.rect.top() + 6, option.rect.width() - 30, self.HEAD - 8), Qt.AlignLeft | Qt.AlignVCenter, head.upper())
+        p.restore()
+        opt = QStyleOptionViewItem(option)
+        opt.rect = option.rect.adjusted(0, self.HEAD, 0, 0)
+        self._paint_row(p, opt, index)
+
+    def _paint_row(self, p, option, index):
         info, t = index.data(InfoRole), self.t
         p.save()
         sw = self.swipe

@@ -360,7 +360,9 @@ class OrganizerMixin:
     def update_category_bar(self):
         """Barre des groupes : visible dans la boîte de réception ; chaque groupe montre ses non lus ; seuls les groupes utiles sont proposés."""
         info = getattr(self, "_group_info", None)
-        self.cat_bar.setVisible(self.view_key == "inbox" and info is not None)
+        on_inbox = self.view_key == "inbox" and info is not None
+        self.group_rows.update_rows(getattr(info[1], "digest", {}) if on_inbox and self.category is None else {})      # boîte unifiée : rangées de groupes en haut
+        self.cat_bar.setVisible(on_inbox and self.category is not None)                                            # dans un groupe : pastilles pour revenir
         if info is None:
             return
         from .. import groups as G

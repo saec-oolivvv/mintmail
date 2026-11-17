@@ -55,6 +55,7 @@ def inbox_groups(cache, config, account, key, threads, limit=400, accounts=None)
         raw = cache.query("inbox", account, limit=2000, threads=threads)
         shown = G.filter_view(gr, raw, key)[:limit]
     unread = cache.query("inbox", account, unread_only=True, limit=2000, threads=False)
+    gr.digest = G.digest(gr, raw) if key is None else {}
     return shown, gr.counts(unread), gr
 
 

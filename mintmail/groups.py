@@ -9,7 +9,8 @@ from .util import split_addresses
 
 ORDER = ["pinned", "mine", "invite", "reply", "notif", "news"]
 GROUP, ALL = "group", "inline"                     # modes d'un groupe
-DEFAULT_MODES = {"pinned": ALL, "mine": ALL, "invite": GROUP, "reply": GROUP, "notif": GROUP, "news": GROUP}
+ROW_ORDER = ["pinned", "notif", "news", "invite", "reply", "mine"]      # ordre des rangées de groupes en haut de la boîte unifiée
+DEFAULT_MODES = {"pinned": GROUP, "mine": ALL, "invite": GROUP, "reply": GROUP, "notif": GROUP, "news": GROUP}
 
 
 def labels() -> Dict[str, str]:
@@ -124,3 +125,30 @@ def filter_view(grouper: Grouper, msgs, key: Optional[str]) -> list:
     if key is None:
         return [m for m in msgs if grouper.in_main(m)]
     return [m for m in msgs if grouper.group(m) == key]
+
+
+def digest(grouper: Grouper, msgs, per: int = 4) -> Dict[str, Dict]:
+    """Rangées de groupes de la boîte unifiée : {groupe: {'n': messages, 'unread': non lus, 'senders': [noms]}} pour les groupes en mode « grouper ».
+    Les noms des expéditeurs (sans doublon, non lus d'abord, puis les plus récents) sont tout ce que la rangée affiche."""
+    out: Dict[str, Dict] = {}
+    for m in msgs:
+        g = grouper.group(m)
+        if not g or grouper.in_main(m):
+            continue
+        d = out.setdefault(g, {"n": 0, "unread": 0, "new": [], "old": []})
+        d["n"] += 1
+        name = (getattr(m, "display_sender", "") or "").strip()
+        if getattr(m, "unread", False):
+            d["unread"] += 1
+        bucket = d["new"] if getattr(m, "unread", False) else d["old"]
+        if name and name not in bucket:
+            bucket.append(name)
+    for d in out.values():
+        names = d.pop("new") + [n for n in d.pop("old")]
+        seen, d["senders"] = set(), []
+        for n in names:
+            if n not in seen:
+                seen.add(n)
+                d["senders"].append(n)
+        d["senders"] = d["senders"][:per]
+    return out
