@@ -20,6 +20,7 @@ from . import ui_personal as UP
 from .ui_cards import Page
 from . import ui_calendar as UC
 from . import ui_sync as US
+from . import ui_groups as UG
 from .gestures import LAYOUTS
 from .. import __version__, updater
 
@@ -55,7 +56,8 @@ class SettingsDialog(QDialog):
             "templates": UP.templates_tab(self),
             "contacts": UP.contacts_tab(self),
             "calendar": UC.calendar_tab(self),
-            "p2p": US.p2p_tab(self)}
+            "p2p": US.p2p_tab(self),
+            "groups": UG.groups_tab(self)}
         self.stack = self.tabs = QStackedWidget()          # « tabs » : ancien nom, conservé (currentIndex / setCurrentIndex)
         for page in pages.values():
             self.stack.addWidget(page)
@@ -67,7 +69,7 @@ class SettingsDialog(QDialog):
         dim = self.palette().color(QPalette.ColorRole.PlaceholderText)
         for caption, entries in ((tr("Messagerie"), (("accounts", tr("Comptes")), ("identities", tr("Identités d'envoi")), ("signatures", tr("Signatures")),
                                                       ("templates", tr("Modèles de réponse")))),
-                                 (tr("Boîte de réception"), (("filters", tr("Filtres & blocage")), ("gestures", tr("Gestes & disposition")),
+                                 (tr("Boîte de réception"), (("groups", tr("Groupes")), ("filters", tr("Filtres & blocage")), ("gestures", tr("Gestes & disposition")),
                                                              ("contacts", tr("Contacts")), ("calendar", tr("Agenda")))),
                                  (tr("Application"), (("look", tr("Apparence")), ("ai", "✨ IA"), ("p2p", tr("Synchronisation")),
                                                       ("updates", tr("Mises à jour"))))):

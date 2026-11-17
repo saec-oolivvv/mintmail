@@ -4,7 +4,7 @@ import os, subprocess, sys
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 CORE = ["models", "util", "i18n", "log", "netutil", "htmlsafe", "ical", "caldav", "gcal", "contacts", "tasks", "slots", "unsub", "store", "offline",
-        "backend", "ai_service", "ai_engine", "oauth", "syncdata", "p2p", "updater", "update_text", "sysdeps", "qtsetup", "qtdeps", "help_format", "themes", "pgp", "suspect"]
+        "backend", "ai_service", "ai_engine", "oauth", "syncdata", "p2p", "updater", "update_text", "sysdeps", "qtsetup", "qtdeps", "help_format", "themes", "pgp", "suspect", "groups"]
 
 
 def test_core_modules_import_without_any_gui_toolkit():

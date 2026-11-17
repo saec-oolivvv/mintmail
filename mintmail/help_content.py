@@ -98,8 +98,7 @@ SECTIONS: List[Dict] = [
          "reporter ou ranger une conversation vaut pour tous ses messages du même dossier. Ouvrir une conversation la marque lue.\n"
          "Désactivation : Paramètres → Gestes & disposition → « Regrouper en conversations ». Les résultats de recherche restent à plat."),
         ("Catégories",
-         "Dans la boîte de réception, les pastilles Tout / Personnes / Notifications / Newsletters filtrent selon le type d'expéditeur "
-         "(détecté automatiquement : mails de vraies personnes, notifications de services, newsletters et promotions)."),
+         "Comme dans Spark, la boîte de réception range automatiquement vos messages en groupes : Épinglés, Attribués à moi (vous êtes le seul destinataire d'une vraie personne, ou une tâche ou une relance est posée dessus), Invitations reçues, Réponses aux invitations, Notifications et Newsletters. Au-dessus de la liste, une pastille par groupe affiche son nombre de non lus ; « Principal » montre le reste, « Tout » montre tout.\n• Paramètres → Groupes : pour chaque groupe, « Grouper » (pastille à part) ou « Afficher tout dans la boîte principale », et un interrupteur général.\n• Chaque boîte mail peut avoir ses propres réglages (carte « Boîte mail » de la même page) : regrouper ou non, et mode de chaque groupe."),
         ("Dossiers de vos boîtes",
          "Tous les dossiers IMAP de chaque compte sont visibles dans la barre latérale (arborescence repliable, nombre de non lus). "
          "• Cliquez un dossier pour le parcourir ; le bouton « anciens messages » charge plus loin dans l'historique.\n"

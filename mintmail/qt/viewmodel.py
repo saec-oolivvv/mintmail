@@ -43,6 +43,21 @@ def list_view(cache, view="inbox", account="all", search="", limit=400, threads=
     return cache.query(view=view, account=account, search=search, limit=limit, threads=threads, category=category)
 
 
+def inbox_groups(cache, config, account, key, threads, limit=400, accounts=None):
+    """Boîte de réception avec groupes : (messages à afficher, non lus par groupe, groupeur). `key` : None = boîte principale
+    (les groupes en mode « grouper » en sortent), 'all' = tout, ou un groupe (pinned, mine, invite, reply, notif, news)."""
+    from .. import groups as G
+    gr = G.Grouper(config, cache, accounts)
+    if key == "all" and not threads:
+        raw = cache.query("inbox", account, limit=limit, threads=False)
+        shown = raw
+    else:
+        raw = cache.query("inbox", account, limit=2000, threads=threads)
+        shown = G.filter_view(gr, raw, key)[:limit]
+    unread = cache.query("inbox", account, unread_only=True, limit=2000, threads=False)
+    return shown, gr.counts(unread), gr
+
+
 def grouped(config, view, search="") -> bool:
     """Conversations affichées ? Comme en GTK : réglage « threads », jamais pendant une recherche ni dans Brouillons / Boîte d'envoi."""
     return bool(config.get("threads", True)) and not (search or "").strip() and view not in ("drafts", "outbox")

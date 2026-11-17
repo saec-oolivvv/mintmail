@@ -335,7 +335,7 @@ class MainWindow(ExtrasMixin, OrganizerMixin, AIMixin, QMainWindow):
         cb.setContentsMargins(16, 0, 16, 2)
         cb.setSpacing(4)
         self.cat_buttons = {}
-        for key, label in OW.CATEGORIES:
+        for key, label in OW.category_choices():
             b = QPushButton(label)
             b.setObjectName("flat")
             b.setCheckable(True)
@@ -568,8 +568,13 @@ class MainWindow(ExtrasMixin, OrganizerMixin, AIMixin, QMainWindow):
         raw = self.search.text()
         q = ("" if AW.is_ai_query(raw) else raw) or SS.query_of(self.config, self.view_key)       # « ? … » : recherche IA, lancée par Entrée
         view = self.view_key if not self.view_key.startswith(SS.PREFIX) else "inbox"
-        msgs = vm.list_view(self.cache, view, self.account, q, threads=vm.grouped(self.config, self.view_key, q),
-                            category=self.category if self.view_key == "inbox" else None)
+        threads = vm.grouped(self.config, self.view_key, q)
+        self._group_info = None
+        if view == "inbox" and self.view_key == "inbox" and not q.strip():
+            msgs, gcounts, gr = vm.inbox_groups(self.cache, self.config, self.account, self.category, threads, accounts=self.engine.accounts())
+            self._group_info = (gcounts, gr)
+        else:
+            msgs = vm.list_view(self.cache, view, self.account, q, threads=threads)
         if self.view_key == "unread" and self._kept:
             have = {m.id for m in msgs}
             for mid in self._kept - have:                   # « Non lus » : le message ouvert reste affiché jusqu'à ce qu'on passe à un autre

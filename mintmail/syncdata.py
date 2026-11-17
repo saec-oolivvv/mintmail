@@ -19,7 +19,7 @@ from .store import DEFAULTS
 from .i18n import tr
 
 ACCOUNT_FIELDS = ("id", "name", "email", "username", "imap_host", "imap_port", "imap_ssl", "smtp_host", "smtp_port",
-                  "signature_html", "has_password", "auth", "oauth_provider")
+                  "signature_html", "has_password", "auth", "oauth_provider", "inbox_grouping", "group_modes")
 SWIPE_ACTIONS = {"archive", "trash", "snooze", "read", "star", "pin", "spam", "block", "none"}
 RULE_FIELDS = {"from", "subject", "to"}
 RULE_ACTIONS = {"archive", "trash", "spam", "read", "star", "pin", "move"}
@@ -38,6 +38,10 @@ def _swipe(v):
             and all(x in SWIPE_ACTIONS for x in v.values()))
 
 
+def _group_modes(v):
+    return isinstance(v, dict) and set(v) <= {"pinned", "mine", "invite", "reply", "notif", "news"} and all(x in ("group", "inline") for x in v.values())
+
+
 # réglages synchronisés (ni tailles de fenêtre, ni disposition, ni zoom : propres à chaque écran)
 SYNC_SETTINGS = {
     "theme": _enum("system", "light", "dark"), "style": _enum("aurora", "papier", "terminal"),
@@ -49,6 +53,7 @@ SYNC_SETTINGS = {
     "nvidia_api_base": lambda v: isinstance(v, str) and len(v) <= 200 and (v == "" or v.startswith("https://") or (
         v.startswith("http://") and is_local_endpoint(v))),
     "ai_model": _str(100), "ai_has_key": _b, "ai_prepare_drafts": _b, "ai_provider": _enum("nvidia", "ollama", "custom"), "threads": _b,
+    "inbox_grouping": _b, "group_modes": lambda v: _group_modes(v),
     "oauth_clients": lambda v: isinstance(v, dict) and set(v) <= {"google", "microsoft"} and all(
         isinstance(c, dict) and set(c) <= {"client_id", "client_secret"} and all(isinstance(x, str) and len(x) <= 300 for x in c.values())
         for c in v.values()),
@@ -91,6 +96,10 @@ def clean_account(v) -> Optional[dict]:
         return None
     for k, ok in (("name", _str(100)), ("username", _str(200)), ("signature_html", _str(20000))):
         out[k] = v.get(k, "") if ok(v.get(k, "")) else ""
+    if _b(v.get("inbox_grouping")):
+        out["inbox_grouping"] = v["inbox_grouping"]
+    if _group_modes(v.get("group_modes")) and v.get("group_modes"):
+        out["group_modes"] = v["group_modes"]
     out["imap_ssl"] = v.get("imap_ssl", True) if _b(v.get("imap_ssl", True)) else True
     out["has_password"] = v.get("has_password", True) if _b(v.get("has_password", True)) else True
     if v.get("auth") == "oauth2" and v.get("oauth_provider") in ("google", "microsoft"):

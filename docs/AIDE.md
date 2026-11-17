@@ -53,7 +53,9 @@ Désactivation : Paramètres → Gestes & disposition → « Regrouper en conver
 
 ### Catégories
 
-Dans la boîte de réception, les pastilles Tout / Personnes / Notifications / Newsletters filtrent selon le type d'expéditeur (détecté automatiquement : mails de vraies personnes, notifications de services, newsletters et promotions).
+Comme dans Spark, la boîte de réception range automatiquement vos messages en groupes : Épinglés, Attribués à moi (vous êtes le seul destinataire d'une vraie personne, ou une tâche ou une relance est posée dessus), Invitations reçues, Réponses aux invitations, Notifications et Newsletters. Au-dessus de la liste, une pastille par groupe affiche son nombre de non lus ; « Principal » montre le reste, « Tout » montre tout.
+• Paramètres → Groupes : pour chaque groupe, « Grouper » (pastille à part) ou « Afficher tout dans la boîte principale », et un interrupteur général.
+• Chaque boîte mail peut avoir ses propres réglages (carte « Boîte mail » de la même page) : regrouper ou non, et mode de chaque groupe.
 
 ### Dossiers de vos boîtes
 

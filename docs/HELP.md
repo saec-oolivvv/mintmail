@@ -53,7 +53,9 @@ To turn off: Settings → Gestures & layout → “Group into conversations”. 
 
 ### Categories
 
-In the inbox, the All / People / Notifications / Newsletters chips filter by sender type (detected automatically: mail from real people, service notifications, newsletters and promotions).
+Like Spark, the inbox sorts your messages into groups automatically: Pinned, Assigned to me (you are the only recipient of a real person's message, or a task or follow-up is set on it), Received invitations, Invitation replies, Notifications and Newsletters. Above the list, one chip per group shows its unread count; “Main” shows everything else, “All” shows everything.
+• Settings → Groups: for each group choose “Group” (separate chip) or “Show all in the main inbox”, plus a general switch.
+• Each mailbox can have its own settings (the “Mailbox” card on the same page): group or not, and the mode of each group.
 
 ### Your mailbox folders
 

@@ -17,7 +17,10 @@ from . import organizer as O
 from . import syncing as SY
 from . import ui_organizer as UO
 
-CATEGORIES = [(None, tr("Tout")), ("people", tr("Personnes")), ("notif", tr("Notifications")), ("news", tr("Newsletters"))]
+def category_choices():
+    """Pastilles de la boîte de réception : boîte principale, tout, puis un groupe par pastille (voir groups.py)."""
+    from .. import groups as G
+    return [(None, tr("Principal")), ("all", tr("Tout"))] + [(k, G.label(k)) for k in G.ORDER]
 ZOOM_MIN, ZOOM_MAX, ZOOM_STEP = 0.6, 2.4, 0.1
 
 
@@ -355,7 +358,30 @@ class OrganizerMixin:
         self.reload()
 
     def update_category_bar(self):
-        self.cat_bar.setVisible(self.view_key == "inbox")
+        """Barre des groupes : visible dans la boîte de réception ; chaque groupe montre ses non lus ; seuls les groupes utiles sont proposés."""
+        info = getattr(self, "_group_info", None)
+        self.cat_bar.setVisible(self.view_key == "inbox" and info is not None)
+        if info is None:
+            return
+        from .. import groups as G
+        counts, gr = info
+        grouping = gr.any_grouping()
+        grouped_keys = {k for a in (list(gr.accounts) or [""]) for k, v in gr.settings(a)["modes"].items() if v == G.GROUP and gr.settings(a)["on"]}
+        labels = dict(category_choices())
+        for key, b in self.cat_buttons.items():
+            if key is None:
+                b.setText(labels[None] if grouping else tr("Tout"))
+                b.setVisible(True)
+            elif key == "all":
+                b.setVisible(grouping)
+            else:
+                n = counts.get(key, 0)
+                b.setText("%s  %d" % (labels[key], n) if n else labels[key])
+                b.setVisible(n > 0 or key in grouped_keys or self.category == key)
+        if self.category not in self.cat_buttons or not self.cat_buttons[self.category].isVisible():
+            self.category = None
+            for k, b in self.cat_buttons.items():
+                b.setChecked(k is None)
 
     # ------------------------------------------------------------ notifications et état hors ligne
     def notify_new_mail(self, fresh):

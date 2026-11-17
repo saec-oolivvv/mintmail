@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.39.0
+- Groupes de la boîte de réception, comme dans Spark : Épinglés, Attribués à moi (seul destinataire d'une vraie personne, ou tâche / relance posée), Invitations reçues, Réponses aux invitations, Notifications et Newsletters. Une pastille par groupe au-dessus de la liste avec ses non lus ; « Principal » montre le reste, « Tout » montre tout.
+- Paramètres → Groupes : pour chaque groupe, « Grouper » ou « Afficher tout dans la boîte principale », un interrupteur général, et des réglages propres à chaque boîte mail (synchronisés entre postes).
+
 ## 1.38.3
 - Messages suspects : à l'ouverture d'un message de la boîte de réception qui ressemble à de l'hameçonnage (nom affiché cachant une autre adresse, marque imitée, texte de lien différent de sa vraie destination, lien raccourci, texte d'arnaque, analyse IA suspecte), un bandeau propose de le mettre en spam ; « Je lui fais confiance » l'écarte. Les expéditeurs de vos contacts ne sont jamais questionnés.
 - Réception plus réactive : à chaque annonce IDLE, le compte concerné relève aussitôt sa boîte de réception ; le survol du bouton de relevé indique l'état de la réception instantanée de chaque compte.
