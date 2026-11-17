@@ -461,7 +461,8 @@ class SettingsDialog(QDialog):
         lang.currentIndexChanged.connect(lambda _i: self.main.say(MT.set_language(self.cfg, lang.currentData())))
         form.addRow(tr("Langue de l'interface"), lang)
         form = page.card(tr("Comportement")).form()
-        for key, label in (("load_images", tr("Charger les images distantes")), ("notifications", tr("Notifications de bureau")),
+        for key, label in (("load_images", tr("Charger les images distantes")), ("notifications", tr("Notifications de bureau")), ("sound_receive", tr("Son à la réception d'un message")),
+                           ("sound_send", tr("Son à l'envoi d'un message")),
                            ("open_today_on_start", tr("Ouvrir la page Aujourd'hui au lancement"))):
             c = QCheckBox(label)
             c.setChecked(bool(self.cfg.get(key)))

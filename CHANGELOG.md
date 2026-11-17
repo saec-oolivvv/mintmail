@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.45.2
+- Alertes : elles sont désormais émises par MintMail lui-même (icône dans la barre de menus / zone de notification) ; un clic sur l'alerte ramène MintMail au premier plan au lieu d'ouvrir l'éditeur de scripts. Menu de l'icône : Ouvrir MintMail / Quitter.
+- Sons : un son à la réception d'un message (même fenêtre au premier plan) et un autre à l'envoi, réglables dans Paramètres → Apparence → Comportement.
+
 ## 1.45.1
 - Relevé du courrier plus fiable avec plusieurs boîtes : les boîtes sont relevées en parallèle (une boîte lente ou en panne ne bloque plus les autres), chaque boîte s'affiche dès qu'elle a du nouveau sans attendre la fin du relevé, les chiffres des dossiers sont relevés après coup, et les erreurs indiquent la boîte en cause.
 

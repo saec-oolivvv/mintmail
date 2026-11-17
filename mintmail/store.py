@@ -59,7 +59,7 @@ def harden_permissions():
 
 DEFAULTS = {
     "accounts": [], "passwords": {}, "theme": "system", "accent": "#1a73ff",
-    "density": "comfortable", "load_images": False, "notifications": True,
+    "density": "comfortable", "load_images": False, "notifications": True, "sound_receive": True, "sound_send": True,
     "refresh_minutes": 5, "undo_seconds": 6, "width": 1280, "height": 800,
     "folders": {}, "collapsed_folders": [], "style": "aurora", "design_v2": False,
     "ui_lang": "auto", "update_check": True, "update_repo": "saec-oolivvv/mintmail", "update_last_check": 0, "update_etag": "", "update_seen": "", "update_available": None, "update_snooze_until": 0, "update_snooze_version": "", "update_last_result": "", "open_today_on_start": False, "pins_pushed": [], "threads": True, "translate_offer": True, "shortcuts": {}, "integrations": {}, "receipt_request": False, "receipt_notify": True, "receipt_reply": "ask", "inbox_grouping": True, "group_modes": {}, "tasks": [], "ai_prepare_drafts": False, "gcal": {}, "ai_provider": "nvidia", "oauth_clients": {}, "caldav": {}, "identities": [], "contacts": {}, "absence": {}, "absence_log": {},

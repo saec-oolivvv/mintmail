@@ -9,7 +9,7 @@ import time
 
 from PySide6.QtCore import QAbstractListModel, QModelIndex, QObject, Qt, QTimer, QUrl, Signal
 from PySide6.QtGui import QAction, QDesktopServices, QKeySequence
-from PySide6.QtWidgets import (QApplication, QFileDialog, QFrame, QHBoxLayout, QLabel, QLineEdit, QListView, QListWidget, QListWidgetItem, QMainWindow, QMenu,
+from PySide6.QtWidgets import (QSystemTrayIcon, QApplication, QFileDialog, QFrame, QHBoxLayout, QLabel, QLineEdit, QListView, QListWidget, QListWidgetItem, QMainWindow, QMenu,
                                QInputDialog, QMessageBox, QPushButton, QSplitter, QTextBrowser, QVBoxLayout, QWidget)
 
 from .. import APP_NAME, __version__
@@ -624,6 +624,7 @@ class MainWindow(ExtrasMixin, OrganizerMixin, AIMixin, QMainWindow):
         self._partial_timer.setSingleShot(True)
         self._partial_timer.timeout.connect(self._show_partial)
         self.bridge.partial.connect(lambda: self._partial_timer.start(250))
+        self._setup_tray()
         self.engine.on_progress = self.bridge.partial.emit                     # appelé depuis les fils de relevé
         if self.config.get("push") is not False:
             self.engine.start_push(self.bridge.newmail.emit)             # réception instantanée : plus d'attente du relevé périodique
@@ -1733,6 +1734,39 @@ class MainWindow(ExtrasMixin, OrganizerMixin, AIMixin, QMainWindow):
         self._busy = True
         self._background(lambda: (None, AU.sync_and_route(self.engine, ("inbox",), only=aids), None), "sync")
 
+    def _setup_tray(self):
+        """Icône de notification de MintMail : les alertes viennent de l'APPLICATION (et non d'un script système) et un clic dessus ramène MintMail au premier plan."""
+        from .. import sysdeps
+        self.tray = None
+        try:
+            if not QSystemTrayIcon.isSystemTrayAvailable():
+                return
+            self.tray = QSystemTrayIcon(AI.load(), self)
+            menu = QMenu(self)
+            menu.addAction(tr("Ouvrir MintMail"), self.bring_to_front)
+            menu.addAction(tr("Quitter"), QApplication.instance().quit)
+            self.tray.setContextMenu(menu)
+            self.tray.setToolTip("MintMail")
+            self.tray.activated.connect(lambda reason: reason in (QSystemTrayIcon.Trigger, QSystemTrayIcon.DoubleClick) and self.bring_to_front())
+            self.tray.messageClicked.connect(self.bring_to_front)
+            self.tray.show()
+            sysdeps.NOTIFIER = self._tray_notify
+        except Exception:
+            self.tray = None
+            sysdeps.NOTIFIER = None
+
+    def _tray_notify(self, title, body):
+        if self.tray is None or not self.tray.isVisible():
+            return False
+        self.tray.showMessage(str(title), str(body), AI.load(), 8000)
+        return True
+
+    def bring_to_front(self):
+        """Ramène la fenêtre au premier plan (réduite, cachée ou derrière les autres)."""
+        self.showNormal()
+        self.raise_()
+        self.activateWindow()
+
     def _show_partial(self):
         """Une boîte a fini de se relever : la liste et les compteurs sont rafraîchis sans attendre les autres boîtes."""
         self.reload()
@@ -2018,6 +2052,9 @@ class MainWindow(ExtrasMixin, OrganizerMixin, AIMixin, QMainWindow):
             for kind, out, e in (res or []):
                 if kind == "sent":
                     self.status.setText(tr("Message envoyé ✔"))
+                    if self.config.get("sound_send", True):
+                        from .. import sysdeps
+                        sysdeps.play("sent")
                 elif kind == "retry":
                     self.status.setText(tr("Hors ligne : message conservé, nouvel essai automatique."))
                 else:

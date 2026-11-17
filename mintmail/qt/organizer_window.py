@@ -389,7 +389,11 @@ class OrganizerMixin:
     # ------------------------------------------------------------ notifications et état hors ligne
     def notify_new_mail(self, fresh):
         """Notification de bureau pour les nouveaux messages (pas au tout premier chargement)."""
-        if fresh <= 0 or not self.config.get("notifications", True) or self.isActiveWindow():
+        if fresh <= 0:
+            return
+        if self.config.get("sound_receive", True):
+            sysdeps.play("received")                                   # le son part même fenêtre au premier plan
+        if not self.config.get("notifications", True) or self.isActiveWindow():
             return
         top = next(iter(self.cache.query("inbox", "all", unread_only=True, limit=1)), None)
         if fresh == 1 and top is not None:
