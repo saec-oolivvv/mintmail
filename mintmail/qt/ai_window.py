@@ -46,11 +46,7 @@ class AIMixin:
         self.digest_card.hide()
 
     def update_digest_visibility(self):
-        show = (self.view_key == "inbox" and not self.search.text().strip() and not self._digest_hidden
-                and bool(self.config.get("ai_digest", True)))
-        self.digest_card.setVisible(show)
-        if show:
-            self.refresh_digest()
+        self.digest_card.hide()                      # le bandeau « En bref » est supprimé : les lignes de groupes (Épinglés, Notifications…) le remplacent
 
     def refresh_digest(self, force=False):
         acc = self.account

@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.44.2
+- Le bandeau « En bref » est supprimé (sa fermeture ouvrait un message des épinglés) ; les lignes Épinglés / Notifications / Newsletters / Invitations suffisent.
+
 ## 1.44.1
 - Glissés plus posés : le geste n'est pris en compte qu'une fois les doigts (ou le bouton) relâchés ; en revenant vers l'origine, ou avec Échap, l'opération est annulée. Seuils plus larges et inertie du pavé tactile ignorée.
 
