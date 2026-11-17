@@ -258,7 +258,7 @@ def digest(engine, account="all", force=False) -> str:
 from ..ai_service import DEFAULT_API_BASE, DEFAULT_MODEL, PROVIDERS, AIService, AIServiceError, is_local_endpoint, list_models  # noqa: E402
 
 AI_SWITCHES = [("ai_enabled", tr("IA activée"), False), ("ai_auto", tr("Analyser chaque message à l'ouverture"), True),
-               ("ai_triage", tr("Trier les nouveaux messages (priorité, spam)"), True), ("ai_digest", tr("Résumé « En bref » de la boîte"), True),
+               ("ai_triage", tr("Trier les nouveaux messages (priorité, spam)"), True),
                ("ai_prepare_drafts", tr("Préparer des brouillons de réponse (messages importants)"), False)]
 AI_CHOICES = [("ai_privacy", tr("Confidentialité"), "full", [("full", tr("Texte complet (meilleurs résultats)")), ("minimal", tr("Minimal : 500 premiers caractères"))]),
               ("ai_lang", tr("Langue de l'IA"), "fr", [("fr", tr("Français")), ("en", "English"), ("nl", "Nederlands"), ("de", "Deutsch"), ("es", tr("Español"))]),

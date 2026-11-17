@@ -254,9 +254,8 @@ SECTIONS: List[Dict] = [
         ("Vos habitudes de rangement",
          "Quand vous rangez des messages à la main dans un dossier, MintMail retient « expéditeur → dossier » (en local seulement). Dès la 2e fois, "
          "il suggère ce dossier (« selon vos habitudes ») ; à la 3e, il propose de créer une règle automatique. Paramètres → IA → « Oublier mes habitudes de rangement » efface tout."),
-        ("Tri automatique et « En bref »",
-         "• Tri : les nouveaux messages reçoivent une priorité (barre colorée, pastille « Important ») et les suspects sont signalés « Suspect ».\n"
-         "• « En bref » : en haut de la boîte, un résumé de ce qui compte aujourd'hui. Chaque fonction a son interrupteur dans les réglages de l'IA."),
+        ("Tri automatique",
+         "• Tri : les nouveaux messages reçoivent une priorité (barre colorée, pastille « Important ») et les suspects sont signalés « Suspect ». Chaque fonction a son interrupteur dans les réglages de l'IA."),
         ('Traduction des messages',
          "Quand un message est écrit dans une autre langue que la vôtre, un bandeau propose « Traduire en … » (désactivable : Paramètres → Apparence → Langue). Dans la rédaction, en répondant à un message étranger, le menu ✨ propose « Traduire mon texte en … » dans la langue de l'expéditeur. La langue est reconnue localement ; le texte n'est envoyé à l'IA qu'à votre demande (IA à configurer dans Paramètres → IA)."),
         ("Traduction, questions, agenda",

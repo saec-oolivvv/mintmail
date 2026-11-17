@@ -187,8 +187,8 @@
      "When you file messages by hand into a folder, MintMail remembers “sender → folder” (locally only). From the 2nd time it suggests that folder (“your habits”); at the 3rd it offers to create an automatic rule. Settings → AI → “Forget my filing habits” erases everything."
     ],
     [
-     "Automatic sorting and “In brief”",
-     "• Sorting: new messages get a priority (colored bar, “Important” badge) and suspicious ones are flagged “Suspicious”.\n• “In brief”: at the top of the inbox, a summary of what matters today. Each feature has its own switch in the AI settings."
+     "Automatic sorting",
+     "• Sorting: new messages get a priority (colored bar, “Important” badge) and suspicious ones are flagged “Suspicious”. Each feature has its own switch in the AI settings."
     ],
     [
      "Message translation",

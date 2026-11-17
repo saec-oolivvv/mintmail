@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.44.3
+- Réglages de l'IA : l'interrupteur « Résumé En bref » (devenu sans objet) est retiré, ainsi que sa mention dans l'aide.
+
 ## 1.44.2
 - Le bandeau « En bref » est supprimé (sa fermeture ouvrait un message des épinglés) ; les lignes Épinglés / Notifications / Newsletters / Invitations suffisent.
 
