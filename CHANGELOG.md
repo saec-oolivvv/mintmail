@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.43.1
+- Lecteur vide : fond sombre (au lieu d'un grand carré blanc) quand aucun message n'est ouvert.
+- Rangées de groupes placées juste au-dessus des messages, sous la carte « En bref » ; titres de période en casse normale, comme dans Spark.
+
 ## 1.43.0
 - Menu « Plus d'actions » (⋯) façon Spark : Répondre, Envoyer à nouveau, Bloquer, Déplacer, Marquer comme spam, Imprimer, Copier en Markdown, Envoyer vers (intégrations), Toutes les actions.
 - Tri de la boîte de réception « Par date / Par priorité » (priorité décidée par l'IA).

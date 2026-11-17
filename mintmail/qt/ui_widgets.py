@@ -181,7 +181,7 @@ class MessageDelegate(QStyledItemDelegate):
         f.setPixelSize(12)
         p.setFont(f)
         p.setPen(_c(self.t["dim"]))
-        p.drawText(QRect(option.rect.left() + 20, option.rect.top() + 6, option.rect.width() - 30, self.HEAD - 8), Qt.AlignLeft | Qt.AlignVCenter, head.upper())
+        p.drawText(QRect(option.rect.left() + 20, option.rect.top() + 6, option.rect.width() - 30, self.HEAD - 8), Qt.AlignLeft | Qt.AlignVCenter, head)
         p.restore()
         opt = QStyleOptionViewItem(option)
         opt.rect = option.rect.adjusted(0, self.HEAD, 0, 0)
