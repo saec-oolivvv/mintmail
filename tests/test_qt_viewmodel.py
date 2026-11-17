@@ -883,12 +883,12 @@ from mintmail.qt import gestures as GS
 def test_swipe_thresholds_actions_and_touchpad_inversion_match_the_gtk_rules():
     cfg = GS.settings({})
     assert cfg == GS.DEFAULT_SWIPE
-    assert GS.pick(40, cfg) == (None, 0) and GS.pick(-89, cfg) == (None, 0)                      # trop court : rien
-    assert GS.pick(90, cfg) == ("archive", 1) and GS.pick(229, cfg) == ("archive", 1)
-    assert GS.pick(230, cfg) == ("trash", 2) and GS.pick(-100, cfg) == ("snooze", 1) and GS.pick(-300, cfg) == ("read", 2)
-    assert GS.pick(100, cfg, invert=True) == ("archive", 1)                                      # souris : jamais inversé
-    assert GS.pick(100, cfg, invert=True, wheel=True) == ("snooze", 1) and GS.pick(-300, cfg, invert=True, wheel=True) == ("trash", 2)
-    assert GS.pick(120, dict(cfg, right="none")) == (None, 0)
+    assert GS.pick(40, cfg) == (None, 0) and GS.pick(-129, cfg) == (None, 0)                      # trop court : rien
+    assert GS.pick(130, cfg) == ("archive", 1) and GS.pick(319, cfg) == ("archive", 1)
+    assert GS.pick(320, cfg) == ("trash", 2) and GS.pick(-140, cfg) == ("snooze", 1) and GS.pick(-340, cfg) == ("read", 2)
+    assert GS.pick(140, cfg, invert=True) == ("archive", 1)                                      # souris : jamais inversé
+    assert GS.pick(140, cfg, invert=True, wheel=True) == ("snooze", 1) and GS.pick(-340, cfg, invert=True, wheel=True) == ("trash", 2)
+    assert GS.pick(140, dict(cfg, right="none")) == (None, 0)
     mine = GS.settings({"swipe": {"right": "star", "left_long": "bidon", "inconnu": "trash"}})
     assert mine["right"] == "star" and mine["left_long"] == "read" and "inconnu" not in mine     # valeur ou clé inconnue : ignorée
 

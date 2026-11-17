@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.44.1
+- Glissés plus posés : le geste n'est pris en compte qu'une fois les doigts (ou le bouton) relâchés ; en revenant vers l'origine, ou avec Échap, l'opération est annulée. Seuils plus larges et inertie du pavé tactile ignorée.
+
 ## 1.44.0
 - Lecture au clic, comme Spark : la liste prend toute la largeur (plus de 3e colonne) et le message s'ouvre au clic, avec la barre d'actions (archiver, supprimer, déplacer, ⋯…) en haut du message et une flèche ← (ou Échap) pour revenir. C'est la disposition par défaut ; à la première ouverture de cette version, elle remplace l'ancienne disposition (Paramètres → Gestes & disposition pour revenir aux colonnes).
 - La liste ne se vide plus en pleine lecture quand elle est rechargée par une synchronisation.

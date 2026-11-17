@@ -133,17 +133,42 @@ class MessageList(QListView):
         self._press = None
         super().mouseReleaseEvent(e)
 
+    IDLE_MS = 650                                    # pavé sans indication de phase (Linux) : le geste ne se termine qu'après ce silence
+    IDLE_PHASE_MS = 1200                             # avec les phases (macOS) : simple filet de sécurité, la fin vient de ScrollEnd
+
+    def cancel_swipe(self):
+        """Annule le geste en cours sans rien exécuter."""
+        self._idle.stop()
+        self._press, self._wheel = None, False
+        self._set(-1, 0.0)
+
+    def keyPressEvent(self, e):
+        if e.key() == Qt.Key_Escape and self._row >= 0:
+            self.cancel_swipe()
+            e.accept()
+            return
+        super().keyPressEvent(e)
+
     def wheelEvent(self, e):
         ax, ay = e.angleDelta().x(), e.angleDelta().y()
-        if abs(ax) > abs(ay) and abs(ax) > 0:                    # défilement horizontal du pavé tactile
+        phase = e.phase()
+        horizontal = abs(ax) > abs(ay) and abs(ax) > 0
+        if phase == Qt.ScrollMomentum and (horizontal or self._wheel):
+            e.accept()                                           # inertie après avoir levé les doigts : jamais un nouveau geste, et rien n'est ajouté
+            return
+        if phase == Qt.ScrollEnd and self._wheel:
+            self._finish()                                       # doigts levés : on décide maintenant (sous le seuil = annulé)
+            e.accept()
+            return
+        if horizontal:                                           # défilement horizontal du pavé tactile
             if self._row < 0:
                 idx = self.indexAt(e.position().toPoint())
                 if not idx.isValid():
                     return super().wheelEvent(e)
                 self._wheel, self._dx = True, 0.0
                 self._row = idx.row()
-            self._set(self._row, self._dx + ax * GS.WHEEL_GAIN * 0.5)
-            self._idle.start(220)
+            self._set(self._row, self._dx + ax * GS.WHEEL_GAIN * 0.5)        # revenir vers l'origine réduit le glissement : sous le seuil, rien ne se passe
+            self._idle.start(self.IDLE_PHASE_MS if phase != Qt.NoScrollPhase else self.IDLE_MS)
             e.accept()
             return
         super().wheelEvent(e)

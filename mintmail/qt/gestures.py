@@ -17,7 +17,7 @@ SWIPE_ACTIONS: Dict[str, Tuple[str, str, str]] = {
 }
 LAYOUTS = [("columns", tr("Colonnes : liste | lecture")), ("bottom", tr("Lecture en bas")), ("list", tr("Liste seule (lecture plein écran)"))]
 DEFAULT_SWIPE = {"right": "archive", "right_long": "trash", "left": "snooze", "left_long": "read"}
-SWIPE_SHORT, SWIPE_LONG = 90, 230
+SWIPE_SHORT, SWIPE_LONG = 130, 320                      # seuils volontairement larges : un glissé léger ou hésitant n'exécute rien
 WHEEL_GAIN = 1.0                                       # pixels de glissement par unité de défilement horizontal du pavé tactile
 
 
