@@ -104,7 +104,7 @@
     ],
     [
      "Reader bar",
-     "Reply, Reply all, Forward, Archive, Delete, ✨ Reply with AI, Spam ▾ and Block ▾ (this message, the address or the whole domain — with the actual address written in the choice), Move, Snooze, Favorite, Pin, and the ⋯ menu (read/unread, spam, blocking, unblock, follow-up reminder, etc.)."
+     "Reply, Reply all, Forward, Archive, Delete, ✨ Reply with AI, Spam ▾ and Block ▾ (this message, the address or the whole domain — with the actual address written in the choice), Move, Snooze, Favorite, Pin, and the ⋯ menu (read/unread, spam, blocking, unblock, follow-up reminder, etc.).\nAbove the list, the ⋯ “More actions” button opens the Spark-style menu: Reply, Send again (a new pre-filled message), Block, Move, Mark as spam, Print, Copy as Markdown, Send to your integrations, All actions (palette). The “By date / By priority” button sorts the inbox (priority comes from the AI). An “N emails are set aside” pill opens the snoozed messages."
     ],
     [
      "Command palette (Ctrl+K)",

@@ -1,4 +1,4 @@
-# Aide de MintMail 1.42.3
+# Aide de MintMail 1.43.0
 _Généré par `make docs` depuis l'aide intégrée (touche F1 dans l'application)._
 
 ## Premiers pas
@@ -145,7 +145,8 @@ Si l'IA n'est pas activée, la section propose « Activer l'IA ».
 
 ### Barre du lecteur
 
-Répondre, Répondre à tous, Transférer, Archiver, Supprimer, ✨ Répondre avec l'IA, Spam ▾ et Bloquer ▾ (ce message, l'adresse ou tout le domaine — avec l'adresse réelle écrite dans le choix), Déplacer, Reporter, Favori, Épingler, et le menu ⋯ (lu/non lu, spam, blocage, débloquer, rappel de relance, etc.).
+Répondre, Répondre à tous, Transférer, Archiver, Supprimer, ✨ Répondre avec l'IA, Spam ▾ et Bloquer ▾ (ce message, l'adresse ou tout le domaine — avec l'adresse réelle écrite dans le choix), Déplacer, Reporter, Favori, Épingler, et le menu ⋯ (lu/non lu, spam, blocage, débloquer, rappel de relance, etc.).  
+Au-dessus de la liste, le bouton ⋯ « Plus d'actions » ouvre le menu façon Spark : Répondre, Envoyer à nouveau (nouveau message prérempli), Bloquer, Déplacer, Marquer comme spam, Imprimer, Copier en Markdown, Envoyer vers vos intégrations, Toutes les actions (palette). Le bouton « Par date / Par priorité » trie la boîte de réception (la priorité vient de l'IA). Une pastille « N e-mails sont mis de côté » ouvre les messages reportés.
 
 ### Palette de commandes (Ctrl+K)
 
@@ -528,7 +529,7 @@ Mise à jour : sudo apt install ./mintmail_X.Y.Z_all.deb (vos réglages et votre
 
 ## À propos et crédits
 
-### MintMail 1.42.3
+### MintMail 1.43.0
 
 Le client mail pour Linux Mint dont l'IA est l'ADN : il lit, trie, résume, classe, rédige et agit avec vous — toujours avec votre accord.  
 Développé par SAEC — https://saec.me · Logiciel libre sous licence MIT (© 2026 SAEC) : vous pouvez l'utiliser, le modifier et le redistribuer. Application Qt (PySide6) / Python, sans service cloud imposé : vos mails, vos clés et vos réglages restent chez vous.

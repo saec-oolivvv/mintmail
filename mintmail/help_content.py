@@ -174,7 +174,8 @@ SECTIONS: List[Dict] = [
         ("Barre du lecteur",
          "Répondre, Répondre à tous, Transférer, Archiver, Supprimer, ✨ Répondre avec l'IA, Spam ▾ et Bloquer ▾ (ce message, l'adresse ou tout le "
          "domaine — avec l'adresse réelle écrite dans le choix), Déplacer, Reporter, Favori, Épingler, et le menu ⋯ (lu/non lu, spam, blocage, "
-         "débloquer, rappel de relance, etc.)."),
+         "débloquer, rappel de relance, etc.).\n"
+         "Au-dessus de la liste, le bouton ⋯ « Plus d'actions » ouvre le menu façon Spark : Répondre, Envoyer à nouveau (nouveau message prérempli), Bloquer, Déplacer, Marquer comme spam, Imprimer, Copier en Markdown, Envoyer vers vos intégrations, Toutes les actions (palette). Le bouton « Par date / Par priorité » trie la boîte de réception (la priorité vient de l'IA). Une pastille « N e-mails sont mis de côté » ouvre les messages reportés."),
         ("Palette de commandes (Ctrl+K)",
          "Tapez quelques lettres pour retrouver une action : répondre, archiver, déplacer vers un dossier, spam / bloquer l'expéditeur ou son domaine, "
          "se désabonner, résumer, traduire, ouvrir les contacts ou les identités, agenda et nouvel événement, boîte d'envoi, chercher sur le serveur, changer de vue, de style, "

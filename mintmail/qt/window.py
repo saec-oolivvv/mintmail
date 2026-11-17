@@ -1,5 +1,6 @@
 """Fenêtre Qt (PySide6) : dossiers · liste des messages · lecteur. Module principal de l'interface Qt.
 Le travail réseau tourne dans un fil de fond ; l'interface ne touche jamais le réseau."""
+import html as html_lib
 import os
 import re
 import sys
@@ -66,14 +67,14 @@ class MessageModel(QAbstractListModel):
         super().__init__()
         self.msgs, self.infos, self.lead = [], [], ""
 
-    def set_messages(self, msgs, meta=None, reads=None, lead=False):
+    def set_messages(self, msgs, meta=None, reads=None, lead=False, sections=True):
         self.beginResetModel()
         self.msgs = list(msgs)
         self.infos = [vm.row_info(m) for m in self.msgs]
         if meta:
             AW.decorate(self.infos, self.msgs, meta)                       # résumé IA, « Important », « Suspect »
         for info, head in zip(self.infos, SEC.headings([m.date or 0 for m in self.msgs])):
-            info["section"] = head                                        # titre de période (Aujourd'hui, Hier, mois…) au-dessus de la première ligne de chaque période
+            info["section"] = head if sections else ""                    # titre de période (Aujourd'hui, Hier, mois…) au-dessus de la première ligne de chaque période
         self.lead = ""
         if lead and self.infos:                                           # rangées de groupes au-dessus : elles portent le titre de la 1re période
             self.lead, self.infos[0]["section"] = self.infos[0]["section"], ""
@@ -285,6 +286,11 @@ class MainWindow(ExtrasMixin, OrganizerMixin, AIMixin, QMainWindow):
         top.addWidget(self.title)
         top.addStretch(1)
         top.addWidget(self.count_lbl)
+        self.sort_btn = QPushButton()
+        self.sort_btn.setObjectName("flat")
+        self.sort_btn.setCursor(Qt.PointingHandCursor)
+        self.sort_btn.clicked.connect(self._sort_menu)
+        top.addWidget(self.sort_btn)
         self.sel_btn = QPushButton("☑")
         self.sel_btn.setObjectName("flat")
         self.sel_btn.setCheckable(True)
@@ -374,7 +380,13 @@ class MainWindow(ExtrasMixin, OrganizerMixin, AIMixin, QMainWindow):
         self.group_rows.opened.connect(self.set_category)
         ll.addWidget(self.group_rows)
         ll.addWidget(self.build_digest_card())
+        self.snooze_pill = QPushButton()
+        self.snooze_pill.setObjectName("flat")
+        self.snooze_pill.setCursor(Qt.PointingHandCursor)
+        self.snooze_pill.clicked.connect(lambda: self.select_view("snoozed"))
+        self.snooze_pill.hide()
         ll.addWidget(self.list, 1)
+        ll.addWidget(self.snooze_pill, 0, Qt.AlignLeft)
         ll.addWidget(self.empty, 1)
 
         # -- lecteur : en-tête (avatar, objet, expéditeur, actions de réponse) puis corps
@@ -544,6 +556,7 @@ class MainWindow(ExtrasMixin, OrganizerMixin, AIMixin, QMainWindow):
         self._tool("📌", tr("Épingler"), "P", lambda: self.toggle_flag("pinned"), self_layout=self.actions_row)
         self._tool("✉", tr("Marquer comme non lu"), "U", lambda: self.toggle_flag("unread"), self_layout=self.actions_row)
         self.move_btn = self._tool("📁", tr("Déplacer vers…"), "V", self._move_menu, self_layout=self.actions_row)
+        self.more_btn = self._tool("⋯", tr("Plus d'actions"), None, self._more_menu, self_layout=self.actions_row)
         self.actions_row.addStretch(1)
         self.ai_btn = self._tool("✨", tr("Assistant IA (Ctrl+J)"), "Ctrl+J", self.toggle_assistant, self_layout=self.actions_row)
         self._act(None, tr("Nouveau message"), "C", lambda: self.compose())
@@ -661,9 +674,14 @@ class MainWindow(ExtrasMixin, OrganizerMixin, AIMixin, QMainWindow):
                 if m is not None:
                     msgs.append(m)
             msgs.sort(key=lambda m: m.date, reverse=True)
+        by_priority = self._sort() == "priority" and self.view_key == "inbox"
+        meta = self.cache.ai_meta([m.id for m in msgs]) if msgs else None
+        if by_priority and meta:
+            msgs.sort(key=lambda m: (-int((meta.get(m.id) or {}).get("priority") or 0), -(m.date or 0)))      # priorité décidée par l'IA, puis les plus récents
+        self.sort_btn.setText("⇅  " + (tr("Par priorité") if by_priority else tr("Par date")))
         reads = RC.read_ids(self.cache, [m.id for m in msgs if m.folder == "sent"]) if msgs else {}
         lead = bool(self._group_info and self.category is None and getattr(self._group_info[1], "digest", None))
-        self.model.set_messages(msgs, self.cache.ai_meta([m.id for m in msgs]) if msgs else None, reads, lead=lead)
+        self.model.set_messages(msgs, meta, reads, lead=lead and not by_priority, sections=not by_priority)
         self.srv_btn.setVisible(bool(q.strip()) and not AW.is_ai_query(raw) and not any(a.get("demo") for a in self.engine.accounts()))
         self.update_digest_visibility()
         self.update_category_bar()
@@ -810,6 +828,9 @@ class MainWindow(ExtrasMixin, OrganizerMixin, AIMixin, QMainWindow):
                 it.setData(CountRole, per[aid].get(key, 0) if key == "inbox" else 0)
             elif key is not None:
                 it.setData(CountRole, c.get(key, 0))
+        n = c.get("snoozed", 0)
+        self.snooze_pill.setText("⏰  " + (tr("%d e-mail est mis de côté") if n == 1 else tr("%d e-mails sont mis de côté")) % n)
+        self.snooze_pill.setVisible(bool(n) and self.view_key != "snoozed")
         self.folders.viewport().update()
         self.notspam_btn.setVisible(self.view_key == "spam")
 
@@ -1253,6 +1274,46 @@ class MainWindow(ExtrasMixin, OrganizerMixin, AIMixin, QMainWindow):
         for msgs, dest, op_ids in groups:
             self._background(lambda m=msgs, d=dest, o=op_ids: self.engine.finish_move(m, d, o), "move")
 
+    def _sort_menu(self):
+        menu = QMenu(self)
+        for key, label in (("date", tr("Par date")), ("priority", tr("Par priorité"))):
+            menu.addAction(("✓  " if self._sort() == key else "     ") + label, lambda k=key: self._set_sort(k))
+        menu.exec(self.sort_btn.mapToGlobal(self.sort_btn.rect().bottomLeft()))
+
+    def _sort(self):
+        return "priority" if self.config.get("list_sort") == "priority" else "date"
+
+    def _set_sort(self, key):
+        self.config["list_sort"] = key
+        self.config.save()
+        self.reload()
+
+    def _more_menu(self):
+        """Menu « … » façon Spark pour le message ouvert (ou sélectionné)."""
+        m = self._open_msg()
+        if m is None:
+            return
+        blocked = (m.sender_email or "").lower() in {x.lower() for x in self.config["blocked"]}
+        menu = QMenu(self)
+        for it in MN.more_items(m, blocked, self._integrations()):
+            if it is None:
+                menu.addSeparator()
+            else:
+                menu.addAction(it[1], lambda k=it[0]: self._run_cmd(k, m))
+        menu.exec(self.more_btn.mapToGlobal(self.more_btn.rect().bottomLeft()))
+
+    def resend(self, m):
+        """« Envoyer à nouveau » : un nouveau message prérempli avec le contenu de celui-ci (mêmes destinataires, même objet, même corps)."""
+        full = self.cache.get(m.id) or m
+        body = full.html or "<p>%s</p>" % html_lib.escape(full.text or "").replace("\n", "<br>")
+        self.compose(account_id=full.account, to=full.to, cc=getattr(full, "cc", ""), subject=full.subject or "", body_html=body, raw=True)
+
+    def copy_markdown(self, m):
+        from .. import integrations as IG
+        full = self.cache.get(m.id) or m
+        QApplication.clipboard().setText(IG.markdown_of(full))
+        self.status.setText(tr("Copié en Markdown"))
+
     def _move_menu(self):
         msgs = self.selected_msgs()
         if not msgs:
@@ -1459,6 +1520,8 @@ class MainWindow(ExtrasMixin, OrganizerMixin, AIMixin, QMainWindow):
     def _run_cmd(self, key, m):
         """Exécute une commande du clic droit ou de la palette (même chemin que les boutons : cache d'abord, serveur ensuite)."""
         head, _, arg = key.partition(":")
+        if key == "all_actions":
+            return self.show_palette()
         if m is not None:
             if key == "reply" or key == "reply_all" or key == "forward":
                 return {"reply": self.reply, "reply_all": lambda: self.reply(True), "forward": self.forward}[key]()
@@ -1470,6 +1533,12 @@ class MainWindow(ExtrasMixin, OrganizerMixin, AIMixin, QMainWindow):
                 return self.send_to(arg, m)
             if key in ("print", "print_pdf"):
                 return self.print_message(pdf=(key == "print_pdf"))
+            if key == "resend":
+                return self.resend(m)
+            if key == "copy_md":
+                return self.copy_markdown(m)
+            if key == "move":
+                return self._move_menu()
             if key == "notspam":
                 return self.not_spam_selected()
             if key in ("spam_sender", "spam_domain"):

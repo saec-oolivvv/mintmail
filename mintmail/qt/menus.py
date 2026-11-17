@@ -37,6 +37,17 @@ def context_items(msg, blocked: bool = False, integ=()) -> List[Item]:
     ]
 
 
+def more_items(msg, blocked: bool = False, integ=()) -> List[Item]:
+    """Menu « … » du lecteur, comme dans Spark : Répondre, Envoyer à nouveau, Bloquer, Déplacer, Spam, Imprimer, Copier en Markdown, Exporter vers, Toutes les actions."""
+    return [
+        ("reply", tr("Répondre")), ("resend", tr("Envoyer à nouveau")), None,
+        ("block", tr("Débloquer ") + msg.sender_email if blocked else tr("Bloquer l'expéditeur")), ("move", tr("Déplacer vers…")),
+        ("spam", tr("Marquer comme spam")), ("print", tr("Imprimer…")), ("copy_md", tr("Copier en Markdown")),
+        *([None] + integration_items(integ) if integ else []), None,
+        ("all_actions", tr("Toutes les actions")),
+    ]
+
+
 SNOOZES = [("snooze_tomorrow", tr("Demain 8 h")), ("snooze_monday", tr("Lundi prochain 8 h"))]
 
 

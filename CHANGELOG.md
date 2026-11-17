@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.43.0
+- Menu « Plus d'actions » (⋯) façon Spark : Répondre, Envoyer à nouveau, Bloquer, Déplacer, Marquer comme spam, Imprimer, Copier en Markdown, Envoyer vers (intégrations), Toutes les actions.
+- Tri de la boîte de réception « Par date / Par priorité » (priorité décidée par l'IA).
+- Pastille « N e-mails sont mis de côté » sous la liste : ouvre les messages reportés.
+
 ## 1.42.3
 - Boîte unifiée comme dans Spark : les rangées de groupes (Épinglés, Notifications, Newsletters, Invitations…) s'insèrent dans la liste sous le titre « Aujourd'hui », avec icône, nombre de messages, point bleu s'il y a des non lus, et seulement les expéditeurs (avatar + nom) ; un clic ouvre le groupe, avec une flèche de retour. Les groupes sont eux aussi découpés par période.
 - Période « La semaine dernière ».

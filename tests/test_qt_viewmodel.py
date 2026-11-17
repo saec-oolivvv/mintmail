@@ -1140,3 +1140,12 @@ def test_push_threads_call_back_on_server_news_and_stop_cleanly():
     for t in eng2._push_threads:
         t.join(3)
         assert not t.is_alive()
+
+
+def test_more_menu_has_the_spark_entries_in_order():
+    from types import SimpleNamespace as NS
+    from mintmail.qt import menus as MN
+    m = NS(sender_email="a@x.be")
+    keys = [i[0] for i in MN.more_items(m) if i]
+    assert keys == ["reply", "resend", "block", "move", "spam", "print", "copy_md", "all_actions"]
+    assert "integ:slack" in [i[0] for i in MN.more_items(m, integ=["slack"]) if i]
