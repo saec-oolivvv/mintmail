@@ -43,6 +43,10 @@
      "Like Spark, the inbox sorts your messages into groups automatically: Pinned, Assigned to me (you are the only recipient of a real person's message, or a task or follow-up is set on it), Received invitations, Invitation replies, Notifications and Newsletters. Above the list, one chip per group shows its unread count; “Main” shows everything else, “All” shows everything.\n• Settings → Groups: for each group choose “Group” (separate chip) or “Show all in the main inbox”, plus a general switch.\n• Each mailbox can have its own settings (the “Mailbox” card on the same page): group or not, and the mode of each group."
     ],
     [
+     "Read receipts",
+     "In the composer, the eye button requests a read receipt (Settings → Appearance → Read receipts to request one by default). When the recipient reads your message and their software sends the receipt, an eye 👁 appears on the message in “Sent” (tooltip: who and when) and, if you wish, a notification tells you.\n• When someone asks you for a receipt, MintMail offers to send it, never sends it, or always sends it (setting).\n• Limit: only the recipient's software decides whether to send the receipt (Gmail sends none). MintMail uses no tracking pixel."
+    ],
+    [
      "Your mailbox folders",
      "All IMAP folders of each account are visible in the side panel (collapsible tree, unread counts). • Click a folder to browse it; the “older messages” button loads further back in the history.\n• Move: V key, right-click menu or ☰, palette (“Move to…”), or the AI.\n• Create, rename, delete a folder or subfolder: right-click a folder or an account.\n• Special folders (Sent, Drafts, Archive, Spam, Trash) are recognized whatever the server's language."
     ],
@@ -491,6 +495,10 @@
   [
    "Ctrl+R",
    "Refresh"
+  ],
+  [
+   "Ctrl+P",
+   "Print the message (or save it as PDF: palette Ctrl+K)"
   ],
   [
    "Esc",

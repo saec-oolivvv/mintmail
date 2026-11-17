@@ -12,7 +12,7 @@ SHORTCUTS_HELP: List[Tuple[str, str]] = [
     ("/  ou  Ctrl+F", "Rechercher"), ("Ctrl+K", "Palette de commandes"), ("Ctrl+A", "Tout sélectionner"),
     ("!", "Signaler comme spam"), ("B", "Menu Bloquer (adresse / domaine)"), ("\\", "Basculer colonnes / liste seule"),
     ("X", "Mode sélection"), ("Ctrl+J", "Assistant IA"), ("F11", "Plein écran"),
-    ("? … (recherche)", "Poser une question à l'IA"), ("Ctrl+,", "Ouvrir les paramètres"), ("Ctrl+R", "Actualiser"),
+    ("? … (recherche)", "Poser une question à l'IA"), ("Ctrl+,", "Ouvrir les paramètres"), ("Ctrl+R", "Actualiser"), ("Ctrl+P", "Imprimer le message (ou l'enregistrer en PDF : palette Ctrl+K)"),
     ("Échap", "Annuler la sélection / la recherche"), ("V", "Déplacer vers un dossier"), ("T", "Aujourd'hui (agenda, priorités, tâches)"),
     ("Ctrl+N", "Nouveau message"), ("Ctrl+Maj+,", "Paramètres dans une fenêtre séparée"), ("F1", "Aide"),
     ("Ctrl++ / Ctrl+-", "Agrandir / réduire le texte des messages"), ("Ctrl+0", "Taille normale du texte"), ("Ctrl+B", "Barre latérale réduite / étendue"),
@@ -99,6 +99,8 @@ SECTIONS: List[Dict] = [
          "Désactivation : Paramètres → Gestes & disposition → « Regrouper en conversations ». Les résultats de recherche restent à plat."),
         ("Catégories",
          "Comme dans Spark, la boîte de réception range automatiquement vos messages en groupes : Épinglés, Attribués à moi (vous êtes le seul destinataire d'une vraie personne, ou une tâche ou une relance est posée dessus), Invitations reçues, Réponses aux invitations, Notifications et Newsletters. Au-dessus de la liste, une pastille par groupe affiche son nombre de non lus ; « Principal » montre le reste, « Tout » montre tout.\n• Paramètres → Groupes : pour chaque groupe, « Grouper » (pastille à part) ou « Afficher tout dans la boîte principale », et un interrupteur général.\n• Chaque boîte mail peut avoir ses propres réglages (carte « Boîte mail » de la même page) : regrouper ou non, et mode de chaque groupe."),
+        ("Accusés de lecture",
+         "Dans la rédaction, le bouton œil demande un accusé de lecture (Paramètres → Apparence → Accusés de lecture pour le demander d'office). Quand le destinataire lit votre message et que son logiciel envoie l'accusé, un œil 👁 apparaît sur le message dans « Envoyés » (infobulle : qui, quand) et, si vous le souhaitez, une notification vous prévient.\n• Quand on vous demande un accusé, MintMail vous propose de l'envoyer, ne l'envoie jamais, ou l'envoie toujours (réglage).\n• Limite : seul le logiciel du destinataire décide d'envoyer l'accusé (Gmail n'en envoie pas). MintMail n'utilise aucune image espion."),
         ("Dossiers de vos boîtes",
          "Tous les dossiers IMAP de chaque compte sont visibles dans la barre latérale (arborescence repliable, nombre de non lus). "
          "• Cliquez un dossier pour le parcourir ; le bouton « anciens messages » charge plus loin dans l'historique.\n"

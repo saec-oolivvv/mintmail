@@ -19,7 +19,7 @@ from email.utils import formataddr, make_msgid, parsedate_to_datetime, parseaddr
 
 from .models import Message
 from .store import DATA_DIR, private_dir, write_private
-from . import ical, oauth, pgp
+from . import ical, oauth, pgp, receipts
 from .util import html_to_text, split_addresses, text_to_html, thread_key
 from .i18n import tr
 
@@ -235,6 +235,7 @@ def parse_message(raw, account, logical, real_folder, uid, flags):
                 invite = {}
             if invite:
                 break
+    receipt_for = receipts.original_id_of_receipt(em)
     return Message(
         id=mid, account=account, folder=logical, real_folder=real_folder, uid=uid,
         sender_name=name, sender_email=addr, to=str(em.get("To", "") or ""),
@@ -242,7 +243,8 @@ def parse_message(raw, account, logical, real_folder, uid, flags):
         subject=subject, date=ts, snippet=re.sub(r"\s+", " ", text_body)[:160].strip(),
         text=text_body, html=html_body,
         unread=("\\seen" not in flags) and logical != "drafts",
-        starred="\\flagged" in flags, pinned=PIN_KEYWORD_LOW in flags, category=classify(addr, em), attachments=atts,
+        starred="\\flagged" in flags, pinned=PIN_KEYWORD_LOW in flags, category="notif" if receipt_for else classify(addr, em), attachments=atts,
+        receipt_for=receipt_for, receipt_request=receipts.requested_address(em),
         message_id=message_id, references=references, unsubscribe=str(em.get("List-Unsubscribe", "") or ""),
         unsub_post="one-click" in str(em.get("List-Unsubscribe-Post", "") or "").lower(),
         thread_id=thread_key(message_id, references, subject), invite=invite, security=security)
@@ -878,6 +880,16 @@ class IMAPBackend:
             s.login(user, self._pw())
         return s
 
+    def send_receipt(self, orig_msg_id, orig_subject, to_addr, from_addr):
+        """Envoie l'accusé de lecture d'un message reçu (jamais automatique : voir receipts.settings)."""
+        raw = receipts.build_mdn(orig_msg_id, orig_subject, to_addr, from_addr, self.acc.get("name", ""))
+        try:
+            s = self._smtp()
+            s.sendmail(from_addr, [to_addr], raw)
+            s.quit()
+        except (OSError, smtplib.SMTPException, oauth.OAuthError) as e:
+            raise BackendError(tr("Envoi impossible : %s") % e, retryable=True)
+
     def send(self, out):
         a = self.acc
         em = EmailMessage()
@@ -889,6 +901,8 @@ class IMAPBackend:
             em["Cc"] = out.cc
         em["Date"] = formatdate(localtime=True)
         em["Message-ID"] = make_msgid(domain=from_email.split("@")[-1])
+        if getattr(out, "request_receipt", False):
+            em["Disposition-Notification-To"] = from_email                  # demande d'accusé de lecture (RFC 8098)
         if out.in_reply_to:
             em["In-Reply-To"] = out.in_reply_to
             em["References"] = (out.references + " " + out.in_reply_to).strip()

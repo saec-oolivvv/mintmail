@@ -20,7 +20,8 @@ def context_items(msg, blocked: bool = False) -> List[Item]:
         ("spam", tr("Signaler comme spam")), ("spam_sender", tr("Mettre l'expéditeur en spam")),
         ("block", tr("Débloquer ") + msg.sender_email if blocked else tr("Bloquer l'expéditeur")),
         ("from", tr("Voir tous ses messages")), ("copy_addr", tr("Copier l'adresse")), ("addcontact", tr("Ajouter aux contacts")), None,
-        ("summarize", tr("✨ Résumer / analyser ce message")), ("translate", tr("✨ Traduire ce message")),
+        ("summarize", tr("✨ Résumer / analyser ce message")), ("translate", tr("✨ Traduire ce message")), None,
+        ("print", tr("Imprimer…")), ("print_pdf", tr("Enregistrer en PDF…")),
     ]
 
 
@@ -41,7 +42,7 @@ def palette_commands(msg, engine=None) -> List[Tuple[str, str]]:
                  (tr("Mettre le domaine en spam — ") + dom, "spam_domain"), (tr("Bloquer l'expéditeur — ") + who, "block"),
                  (tr("Bloquer le domaine — ") + dom, "block_domain"), (tr("Voir tous les messages de ") + who, "from"), (tr("Ajouter aux contacts — ") + who, "addcontact"),
                  (tr("Copier l'adresse ") + who, "copy_addr"),
-                 (tr("Reporter à demain 8 h"), "snooze_tomorrow")]
+                 (tr("Reporter à demain 8 h"), "snooze_tomorrow"), (tr("Imprimer ce message (Ctrl+P)"), "print"), (tr("Enregistrer ce message en PDF"), "print_pdf")]
     if msg is not None:
         cmds += [(tr("Créer une tâche depuis ce message"), "task_from"), (tr("Proposer des créneaux (agenda)"), "slots"),
                  (tr("Me le rappeler si pas de réponse sous 3 jours"), "followup3"), (tr("Se désabonner de cet expéditeur"), "unsubscribe")]

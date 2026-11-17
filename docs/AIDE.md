@@ -57,6 +57,12 @@ Comme dans Spark, la boîte de réception range automatiquement vos messages en 
 • Paramètres → Groupes : pour chaque groupe, « Grouper » (pastille à part) ou « Afficher tout dans la boîte principale », et un interrupteur général.
 • Chaque boîte mail peut avoir ses propres réglages (carte « Boîte mail » de la même page) : regrouper ou non, et mode de chaque groupe.
 
+### Accusés de lecture
+
+Dans la rédaction, le bouton œil demande un accusé de lecture (Paramètres → Apparence → Accusés de lecture pour le demander d'office). Quand le destinataire lit votre message et que son logiciel envoie l'accusé, un œil 👁 apparaît sur le message dans « Envoyés » (infobulle : qui, quand) et, si vous le souhaitez, une notification vous prévient.
+• Quand on vous demande un accusé, MintMail vous propose de l'envoyer, ne l'envoie jamais, ou l'envoie toujours (réglage).
+• Limite : seul le logiciel du destinataire décide d'envoyer l'accusé (Gmail n'en envoie pas). MintMail n'utilise aucune image espion.
+
 ### Dossiers de vos boîtes
 
 Tous les dossiers IMAP de chaque compte sont visibles dans la barre latérale (arborescence repliable, nombre de non lus). • Cliquez un dossier pour le parcourir ; le bouton « anciens messages » charge plus loin dans l'historique.  
@@ -162,6 +168,7 @@ F11                Plein écran
 ? … (recherche)    Poser une question à l'IA
 Ctrl+,             Ouvrir les paramètres
 Ctrl+R             Actualiser
+Ctrl+P             Imprimer le message (ou l'enregistrer en PDF : palette Ctrl+K)
 Échap              Annuler la sélection / la recherche
 V                  Déplacer vers un dossier
 T                  Aujourd'hui (agenda, priorités, tâches)

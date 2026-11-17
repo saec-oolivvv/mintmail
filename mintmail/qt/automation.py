@@ -4,6 +4,7 @@ Même comportement que la version GTK (window._auto_route, listing._filter_sende
 from typing import Dict, List, Optional, Tuple
 
 from ..i18n import tr
+from .. import receipts as RC
 from .viewmodel import dest_of
 
 MOVES = ("trash", "spam", "archive")
@@ -167,6 +168,14 @@ def sync_and_route(engine, folders=("inbox", "sent"), only=None):
     before = {m.id for m in engine.cache.query("inbox", "all")}
     fresh, errors = engine.sync(folders=folders, only=only)
     new = [m for m in engine.cache.query("inbox", "all") if m.id not in before]
+    for m in new:                                                    # accusés de lecture reçus : œil sur le message envoyé, puis notification
+        try:
+            hit = RC.record_incoming(engine.cache, m)
+        except Exception:
+            hit = None
+        if hit:
+            m.unread = False
+            engine.__dict__.setdefault("receipt_events", []).append((hit[0].subject, hit[1]))
     keep, plan = route(engine, new)
     done = []
     for msgs, dest, op_ids in apply_moves(engine, plan):

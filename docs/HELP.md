@@ -57,6 +57,12 @@ Like Spark, the inbox sorts your messages into groups automatically: Pinned, Ass
 • Settings → Groups: for each group choose “Group” (separate chip) or “Show all in the main inbox”, plus a general switch.
 • Each mailbox can have its own settings (the “Mailbox” card on the same page): group or not, and the mode of each group.
 
+### Read receipts
+
+In the composer, the eye button requests a read receipt (Settings → Appearance → Read receipts to request one by default). When the recipient reads your message and their software sends the receipt, an eye 👁 appears on the message in “Sent” (tooltip: who and when) and, if you wish, a notification tells you.
+• When someone asks you for a receipt, MintMail offers to send it, never sends it, or always sends it (setting).
+• Limit: only the recipient's software decides whether to send the receipt (Gmail sends none). MintMail uses no tracking pixel.
+
 ### Your mailbox folders
 
 All IMAP folders of each account are visible in the side panel (collapsible tree, unread counts). • Click a folder to browse it; the “older messages” button loads further back in the history.  
@@ -162,6 +168,7 @@ F11                Full screen
 ? … (search)       Ask the AI a question
 Ctrl+,             Open the settings
 Ctrl+R             Refresh
+Ctrl+P             Print the message (or save it as PDF: palette Ctrl+K)
 Esc                Clear selection / search
 V                  Move to a folder
 T                  Today (calendar, priorities, tasks)

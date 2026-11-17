@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.40.0
+- Accusés de lecture (RFC 8098) : bouton œil dans la rédaction (ou demande d'office dans Paramètres → Apparence), œil 👁 sur le message dans « Envoyés » dès que le destinataire a lu (infobulle : qui, quand), notification facultative ; quand on vous demande un accusé : demander / ne jamais envoyer / toujours envoyer. Aucune image espion.
+- Impression : Ctrl+P, clic droit ou palette (Imprimer, Enregistrer en PDF) ; en-têtes, pièces jointes, corps assaini sans images distantes.
+
 ## 1.39.0
 - Groupes de la boîte de réception, comme dans Spark : Épinglés, Attribués à moi (seul destinataire d'une vraie personne, ou tâche / relance posée), Invitations reçues, Réponses aux invitations, Notifications et Newsletters. Une pastille par groupe au-dessus de la liste avec ses non lus ; « Principal » montre le reste, « Tout » montre tout.
 - Paramètres → Groupes : pour chaque groupe, « Grouper » ou « Afficher tout dans la boîte principale », un interrupteur général, et des réglages propres à chaque boîte mail (synchronisés entre postes).

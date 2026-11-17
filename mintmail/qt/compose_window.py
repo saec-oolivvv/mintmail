@@ -239,6 +239,8 @@ class ComposeWindow(QMainWindow):
         if pgp.available():                                        # gpg installé : signer / chiffrer en PGP/MIME (facultatif)
             self.pgp_sign = tool(bl, "sign", tr("Signer ce message avec votre clé OpenPGP (gpg)"), None, lambda: None, checkable=True)
             self.pgp_encrypt = tool(bl, "lock", tr("Chiffrer ce message : il faut la clé publique de chaque destinataire"), None, lambda: None, checkable=True)
+        self.receipt_btn = tool(bl, "eye", tr("Demander un accusé de lecture (le logiciel du destinataire doit l'accepter)"), None, lambda: None, checkable=True)
+        self.receipt_btn.setChecked(bool(self.engine.config.get("receipt_request", False)))
         bl.addStretch(1)
         tool(bl, "trash", tr("Supprimer le brouillon"), None, self._discard)
         QShortcut(QKeySequence("Ctrl+Return"), self, activated=lambda: self.do_send(0))
@@ -509,6 +511,7 @@ class ComposeWindow(QMainWindow):
         acc, ident = self._account_ident()
         out = C.build_outgoing(acc, ident, self.to.text(), self.cc.text(), self.bcc.text(), self.subject.text(), self._body(), self.attachments,
                                self.in_reply_to, self.references)
+        out.request_receipt = bool(self.receipt_btn and self.receipt_btn.isChecked())
         out.pgp_sign = bool(self.pgp_sign and self.pgp_sign.isChecked())
         out.pgp_encrypt = bool(self.pgp_encrypt and self.pgp_encrypt.isChecked())
         self.sent = True

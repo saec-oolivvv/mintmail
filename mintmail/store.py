@@ -62,7 +62,7 @@ DEFAULTS = {
     "density": "comfortable", "load_images": False, "notifications": True,
     "refresh_minutes": 5, "undo_seconds": 6, "width": 1280, "height": 800,
     "folders": {}, "collapsed_folders": [], "style": "aurora", "design_v2": False,
-    "ui_lang": "auto", "update_check": True, "update_repo": "saec-oolivvv/mintmail", "update_last_check": 0, "update_etag": "", "update_seen": "", "update_available": None, "update_snooze_until": 0, "update_snooze_version": "", "update_last_result": "", "open_today_on_start": False, "pins_pushed": [], "threads": True, "inbox_grouping": True, "group_modes": {}, "tasks": [], "ai_prepare_drafts": False, "gcal": {}, "ai_provider": "nvidia", "oauth_clients": {}, "caldav": {}, "identities": [], "contacts": {},
+    "ui_lang": "auto", "update_check": True, "update_repo": "saec-oolivvv/mintmail", "update_last_check": 0, "update_etag": "", "update_seen": "", "update_available": None, "update_snooze_until": 0, "update_snooze_version": "", "update_last_result": "", "open_today_on_start": False, "pins_pushed": [], "threads": True, "receipt_request": False, "receipt_notify": True, "receipt_reply": "ask", "inbox_grouping": True, "group_modes": {}, "tasks": [], "ai_prepare_drafts": False, "gcal": {}, "ai_provider": "nvidia", "oauth_clients": {}, "caldav": {}, "identities": [], "contacts": {},
     "last_view": "inbox", "layout": "columns", "pos_cols": 420, "pos_bottom": 300,
     "side_width": 230, "zoom": 1.0,
     "swipe": {"right": "archive", "right_long": "trash", "left": "snooze", "left_long": "read"},
@@ -818,6 +818,31 @@ class Cache:
                     except ValueError:
                         pass
         return out
+
+    def ai_kind(self, kind, ids):
+        """{id: objet} des données IA d'un genre donné (ex. « receipt » : accusés de lecture reçus) pour ces messages."""
+        ids = list(ids)
+        out = {}
+        with self.lock:
+            for i in range(0, len(ids), 500):
+                chunk = ids[i:i + 500]
+                for mid, blob in self.db.execute(
+                        "SELECT msg_id, data FROM ai WHERE kind=? AND msg_id IN (%s)" % ",".join("?" * len(chunk)), [kind] + chunk).fetchall():
+                    try:
+                        out[mid] = json.loads(blob)
+                    except ValueError:
+                        pass
+        return out
+
+    def find_sent_by_message_id(self, message_id):
+        """Message envoyé dont l'en-tête Message-ID est `message_id` (None si absent)."""
+        if not message_id:
+            return None
+        needle = '"message_id": ' + json.dumps(message_id, ensure_ascii=False)
+        with self.lock:
+            r = self.db.execute(self._SEL % ("COALESCE(meta,data)", "1") + "WHERE folder='sent' AND instr(COALESCE(meta,data), ?) > 0 LIMIT 1",
+                                (needle,)).fetchone()
+        return self._build(*r[:7], light=True) if r else None
 
     def ai_clear(self):
         with self.lock:

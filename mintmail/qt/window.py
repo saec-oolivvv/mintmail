@@ -1,18 +1,20 @@
 """Fenêtre Qt (PySide6) : dossiers · liste des messages · lecteur. Module principal de l'interface Qt.
 Le travail réseau tourne dans un fil de fond ; l'interface ne touche jamais le réseau."""
 import os
+import re
 import sys
 import threading
 import time
 
 from PySide6.QtCore import QAbstractListModel, QModelIndex, QObject, Qt, QTimer, QUrl, Signal
 from PySide6.QtGui import QAction, QDesktopServices, QKeySequence
-from PySide6.QtWidgets import (QApplication, QFrame, QHBoxLayout, QLabel, QLineEdit, QListView, QListWidget, QListWidgetItem, QMainWindow, QMenu,
+from PySide6.QtWidgets import (QApplication, QFileDialog, QFrame, QHBoxLayout, QLabel, QLineEdit, QListView, QListWidget, QListWidgetItem, QMainWindow, QMenu,
                                QInputDialog, QMessageBox, QPushButton, QSplitter, QTextBrowser, QVBoxLayout, QWidget)
 
 from .. import APP_NAME, __version__
 from ..htmlsafe import safe_to_open
 from ..i18n import tr
+from .. import receipts as RC
 from ..store import Cache, Config
 from .. import updater
 from . import ui_icons as UI
@@ -60,12 +62,15 @@ class MessageModel(QAbstractListModel):
         super().__init__()
         self.msgs, self.infos = [], []
 
-    def set_messages(self, msgs, meta=None):
+    def set_messages(self, msgs, meta=None, reads=None):
         self.beginResetModel()
         self.msgs = list(msgs)
         self.infos = [vm.row_info(m) for m in self.msgs]
         if meta:
             AW.decorate(self.infos, self.msgs, meta)                       # résumé IA, « Important », « Suspect »
+        for info, m in zip(self.infos, self.msgs):
+            r = (reads or {}).get(m.id)
+            info["read_by"] = RC.eye_title(r) if r else ""                 # accusé de lecture reçu : œil dans la liste
         self.endResetModel()
 
     def rowCount(self, parent=QModelIndex()):
@@ -406,10 +411,32 @@ class MainWindow(ExtrasMixin, OrganizerMixin, AIMixin, QMainWindow):
         sbl.addWidget(self.suspect_spam)
         sbl.addWidget(self.suspect_ok)
         self.suspect_bar.hide()
+        self.receipt_bar = QFrame()                          # « X demande un accusé de lecture : l'envoyer ? »
+        self.receipt_bar.setObjectName("receiptbar")
+        self.receipt_bar.setStyleSheet("#receiptbar { background: rgba(59,130,246,0.10); border: 1px solid rgba(59,130,246,0.45); border-radius: 10px; }")
+        rbl = QHBoxLayout(self.receipt_bar)
+        rbl.setContentsMargins(14, 8, 10, 8)
+        rbl.setSpacing(8)
+        self.receipt_label = QLabel()
+        self.receipt_label.setWordWrap(True)
+        rbl.addWidget(self.receipt_label, 1)
+        self.receipt_yes = QPushButton(tr("Envoyer l'accusé"))
+        self.receipt_yes.setObjectName("primary")
+        self.receipt_no = QPushButton(tr("Pas d'accusé"))
+        self.receipt_no.setObjectName("flat")
+        self.receipt_yes.clicked.connect(lambda: self._receipt_answer(True))
+        self.receipt_no.clicked.connect(lambda: self._receipt_answer(False))
+        rbl.addWidget(self.receipt_yes)
+        rbl.addWidget(self.receipt_no)
+        self.receipt_bar.hide()
         sw = QHBoxLayout()
         sw.setContentsMargins(22, 8, 22, 0)
         sw.addWidget(self.suspect_bar)
         rl.addLayout(sw)
+        rw = QHBoxLayout()
+        rw.setContentsMargins(22, 6, 22, 0)
+        rw.addWidget(self.receipt_bar)
+        rl.addLayout(rw)
         self.extras = MessageExtras()
         self._wire_extras()
         rl.addWidget(self.extras)
@@ -498,6 +525,7 @@ class MainWindow(ExtrasMixin, OrganizerMixin, AIMixin, QMainWindow):
         self.set_layout(self.config.get("layout") or "columns")
         self._act(None, "", "Escape", self._back_to_list)
         self._act(None, "", "Ctrl+R", lambda: self.sync())
+        self._act(None, "", "Ctrl+P", lambda: self.print_message())
         self._act(None, "", "Ctrl+K", self.show_palette)
         self._act(None, "", "X", lambda: self.sel_btn.toggle())
         self._act(None, "", "Ctrl+A", self.select_all)
@@ -582,7 +610,8 @@ class MainWindow(ExtrasMixin, OrganizerMixin, AIMixin, QMainWindow):
                 if m is not None:
                     msgs.append(m)
             msgs.sort(key=lambda m: m.date, reverse=True)
-        self.model.set_messages(msgs, self.cache.ai_meta([m.id for m in msgs]) if msgs else None)
+        reads = RC.read_ids(self.cache, [m.id for m in msgs if m.folder == "sent"]) if msgs else {}
+        self.model.set_messages(msgs, self.cache.ai_meta([m.id for m in msgs]) if msgs else None, reads)
         self.srv_btn.setVisible(bool(q.strip()) and not AW.is_ai_query(raw) and not any(a.get("demo") for a in self.engine.accounts()))
         self.update_digest_visibility()
         self.update_category_bar()
@@ -1310,6 +1339,8 @@ class MainWindow(ExtrasMixin, OrganizerMixin, AIMixin, QMainWindow):
                 return self.move_selected(key)
             if key in ("read", "star", "pin"):
                 return self.toggle_flag({"read": "unread", "star": "starred", "pin": "pinned"}[key])
+            if key in ("print", "print_pdf"):
+                return self.print_message(pdf=(key == "print_pdf"))
             if key == "notspam":
                 return self.not_spam_selected()
             if key in ("spam_sender", "spam_domain"):
@@ -1481,6 +1512,7 @@ class MainWindow(ExtrasMixin, OrganizerMixin, AIMixin, QMainWindow):
             self.avatar.set_sender("", "")
             self.images_btn.hide()
             self.suspect_bar.hide()
+            self.receipt_bar.hide()
             self.extras.clear()
             self.ai_card.idle()
             self.quick.hide()
@@ -1514,6 +1546,7 @@ class MainWindow(ExtrasMixin, OrganizerMixin, AIMixin, QMainWindow):
         self.images_btn.setVisible(bool(msg.html) and has_remote_content(msg.html) and not load)
         self._fill_images_menu(msg)
         self._suspect_check(msg)
+        self._receipt_check(msg)
         self.reader.show_html(vm.render_html(msg, load, self.is_dark()))
         self.apply_zoom()
         self.fill_extras(msg)
@@ -1521,6 +1554,69 @@ class MainWindow(ExtrasMixin, OrganizerMixin, AIMixin, QMainWindow):
         self.quick.set_ai(AS.ai_engine(self.engine).enabled())
         if msg.folder != "drafts":
             self.ai_open(msg)
+
+    def print_message(self, pdf=False):
+        """Imprime le message affiché (boîte de dialogue d'impression du système) ou l'enregistre en PDF."""
+        msg = self.shown or next(iter(self.selected_msgs()), None)
+        if msg is None:
+            self.status.setText(tr("Aucun message à imprimer."))
+            return
+        full = self.cache.get(msg.id) or msg
+        try:
+            from PySide6.QtGui import QPageLayout, QTextDocument
+            from PySide6.QtPrintSupport import QPrintDialog, QPrinter
+        except ImportError:
+            self.status.setText(tr("Impression indisponible : QtPrintSupport manque."))
+            return
+        from . import printing
+        printer = QPrinter(QPrinter.HighResolution)
+        if pdf:
+            safe = re.sub(r"[^\w.\- ]", "_", full.subject or "message")[:60].strip() or "message"
+            path, _f = QFileDialog.getSaveFileName(self, tr("Enregistrer en PDF"), os.path.expanduser("~/%s.pdf" % safe), "PDF (*.pdf)")
+            if not path:
+                return
+            printer.setOutputFormat(QPrinter.PdfFormat)
+            printer.setOutputFileName(path if path.lower().endswith(".pdf") else path + ".pdf")
+        elif QPrintDialog(printer, self).exec() != QPrintDialog.Accepted:
+            return
+        doc = QTextDocument()
+        doc.setHtml(printing.printable_html(full))
+        doc.print_(printer)
+        self.status.setText(tr("Enregistré en PDF : %s") % printer.outputFileName() if pdf else tr("Message envoyé à l'imprimante"))
+
+    def _receipt_check(self, msg):
+        """L'expéditeur demande un accusé de lecture : on répond selon le réglage (jamais / demander / toujours) ; une seule réponse par message."""
+        self.receipt_bar.hide()
+        if msg.folder != "inbox" or not msg.receipt_request or self.cache.ai_get(msg.id, "receipt_answer"):
+            return
+        mode = RC.settings(self.config)["reply"]
+        if mode == "always":
+            self._receipt_answer(True, msg)
+        elif mode == "ask":
+            self.receipt_label.setText(tr("%s demande un accusé de lecture. L'envoyer ?") % (msg.receipt_request or msg.sender_email))
+            self.receipt_bar.show()
+
+    def _receipt_answer(self, send, msg=None):
+        msg = msg or self.shown
+        self.receipt_bar.hide()
+        if msg is None:
+            return
+        self.cache.ai_set(msg.id, "receipt_answer", {"sent": bool(send), "at": time.time()})
+        if not send:
+            return
+        acct = next((a for a in self.engine.accounts() if a.get("id") == msg.account), None)
+        if acct is None or not msg.message_id:
+            return
+
+        def run():
+            try:
+                self.engine.backend(msg.account).send_receipt(msg.message_id, msg.subject, msg.receipt_request, acct["email"])
+            except Exception:
+                with self.cache.lock:                                                                   # échec : on pourra réessayer
+                    self.cache.db.execute("DELETE FROM ai WHERE msg_id=? AND kind='receipt_answer'", (msg.id,))
+                    self.cache.db.commit()
+        threading.Thread(target=run, daemon=True).start()
+        self.status.setText(tr("Accusé de lecture envoyé à %s") % msg.receipt_request)
 
     def _suspect_check(self, msg):
         """Message de la boîte de réception qui ressemble à de l'hameçonnage : on demande s'il faut le mettre en spam (jamais d'action automatique)."""
@@ -1640,6 +1736,7 @@ class MainWindow(ExtrasMixin, OrganizerMixin, AIMixin, QMainWindow):
         self._update_counts()
         self.p2p_footer()
         self.notify_new_mail(fresh if getattr(self, "_synced_once", False) else 0)
+        self.notify_receipts()
         self._synced_once = True
         self.check_followups()
         self.after_sync_pins()                               # mémorise si le serveur garde les épingles ; envoie une fois les épingles locales

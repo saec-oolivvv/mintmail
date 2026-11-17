@@ -394,6 +394,18 @@ class OrganizerMixin:
         else:
             sysdeps.notify(tr("MintMail"), tr("%d nouveaux messages") % fresh)
 
+    def notify_receipts(self):
+        """Accusés de lecture arrivés pendant la synchronisation : notification de bureau (réglage « Prévenir quand un message est lu »)."""
+        events = self.engine.__dict__.pop("receipt_events", [])
+        if not events:
+            return
+        self.reload()
+        if self.config.get("receipt_notify", True):
+            if len(events) == 1:
+                sysdeps.notify(tr("Message lu"), tr("%s a lu « %s »") % (events[0][1], events[0][0]))
+            else:
+                sysdeps.notify(tr("Messages lus"), tr("%d de vos messages ont été lus") % len(events))
+
     def offline_text(self, offline):
         n = self.cache.ops_count() + self.cache.outbox_count()
         if offline:
