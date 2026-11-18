@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.48.3
+- Fenêtre des paramètres plus grande (jusqu'à 1280 × 880, sans dépasser l'écran) pour voir toutes les informations.
+- Aide : crédits complets de SAEC HOLDING (éditeur, contact, licence MIT, composants libres, marques, assistance) ; copyright du fichier LICENSE et du README mis à jour.
+
 ## 1.48.2
 - Tests : plus de plantage (segfault) à la fermeture de Qt une fois tous les tests réussis ; les widgets de test sont détruits proprement.
 

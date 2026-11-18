@@ -481,7 +481,24 @@ SECTIONS: List[Dict] = [
     {"id": "about", "title": "À propos et crédits", "items": [
         ("MintMail {version}",
          "Le client mail pour Linux Mint dont l'IA est l'ADN : il lit, trie, résume, classe, rédige et agit avec vous — toujours avec votre accord.\n"
-         "Développé par SAEC — https://saec.me · Logiciel libre sous licence MIT (© 2026 SAEC) : vous pouvez l'utiliser, le modifier et le redistribuer. Application Qt (PySide6) / Python, sans service cloud imposé : vos mails, vos clés et vos réglages restent chez vous."),
+         "Application Qt (PySide6) / Python, sans service cloud imposé : vos mails, vos clés et vos réglages restent chez vous."),
+        ("SAEC HOLDING",
+         "MintMail est conçu, développé et maintenu par SAEC HOLDING — https://saec.me · contact@saec.me\n"
+         "SAEC est un studio d'ingénierie logicielle : CRM et ERP sur mesure, sécurité, performance, middleware.\n"
+         "© 2026 SAEC HOLDING. Tous droits réservés sur le nom et le logo SAEC."),
+        ("Licence",
+         "Logiciel libre sous licence MIT : vous pouvez l'utiliser, le copier, le modifier et le redistribuer, à condition de conserver la mention de copyright et le texte de la licence (fichier LICENSE). "
+         "Le logiciel est fourni « tel quel », sans garantie."),
+        ("Composants libres utilisés",
+         "• Qt et PySide6 (Qt Company / Qt for Python) — interface graphique, licence LGPLv3.\n"
+         "• Python et sa bibliothèque standard (IMAP, SMTP, SQLite, chiffrement) — licence PSF.\n"
+         "• SQLite — base de données locale, domaine public.\n"
+         "Les services d'IA (Claude, OpenAI, NVIDIA, modèle local…) sont facultatifs : MintMail ne les contacte que si vous les activez et avec VOTRE clé."),
+        ("Marques citées",
+         "Gmail, Google Agenda, Microsoft 365, iCloud, Yahoo, Spark, Thunderbird, Slack, Todoist, Obsidian et les autres noms cités sont des marques de leurs propriétaires respectifs ; "
+         "MintMail n'est ni affilié ni approuvé par eux."),
+        ("Contact et assistance",
+         "Écrire à contact@saec.me en joignant le rapport de « mintmail --diagnose » (sans mot de passe) ou celui de Paramètres → Maintenance."),
     ]},
 ]
 

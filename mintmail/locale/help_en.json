@@ -446,7 +446,27 @@
    "items": [
     [
      "MintMail {version}",
-     "The mail client for Linux Mint with AI in its DNA: it reads, sorts, summarizes, files, writes and acts with you — always with your approval.\nDeveloped by SAEC — https://saec.me · Free software under the MIT license (© 2026 SAEC): you may use, modify and redistribute it. Qt (PySide6) / Python application, with no imposed cloud service: your mail, keys and settings stay with you."
+     "The mail client for Linux Mint with AI in its DNA: it reads, sorts, summarizes, files, writes and acts with you — always with your approval.\nQt (PySide6) / Python application, with no imposed cloud service: your mail, keys and settings stay with you."
+    ],
+    [
+     "SAEC HOLDING",
+     "MintMail is designed, developed and maintained by SAEC HOLDING — https://saec.me · contact@saec.me\nSAEC is a software engineering studio: custom CRM and ERP, security, performance, middleware.\n© 2026 SAEC HOLDING. All rights reserved on the SAEC name and logo."
+    ],
+    [
+     "License",
+     "Free software under the MIT license: you may use, copy, modify and redistribute it, provided you keep the copyright notice and the license text (LICENSE file). The software is provided “as is”, without warranty."
+    ],
+    [
+     "Free components used",
+     "• Qt and PySide6 (Qt Company / Qt for Python) — graphical interface, LGPLv3 license.\n• Python and its standard library (IMAP, SMTP, SQLite, cryptography) — PSF license.\n• SQLite — local database, public domain.\nAI services (Claude, OpenAI, NVIDIA, local model…) are optional: MintMail only contacts them if you turn them on, and with YOUR key."
+    ],
+    [
+     "Trademarks mentioned",
+     "Gmail, Google Calendar, Microsoft 365, iCloud, Yahoo, Spark, Thunderbird, Slack, Todoist, Obsidian and the other names mentioned are trademarks of their respective owners; MintMail is neither affiliated with nor endorsed by them."
+    ],
+    [
+     "Contact and support",
+     "Write to contact@saec.me attaching the report from “mintmail --diagnose” (no passwords) or the one from Settings → Maintenance."
     ]
    ]
   }

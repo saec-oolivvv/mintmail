@@ -3,7 +3,7 @@ Toute la logique (validation, enregistrement, test) est dans accounts.py, testé
 import threading
 
 from PySide6.QtCore import QObject, Qt, QUrl, Signal
-from PySide6.QtGui import QDesktopServices, QFont, QPalette
+from PySide6.QtGui import QDesktopServices, QFont, QGuiApplication, QPalette
 from PySide6.QtWidgets import (QCheckBox, QComboBox, QDialog, QDialogButtonBox, QFormLayout, QHBoxLayout, QLabel, QLineEdit, QListWidget,
                                QListWidgetItem, QMenu, QMessageBox, QPushButton, QSpinBox, QStackedWidget, QVBoxLayout, QWidget)
 
@@ -47,8 +47,10 @@ class SettingsDialog(QDialog):
         super().__init__(main)
         self.main, self.cfg = main, main.config
         self.setWindowTitle(tr("Paramètres"))
-        self.resize(1040, 700)
-        self.setMinimumSize(820, 520)
+        scr = QGuiApplication.primaryScreen().availableGeometry() if QGuiApplication.primaryScreen() else None
+        w, h = (min(1280, scr.width() - 60), min(880, scr.height() - 60)) if scr else (1280, 880)     # grande, mais jamais plus que l'écran
+        self.resize(w, h)
+        self.setMinimumSize(min(900, w), min(600, h))
         self.sig = _Signals()
         self.sig.say.connect(self._say)
         self.sig.ai_say.connect(self._ai_say)
