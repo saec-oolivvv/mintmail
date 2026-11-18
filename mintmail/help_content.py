@@ -483,9 +483,10 @@ SECTIONS: List[Dict] = [
          "Le client mail pour Linux Mint dont l'IA est l'ADN : il lit, trie, résume, classe, rédige et agit avec vous — toujours avec votre accord.\n"
          "Application Qt (PySide6) / Python, sans service cloud imposé : vos mails, vos clés et vos réglages restent chez vous."),
         ("SAEC HOLDING",
-         "MintMail est conçu, développé et maintenu par SAEC HOLDING — https://saec.me · contact@saec.me\n"
+         "MintMail est conçu, développé et maintenu par SAEC HOLDING LTD — https://saec.me · contact@saec.me\n"
+         "Adresse : 20 Wenlock Road, London N1 7GU, Angleterre (Royaume-Uni).\n"
          "SAEC est un studio d'ingénierie logicielle : CRM et ERP sur mesure, sécurité, performance, middleware.\n"
-         "© 2026 SAEC HOLDING. Tous droits réservés sur le nom et le logo SAEC."),
+         "© 2026 SAEC HOLDING LTD. Tous droits réservés sur le nom et le logo SAEC."),
         ("Licence",
          "Logiciel libre sous licence MIT : vous pouvez l'utiliser, le copier, le modifier et le redistribuer, à condition de conserver la mention de copyright et le texte de la licence (fichier LICENSE). "
          "Le logiciel est fourni « tel quel », sans garantie."),

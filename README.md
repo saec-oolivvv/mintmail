@@ -75,4 +75,4 @@ The tests cover the logic (storage, simulated IMAP/SMTP, simulated AI, sync, OAu
 
 Free software under the **MIT license** — see [LICENSE](LICENSE): you may use, modify and redistribute it, including commercially, provided the copyright notice is kept. No warranty.
 
-Developed by [SAEC HOLDING](https://saec.me) · contact: contact@saec.me
+Developed by [SAEC HOLDING LTD](https://saec.me), 20 Wenlock Road, London N1 7GU, UK · contact: contact@saec.me

@@ -1,4 +1,4 @@
-# Aide de MintMail 1.48.3
+# Aide de MintMail 1.48.4
 _Généré par `make docs` depuis l'aide intégrée (touche F1 dans l'application)._
 
 ## Premiers pas
@@ -591,16 +591,17 @@ Mise à jour : sudo apt install ./mintmail_X.Y.Z_all.deb (vos réglages et votre
 
 ## À propos et crédits
 
-### MintMail 1.48.3
+### MintMail 1.48.4
 
 Le client mail pour Linux Mint dont l'IA est l'ADN : il lit, trie, résume, classe, rédige et agit avec vous — toujours avec votre accord.  
 Application Qt (PySide6) / Python, sans service cloud imposé : vos mails, vos clés et vos réglages restent chez vous.
 
 ### SAEC HOLDING
 
-MintMail est conçu, développé et maintenu par SAEC HOLDING — https://saec.me · contact@saec.me  
+MintMail est conçu, développé et maintenu par SAEC HOLDING LTD — https://saec.me · contact@saec.me  
+Adresse : 20 Wenlock Road, London N1 7GU, Angleterre (Royaume-Uni).  
 SAEC est un studio d'ingénierie logicielle : CRM et ERP sur mesure, sécurité, performance, middleware.  
-© 2026 SAEC HOLDING. Tous droits réservés sur le nom et le logo SAEC.
+© 2026 SAEC HOLDING LTD. Tous droits réservés sur le nom et le logo SAEC.
 
 ### Licence
 
