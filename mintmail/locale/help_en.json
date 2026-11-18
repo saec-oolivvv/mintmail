@@ -69,6 +69,10 @@
     [
      "Swipe gestures",
      "Drag a row with the mouse, touchpad or finger. By default: right = archive, long right = delete, left = snooze, long left = read/unread. Customizable in Settings → Gestures & layout (archive, delete, snooze, read, favorite, pin, spam, block, nothing) plus reversing the direction for the touchpad."
+    ],
+    [
+     "Advanced search",
+     "In the search bar: free words plus combinable filters — from:name, is:unread, is:read, is:starred, is:pinned, has:attachment, after:2026-11-01, before:2026-12-01 (dates YYYY-MM-DD; after: included, before: excluded). Example: invoice from:ovh after:2026-01-01 has:attachment. The same criteria are sent to the server to also search messages MintMail has not downloaded yet."
     ]
    ]
   },
@@ -239,6 +243,10 @@
     [
      "Remote images and phishing",
      "Remote images (tracking pixels) are blocked by default: “Remote images blocked” banner → Show, or the global setting in Appearance. The HTML of messages is cleaned (no scripts). Suspicious messages are flagged."
+    ],
+    [
+     "Server-side rules (Sieve) and Thunderbird import",
+     "Settings → Filters & blocking:\n• “Send to the server (Sieve)”: your rules (and the out-of-office reply, see Out of office) are installed on the server, which applies them even when MintMail is closed. It needs a server with Sieve (ManageSieve, port 4190) and a password; Gmail, Microsoft, iCloud and Yahoo have none: MintMail must stay open there.\n• “Import from Thunderbird…”: brings in your simple filters (one “contains” condition: from, subject, to/cc; actions move, read, star, delete). Filters with several conditions, disabled ones or other actions are skipped and counted.\n• The “Pin” rule does not exist in Sieve: it stays applied by MintMail only."
     ]
    ]
   },
@@ -309,6 +317,10 @@
     [
      "Performance",
      "Persistent IMAP connections, progressive loading, list updated without rebuilding, bulk actions in a single transaction: archiving or marking a sender as spam takes a few milliseconds in the interface, the server follows in the background."
+    ],
+    [
+     "Backup, restore and safe mode",
+     "Settings → Application → Maintenance:\n• Create a backup: a single .zip with settings and cache (passwords excluded, they stay in the keyring), readable by you only.\n• Restore: the current state is saved first (before-restore-…), so a restore can be undone. Then restart MintMail.\n• Check now / diagnostic report: checks the database and settings, saves a report without passwords to attach to a help request.\n• Safe mode: after 3 failed starts in a row (or “mintmail --safe-mode”), MintMail starts without sync between computers, alerts, sounds or automatic out-of-office replies, without touching your settings, and sets aside (never deletes) an unreadable database or settings file. Command lines: --backup, --restore."
     ]
    ]
   },
@@ -327,6 +339,10 @@
     [
      "Settings pages",
      "Accounts · Appearance · Filters & blocking · ✨ AI · Updates · Gestures & layout · Signatures · Sending identities · Reply templates · Contacts · Calendar · Sync. The help (F1) holds the shortcuts, the command-line options and the credits. Esc closes the settings window."
+    ],
+    [
+     "Dosed notifications",
+     "Settings → Application → Notifications:\n• Alert for: all messages, people only (no newsletters or notifications), contacts and VIPs only, or no alerts.\n• Untick a mailbox to stop alerts for it. VIPs: one address per line.\n• Quiet hours (e.g. 22:00 → 07:00, crosses midnight): no alert or sound, mail still arrives.\n• The number of unread inbox messages is shown in the window title and the notification icon tooltip."
     ]
    ]
   },
@@ -581,6 +597,18 @@
   [
    "mintmail --diagnose",
    "Full report WITHOUT secrets (system, Python, Qt, modules, data, sync, keyring, log), saved to {data}/diagnostic.txt."
+  ],
+  [
+   "mintmail --backup",
+   "Creates a .zip backup of the settings and the cache (passwords excluded: they stay in the keyring). Without a file name: in {data}/backups/. Only you can read the file."
+  ],
+  [
+   "mintmail --restore backup.zip",
+   "Restores a backup. The current state is first saved to {data}/backups/before-restore-<date>.zip: a restore can be undone."
+  ],
+  [
+   "mintmail --safe-mode",
+   "Starts without sync between computers, alerts, sounds or automatic out-of-office replies, without changing your settings. Also repairs a damaged database (set aside, never deleted). MintMail switches to it by itself after 3 failed starts in a row."
   ],
   [
    "mintmail --reset",

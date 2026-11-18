@@ -15,6 +15,7 @@ from PySide6.QtWidgets import (QSystemTrayIcon, QApplication, QFileDialog, QFram
 from .. import APP_NAME, __version__
 from ..htmlsafe import safe_to_open
 from ..i18n import tr
+from .. import notifyrules as NR
 from .. import receipts as RC
 from .. import shortcuts as SC
 from .. import sections as SEC
@@ -453,6 +454,7 @@ class MainWindow(ExtrasMixin, OrganizerMixin, AIMixin, QMainWindow):
         self._rl = rl
         rl.addWidget(readerhead)
         self.info = IC.InfoColumn()                          # colonne de droite : informations, alertes, images, pièces jointes, résumé / traduction (défile)
+        self._accessible_names()
         self.info.add(self.images_btn)
 
         def bar(frame, label, *buttons):
@@ -869,6 +871,28 @@ class MainWindow(ExtrasMixin, OrganizerMixin, AIMixin, QMainWindow):
         self.snooze_pill.setVisible(bool(n) and self.view_key != "snoozed")
         self.folders.viewport().update()
         self.notspam_btn.setVisible(self.view_key == "spam")
+        self._show_unread_total(c.get("inbox", 0))
+
+    def _accessible_names(self):
+        """Noms et descriptions pour les lecteurs d'écran (VoiceOver, Orca) : les zones principales et les boutons qui n'ont qu'une icône."""
+        for w, name in ((self.folders, tr("Dossiers")), (self.list, tr("Liste des messages")), (self.search, tr("Rechercher")),
+                        (self.reader, tr("Message")), (self.info, tr("Informations sur le message"))):
+            w.setAccessibleName(name)
+        for b in self.findChildren(QPushButton):
+            if not b.accessibleName():
+                tip = (b.toolTip() or b.text() or "").split("  (")[0].strip()
+                if tip:
+                    b.setAccessibleName(tip)
+        self.list.setAccessibleDescription(tr("Glissez à droite ou à gauche, ou utilisez les raccourcis clavier, pour traiter un message."))
+
+    def _show_unread_total(self, unread):
+        """Compteur de non lus dans le titre de la fenêtre et l'infobulle de l'icône de notification."""
+        try:
+            self.setWindowTitle(NR.title_with_count("%s %s (Qt)" % (APP_NAME, __version__), int(unread or 0)))
+            if getattr(self, "tray", None) is not None:
+                self.tray.setToolTip(NR.title_with_count("MintMail", int(unread or 0)))
+        except (RuntimeError, TypeError, ValueError):
+            pass
 
     def _scope_of(self, it):
         """Boîte affichée pour une ligne de la barre latérale : « all » (boîte unifiée) pour les vues, la boîte du dossier pour un dossier de rangement."""
@@ -2180,7 +2204,18 @@ def run(argv=None):
     app.setApplicationDisplayName(APP_NAME)
     app.setDesktopFileName(AI.DESKTOP_ID)                  # idem sous Wayland
     app.setWindowIcon(AI.load())
-    win = MainWindow()
+    from .. import backup as BK
+    from ..store import CONFIG_DIR
+    failures = BK.note_start(DATA_DIR)                     # démarrages précédents jamais arrivés « au calme » (3 de suite → mode sans échec)
+    safe = "--safe-mode" in (argv if argv is not None else sys.argv) or BK.should_start_safe(failures)
+    fixed = BK.repair(CONFIG_DIR, DATA_DIR) if safe or failures else []     # base ou configuration illisible : mise de côté, jamais supprimée
+    cfg = Config()
+    if safe:
+        BK.apply_safe(cfg)
+    win = MainWindow(config=cfg)
     win.show()
+    if safe or fixed:
+        QTimer.singleShot(600, lambda: QMessageBox.information(win, tr("Mode sans échec"), BK.safe_message(safe, fixed)))
     QTimer.singleShot(0, lambda: QD.end_start(QD.start_marker(str(DATA_DIR))))       # la fenêtre est arrivée jusqu'à l'écran : le démarrage a réussi
+    QTimer.singleShot(8000, lambda: BK.note_ok(DATA_DIR))  # …et tient plus de 8 s : le compteur de démarrages ratés repart à zéro
     return app.exec()

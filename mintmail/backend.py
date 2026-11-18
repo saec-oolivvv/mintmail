@@ -257,6 +257,9 @@ def _is_auto(em) -> bool:
                 or em.get("List-Id") or em.get("X-Auto-Response-Suppress"))
 
 
+_IMAP_MONTHS = ("Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec")      # indépendant de la langue du système
+
+
 def build_imap_search(text):
     """Critères IMAP SEARCH depuis la syntaxe de recherche de MintMail (mots, from:, is:unread, is:starred, has:attachment)."""
     from .store import parse_search
@@ -276,6 +279,14 @@ def build_imap_search(text):
         args += ["FROM", lit(flt["from"])]
     if flt.get("att"):
         args += ["HEADER", "Content-Type", '"multipart/mixed"']
+    if flt.get("read"):
+        args.append("SEEN")
+    if flt.get("pinned"):
+        args += ["KEYWORD", PIN_KEYWORD]
+    if "after" in flt:
+        args += ["SINCE", flt["after"].strftime("%d-") + _IMAP_MONTHS[flt["after"].month - 1] + flt["after"].strftime("-%Y")]
+    if "before" in flt:
+        args += ["BEFORE", flt["before"].strftime("%d-") + _IMAP_MONTHS[flt["before"].month - 1] + flt["before"].strftime("-%Y")]
     for t in terms:
         args += ["TEXT", lit(t)]
     if utf8[0]:

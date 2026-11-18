@@ -24,6 +24,9 @@ from . import ui_groups as UG
 from . import ui_integrations as UI_INTEG
 from . import ui_shortcuts as USC
 from . import ui_absence as UAB
+from . import ui_maintenance as UMT
+from . import ui_sieve as USV
+from . import ui_notify as UNT
 from . import ui_import as UIM
 from .gestures import LAYOUTS
 from .. import __version__, updater
@@ -64,7 +67,9 @@ class SettingsDialog(QDialog):
             "groups": UG.groups_tab(self),
             "integrations": UI_INTEG.integrations_tab(self),
             "shortcuts": USC.shortcuts_tab(self),
-            "absence": UAB.absence_tab(self)}
+            "absence": UAB.absence_tab(self),
+            "notify": UNT.notify_tab(self),
+            "maintenance": UMT.maintenance_tab(self)}
         self.stack = self.tabs = QStackedWidget()          # « tabs » : ancien nom, conservé (currentIndex / setCurrentIndex)
         for page in pages.values():
             self.stack.addWidget(page)
@@ -78,8 +83,8 @@ class SettingsDialog(QDialog):
                                                       ("templates", tr("Modèles de réponse")), ("absence", tr("Absence")))),
                                  (tr("Boîte de réception"), (("groups", tr("Groupes")), ("filters", tr("Filtres & blocage")), ("gestures", tr("Gestes & disposition")),
                                                              ("contacts", tr("Contacts")), ("calendar", tr("Agenda")), ("integrations", tr("Intégrations")))),
-                                 (tr("Application"), (("look", tr("Apparence")), ("shortcuts", tr("Raccourcis")), ("ai", "✨ IA"), ("p2p", tr("Synchronisation")),
-                                                      ("updates", tr("Mises à jour"))))):
+                                 (tr("Application"), (("look", tr("Apparence")), ("notify", tr("Notifications")), ("shortcuts", tr("Raccourcis")), ("ai", "✨ IA"), ("p2p", tr("Synchronisation")),
+                                                      ("updates", tr("Mises à jour")), ("maintenance", tr("Maintenance"))))):
             head = QListWidgetItem(caption.upper())
             f = QFont(self.font())
             f.setPointSizeF(max(8.0, f.pointSizeF() * 0.78))
@@ -122,6 +127,8 @@ class SettingsDialog(QDialog):
         idx = {"accounts": 0, "look": 1, "appearance": 1, "filters": 2, "ai": 3, "updates": 4, "gestures": 5, "layout": 5, "sig": 6, "signatures": 6, "identities": 7, "templates": 8, "contacts": 9, "calendar": 10, "agenda": 10, "p2p": 11, "sync": 11}.get(page)
         if page in ("absence", "vacation", "vacances"):
             idx = self._order.index("absence")
+        if page in ("notify", "notifications"):
+            idx = self._order.index("notify")
         if idx is not None:
             self._goto(idx)
 
@@ -530,6 +537,13 @@ class SettingsDialog(QDialog):
         now.clicked.connect(self._apply_rules_now)
         row = QHBoxLayout()
         row.addWidget(now)
+        tb = QPushButton(tr("Importer de Thunderbird…"))
+        tb.clicked.connect(lambda: USV.import_thunderbird(self) and self._fill_filters())
+        srv = QPushButton(tr("Envoyer au serveur (Sieve)"))
+        srv.setToolTip(tr("Les règles tournent alors même quand MintMail est fermé (serveurs avec Sieve seulement)."))
+        srv.clicked.connect(lambda: USV.push_to_server(self))
+        row.addWidget(tb)
+        row.addWidget(srv)
         row.addStretch(1)
         card.addLayout(row)
         self._fill_filters()

@@ -1,4 +1,5 @@
 import copy
+import datetime
 import json
 import os
 import sqlite3
@@ -63,7 +64,7 @@ DEFAULTS = {
     "refresh_minutes": 5, "undo_seconds": 6, "width": 1280, "height": 800,
     "folders": {}, "collapsed_folders": [], "style": "aurora", "design_v2": False,
     "ui_lang": "auto", "update_check": True, "update_repo": "saec-oolivvv/mintmail", "update_last_check": 0, "update_etag": "", "update_seen": "", "update_available": None, "update_snooze_until": 0, "update_snooze_version": "", "update_last_result": "", "open_today_on_start": False, "pins_pushed": [], "threads": True, "translate_offer": True, "shortcuts": {}, "integrations": {}, "receipt_request": False, "receipt_notify": True, "receipt_reply": "ask", "inbox_grouping": True, "group_modes": {}, "tasks": [], "ai_prepare_drafts": False, "gcal": {}, "ai_provider": "nvidia", "oauth_clients": {}, "caldav": {}, "identities": [], "contacts": {}, "absence": {}, "absence_log": {},
-    "last_view": "inbox", "layout": "list", "layout_spark": False, "info_column": True, "pos_cols": 420, "pos_bottom": 300,
+    "last_view": "inbox", "layout": "list", "layout_spark": False, "info_column": True, "notify_mode": "all", "notify_off_accounts": [], "vips": [], "quiet_enabled": False, "quiet_from": "22:00", "quiet_to": "07:00", "pos_cols": 420, "pos_bottom": 300,
     "side_width": 230, "zoom": 1.0,
     "swipe": {"right": "archive", "right_long": "trash", "left": "snooze", "left_long": "read"},
     "swipe_invert": False,
@@ -107,7 +108,11 @@ class Config:
         if self.data.get("accent") == "#3b82f6":   # ancien bleu par défaut
             self.data["accent"] = DEFAULTS["accent"]
 
+    read_only = False        # mode sans échec : les réglages forcés en mémoire ne sont jamais écrits sur le disque
+
     def save(self):
+        if self.read_only:
+            return
         with self._save_lock:   # plusieurs threads (UI, synchro P2P) peuvent enregistrer
             private_dir(self.path.parent)
             tmp = str(self.path) + ".tmp"
@@ -282,6 +287,14 @@ def _keyring(op, *args, timeout=None):
     return box.get("v")
 
 
+def _search_date(txt):
+    """AAAA-MM-JJ → date, sinon None (opérateurs after: / before:)."""
+    try:
+        return datetime.date.fromisoformat(txt)
+    except ValueError:
+        return None
+
+
 def parse_search(q):
     terms, flt = [], {}
     for tok in (q or "").split():
@@ -294,6 +307,12 @@ def parse_search(q):
             flt["starred"] = True
         elif low == "has:attachment":
             flt["att"] = True
+        elif low == "is:read":
+            flt["read"] = True
+        elif low == "is:pinned":
+            flt["pinned"] = True
+        elif low.startswith(("after:", "before:")) and _search_date(low.split(":", 1)[1]):
+            flt[low.split(":", 1)[0]] = _search_date(low.split(":", 1)[1])
         else:
             terms.append(low)
     return terms, flt
@@ -572,6 +591,16 @@ class Cache:
                 where.append("starred=1")
             if flt.get("att"):
                 where.append("has_att=1")
+            if flt.get("read"):
+                where.append("unread=0")
+            if flt.get("pinned"):
+                where.append("pinned=1")
+            if "after" in flt:                                   # après (inclus) ce jour, heure locale
+                where.append("date>=?")
+                args.append(time.mktime(flt["after"].timetuple()))
+            if "before" in flt:                                  # avant (exclu) ce jour
+                where.append("date<?")
+                args.append(time.mktime(flt["before"].timetuple()))
         elif view == "inbox":
             where.append("folder='inbox' AND snoozed<=?")
             args.append(now)

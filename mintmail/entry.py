@@ -349,6 +349,28 @@ def check_update_cli(api=None, allow_loopback=False, out=print) -> int:
     return 1
 
 
+def backup_cli(argv, out=print) -> int:
+    """`mintmail --backup [fichier.zip]` / `mintmail --restore fichier.zip` : sauvegarde ou restaure réglages + cache (mots de passe exclus : ils restent dans le trousseau)."""
+    from . import backup as BK
+    if "--backup" in argv:
+        i = argv.index("--backup")
+        dest = argv[i + 1] if len(argv) > i + 1 and not argv[i + 1].startswith("--") else None
+        path = BK.create(CONFIG_DIR, DATA_DIR, dest, __version__)
+        out(tr("Sauvegarde créée : %s") % path)
+        return 0
+    i = argv.index("--restore")
+    if len(argv) <= i + 1:
+        out(tr("Indiquez le fichier à restaurer : mintmail --restore sauvegarde.zip"))
+        return 2
+    try:
+        res = BK.restore(argv[i + 1], CONFIG_DIR, DATA_DIR, __version__)
+    except ValueError:
+        out(tr("Ce fichier n'est pas une sauvegarde MintMail valide."))
+        return 1
+    out(tr("Restauration terminée (%s). L'état précédent est gardé dans : %s") % (", ".join(res["restored"]), res["safety"]))
+    return 0
+
+
 def check_pins_cli(test=True, out=print, cfg=None, factory=None) -> int:
     """`mintmail --check-pins` : pour chaque compte, dit si le serveur GARDE les épingles (étiquette Gmail ou mot-clé IMAP), par un essai réversible.
     --no-test : lecture seule. Code de sortie : 0 tout va bien, 1 un compte ne garde pas les épingles ou n'est pas joignable."""
@@ -414,6 +436,8 @@ def main(argv=None) -> int:
     if "--diagnose" in argv:
         from .diagnose import print_report
         return print_report()
+    if "--backup" in argv or "--restore" in argv:
+        return backup_cli(argv)
     if "--remove-local-install" in argv:
         return remove_local_install(argv)
     if "--install-qt" in argv:

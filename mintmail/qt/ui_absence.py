@@ -6,6 +6,7 @@ from PySide6.QtWidgets import QCheckBox, QComboBox, QDateEdit, QHBoxLayout, QLab
 
 from .. import absence as AB
 from ..i18n import tr
+from . import ui_sieve
 from .ui_cards import Page
 
 
@@ -85,6 +86,10 @@ def absence_tab(win):
     clear = QPushButton(tr("Désactiver maintenant"))
     clear.clicked.connect(lambda: on.setChecked(False))
     top.addWidget(clear)
+    srv = page.card(tr("Aussi sur le serveur"), tr("Si votre serveur propose Sieve, la réponse d'absence part même quand MintMail est fermé. Gmail, Microsoft, iCloud et Yahoo n'ont pas Sieve : MintMail doit y rester ouvert."))
+    push = QPushButton(tr("Envoyer au serveur (Sieve)"))
+    push.clicked.connect(lambda: ui_sieve.push_to_server(win))
+    srv.addWidget(push)
     busy = [False]
 
     def chosen():

@@ -241,7 +241,7 @@ def test_settings_have_a_left_navigation_with_one_page_per_section():
     w = _window()
     from mintmail.qt.settings_window import SettingsDialog
     d = SettingsDialog(w)
-    assert d.stack.count() == 16 and d.nav.count() == 19                                   # 16 pages + 3 titres de groupe (non sélectionnables)
+    assert d.stack.count() == 18 and d.nav.count() == 21                                   # 16 pages + 3 titres de groupe (non sélectionnables)
     for page, idx in (("ai", 3), ("signatures", 6), ("updates", 4), ("p2p", 11), ("accounts", 0)):
         d.open_page(page)
         assert d.stack.currentIndex() == idx and d.nav.currentItem().data(0x100) == idx    # la navigation suit la page affichée

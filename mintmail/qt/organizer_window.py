@@ -8,6 +8,7 @@ from PySide6.QtCore import Qt, QTimer, QUrl
 from PySide6.QtGui import QDesktopServices, QGuiApplication
 from PySide6.QtWidgets import QFileDialog, QMessageBox
 
+from .. import notifyrules as NR
 from .. import sysdeps
 from ..i18n import tr
 from ..p2p import SyncEngine
@@ -388,18 +389,22 @@ class OrganizerMixin:
 
     # ------------------------------------------------------------ notifications et état hors ligne
     def notify_new_mail(self, fresh):
-        """Notification de bureau pour les nouveaux messages (pas au tout premier chargement)."""
+        """Alerte + son pour les nouveaux messages qui le méritent (réglages Notifications : mode, boîtes, VIP, silence). Pas au tout premier chargement."""
         if fresh <= 0:
+            return
+        new = list(self.cache.query("inbox", "all", unread_only=True, limit=fresh))
+        wanted = NR.split(self.config, new) if new else ([] if self.config.get("notify_mode", "all") != "all" else [None] * fresh)
+        if not wanted:
             return
         if self.config.get("sound_receive", True):
             sysdeps.play("received")                                   # le son part même fenêtre au premier plan
         if not self.config.get("notifications", True) or self.isActiveWindow():
             return
-        top = next(iter(self.cache.query("inbox", "all", unread_only=True, limit=1)), None)
-        if fresh == 1 and top is not None:
+        top = wanted[0]
+        if len(wanted) == 1 and top is not None:
             sysdeps.notify(top.display_sender, top.subject or "")
         else:
-            sysdeps.notify(tr("MintMail"), tr("%d nouveaux messages") % fresh)
+            sysdeps.notify(tr("MintMail"), tr("%d nouveaux messages") % len(wanted))
 
     def notify_receipts(self):
         """Accusés de lecture arrivés pendant la synchronisation : notification de bureau (réglage « Prévenir quand un message est lu »)."""

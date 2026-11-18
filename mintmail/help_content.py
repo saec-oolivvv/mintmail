@@ -26,6 +26,9 @@ CLI_OPTIONS: List[Tuple[str, str]] = [
     ("mintmail mailto:adresse@exemple.be", "Ouvre la rédaction pour cette adresse (MintMail sait gérer les liens mailto:)."),
     ("mintmail --diagnose", "Rapport complet SANS secret (système, Python, Qt, modules, données, synchro, trousseau, journal), "
                             "enregistré dans {data}/diagnostic.txt."),
+    ("mintmail --backup", "Crée une sauvegarde .zip des réglages et du cache (mots de passe exclus : ils restent dans le trousseau). Sans nom de fichier : dans {data}/backups/. Le fichier est lisible par vous seul."),
+    ("mintmail --restore sauvegarde.zip", "Restaure une sauvegarde. L'état actuel est d'abord sauvegardé dans {data}/backups/before-restore-<date>.zip : la restauration est annulable."),
+    ("mintmail --safe-mode", "Démarre sans synchronisation entre machines, alertes, sons ni absence automatique, sans rien modifier dans vos réglages. Répare aussi une base endommagée (mise de côté, jamais supprimée). MintMail y passe tout seul après 3 démarrages ratés de suite."),
     ("mintmail --reset", "Met de côté (sans rien supprimer) la configuration et le cache : MintMail repart propre."),
     ("mintmail --remove-local-install", "Liste les anciennes installations qui masquent le paquet ; avec --yes, les met de côté "
                                         "dans ~/mintmail-sauvegarde-<date>/. À lancer avec le chemin complet : /usr/bin/mintmail."),
@@ -132,6 +135,8 @@ SECTIONS: List[Dict] = [
          "Faites glisser une ligne à la souris, au pavé tactile ou au doigt. Par défaut : droite = archiver, droite longue = supprimer, "
          "gauche = reporter, gauche longue = lu/non lu. Personnalisable dans Paramètres → Gestes & disposition (archiver, supprimer, "
          "reporter, lu, favori, épingle, spam, bloquer, rien) et inversion du sens pour le pavé tactile."),
+        ('Recherche avancée',
+         "Dans la barre de recherche : mots libres, plus des filtres combinables — from:nom, is:unread, is:read, is:starred, is:pinned, has:attachment, after:2026-11-01, before:2026-12-01 (dates AAAA-MM-JJ ; after: inclus, before: exclu). Exemple : facture from:ovh after:2026-01-01 has:attachment. Les mêmes critères sont envoyés au serveur pour chercher aussi dans les messages que MintMail n'a pas encore téléchargés."),
     ]},
     {"id": "today", "title": "Aujourd'hui, tâches et créneaux", "items": [
         ("Page « Aujourd'hui » (touche T)",
@@ -308,6 +313,8 @@ SECTIONS: List[Dict] = [
         ("Images distantes et hameçonnage",
          "Les images distantes (pixels espions) sont bloquées par défaut : bandeau « Images distantes bloquées » → Afficher, ou réglage global dans Apparence. "
          "Le HTML des messages est nettoyé (pas de scripts). Les messages suspects sont signalés."),
+        ('Règles sur le serveur (Sieve) et import Thunderbird',
+         "Paramètres → Filtres & blocage :\n• « Envoyer au serveur (Sieve) » : vos règles (et l'absence, voir Absence) sont installées sur le serveur, qui les applique même MintMail fermé. Il faut un serveur avec Sieve (ManageSieve, port 4190) et un mot de passe ; Gmail, Microsoft, iCloud et Yahoo n'en ont pas : MintMail doit y rester ouvert.\n• « Importer de Thunderbird… » : reprend vos filtres simples (une condition « contient » : de, objet, à/cc ; actions ranger, lu, favori, supprimer). Les filtres à conditions multiples, désactivés ou aux autres actions sont ignorés et comptés.\n• La règle « Épingler » n'existe pas en Sieve : elle reste appliquée par MintMail seulement."),
     ]},
     {"id": "attach", "title": "Pièces jointes, invitations, contacts, agenda", "items": [
         ("Pièces jointes reçues",
@@ -381,6 +388,8 @@ SECTIONS: List[Dict] = [
         ("Performances",
          "Connexions IMAP persistantes, chargement progressif, liste mise à jour sans reconstruction, actions groupées en une transaction : archiver ou "
          "mettre un expéditeur en spam se fait en quelques millisecondes dans l'interface, le serveur suit en arrière-plan."),
+        ('Sauvegarde, restauration et mode sans échec',
+         "Paramètres → Application → Maintenance :\n• Créer une sauvegarde : un seul fichier .zip avec réglages et cache (mots de passe exclus, ils restent dans le trousseau), lisible par vous seul.\n• Restaurer : l'état actuel est d'abord sauvegardé (before-restore-…), donc la restauration est annulable. Relancez ensuite MintMail.\n• Contrôler maintenant / rapport de diagnostic : vérifie la base et les réglages, enregistre un rapport sans mot de passe à joindre à une demande d'aide.\n• Mode sans échec : après 3 démarrages ratés de suite (ou « mintmail --safe-mode »), MintMail démarre sans synchronisation entre machines, alertes, sons ni absence automatique, sans toucher à vos réglages, et met de côté (jamais supprime) une base ou un fichier de réglages illisible. Lignes de commande : --backup, --restore."),
     ]},
     {"id": "look", "title": "Apparence et réglages", "items": [
         ("Styles et thème",
@@ -394,6 +403,8 @@ SECTIONS: List[Dict] = [
         ("Pages de paramètres",
          "Comptes · Apparence · Filtres & blocage · ✨ IA · Mises à jour · Gestes & disposition · Signatures · Identités d'envoi · Modèles de réponse · Contacts · Agenda · Synchronisation. "
          "L'aide (F1) contient les raccourcis, les options en ligne de commande et les crédits. Échap ferme la fenêtre des paramètres."),
+        ('Notifications dosées',
+         "Paramètres → Application → Notifications :\n• Prévenir pour : tous les messages, personnes seulement (ni newsletters ni notifications), contacts et VIP seulement, ou aucune alerte.\n• Décochez une boîte mail pour ne plus recevoir d'alerte pour elle. VIP : une adresse par ligne.\n• Silence horaire (ex. 22:00 → 07:00, passe minuit) : ni alerte ni son, le courrier arrive quand même.\n• Le nombre de messages non lus de la boîte de réception s'affiche dans le titre de la fenêtre et l'info-bulle de l'icône de notification."),
     ]},
     {"id": "updates", "title": "Mises à jour automatiques", "items": [
         ("Comment ça marche",

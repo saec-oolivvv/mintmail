@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.47.0
+- Notifications dosées (Paramètres → Notifications) : alerte pour tous les messages, pour les personnes seulement (ni newsletters ni notifications), pour les contacts et VIP seulement, ou aucune ; réglage par boîte mail ; silence horaire (passe minuit) ; compteur de non lus dans le titre de la fenêtre et l'icône de notification. Le son suit les mêmes règles.
+- Maintenance (Paramètres → Maintenance, et « mintmail --backup » / « --restore ») : sauvegarde .zip des réglages et du cache (mots de passe exclus), restauration avec copie de sécurité de l'état actuel, contrôle de la base, rapport de diagnostic enregistrable.
+- Mode sans échec (« mintmail --safe-mode », automatique après 3 démarrages ratés) : démarre sans synchronisation entre machines, alertes, sons ni absence, sans rien modifier dans les réglages ; une base ou un fichier de réglages illisible est mis de côté, jamais supprimé.
+- Règles et absence sur le serveur (Sieve / ManageSieve) : bouton « Envoyer au serveur » dans Filtres & blocage et dans Absence (serveurs avec Sieve seulement ; Gmail, Microsoft, iCloud et Yahoo n'en ont pas). Import des filtres simples de Thunderbird.
+- Recherche avancée : after:AAAA-MM-JJ, before:AAAA-MM-JJ, is:read, is:pinned (en local et côté serveur).
+- Accessibilité : noms et descriptions pour les lecteurs d'écran sur les zones principales et les boutons à icône.
+- Tests : widgets Qt isolés (clic simple, clic droit, glissé, annulation, colonne d'informations) et tâche CI avec PySide6 hors écran.
+
 ## 1.46.2
 - Liste des messages : le message ne s'ouvre plus dès que le bouton est enfoncé mais au relâchement d'un clic simple. Le clic droit affiche enfin le menu de l'application sans ouvrir le message, et le glissé (souris) fonctionne sans que le message s'ouvre avant. Les flèches du clavier ouvrent toujours le message.
 
