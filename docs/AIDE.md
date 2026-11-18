@@ -1,4 +1,4 @@
-# Aide de MintMail 1.48.4
+# Aide de MintMail 1.49.0
 _Généré par `make docs` depuis l'aide intégrée (touche F1 dans l'application)._
 
 ## Premiers pas
@@ -132,7 +132,7 @@ Touche T, menu ☰ → Aujourd'hui, ou palette. Une seule fenêtre pour démarre
 ### Tâches et échéances
 
 • Créer : clic droit sur un message → « ✔ Ajouter aux tâches… », ou « ✨ Ajouter les N tâche(s) détectée(s) » (celles trouvées par l'analyse IA du message), ou palette → « Nouvelle tâche… », ou le champ de la page Aujourd'hui.  
-• L'échéance est lue dans le texte, en français : « demain », « après-demain », « avant vendredi », « ce vendredi », « le 15/11 », « avant le 20 novembre », « dans 3 jours », « dans 2 semaines », « la semaine prochaine », « fin de semaine », « fin du mois », « le 20 ». Un nom de jour désigne sa prochaine occurrence (aujourd'hui exclu, sauf « ce lundi »). Aucune date trouvée : la tâche n'a pas d'échéance. Les dates et heures anglaises ne sont pas lues.  
+• L'échéance est lue dans le texte, en français, anglais, néerlandais, allemand ou espagnol (« tomorrow », « morgen », « übermorgen », « en 3 días », « 15 november », « by friday »…). Exemples en français : « demain », « après-demain », « avant vendredi », « ce vendredi », « le 15/11 », « avant le 20 novembre », « dans 3 jours », « dans 2 semaines », « la semaine prochaine », « fin de semaine », « fin du mois », « le 20 ». Un nom de jour désigne sa prochaine occurrence (aujourd'hui exclu, sauf « ce lundi »). Aucune date trouvée : la tâche n'a pas d'échéance. Les heures (« à 14 h ») ne sont pas lues.  
 • Une tâche déjà ajoutée pour le même message n'est jamais dupliquée. Les tâches se synchronisent entre vos machines (la modification la plus récente l'emporte).
 
 ### Proposer des créneaux (d'après Google Agenda)
@@ -591,7 +591,7 @@ Mise à jour : sudo apt install ./mintmail_X.Y.Z_all.deb (vos réglages et votre
 
 ## À propos et crédits
 
-### MintMail 1.48.4
+### MintMail 1.49.0
 
 Le client mail pour Linux Mint dont l'IA est l'ADN : il lit, trie, résume, classe, rédige et agit avec vous — toujours avec votre accord.  
 Application Qt (PySide6) / Python, sans service cloud imposé : vos mails, vos clés et vos réglages restent chez vous.

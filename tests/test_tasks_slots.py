@@ -65,3 +65,39 @@ def test_proposal_text_is_french_and_complete():
     text = slots.proposal_text(got)
     assert text.startswith("Je vous propose les créneaux suivants :") and "- lundi 9 novembre, de 10h00 à 11h00" in text
     assert "mardi 10 novembre, de 9h00 à 10h00" in text and text.endswith("Dites-moi celui qui vous convient.")
+
+
+def test_parse_due_english_dutch_german_spanish():
+    # TODAY : voir plus haut dans ce fichier
+    cases = [
+        ("please send it tomorrow", 1), ("by friday", None), ("in 3 days", 3), ("in 2 weeks", 14), ("the day after tomorrow", 2), ("today", 0),
+        ("morgen graag", 1), ("overmorgen", 2), ("over 3 dagen", 3), ("over 2 weken", 14), ("vandaag nog", 0),
+        ("bis morgen", 1), ("übermorgen", 2), ("in 4 Tagen", 4), ("in 2 Wochen", 14), ("heute", 0),
+        ("mañana por la mañana", 1), ("pasado mañana", 2), ("en 3 días", 3), ("en 2 semanas", 14), ("hoy", 0),
+    ]
+    for text, days in cases:
+        got = tasks.parse_due(text, TODAY)
+        if days is None:
+            assert got is not None and got > TODAY, text
+        else:
+            assert got == TODAY + D.timedelta(days=days), (text, got)
+    assert tasks.parse_due("deadline 15 november", D.date(2026, 11, 1)) == D.date(2026, 11, 15)
+    assert tasks.parse_due("due November 15th", D.date(2026, 11, 1)) == D.date(2026, 11, 15)
+    assert tasks.parse_due("vóór 20 december", D.date(2026, 11, 1)) == D.date(2026, 12, 20)
+    assert tasks.parse_due("am 3. Dezember 2027", D.date(2026, 11, 1)) == D.date(2027, 12, 3)
+    assert tasks.parse_due("el 5 de enero", D.date(2026, 12, 20)) == D.date(2027, 1, 5)
+    assert tasks.parse_due("end of the month", D.date(2026, 11, 3)) == D.date(2026, 11, 30)
+    assert tasks.parse_due("eind van de week", D.date(2026, 11, 16)) == D.date(2026, 11, 20)
+    assert tasks.parse_due("Ende des Monats", D.date(2026, 2, 3)) == D.date(2026, 2, 28)
+    assert tasks.parse_due("next week", D.date(2026, 11, 18)) == D.date(2026, 11, 23)
+    assert tasks.parse_due("volgende week", D.date(2026, 11, 18)) == D.date(2026, 11, 23)
+    assert tasks.parse_due("próxima semana", D.date(2026, 11, 18)) == D.date(2026, 11, 23)
+
+
+def test_parse_due_foreign_weekdays_and_no_false_positive():
+    wed = D.date(2026, 11, 18)                                               # un mercredi
+    for text in ("by friday", "vrijdag", "am Freitag", "el viernes", "this friday", "deze vrijdag"):
+        assert tasks.parse_due(text, wed) == D.date(2026, 11, 20), text
+    assert tasks.parse_due("this wednesday", wed) == wed and tasks.parse_due("wednesday", wed) == D.date(2026, 11, 25)
+    for none in ("thank you for your order", "bedankt voor uw bestelling", "vielen Dank für Ihre Nachricht", "gracias por su mensaje", "we may meet at some point"):
+        assert tasks.parse_due(none, wed) is None, none

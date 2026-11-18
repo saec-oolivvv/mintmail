@@ -81,6 +81,74 @@ def parse_due(text: str, today: Optional[datetime.date] = None) -> Optional[date
             ny, nm = (today.year + 1, 1) if today.month == 12 else (today.year, today.month + 1)
             cand = _safe(ny, nm, d)
         return cand
+    return _parse_other(t, today)
+
+
+# ---- autres langues : anglais, néerlandais, allemand, espagnol (le texte est déjà en minuscules sans accents : _plain)
+_WORDS = {
+    "en": dict(days="monday tuesday wednesday thursday friday saturday sunday", today=r"today|tonight", tomorrow=r"tomorrow", after=r"day after tomorrow",
+               inn=r"in\s+(\d{1,3})\s+(day|days|week|weeks)", nextweek=r"next\s+week", endweek=r"end\s+of\s+(?:the\s+)?week", endmonth=r"end\s+of\s+(?:the\s+)?month",
+               this=r"this|on|by|before",
+               months="january february march april may june july august september october november december"),
+    "nl": dict(days="maandag dinsdag woensdag donderdag vrijdag zaterdag zondag", today=r"vandaag|vanavond", tomorrow=r"morgen", after=r"overmorgen",
+               inn=r"over\s+(\d{1,3})\s+(dag|dagen|week|weken)", nextweek=r"volgende\s+week", endweek=r"eind(?:e)?\s+van\s+de\s+week", endmonth=r"eind(?:e)?\s+van\s+de\s+maand",
+               this=r"deze|voor|tegen|op",
+               months="januari februari maart april mei juni juli augustus september oktober november december"),
+    "de": dict(days="montag dienstag mittwoch donnerstag freitag samstag sonntag", today=r"heute|heute abend", tomorrow=r"morgen", after=r"ubermorgen",
+               inn=r"in\s+(\d{1,3})\s+(tag|tagen|woche|wochen)", nextweek=r"nachste\s+woche", endweek=r"ende\s+der\s+woche", endmonth=r"ende\s+des\s+monats",
+               this=r"diesen|bis|am|vor",
+               months="januar februar marz april mai juni juli august september oktober november dezember"),
+    "es": dict(days="lunes martes miercoles jueves viernes sabado domingo", today=r"hoy|esta noche", tomorrow=r"manana", after=r"pasado\s+manana",
+               inn=r"en\s+(\d{1,3})\s+(dia|dias|semana|semanas)", nextweek=r"(?:la\s+)?semana\s+que\s+viene|proxima\s+semana", endweek=r"fin\s+de\s+la\s+semana", endmonth=r"fin\s+de\s+mes|finales\s+de\s+mes",
+               this=r"este|el|para|antes\s+del?",
+               months="enero febrero marzo abril mayo junio julio agosto septiembre octubre noviembre diciembre"),
+}
+_MONTH_ABBR = {"jan": 1, "feb": 2, "mar": 3, "apr": 4, "jun": 6, "jul": 7, "aug": 8, "sep": 9, "sept": 9, "oct": 10, "okt": 10, "nov": 11, "dec": 12, "dez": 12}
+
+
+def _parse_other(t: str, today: datetime.date) -> Optional[datetime.date]:
+    """Échéance écrite en anglais, néerlandais, allemand ou espagnol (mêmes expressions que le français : demain, dans N jours, vendredi, le 15 novembre…)."""
+    for w in _WORDS.values():
+        if re.search(r"\b(?:%s)\b" % w["after"], t):
+            return today + datetime.timedelta(days=2)
+    for w in _WORDS.values():
+        if re.search(r"\b(?:%s)\b" % w["tomorrow"], t):
+            return today + datetime.timedelta(days=1)
+    for w in _WORDS.values():
+        if re.search(r"\b(?:%s)\b" % w["today"], t):
+            return today
+    for w in _WORDS.values():
+        m = re.search(r"\b%s\b" % w["inn"], t)
+        if m:
+            return today + datetime.timedelta(days=int(m.group(1)) * (7 if m.group(2).startswith(("week", "wek", "woche", "seman")) else 1))
+    for w in _WORDS.values():
+        if re.search(r"\b(?:%s)\b" % w["endmonth"], t):
+            return datetime.date(today.year, today.month, calendar.monthrange(today.year, today.month)[1])
+    for w in _WORDS.values():
+        if re.search(r"\b(?:%s)\b" % w["endweek"], t):
+            return today + datetime.timedelta(days=(4 - today.weekday()) % 7)
+    for w in _WORDS.values():
+        if re.search(r"\b(?:%s)\b" % w["nextweek"], t):
+            return today + datetime.timedelta(days=7 - today.weekday())
+    for w in _WORDS.values():                                    # « 15 november », « november 15th », « 15 de noviembre », « 15. November »
+        names = {n: i + 1 for i, n in enumerate(w["months"].split())}
+        alt = "|".join(sorted(list(names) + list(_MONTH_ABBR), key=len, reverse=True))
+        m = re.search(r"\b(\d{1,2})(?:st|nd|rd|th|\.|er)?\s+(?:de\s+|of\s+)?(%s)\b\.?(?:\s+(?:de\s+)?(\d{4}))?" % alt, t) \
+            or re.search(r"\b(%s)\b\.?\s+(\d{1,2})(?:st|nd|rd|th)?\b(?:,?\s+(\d{4}))?" % alt, t)
+        if m:
+            a, b, y = m.group(1), m.group(2), m.group(3)
+            day, mon = (int(a), b) if a.isdigit() else (int(b), a)
+            mon = names.get(mon) or _MONTH_ABBR.get(mon)
+            if mon:
+                return _safe(int(y), mon, day) if y else _pick_year(today, mon, day)
+    for w in _WORDS.values():
+        days = {n: i for i, n in enumerate(w["days"].split())}
+        m = re.search(r"\b(?:(%s)\s+)?(%s)\b" % (w["this"], "|".join(days)), t)
+        if m:
+            delta = (days[m.group(2)] - today.weekday()) % 7
+            if delta == 0 and not (m.group(1) and m.group(1) in ("this", "deze", "diesen", "este")):
+                delta = 7
+            return today + datetime.timedelta(days=delta)
     return None
 
 

@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.49.0
+- Échéances des tâches (et de « Attribuer à… ») lues aussi en anglais, néerlandais, allemand et espagnol : demain / tomorrow / morgen / mañana, dans 3 jours / in 3 days / over 3 dagen / in 3 Tagen / en 3 días, vendredi / friday / vrijdag / Freitag / viernes, « 15 november », « November 15th », « 15 de noviembre », fin de mois / semaine, semaine prochaine…
+
 ## 1.48.4
 - Crédits : SAEC HOLDING LTD, 20 Wenlock Road, London N1 7GU (Royaume-Uni) dans l'aide, le fichier LICENSE et le README.
 

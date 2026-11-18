@@ -153,9 +153,9 @@ SECTIONS: List[Dict] = [
         ("Tâches et échéances",
          "• Créer : clic droit sur un message → « ✔ Ajouter aux tâches… », ou « ✨ Ajouter les N tâche(s) détectée(s) » (celles trouvées par l'analyse IA du message), "
          "ou palette → « Nouvelle tâche… », ou le champ de la page Aujourd'hui.\n"
-         "• L'échéance est lue dans le texte, en français : « demain », « après-demain », « avant vendredi », « ce vendredi », « le 15/11 », « avant le 20 novembre », "
+         "• L'échéance est lue dans le texte, en français, anglais, néerlandais, allemand ou espagnol (« tomorrow », « morgen », « übermorgen », « en 3 días », « 15 november », « by friday »…). Exemples en français : « demain », « après-demain », « avant vendredi », « ce vendredi », « le 15/11 », « avant le 20 novembre », "
          "« dans 3 jours », « dans 2 semaines », « la semaine prochaine », « fin de semaine », « fin du mois », « le 20 ». Un nom de jour désigne sa prochaine occurrence "
-         "(aujourd'hui exclu, sauf « ce lundi »). Aucune date trouvée : la tâche n'a pas d'échéance. Les dates et heures anglaises ne sont pas lues.\n"
+         "(aujourd'hui exclu, sauf « ce lundi »). Aucune date trouvée : la tâche n'a pas d'échéance. Les heures (« à 14 h ») ne sont pas lues.\n"
          "• Une tâche déjà ajoutée pour le même message n'est jamais dupliquée. Les tâches se synchronisent entre vos machines (la modification la plus récente l'emporte)."),
         ("Proposer des créneaux (d'après Google Agenda)",
          "Clic droit sur un message → « 📅 Proposer des créneaux (agenda) » → 30 min / 1 h / 1 h 30. MintMail lit votre agenda, trouve 3 créneaux libres sur des jours "
