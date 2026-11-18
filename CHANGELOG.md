@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.46.2
+- Liste des messages : le message ne s'ouvre plus dès que le bouton est enfoncé mais au relâchement d'un clic simple. Le clic droit affiche enfin le menu de l'application sans ouvrir le message, et le glissé (souris) fonctionne sans que le message s'ouvre avant. Les flèches du clavier ouvrent toujours le message.
+
 ## 1.46.1
 - Colonne « Informations » : tout le texte passe à la ligne (lignes de la conversation, boutons des alertes, invitations, suggestions) et ne dépasse plus du cadre.
 

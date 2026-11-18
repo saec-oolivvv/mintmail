@@ -263,6 +263,7 @@ class MainWindow(ExtrasMixin, OrganizerMixin, AIMixin, QMainWindow):
         self.delegate = MessageDelegate(self.t, T.row_height(self.config.get("density") or "comfortable"))
         self.list = MessageList(self.delegate, lambda: (GS.settings(self.config), bool(self.config.get("swipe_invert"))))
         self.list.swiped.connect(self._swiped)
+        self.list.clickedRow.connect(self._clicked_row)
         self.list.setContextMenuPolicy(Qt.CustomContextMenu)
         self.list.customContextMenuRequested.connect(self._context_menu)
         self.list.setModel(self.model)
@@ -890,9 +891,20 @@ class MainWindow(ExtrasMixin, OrganizerMixin, AIMixin, QMainWindow):
             self.reload()
             self._show(None)
 
+    def _clicked_row(self, idx):
+        """Clic simple terminé : on ouvre le message (un clic droit ou un glissé ne l'ouvrent jamais)."""
+        if not self.list.selectionModel().isRowSelected(idx.row(), QModelIndex()):
+            return                                                      # clic avec Ctrl qui désélectionne
+        if self.list.currentIndex() != idx:
+            self.list.setCurrentIndex(idx)                              # déclenche _row_changed
+        else:
+            self._row_changed(idx, None)
+
     def _row_changed(self, cur, _prev):
         if not cur.isValid() and getattr(self, "_reloading", False):
             return
+        if cur.isValid() and (self.list.mouse_down or getattr(self, "_ctx", False)):
+            return                                                      # bouton enfoncé (clic droit, début de glissé) ou menu contextuel : pas d'ouverture ; le relâchement d'un clic simple ouvre
         mid = cur.data(IdRole) if cur.isValid() else None
         old = self.current
         self.current, self.load_images = mid, False
@@ -1557,7 +1569,11 @@ class MainWindow(ExtrasMixin, OrganizerMixin, AIMixin, QMainWindow):
         if not idx.isValid():
             return
         if not self.list.selectionModel().isRowSelected(idx.row(), QModelIndex()):
-            self.list.setCurrentIndex(idx)
+            self._ctx = True                                            # sélectionner pour le menu SANS ouvrir le message
+            try:
+                self.list.setCurrentIndex(idx)
+            finally:
+                self._ctx = False
         msgs = self.selected_msgs()
         if not msgs:
             return
@@ -1578,6 +1594,7 @@ class MainWindow(ExtrasMixin, OrganizerMixin, AIMixin, QMainWindow):
         for dest, label in self.engine.move_targets(m.account):
             mv.addAction(label, lambda d=dest: self._run_cmd("move:" + d, m))
         menu.exec(self.list.viewport().mapToGlobal(pos))
+        self.list.mouse_down = False                                    # le menu a pu avaler le relâchement du bouton
 
     def show_palette(self):
         sel = self.selected_msgs()

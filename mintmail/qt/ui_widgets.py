@@ -1,7 +1,7 @@
 """Éléments visuels Qt : pastille d'initiales, lignes de la liste des messages, lignes de la barre latérale (peints à la main, aux couleurs du thème)."""
 from PySide6.QtCore import QRect, QRectF, QSize, Qt, QTimer, Signal
 from PySide6.QtGui import QColor, QFont, QPainter, QPainterPath, QPen
-from PySide6.QtWidgets import QListView, QListWidget, QStyle, QStyledItemDelegate, QStyleOptionViewItem, QWidget
+from PySide6.QtWidgets import QApplication, QListView, QListWidget, QStyle, QStyledItemDelegate, QStyleOptionViewItem, QWidget
 
 from ..util import color_index, initials
 from ..i18n import tr
@@ -81,10 +81,12 @@ class AvatarWidget(QWidget):
 class MessageList(QListView):
     """Liste des messages avec gestes : glisser à la souris (ou deux doigts sur le pavé tactile) vers la droite / la gauche ; court ou long = deux actions."""
     swiped = Signal(int, str)                        # (ligne, action)
+    clickedRow = Signal(object)                      # clic simple terminé (bouton gauche relâché sans glissé) : QModelIndex à ouvrir
 
     def __init__(self, delegate, cfg_fn):
         super().__init__()
         self._d, self._cfg, self._press, self._row, self._dx, self._wheel = delegate, cfg_fn, None, -1, 0.0, False
+        self.mouse_down = False                      # un bouton de la souris est enfoncé : la sélection ne doit PAS encore ouvrir le message (clic droit, glissé)
         self._idle = QTimer(self)
         self._idle.setSingleShot(True)
         self._idle.timeout.connect(self._finish)
@@ -114,6 +116,7 @@ class MessageList(QListView):
     def mousePressEvent(self, e):
         idx = self.indexAt(e.position().toPoint())
         self._press = (e.position().toPoint(), idx.row()) if idx.isValid() and e.button() == Qt.LeftButton else None
+        self.mouse_down = True
         super().mousePressEvent(e)
 
     def mouseMoveEvent(self, e):
@@ -127,11 +130,26 @@ class MessageList(QListView):
 
     def mouseReleaseEvent(self, e):
         if self._row >= 0 and not self._wheel:
-            self._finish()
+            self.mouse_down = False
+            self._finish()                                           # glissé : l'action est décidée au relâchement, le message n'est jamais ouvert
             e.accept()
             return
         self._press = None
         super().mouseReleaseEvent(e)
+        self.mouse_down = False
+        if e.button() == Qt.LeftButton:
+            idx = self.indexAt(e.position().toPoint())
+            if idx.isValid():
+                self.clickedRow.emit(idx)                            # vrai clic simple : c'est maintenant qu'on ouvre
+
+    def leaveEvent(self, e):
+        super().leaveEvent(e)
+        if not (QApplication.mouseButtons() & (Qt.LeftButton | Qt.RightButton)):
+            self.mouse_down = False
+
+    def focusOutEvent(self, e):
+        super().focusOutEvent(e)
+        self.mouse_down = False
 
     IDLE_MS = 320                                    # pavé sans indication de phase (Linux) : le geste ne se termine qu'après ce silence
     IDLE_PHASE_MS = 500                             # avec les phases (macOS) : simple filet de sécurité, la fin vient de ScrollEnd
@@ -143,6 +161,7 @@ class MessageList(QListView):
         self._set(-1, 0.0)
 
     def keyPressEvent(self, e):
+        self.mouse_down = False                         # le clavier reprend la main : plus de clic en cours
         if e.key() == Qt.Key_Escape and self._row >= 0:
             self.cancel_swipe()
             e.accept()
