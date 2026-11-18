@@ -1152,3 +1152,14 @@ def test_more_menu_has_the_spark_entries_in_order():
     keys = [i[0] for i in MN.more_items(m) if i]
     assert keys == ["reply", "resend", "block", "move", "spam", "print", "copy_md", "all_actions"]
     assert "integ:slack" in [i[0] for i in MN.more_items(m, integ=["slack"]) if i]
+
+
+def test_info_column_facts():
+    from mintmail.i18n import tr
+    msg = Message(id="m", account="a1", folder="inbox", date=1700000000.0, category="news", thread_id="t",
+                  attachments=[{"filename": "a.pdf", "size": 2048}, {"filename": "b.png", "size": 1024}])
+    rows = dict(V.info_facts(msg, [{"id": "a1", "email": "moi@x.be"}], 3))
+    assert rows[tr("Boîte")] == "moi@x.be" and rows[tr("Dossier")] == tr("Boîte de réception") and rows[tr("Pièces jointes")].startswith("2 · 3.0")
+    assert tr("Conversation") in rows and tr("Catégorie") in rows and tr("Reçu le") in rows
+    sent = dict(V.info_facts(Message(id="s", account="zz", folder="sent", date=1.0), [], 1))
+    assert tr("Envoyé le") in sent and tr("Boîte") not in sent and tr("Conversation") not in sent and tr("Pièces jointes") not in sent

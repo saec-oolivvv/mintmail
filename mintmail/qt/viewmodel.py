@@ -108,6 +108,30 @@ def header_lines(msg) -> Dict[str, str]:
             "to": msg.to, "subject": msg.subject, "date": time.strftime("%d/%m/%Y %H:%M", time.localtime(msg.date)) if msg.date else ""}
 
 
+def info_facts(msg, accounts, thread_count=0):
+    """Lignes de la colonne « Informations » du lecteur : [(libellé, valeur)] — boîte, dossier, date complète, catégorie, pièces jointes, conversation."""
+    from .. import groups as G
+    from ..util import format_full, human_size
+    acc = next((a for a in accounts if a["id"] == msg.account), None)
+    rows = []
+    if acc:
+        rows.append((tr("Boîte"), acc.get("email") or acc.get("name") or ""))
+    folder = dict(VIEWS).get(msg.folder) or msg.folder
+    if folder:
+        rows.append((tr("Dossier"), folder))
+    if msg.date:
+        rows.append((tr("Reçu le") if msg.folder != "sent" else tr("Envoyé le"), format_full(msg.date)))
+    cat = {"people": tr("Personnes"), "notif": G.label("notif"), "news": G.label("news")}.get(msg.category)
+    if cat:
+        rows.append((tr("Catégorie"), cat))
+    atts = [a for a in msg.attachments or [] if isinstance(a, dict)]
+    if atts:
+        rows.append((tr("Pièces jointes"), "%d · %s" % (len(atts), human_size(sum(int(a.get("size") or 0) for a in atts)))))
+    if thread_count > 1:
+        rows.append((tr("Conversation"), tr("%d messages") % thread_count))
+    return rows
+
+
 def recipients_text(msg, accounts) -> Dict[str, str]:
     """Destinataires affichés dans le lecteur : « À », « Cc » et la boîte (adresse du compte) qui a reçu le message."""
     from email.utils import getaddresses

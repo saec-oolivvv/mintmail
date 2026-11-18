@@ -16,6 +16,7 @@ def _clear(layout):
 class ReaderCard(QFrame):
     """Résumé, points, tâches, alerte d'hameçonnage, suggestion « pas du spam », question et boutons d'action IA."""
     action = Signal(str, str)
+    revealed = Signal()                       # la carte vient d'être affichée (la colonne qui la porte doit alors être visible)
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -57,6 +58,11 @@ class ReaderCard(QFrame):
         lay.addWidget(self.cta, 0, Qt.AlignLeft)
         lay.addLayout(row)
         self.hide()
+
+    def setVisible(self, visible):
+        super().setVisible(visible)
+        if visible:
+            self.revealed.emit()
 
     @staticmethod
     def _label():

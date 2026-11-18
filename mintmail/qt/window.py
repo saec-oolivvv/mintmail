@@ -41,6 +41,7 @@ from . import navtree as NT
 from . import gestures as GS
 from . import menus as MN
 from . import ui_appicon as AI
+from . import ui_infocol as IC
 from . import savedsearch as SS
 from . import imagetrust as IT
 from . import aiwork as AW
@@ -427,6 +428,13 @@ class MainWindow(ExtrasMixin, OrganizerMixin, AIMixin, QMainWindow):
         headrow.addWidget(self.avatar, 0, Qt.AlignTop)
         headrow.addWidget(self.head, 1)
         headrow.addLayout(rb)
+        self.info_btn = QPushButton("ⓘ")                       # affiche / masque la colonne d'informations
+        self.info_btn.setObjectName("flat")
+        self.info_btn.setCheckable(True)
+        self.info_btn.setChecked(bool(self.config.get("info_column", True)))
+        self.info_btn.setToolTip(tr("Informations sur le message"))
+        self.info_btn.toggled.connect(self._toggle_info)
+        headrow.addWidget(self.info_btn, 0, Qt.AlignTop)
         readerhead = QFrame()
         readerhead.setObjectName("readerhead")
         readerhead.setLayout(headrow)
@@ -443,91 +451,85 @@ class MainWindow(ExtrasMixin, OrganizerMixin, AIMixin, QMainWindow):
         rl.setSpacing(0)
         self._rl = rl
         rl.addWidget(readerhead)
-        ib = QHBoxLayout()
-        ib.setContentsMargins(22, 8, 22, 0)
-        ib.addWidget(self.images_btn)
-        ib.addStretch(1)
-        rl.addLayout(ib)
+        self.info = IC.InfoColumn()                          # colonne de droite : informations, alertes, images, pièces jointes, résumé / traduction (défile)
+        self.info.add(self.images_btn)
+
+        def bar(frame, label, *buttons):
+            """Carte d'alerte étroite : le texte en haut, les boutons dessous (elle vit dans la colonne de droite)."""
+            lay = QVBoxLayout(frame)
+            lay.setContentsMargins(12, 8, 12, 8)
+            lay.setSpacing(6)
+            lay.addWidget(label)
+            row = QHBoxLayout()
+            row.setSpacing(6)
+            for b in buttons:
+                row.addWidget(b)
+            row.addStretch(1)
+            lay.addLayout(row)
         self.suspect_bar = QFrame()                          # « Ce message semble suspect : le mettre en spam ? »
         self.suspect_bar.setObjectName("suspectbar")
         self.suspect_bar.setStyleSheet("#suspectbar { background: rgba(220,38,38,0.10); border: 1px solid rgba(220,38,38,0.45); border-radius: 10px; }"
                                        "#suspectbar QLabel { color: #dc2626; font-weight: 600; }")
-        sbl = QHBoxLayout(self.suspect_bar)
-        sbl.setContentsMargins(14, 8, 10, 8)
-        sbl.setSpacing(8)
         self.suspect_label = QLabel()
         self.suspect_label.setWordWrap(True)
-        sbl.addWidget(self.suspect_label, 1)
         self.suspect_spam = QPushButton(tr("Mettre en spam"))
         self.suspect_spam.setObjectName("primary")
         self.suspect_ok = QPushButton(tr("Je lui fais confiance"))
         self.suspect_ok.setObjectName("flat")
         self.suspect_spam.clicked.connect(self._suspect_to_spam)
         self.suspect_ok.clicked.connect(self._suspect_trust)
-        sbl.addWidget(self.suspect_spam)
-        sbl.addWidget(self.suspect_ok)
+        bar(self.suspect_bar, self.suspect_label, self.suspect_spam, self.suspect_ok)
         self.suspect_bar.hide()
         self.receipt_bar = QFrame()                          # « X demande un accusé de lecture : l'envoyer ? »
         self.receipt_bar.setObjectName("receiptbar")
         self.receipt_bar.setStyleSheet("#receiptbar { background: rgba(59,130,246,0.10); border: 1px solid rgba(59,130,246,0.45); border-radius: 10px; }")
-        rbl = QHBoxLayout(self.receipt_bar)
-        rbl.setContentsMargins(14, 8, 10, 8)
-        rbl.setSpacing(8)
         self.receipt_label = QLabel()
         self.receipt_label.setWordWrap(True)
-        rbl.addWidget(self.receipt_label, 1)
         self.receipt_yes = QPushButton(tr("Envoyer l'accusé"))
         self.receipt_yes.setObjectName("primary")
         self.receipt_no = QPushButton(tr("Pas d'accusé"))
         self.receipt_no.setObjectName("flat")
         self.receipt_yes.clicked.connect(lambda: self._receipt_answer(True))
         self.receipt_no.clicked.connect(lambda: self._receipt_answer(False))
-        rbl.addWidget(self.receipt_yes)
-        rbl.addWidget(self.receipt_no)
+        bar(self.receipt_bar, self.receipt_label, self.receipt_yes, self.receipt_no)
         self.receipt_bar.hide()
         self.translate_bar = QFrame()                        # « Ce message est écrit en … : le traduire ? »
         self.translate_bar.setObjectName("translatebar")
         self.translate_bar.setStyleSheet("#translatebar { background: rgba(124,58,237,0.10); border: 1px solid rgba(124,58,237,0.45); border-radius: 10px; }")
-        tbl = QHBoxLayout(self.translate_bar)
-        tbl.setContentsMargins(14, 8, 10, 8)
-        tbl.setSpacing(8)
         self.translate_label = QLabel()
         self.translate_label.setWordWrap(True)
-        tbl.addWidget(self.translate_label, 1)
         self.translate_yes = QPushButton("")
         self.translate_yes.setObjectName("primary")
         self.translate_no = QPushButton(tr("Pas maintenant"))
         self.translate_no.setObjectName("flat")
         self.translate_yes.clicked.connect(self._translate_now)
         self.translate_no.clicked.connect(self.translate_bar.hide)
-        tbl.addWidget(self.translate_yes)
-        tbl.addWidget(self.translate_no)
+        bar(self.translate_bar, self.translate_label, self.translate_yes, self.translate_no)
         self.translate_bar.hide()
-        sw = QHBoxLayout()
-        sw.setContentsMargins(22, 8, 22, 0)
-        sw.addWidget(self.suspect_bar)
-        rl.addLayout(sw)
-        rw = QHBoxLayout()
-        rw.setContentsMargins(22, 6, 22, 0)
-        rw.addWidget(self.receipt_bar)
-        rl.addLayout(rw)
-        tw = QHBoxLayout()
-        tw.setContentsMargins(22, 6, 22, 0)
-        tw.addWidget(self.translate_bar)
-        rl.addLayout(tw)
+        for w in (self.suspect_bar, self.receipt_bar, self.translate_bar):
+            self.info.add(w)
         self.extras = MessageExtras()
         self._wire_extras()
-        rl.addWidget(self.extras)
+        self.extras.layout().setContentsMargins(4, 4, 4, 4)
+        self.info.add(self.extras)
         self.ai_card = ReaderCard()
         self.ai_card.action.connect(self._on_ai_action)
-        rl.addWidget(self.ai_card)
-        rl.addWidget(self.reader, 1)
+        self.info.add(self.ai_card)
+        self.ai_card.revealed.connect(lambda: getattr(self, "shown", None) is not None and self.info.show())      # un résumé ou une traduction demandés ouvrent la colonne
         self.quick = QuickReply()
         self.quick.send.connect(self.quick_reply)
         self.quick.ai.connect(lambda: self._on_ai_action("reply_ai", ""))
         self.quick.expand.connect(lambda t: self._on_ai_action("quick_expand", t))
         self.quick.hide()
-        rl.addWidget(self.quick)
+        reader_col = QWidget()
+        rcl = QVBoxLayout(reader_col)
+        rcl.setContentsMargins(0, 0, 0, 0)
+        rcl.setSpacing(0)
+        rcl.addWidget(self.reader, 1)
+        rcl.addWidget(self.quick)
+        self.info.hide()
+        self.body_split = IC.BodySplit(reader_col, self.info)
+        rl.addWidget(self.body_split, 1)
         self._ai_token = 0
 
         self.listcol, self.right = listcol, right
@@ -1050,6 +1052,19 @@ class MainWindow(ExtrasMixin, OrganizerMixin, AIMixin, QMainWindow):
         else:
             self._ll.insertWidget(min(getattr(self, "_actions_index", 4), self._ll.count()), bar)
         bar.show()
+
+    def _toggle_info(self, on):
+        self.config["info_column"] = bool(on)
+        self.config.save()
+        self._info_visible()
+
+    def _info_visible(self):
+        """Colonne d'informations : selon le bouton ⓘ, mais toujours visible quand une alerte (message suspect…) ou un résumé l'exige."""
+        if getattr(self, "shown", None) is None:
+            self.info.hide()
+            return
+        urgent = any(not w.isHidden() for w in (self.suspect_bar, self.receipt_bar, self.translate_bar, self.ai_card))
+        self.info.setVisible(bool(self.config.get("info_column", True)) or urgent)
 
     def _back_to_list(self):
         if (self.config.get("layout") == "list") and self.listcol.isHidden():
@@ -1838,6 +1853,8 @@ class MainWindow(ExtrasMixin, OrganizerMixin, AIMixin, QMainWindow):
             self.translate_bar.hide()
             self.extras.clear()
             self.ai_card.idle()
+            self.info.set_facts([])
+            self.info.hide()
             self.quick.hide()
             self.reader.show_html("<html><body style='margin:0;background:%s'></body></html>" % ("#1f2229" if self.is_dark() else "#ffffff"))
             return
@@ -1875,6 +1892,8 @@ class MainWindow(ExtrasMixin, OrganizerMixin, AIMixin, QMainWindow):
         self.reader.show_html(vm.render_html(msg, load, self.is_dark()))
         self.apply_zoom()
         self.fill_extras(msg)
+        self.info.set_facts(vm.info_facts(msg, self.engine.accounts(), len(self.cache.thread_members(msg.account, msg.thread_id)) if msg.thread_id else 0), self.t["dim"])
+        self._info_visible()
         self.quick.show()
         self.quick.set_ai(AS.ai_engine(self.engine).enabled())
         if msg.folder != "drafts":

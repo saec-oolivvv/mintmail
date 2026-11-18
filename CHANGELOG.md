@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.46.0
+- Lecteur : colonne « Informations » à droite du message (bouton ⓘ pour l'afficher ou la masquer). Elle réunit la boîte, le dossier, la date, la catégorie, les pièces jointes, la conversation, les alertes (message suspect, accusé de lecture, traduction), les images distantes, le résumé / la traduction IA. Elle défile : une longue traduction ou un petit écran ne cachent plus le message. Sur écran étroit, elle passe au-dessus du message avec une hauteur limitée.
+
 ## 1.45.3
 - Glissés instantanés : la ligne disparaît à l'instant (le serveur suit en fond) ; sur pavé tactile, l'action est décidée dès que les doigts sont levés (plus d'attente).
 - Temps réel entre machines : les actions rapprochées (ex. 21 suppressions) partent ensemble au serveur en une seule commande, un message déplacé ici mais pas encore côté serveur n'est plus ramené par un relevé, et une veille légère (toutes les 6 s, boîte de réception et envoyés de chaque boîte, en plus d'IDLE) détecte tout changement fait ailleurs (suppression, déplacement, lecture, arrivée). IDLE ne perd plus les rafales de changements.
