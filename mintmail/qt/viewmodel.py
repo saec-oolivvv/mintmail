@@ -6,6 +6,7 @@ import time
 from typing import Dict, List, Tuple
 
 from ..backend import is_retryable, make_backend
+from .. import mailevents as ME
 from ..htmlsafe import reader_csp, sanitize
 from ..i18n import tr
 from ..offline import OfflineMixin
@@ -164,6 +165,7 @@ class Engine(OfflineMixin):
         self.config, self.cache = config, cache
         self._backends: Dict[str, object] = {}
         self.folder_unread: Dict[tuple, int] = {}              # (compte, dossier) → non lus annoncés par le serveur
+        self.event_sink = None                                  # fonction(liste d'événements) : prévient vos autres machines (réseau local) tout de suite
 
     def accounts(self):
         return accounts_of(self.config)
@@ -457,6 +459,7 @@ class Engine(OfflineMixin):
     def move(self, msgs, dest):
         """Déplace dans le cache tout de suite ; retourne les identifiants d'actions à exécuter (finish_move, en fond)."""
         self.cache.update_many([m.id for m in msgs], folder=dest, snoozed_until=0.0)
+        self.emit_events("move", msgs, dest)
         extra = {"notjunk": True} if dest == "inbox" and all(m.folder == "spam" for m in msgs) else {}
         return self.op_enqueue("move", msgs, dest=dest, **extra)
 
@@ -497,6 +500,7 @@ class Engine(OfflineMixin):
 
     def delete_forever(self, msgs):
         self.cache.delete_many([m.id for m in msgs])
+        self.emit_events("delete", msgs)
         return self.op_enqueue("delete", msgs)
 
     def run_ops(self, op_ids):
@@ -505,9 +509,45 @@ class Engine(OfflineMixin):
         with lock:
             return self.op_run(self.cache.ops_pending(limit=2000))
 
+    # -- événements vers les autres machines (lu, favori, épingle, déplacement, suppression)
+    def emit_events(self, kind, msgs, dest=""):
+        sink = self.event_sink
+        if sink is None:
+            return
+        try:
+            emails = {a["id"]: a.get("email", "") for a in self.accounts()}
+            evs = [ME.make(kind, m, emails.get(m.account, ""), dest) for m in msgs]
+            evs = [e for e in evs if e]
+            if evs:
+                sink(evs)
+        except Exception:
+            pass
+
+    def apply_mail_events(self, events, now=None) -> int:
+        """Applique au cache local les événements reçus d'une autre machine. Ne renvoie RIEN au serveur ni aux autres machines (pas de boucle) :
+        la machine d'origine a déjà envoyé l'action au serveur. Retourne le nombre de messages modifiés."""
+        ids_of = {a.get("email", "").lower(): a["id"] for a in self.accounts()}
+        done = 0
+        for ev in ME.newest_per_message(ME.sanitize(events, now)):
+            aid = ids_of.get(ev["acct"])
+            ids = self.cache.find_ids_by_message_id(aid, ev["mid"]) if aid else []
+            if not ids:
+                continue
+            kind, what = ME.as_change(ev)
+            if kind == "flag":
+                self.cache.update_many(ids, **{what[0]: what[1]})
+            elif kind == "move":
+                self.cache.update_many(ids, folder=what, snoozed_until=0.0)
+            else:
+                self.cache.delete_many(ids)
+            done += len(ids)
+        return done
+
     def set_flag(self, msgs, field, value):
         """field : starred (favori), unread (non lu) ou pinned (épingle, aussi enregistrée sur la boîte). Retourne les actions à exécuter."""
         self.cache.update_many([m.id for m in msgs], **{field: bool(value)})
+        self.emit_events({("unread", False): "read", ("unread", True): "unread", ("starred", True): "star", ("starred", False): "unstar",
+                          ("pinned", True): "pin", ("pinned", False): "unpin"}[(field, bool(value))], msgs)
         if field == "starred":
             return self.op_enqueue("flags", msgs, flagged=bool(value))
         if field == "unread":

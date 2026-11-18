@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.48.0
+- Bulle de réponse sous le message (comme Spark) : saisie sur plusieurs lignes qui grandit (Ctrl+Entrée pour envoyer), « Répondre à tous » quand il y a d'autres destinataires, « Agrandir » vers la fenêtre de rédaction complète avec le texte déjà saisi.
+- Flèches ↑/↓ : elles déplacent seulement la surbrillance, Entrée ouvre le message (réglable : Gestes & disposition).
+- Attribuer à… / Partager… (menu ⋯, clic droit, palette) : transfert préparé avec mot d'introduction, tâche « Attribué à … » avec échéance, relance si pas de réponse sous 3 jours.
+- Actions en direct entre vos machines : lu / non lu, favori, épingle, déplacement et suppression sont annoncés aussitôt aux autres postes du réseau local (canal chiffré de la synchro), sans attendre le serveur. Aucun écho, le serveur reste la référence.
+
 ## 1.47.0
 - Notifications dosées (Paramètres → Notifications) : alerte pour tous les messages, pour les personnes seulement (ni newsletters ni notifications), pour les contacts et VIP seulement, ou aucune ; réglage par boîte mail ; silence horaire (passe minuit) ; compteur de non lus dans le titre de la fenêtre et l'icône de notification. Le son suit les mêmes règles.
 - Maintenance (Paramètres → Maintenance, et « mintmail --backup » / « --restore ») : sauvegarde .zip des réglages et du cache (mots de passe exclus), restauration avec copie de sécurité de l'état actuel, contrôle de la base, rapport de diagnostic enregistrable.

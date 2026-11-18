@@ -40,7 +40,7 @@ def context_items(msg, blocked: bool = False, integ=()) -> List[Item]:
 def more_items(msg, blocked: bool = False, integ=()) -> List[Item]:
     """Menu « … » du lecteur, comme dans Spark : Répondre, Envoyer à nouveau, Bloquer, Déplacer, Spam, Imprimer, Copier en Markdown, Exporter vers, Toutes les actions."""
     return [
-        ("reply", tr("Répondre")), ("resend", tr("Envoyer à nouveau")), None,
+        ("reply", tr("Répondre")), ("resend", tr("Envoyer à nouveau")), ("assign", tr("Attribuer à…")), ("share", tr("Partager…")), None,
         ("block", tr("Débloquer ") + msg.sender_email if blocked else tr("Bloquer l'expéditeur")), ("move", tr("Déplacer vers…")),
         ("spam", tr("Marquer comme spam")), ("print", tr("Imprimer…")), ("copy_md", tr("Copier en Markdown")),
         *([None] + integration_items(integ) if integ else []), None,
@@ -67,7 +67,7 @@ def palette_commands(msg, engine=None, integ=()) -> List[Tuple[str, str]]:
                  (tr("Copier l'adresse ") + who, "copy_addr"),
                  (tr("Reporter à demain 8 h"), "snooze_tomorrow"), (tr("Imprimer ce message (Ctrl+P)"), "print"), (tr("Enregistrer ce message en PDF"), "print_pdf"), *integration_items(integ)]
     if msg is not None:
-        cmds += [(tr("Créer une tâche depuis ce message"), "task_from"), (tr("Proposer des créneaux (agenda)"), "slots"),
+        cmds += [(tr("Créer une tâche depuis ce message"), "task_from"), (tr("Attribuer ce message à…"), "assign"), (tr("Partager ce message…"), "share"), (tr("Proposer des créneaux (agenda)"), "slots"),
                  (tr("Me le rappeler si pas de réponse sous 3 jours"), "followup3"), (tr("Se désabonner de cet expéditeur"), "unsubscribe")]
     cmds += [(tr("Aujourd'hui : agenda, priorités, tâches, relances"), "today"), (tr("Agenda des prochains jours"), "agenda"),
              (tr("Nouvel événement dans l'agenda"), "new_event"), (tr("Nouvelle tâche"), "new_task"),

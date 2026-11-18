@@ -230,6 +230,28 @@ class OrganizerMixin:
         if note:
             self.say(note)
 
+    def assign_dialog(self, msg, assign=True):
+        """Attribuer (tâche + relance) ou partager (pour information) : prépare le transfert, que vous relisez avant d'envoyer."""
+        from . import delegation as DG
+        full = self.cache.get(msg.id) or msg
+        dlg = UO.AssignDialog(self, full, self.cache.contacts_list(limit=300), assign)
+        if dlg.exec() != dlg.Accepted:
+            return
+        who = DG.clean_recipients(dlg.who.text())
+        if not who:
+            self.say(tr("Adresse e-mail invalide."))
+            return
+        due = None
+        if assign:
+            task, note = DG.assign(self.config, full, who, dlg.note.toPlainText(), dlg.due.text(), 3 if dlg.follow.isChecked() else 0)
+            self.say(note)
+            if task is None:
+                return
+            from .. import tasks as tk
+            due = tk.parse_due(dlg.due.text()) if dlg.due.text().strip() else None
+        self.compose(**DG.compose_args(self.config, self.engine.accounts(), full, who, dlg.note.toPlainText(), due,
+                                       self.engine.default_account(full, self.account), assign))
+
     def tasks_from_message(self, msg):
         _added, text = O.tasks_from_message(self.config, self.cache, msg)
         self.say(text)
@@ -265,7 +287,20 @@ class OrganizerMixin:
         if old is not None:
             old.stop()
         self.sync_engine = SyncEngine(self.config, cache=self.cache, apply_cb=self._p2p_apply)
+        self.sync_engine.events_cb = self._p2p_mail_events
+        self.engine.event_sink = self.sync_engine.push_events          # chaque action sur un message prévient aussitôt vos autres machines
         self.sync_engine.start()
+
+    def _p2p_mail_events(self, events, _node):
+        """Événements reçus d'une autre machine (fil de synchro) : cache mis à jour tout de suite, affichage rafraîchi dans le fil de l'interface."""
+        n = self.engine.apply_mail_events(events)
+        if n:
+            self.bridge.mailev.emit()
+        return n
+
+    def _p2p_mail_refresh(self):
+        self.reload()
+        self._update_counts()
 
     def _p2p_apply(self, wins):
         """Appelé par le moteur (fil de synchro) : applique les éléments reçus DANS le fil de l'interface, puis attend le résultat."""

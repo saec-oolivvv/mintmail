@@ -241,6 +241,47 @@ class TaskDialog(QDialog):
         form.addRow(row)
 
 
+class AssignDialog(QDialog):
+    """« Attribuer à… » (tâche suivie + relance) ou « Partager… » (pour information) : destinataire (contacts proposés), mot d'introduction, échéance."""
+
+    def __init__(self, parent, msg, contacts=(), assign=True):
+        super().__init__(parent)
+        self.assign = assign
+        self.setWindowTitle(tr("Attribuer à…") if assign else tr("Partager…"))
+        self.resize(560, 300)
+        form = QFormLayout(self)
+        form.addRow(QLabel(tr("« %s »") % (msg.subject or tr("(Sans objet)"))))
+        self.who = QLineEdit()
+        self.who.setPlaceholderText(tr("adresse e-mail (plusieurs : séparées par des virgules)"))
+        from PySide6.QtWidgets import QCompleter
+        comp = QCompleter([("%s" % c["email"]) for c in contacts], self.who)
+        comp.setCaseSensitivity(Qt.CaseInsensitive)
+        comp.setFilterMode(Qt.MatchContains)
+        self.who.setCompleter(comp)
+        self.note = QPlainTextEdit()
+        self.note.setPlaceholderText(tr("Mot d'introduction (facultatif)"))
+        self.note.setFixedHeight(80)
+        form.addRow(tr("À"), self.who)
+        form.addRow(tr("Message"), self.note)
+        self.due = QLineEdit()
+        self.follow = QCheckBox(tr("Me relancer si pas de réponse sous 3 jours"))
+        self.follow.setChecked(True)
+        if assign:
+            self.due.setPlaceholderText(tr("facultatif : vendredi, 15/11, dans 3 jours…"))
+            form.addRow(tr("Échéance"), self.due)
+            form.addRow("", self.follow)
+        row = QHBoxLayout()
+        cancel, ok = QPushButton(tr("Annuler")), QPushButton(tr("Continuer"))
+        ok.setObjectName("primary")
+        ok.setDefault(True)
+        cancel.clicked.connect(self.reject)
+        ok.clicked.connect(self.accept)
+        row.addStretch(1)
+        row.addWidget(cancel)
+        row.addWidget(ok)
+        form.addRow(row)
+
+
 class EventDialog(QDialog):
     def __init__(self, parent):
         super().__init__(parent)

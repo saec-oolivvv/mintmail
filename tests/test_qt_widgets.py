@@ -130,3 +130,56 @@ def test_body_split_switches_orientation_with_width():
     sp.resize(WIDE_MIN - 300, 500)
     app.processEvents()
     assert sp.orientation() == Qt.Vertical and sp.widget(0) is sp.info
+
+
+def test_arrows_only_highlight_and_enter_opens():
+    app = _qt()
+    if app is None:
+        return
+    from PySide6.QtCore import Qt
+    from PySide6.QtTest import QTest
+    lst = _list()
+    lst.highlight_only = True
+    seen = []
+    lst.selectionModel().currentChanged.connect(lambda cur, _p: seen.append((cur.row(), lst.keynav)))
+    lst.setCurrentIndex(lst.model().index(0, 0))
+    lst.setFocus()
+    QTest.keyClick(lst, Qt.Key_Down)
+    QTest.keyClick(lst, Qt.Key_Down)
+    assert lst.currentIndex().row() == 2 and lst.clicked_log == []
+    assert all(k for r, k in seen[1:])                              # chaque déplacement s'est fait avec le drapeau « touche de navigation »
+    QTest.keyClick(lst, Qt.Key_Return)
+    assert lst.clicked_log == [2]
+    lst.highlight_only = False
+    QTest.keyClick(lst, Qt.Key_Up)
+    assert lst.currentIndex().row() == 1 and not lst.keynav
+
+
+def test_quick_reply_bubble_grows_sends_with_ctrl_enter_and_offers_reply_all():
+    app = _qt()
+    if app is None:
+        return
+    from PySide6.QtCore import Qt
+    from PySide6.QtTest import QTest
+    from mintmail.qt.ui_readercard import QuickReply
+    q = QuickReply()
+    q.resize(500, 300)
+    q.show()
+    sent, full = [], []
+    q.send.connect(sent.append)
+    q.expand_full.connect(full.append)
+    h0 = q.entry.height()
+    q.entry.setText("\n".join("ligne %d" % i for i in range(6)))
+    app.processEvents()
+    assert q.entry.height() > h0 and q.entry.height() <= q.entry.fontMetrics().lineSpacing() * 8 + 40
+    q.entry.setText("Bonjour")
+    QTest.keyClick(q.entry, Qt.Key_Return)                           # Entrée seule : nouvelle ligne, pas d'envoi
+    assert sent == [] and "\n" in q.entry.text()
+    QTest.keyClick(q.entry, Qt.Key_Return, Qt.ControlModifier)
+    assert sent == ["Bonjour"] and q.entry.text() == ""
+    assert not q.reply_all()
+    q.set_all_available(True)
+    q.all_box.setChecked(True)
+    assert q.reply_all()
+    q.set_all_available(False)
+    assert not q.reply_all()

@@ -137,6 +137,10 @@ SECTIONS: List[Dict] = [
          "reporter, lu, favori, épingle, spam, bloquer, rien) et inversion du sens pour le pavé tactile."),
         ('Recherche avancée',
          "Dans la barre de recherche : mots libres, plus des filtres combinables — from:nom, is:unread, is:read, is:starred, is:pinned, has:attachment, after:2026-11-01, before:2026-12-01 (dates AAAA-MM-JJ ; after: inclus, before: exclu). Exemple : facture from:ovh after:2026-01-01 has:attachment. Les mêmes critères sont envoyés au serveur pour chercher aussi dans les messages que MintMail n'a pas encore téléchargés."),
+        ('Bulle de réponse et flèches du clavier',
+         "• Sous le message, la bulle de réponse accepte plusieurs lignes (Entrée = nouvelle ligne, Ctrl+Entrée = envoyer), propose « Répondre à tous » quand il y a d'autres destinataires, et « Agrandir » pour continuer dans la fenêtre de rédaction complète avec le texte déjà saisi.\n• Flèches ↑/↓ (comme Spark) : elles déplacent seulement la surbrillance ; Entrée ouvre le message. Réglable dans Paramètres → Gestes & disposition (« Flèches ↑/↓ : surligner sans ouvrir »)."),
+        ('Attribuer et partager',
+         "Menu ⋯ du message, clic droit ou palette :\n• Attribuer à… : choisissez la personne, un mot d'introduction et une échéance. MintMail prépare le transfert (que vous relisez avant d'envoyer), crée la tâche « Attribué à … » avec son échéance (visible dans Aujourd'hui) et vous relance si la personne n'a pas répondu sous 3 jours.\n• Partager… : transfère le message pour information, avec votre mot d'introduction. Rien ne part sans que vous validiez la fenêtre de rédaction."),
     ]},
     {"id": "today", "title": "Aujourd'hui, tâches et créneaux", "items": [
         ("Page « Aujourd'hui » (touche T)",
@@ -372,6 +376,8 @@ SECTIONS: List[Dict] = [
         ("Sécurité de la synchro",
          "Le canal est chiffré et authentifié par le code de jumelage ; les mots de passe ne circulent jamais en clair ; les données reçues sont "
          "strictement validées avant d'être appliquées. Gardez le code secret : quiconque le connaît et partage votre réseau peut se jumeler."),
+        ('Actions en direct entre vos machines',
+         "Quand la synchronisation entre postes est active, lire un message, le mettre en favori ou en épingle, le déplacer ou le supprimer est annoncé aussitôt à vos autres machines du réseau local (canal chiffré), sans attendre le serveur de courrier : la liste s'y met à jour en une ou deux secondes. Le serveur reste la référence : la machine qui agit lui envoie l'action, les autres ne modifient que leur copie locale (jamais d'écho ni de boucle). Les machines sur un autre réseau suivent via le serveur, comme avant."),
     ]},
     {"id": "offline", "title": "Hors ligne et fiabilité", "items": [
         ("Mode hors ligne",

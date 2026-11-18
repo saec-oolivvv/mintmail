@@ -86,6 +86,8 @@ class MessageList(QListView):
     def __init__(self, delegate, cfg_fn):
         super().__init__()
         self._d, self._cfg, self._press, self._row, self._dx, self._wheel = delegate, cfg_fn, None, -1, 0.0, False
+        self.highlight_only = False                  # flèches : la sélection bouge sans ouvrir le message ; Entrée l'ouvre (comme Spark)
+        self.keynav = False                          # une touche de navigation est en cours de traitement
         self.mouse_down = False                      # un bouton de la souris est enfoncé : la sélection ne doit PAS encore ouvrir le message (clic droit, glissé)
         self._idle = QTimer(self)
         self._idle.setSingleShot(True)
@@ -166,6 +168,18 @@ class MessageList(QListView):
             self.cancel_swipe()
             e.accept()
             return
+        if self.highlight_only and not (e.modifiers() & (Qt.ControlModifier | Qt.AltModifier | Qt.MetaModifier)):
+            if e.key() in (Qt.Key_Up, Qt.Key_Down, Qt.Key_PageUp, Qt.Key_PageDown, Qt.Key_Home, Qt.Key_End):
+                self.keynav = True
+                try:
+                    super().keyPressEvent(e)
+                finally:
+                    self.keynav = False
+                return
+            if e.key() in (Qt.Key_Return, Qt.Key_Enter) and self.currentIndex().isValid():
+                self.clickedRow.emit(self.currentIndex())                 # Entrée : ouvre le message en surbrillance
+                e.accept()
+                return
         super().keyPressEvent(e)
 
     def wheelEvent(self, e):

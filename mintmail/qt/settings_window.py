@@ -423,9 +423,10 @@ class SettingsDialog(QDialog):
             c.currentIndexChanged.connect(lambda _i, c=c, k=key: self._set_swipe(k, c.currentData()))
             form.addRow(label, c)
         form = page.card(tr("Options")).form()
-        for key, label in (("swipe_invert", tr("Inverser le sens au pavé tactile")), ("threads", tr("Regrouper en conversations"))):
+        for key, label in (("swipe_invert", tr("Inverser le sens au pavé tactile")), ("threads", tr("Regrouper en conversations")),
+                           ("arrows_highlight", tr("Flèches ↑/↓ : surligner sans ouvrir (Entrée ouvre le message)"))):
             sw = QCheckBox(label)
-            sw.setChecked(bool(self.cfg.get(key, key == "threads")))
+            sw.setChecked(bool(self.cfg.get(key, key in ("threads", "arrows_highlight"))))
             sw.toggled.connect(lambda v, k=key: self._set(k, bool(v)))
             form.addRow("", sw)
         return page.finish()
@@ -803,6 +804,8 @@ class SettingsDialog(QDialog):
         self.cfg.save()
         if key in ("threads", "swipe", "swipe_invert"):
             self.main.reload()
+        if key == "arrows_highlight":
+            self.main.list.highlight_only = bool(value)
         if key in ("theme", "style", "accent", "density", "load_images"):
             self.main.apply_theme()
             self.main.reload()

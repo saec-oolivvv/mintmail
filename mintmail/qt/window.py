@@ -153,6 +153,7 @@ class _Bridge(QObject):
     progress = Signal(object)      # avancement d'une mise à jour (version, texte, fraction)
     p2p = Signal()                 # éléments reçus d'un autre poste à appliquer dans le fil de l'interface
     partial = Signal()             # une boîte vient de recevoir du nouveau pendant un relevé : afficher tout de suite
+    mailev = Signal()              # une autre de vos machines vient d'agir sur des messages (lu, déplacé…) : rafraîchir
     newmail = Signal(str)          # le serveur annonce du nouveau pour ce compte (IMAP IDLE) : relever tout de suite
 
 
@@ -274,6 +275,7 @@ class MainWindow(ExtrasMixin, OrganizerMixin, AIMixin, QMainWindow):
         self.list.setItemDelegate(self.delegate)
         self.list.setUniformItemSizes(True)
         self.list.setSelectionMode(QListView.ExtendedSelection)
+        self.list.highlight_only = bool(self.config.get("arrows_highlight", True))
         self.list.selectionModel().currentChanged.connect(self._row_changed)
         self.list.selectionModel().selectionChanged.connect(lambda *_: self._selection_changed())
         self.search = QLineEdit()
@@ -517,6 +519,7 @@ class MainWindow(ExtrasMixin, OrganizerMixin, AIMixin, QMainWindow):
         self.ai_card.revealed.connect(lambda: getattr(self, "shown", None) is not None and self.info.show())      # un résumé ou une traduction demandés ouvrent la colonne
         self.quick = QuickReply()
         self.quick.send.connect(self.quick_reply)
+        self.quick.expand_full.connect(self.quick_expand_full)
         self.quick.ai.connect(lambda: self._on_ai_action("reply_ai", ""))
         self.quick.expand.connect(lambda t: self._on_ai_action("quick_expand", t))
         self.quick.hide()
@@ -624,6 +627,7 @@ class MainWindow(ExtrasMixin, OrganizerMixin, AIMixin, QMainWindow):
         self._act(None, "", "Ctrl+0", lambda: self.zoom_reader(0))
         self._act(None, "", "Ctrl+B", self.toggle_rail)
         self.bridge.p2p.connect(self._p2p_run)
+        self.bridge.mailev.connect(self._p2p_mail_refresh)
         self._push_pending = False
         self._push_accounts = set()
         self._push_timer = QTimer(self)
@@ -927,6 +931,8 @@ class MainWindow(ExtrasMixin, OrganizerMixin, AIMixin, QMainWindow):
     def _row_changed(self, cur, _prev):
         if not cur.isValid() and getattr(self, "_reloading", False):
             return
+        if cur.isValid() and self.list.keynav:
+            return                                                      # flèches en mode « surbrillance » : on ne fait que déplacer la sélection ; Entrée ouvre
         if cur.isValid() and (self.list.mouse_down or getattr(self, "_ctx", False)):
             return                                                      # bouton enfoncé (clic droit, début de glissé) ou menu contextuel : pas d'ouverture ; le relâchement d'un clic simple ouvre
         mid = cur.data(IdRole) if cur.isValid() else None
@@ -1242,7 +1248,7 @@ class MainWindow(ExtrasMixin, OrganizerMixin, AIMixin, QMainWindow):
                 if err:
                     self.status.setText(tr("Erreur IA : %s") % str(err)[:90])
                 else:
-                    self.quick.entry.setText(t.replace("\n", " ").strip())
+                    self.quick.entry.setText(t.strip())
                     self.quick.entry.setFocus()
                 self.ai_card.answer.hide()
             self.run_bg(lambda: RA.draft(self.engine, msg, payload, 1200), done)
@@ -1282,7 +1288,19 @@ class MainWindow(ExtrasMixin, OrganizerMixin, AIMixin, QMainWindow):
         msg = getattr(self, "shown", None)
         if msg is not None:
             self.queue_send(C.quick_reply_outgoing(self.config, self.engine.accounts(), msg, text,
-                                                   self.engine.default_account(msg, self.account)), 0)
+                                                   self.engine.default_account(msg, self.account), self.quick.reply_all()), 0)
+            self.quick.all_box.setChecked(False)
+
+    def quick_expand_full(self, text):
+        """« Agrandir » : la réponse commencée dans la bulle continue dans la fenêtre de rédaction (adresses, citation et signature habituelles)."""
+        msg = getattr(self, "shown", None)
+        if msg is None:
+            return
+        kw = C.reply_args(self.config, self.engine.accounts(), msg, self.quick.reply_all(), self.engine.default_account(msg, self.account))
+        if text:
+            kw["ai_suggested_text"] = text
+        self.quick.all_box.setChecked(False)
+        self.compose(**kw)
 
     # ------------------------------------------------------------ assistant IA
     def toggle_assistant(self, show=None):
@@ -1681,6 +1699,8 @@ class MainWindow(ExtrasMixin, OrganizerMixin, AIMixin, QMainWindow):
                 return self.add_task_dialog(self.cache.get(m.id) or m)
             if key == "slots":
                 return self.propose_slots(self.cache.get(m.id) or m)
+            if key in ("assign", "share"):
+                return self.assign_dialog(m, key == "assign")
             if key == "followup3":
                 return self.add_followup(self.cache.get(m.id) or m, 3)
             if key == "unsubscribe":
@@ -1933,6 +1953,7 @@ class MainWindow(ExtrasMixin, OrganizerMixin, AIMixin, QMainWindow):
         self._info_visible()
         self.quick.show()
         self.quick.set_ai(AS.ai_engine(self.engine).enabled())
+        self.quick.set_all_available(bool(C.reply_args(self.config, self.engine.accounts(), msg, True)["cc"]))
         if msg.folder != "drafts":
             self.ai_open(msg)
 

@@ -24,7 +24,7 @@ import threading
 import time
 from typing import Any, Dict, List, Optional
 
-from . import netutil, syncdata
+from . import mailevents, netutil, syncdata
 from .netutil import local_ip   # noqa: F401  (compatibilité : importé depuis ce module par les réglages)
 from .store import P2P_MIN_SECRET
 from .i18n import tr
@@ -119,6 +119,8 @@ class SyncEngine:
 
     def __init__(self, config, cache=None, on_update=None, apply_cb=None):
         self.config, self.cache, self.on_update, self.apply_cb = config, cache, on_update, apply_cb
+        self.events_cb = None                           # fonction(événements, nœud) appelée à la réception d'événements de messagerie (lu, déplacé…)
+        self._events = mailevents.Queue(self._deliver_events)
         self._node_id = config.get("p2p_node_id")
         if not self._node_id:
             self._node_id = secrets.token_hex(4).upper()
@@ -454,6 +456,12 @@ class SyncEngine:
                 return   # code de jumelage différent : rejet silencieux
             chan = SecureChannel(f, self._key, nc.encode(), ns.encode(), initiator=False)
             msg = chan.recv()
+            if msg.get("t") == "events":                      # événements de messagerie en direct : appliqués puis acquittés (pas d'échange de réglages)
+                n = 0
+                if self.events_cb:
+                    n = int(self.events_cb(msg.get("events"), node_c) or 0)
+                chan.send({"t": "ack", "n": n})
+                return
             mine = self.local_items()
             chan.send({"t": "items", "items": syncdata.to_wire(mine)})
             if msg.get("t") == "items":
@@ -502,6 +510,53 @@ class SyncEngine:
                 deadline.cancel()
             if sock:
                 sock.close()
+
+    # ------------------------------------------------------------------ événements de messagerie
+    def push_events(self, events) -> None:
+        """Prévient tout de suite les autres machines (lu, favori, épingle, déplacé, supprimé). Sans effet si la synchro est inactive ; ne bloque jamais."""
+        if self.can_run():
+            self._events.push(events)
+
+    def _deliver_events(self, events) -> None:
+        with self._lock:
+            peers = list(self._peers.values())
+        threads = [threading.Thread(target=self._send_events, args=(p, events), daemon=True) for p in peers]
+        for t in threads:
+            t.start()
+        for t in threads:
+            t.join(12)
+
+    def _send_events(self, peer: Dict[str, Any], events) -> bool:
+        sock = deadline = None
+        try:
+            sock = socket.create_connection((peer["host"], int(peer["port"])), timeout=3.0)
+            deadline = threading.Timer(CONN_DEADLINE, lambda: _cut(sock))
+            deadline.daemon = True
+            deadline.start()
+            sock.settimeout(8.0)
+            f = sock.makefile("rwb")
+            nc = secrets.token_hex(16)
+            self._write_line(f, {"t": "hello", "v": PROTOCOL, "node": self._node_id, "nc": nc})
+            ch = self._read_line(f)
+            ns, node_s = str(ch.get("ns", "")), str(ch.get("node", ""))
+            if ch.get("t") != "challenge" or not hmac.compare_digest(str(ch.get("ps", "")), self._mac(b"S", nc, ns, node_s)):
+                return False
+            self._write_line(f, {"t": "auth", "pc": self._mac(b"C", ns, nc, self._node_id)})
+            chan = SecureChannel(f, self._key, nc.encode(), ns.encode(), initiator=True)
+            chan.send({"t": "events", "events": events})
+            chan.recv()                                        # « ack » (une machine plus ancienne répond par ses réglages : sans importance)
+            self.stats["events_sent"] = self.stats.get("events_sent", 0) + len(events)
+            return True
+        except (OSError, ValueError):
+            return False
+        finally:
+            if deadline:
+                deadline.cancel()
+            if sock:
+                try:
+                    sock.close()
+                except OSError:
+                    pass
 
     def _merge(self, mine: dict, remote_wire: Any, node: str) -> int:
         """Fusion « dernière modification gagnante » : applique ce qui est plus récent côté pair."""

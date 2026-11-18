@@ -166,14 +166,15 @@ def body_of_qt_html(doc_html: str) -> str:
     return (m.group(1) if m else doc_html).strip()
 
 
-def quick_reply_outgoing(config, accounts, msg, text, default_account="") -> Outgoing:
+def quick_reply_outgoing(config, accounts, msg, text, default_account="", all_=False) -> Outgoing:
     """« Réponse rapide » du lecteur : réponse immédiate à l'expéditeur, avec la signature du compte ou de l'alias qui a reçu le message."""
     acc = next((a for a in accounts if a["id"] == default_account), accounts[0])
     ident = addressed_identity(config, msg)
     sig = signature_html(acc, ident)
     body = text_to_html(text) + ("<br><br>" + clean_for_send(sig) if sig else "")
     body, inline = SI.to_mail(body)
-    return Outgoing(account=acc["id"], to=(msg.reply_to or msg.sender_email), subject="Re: " + normalize_subject(msg.subject), html=body,
+    cc = reply_args(config, accounts, msg, True, default_account)["cc"] if all_ else ""          # « Répondre à tous » : les autres destinataires en copie
+    return Outgoing(account=acc["id"], to=(msg.reply_to or msg.sender_email), cc=cc, subject="Re: " + normalize_subject(msg.subject), html=body,
                     from_email=ident["email"] if ident else "", from_name=ident.get("name", "") if ident else "",
                     in_reply_to=msg.message_id, references=msg.references, inline=inline)
 

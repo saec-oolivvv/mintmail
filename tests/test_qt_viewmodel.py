@@ -667,6 +667,16 @@ def test_quick_reply_goes_to_the_sender_with_the_alias_signature():
     assert "Merci !" in out.html and "<b>Sig</b>" in out.html and out.html.index("Merci") < out.html.index("Sig")
 
 
+def test_quick_reply_all_copies_the_other_recipients_but_not_me():
+    from mintmail.qt import composing as C
+    cfg = {"identities": []}
+    m = _m(1, reply_to="", sender_email="s@x.be", to="moi@x.be, collegue@x.be", cc="autre@x.be, S@x.be", message_id="<id@x>")
+    acc = dict(A, email="moi@x.be")
+    one = C.quick_reply_outgoing(cfg, [acc], m, "Ok", "a1")
+    allr = C.quick_reply_outgoing(cfg, [acc], m, "Ok", "a1", True)
+    assert one.cc == "" and allr.to == "s@x.be" and allr.cc == "collegue@x.be, autre@x.be"
+
+
 def test_missing_keyring_password_gives_a_clear_error_instead_of_a_bad_login():
     class Cfg(dict):
         def password(self, aid): return ""
@@ -1150,7 +1160,7 @@ def test_more_menu_has_the_spark_entries_in_order():
     from mintmail.qt import menus as MN
     m = NS(sender_email="a@x.be")
     keys = [i[0] for i in MN.more_items(m) if i]
-    assert keys == ["reply", "resend", "block", "move", "spam", "print", "copy_md", "all_actions"]
+    assert keys == ["reply", "resend", "assign", "share", "block", "move", "spam", "print", "copy_md", "all_actions"]
     assert "integ:slack" in [i[0] for i in MN.more_items(m, integ=["slack"]) if i]
 
 

@@ -1,4 +1,4 @@
-# Aide de MintMail 1.47.0
+# Aide de MintMail 1.48.0
 _Généré par `make docs` depuis l'aide intégrée (touche F1 dans l'application)._
 
 ## Premiers pas
@@ -106,6 +106,17 @@ Faites glisser une ligne à la souris, au pavé tactile ou au doigt. Par défaut
 ### Recherche avancée
 
 Dans la barre de recherche : mots libres, plus des filtres combinables — from:nom, is:unread, is:read, is:starred, is:pinned, has:attachment, after:2026-11-01, before:2026-12-01 (dates AAAA-MM-JJ ; after: inclus, before: exclu). Exemple : facture from:ovh after:2026-01-01 has:attachment. Les mêmes critères sont envoyés au serveur pour chercher aussi dans les messages que MintMail n'a pas encore téléchargés.
+
+### Bulle de réponse et flèches du clavier
+
+• Sous le message, la bulle de réponse accepte plusieurs lignes (Entrée = nouvelle ligne, Ctrl+Entrée = envoyer), propose « Répondre à tous » quand il y a d'autres destinataires, et « Agrandir » pour continuer dans la fenêtre de rédaction complète avec le texte déjà saisi.  
+• Flèches ↑/↓ (comme Spark) : elles déplacent seulement la surbrillance ; Entrée ouvre le message. Réglable dans Paramètres → Gestes & disposition (« Flèches ↑/↓ : surligner sans ouvrir »).
+
+### Attribuer et partager
+
+Menu ⋯ du message, clic droit ou palette :  
+• Attribuer à… : choisissez la personne, un mot d'introduction et une échéance. MintMail prépare le transfert (que vous relisez avant d'envoyer), crée la tâche « Attribué à … » avec son échéance (visible dans Aujourd'hui) et vous relance si la personne n'a pas répondu sous 3 jours.  
+• Partager… : transfère le message pour information, avec votre mot d'introduction. Rien ne part sans que vous validiez la fenêtre de rédaction.
 
 ## Aujourd'hui, tâches et créneaux
 
@@ -404,6 +415,10 @@ Le voyant en pied de barre latérale indique l'état (« 1 pair(s) », « synchr
 
 Le canal est chiffré et authentifié par le code de jumelage ; les mots de passe ne circulent jamais en clair ; les données reçues sont strictement validées avant d'être appliquées. Gardez le code secret : quiconque le connaît et partage votre réseau peut se jumeler.
 
+### Actions en direct entre vos machines
+
+Quand la synchronisation entre postes est active, lire un message, le mettre en favori ou en épingle, le déplacer ou le supprimer est annoncé aussitôt à vos autres machines du réseau local (canal chiffré), sans attendre le serveur de courrier : la liste s'y met à jour en une ou deux secondes. Le serveur reste la référence : la machine qui agit lui envoie l'action, les autres ne modifient que leur copie locale (jamais d'écho ni de boucle). Les machines sur un autre réseau suivent via le serveur, comme avant.
+
 ## Hors ligne et fiabilité
 
 ### Mode hors ligne
@@ -576,7 +591,7 @@ Mise à jour : sudo apt install ./mintmail_X.Y.Z_all.deb (vos réglages et votre
 
 ## À propos et crédits
 
-### MintMail 1.47.0
+### MintMail 1.48.0
 
 Le client mail pour Linux Mint dont l'IA est l'ADN : il lit, trie, résume, classe, rédige et agit avec vous — toujours avec votre accord.  
 Développé par SAEC — https://saec.me · Logiciel libre sous licence MIT (© 2026 SAEC) : vous pouvez l'utiliser, le modifier et le redistribuer. Application Qt (PySide6) / Python, sans service cloud imposé : vos mails, vos clés et vos réglages restent chez vous.

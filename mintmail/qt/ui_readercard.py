@@ -1,6 +1,6 @@
 """Carte IA et barre « Réponse rapide » du lecteur Qt. Aucune logique : tout vient de readerai.py (testé sans Qt)."""
 from PySide6.QtCore import Qt, Signal
-from PySide6.QtWidgets import QFrame, QHBoxLayout, QLabel, QLineEdit, QPushButton, QVBoxLayout, QWidget
+from PySide6.QtWidgets import QCheckBox, QFrame, QHBoxLayout, QLabel, QLineEdit, QPlainTextEdit, QPushButton, QVBoxLayout, QWidget
 
 from ..i18n import tr
 from . import readerai as RA
@@ -142,10 +142,47 @@ class ReaderCard(QFrame):
         self.show()
 
 
+class GrowEdit(QPlainTextEdit):
+    """Zone de saisie de la réponse : grandit avec le texte (2 à 8 lignes). Entrée = nouvelle ligne ; Ctrl+Entrée envoie ; Échap rend la main à la liste."""
+    submit = Signal()
+    MIN_LINES, MAX_LINES = 2, 8
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setTabChangesFocus(True)
+        self.textChanged.connect(self._fit)
+        self._fit()
+
+    def text(self):
+        return self.toPlainText()
+
+    def setText(self, t):
+        self.setPlainText(t)
+
+    def clear(self):
+        super().clear()
+        self._fit()
+
+    def _fit(self):
+        fm = self.fontMetrics()
+        doc_h = int(self.document().size().height())                       # hauteur réelle du texte (lignes repliées comprises), en pixels
+        rows = max(self.MIN_LINES, min(self.MAX_LINES, -(-doc_h // max(1, fm.lineSpacing())))) if doc_h > 0 else self.MIN_LINES
+        self.setFixedHeight(rows * fm.lineSpacing() + 18)
+
+    def keyPressEvent(self, e):
+        if e.key() in (Qt.Key_Return, Qt.Key_Enter) and (e.modifiers() & (Qt.ControlModifier | Qt.MetaModifier)):
+            self.submit.emit()
+            e.accept()
+            return
+        super().keyPressEvent(e)
+
+
 class QuickReply(QWidget):
-    """« Réponse rapide… » : réponses toutes faites, saisie libre, envoi immédiat, et ✨ pour développer le texte avec l'IA."""
+    """Bulle de réponse sous le message (comme Spark) : réponses toutes faites, texte sur plusieurs lignes, « Répondre à tous », envoi immédiat,
+    « Agrandir » vers la fenêtre de rédaction complète, et ✨ pour développer le texte avec l'IA."""
     send = Signal(str)
     expand = Signal(str)
+    expand_full = Signal(str)
     ai = Signal()
 
     def __init__(self, parent=None):
@@ -161,29 +198,51 @@ class QuickReply(QWidget):
             chips.addWidget(b)
         chips.addStretch(1)
         lay.addLayout(chips)
+        self.entry = GrowEdit()
+        self.entry.setPlaceholderText(tr("Répondre…  (Ctrl+Entrée pour envoyer)"))
+        self.entry.submit.connect(self._send)
+        lay.addWidget(self.entry)
         row = QHBoxLayout()
-        self.entry = QLineEdit()
-        self.entry.setPlaceholderText(tr("Réponse rapide…"))
-        self.entry.returnPressed.connect(self._send)
+        self.all_box = QCheckBox(tr("Répondre à tous"))
+        self.all_box.hide()
         self.reply_ai = QPushButton(tr("✨ Répondre"))
         self.reply_ai.setToolTip(tr("Rédiger une réponse avec l'IA"))
         self.reply_ai.clicked.connect(self.ai.emit)
         self.expand_btn = QPushButton("✨")
         self.expand_btn.setToolTip(tr("Développer ce texte en réponse complète avec l'IA"))
         self.expand_btn.clicked.connect(lambda: self.entry.text().strip() and self.expand.emit(self.entry.text().strip()))
-        go = QPushButton("➤")
+        big = QPushButton(tr("Agrandir"))
+        big.setToolTip(tr("Continuer dans la fenêtre de rédaction complète"))
+        big.clicked.connect(self._big)
+        go = QPushButton(tr("Envoyer") + "  ➤")
         go.setObjectName("primary")
         go.setToolTip(tr("Envoyer la réponse"))
         go.clicked.connect(self._send)
-        for x in (self.entry, self.reply_ai, self.expand_btn, go):
-            row.addWidget(x, 1 if x is self.entry else 0)
+        row.addWidget(self.all_box)
+        row.addStretch(1)
+        for x in (self.reply_ai, self.expand_btn, big, go):
+            row.addWidget(x)
         lay.addLayout(row)
+
+    def reply_all(self):
+        return self.all_box.isVisibleTo(self) and self.all_box.isChecked()
+
+    def set_all_available(self, on):
+        """Affiche « Répondre à tous » seulement s'il y a d'autres destinataires que l'expéditeur."""
+        self.all_box.setVisible(bool(on))
+        if not on:
+            self.all_box.setChecked(False)
 
     def _send(self):
         t = self.entry.text().strip()
         if t:
             self.entry.clear()
             self.send.emit(t)
+
+    def _big(self):
+        t = self.entry.text().strip()
+        self.entry.clear()
+        self.expand_full.emit(t)
 
     def set_ai(self, on):
         self.reply_ai.setVisible(bool(on))
