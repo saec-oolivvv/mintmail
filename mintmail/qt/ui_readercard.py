@@ -165,8 +165,8 @@ class GrowEdit(QPlainTextEdit):
 
     def _fit(self):
         fm = self.fontMetrics()
-        doc_h = int(self.document().size().height())                       # hauteur réelle du texte (lignes repliées comprises), en pixels
-        rows = max(self.MIN_LINES, min(self.MAX_LINES, -(-doc_h // max(1, fm.lineSpacing())))) if doc_h > 0 else self.MIN_LINES
+        lines = int(self.document().size().height())                        # QPlainTextEdit : la « hauteur » du document est un nombre de lignes (repliées comprises)
+        rows = max(self.MIN_LINES, min(self.MAX_LINES, lines))
         self.setFixedHeight(rows * fm.lineSpacing() + 18)
 
     def keyPressEvent(self, e):

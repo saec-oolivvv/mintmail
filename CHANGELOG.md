@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.48.1
+- Bulle de réponse : la zone de saisie grandit enfin avec le texte (hauteur calculée en lignes).
+
 ## 1.48.0
 - Bulle de réponse sous le message (comme Spark) : saisie sur plusieurs lignes qui grandit (Ctrl+Entrée pour envoyer), « Répondre à tous » quand il y a d'autres destinataires, « Agrandir » vers la fenêtre de rédaction complète avec le texte déjà saisi.
 - Flèches ↑/↓ : elles déplacent seulement la surbrillance, Entrée ouvre le message (réglable : Gestes & disposition).
