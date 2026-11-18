@@ -31,6 +31,28 @@ def _label(text="", dim=False, wrap=True):
     return lab
 
 
+class ThreadRow(QLabel):
+    """Ligne cliquable de la conversation : le texte passe à la ligne au lieu de dépasser de la colonne."""
+    clicked = Signal()
+
+    def __init__(self, text, bold=False, enabled=True):
+        super().__init__(text)
+        self.setWordWrap(True)
+        self.setContentsMargins(6, 3, 6, 3)
+        self.setEnabled(enabled)
+        if bold:
+            f = self.font()
+            f.setBold(True)
+            self.setFont(f)
+        if enabled:
+            self.setCursor(Qt.PointingHandCursor)
+
+    def mousePressEvent(self, e):
+        if self.isEnabled() and e.button() == Qt.LeftButton:
+            self.clicked.emit()
+        super().mousePressEvent(e)
+
+
 class MessageExtras(QFrame):
     """Bandeau entre l'en-tête et le corps du message : conversation, invitation, pièces jointes, désabonnement."""
     attachment = Signal(object, str)          # pièce jointe, action : open | preview | save | copy
@@ -55,7 +77,7 @@ class MessageExtras(QFrame):
         il.addWidget(self.inv_title)
         il.addWidget(self.inv_when)
         il.addWidget(self.inv_note)
-        self.inv_btns = QHBoxLayout()
+        self.inv_btns = QVBoxLayout()                          # boutons l'un sous l'autre : la colonne est étroite
         il.addLayout(self.inv_btns)
         lay.addWidget(self.invite_card)
         self.att_scroll = QScrollArea()
@@ -96,13 +118,11 @@ class MessageExtras(QFrame):
         _clear(self.thread_box)
         if not rows:
             return
-        self.thread_box.addWidget(_label("<b>" + tr("💬 Conversation (%d messages)") % len(rows) + "</b>", wrap=False))
+        self.thread_box.addWidget(_label("<b>" + tr("💬 Conversation (%d messages)") % len(rows) + "</b>"))
         for r in rows[-8:]:
-            b = QPushButton("%s%s · %s — %s" % ("● " if r["unread"] else "", r["who"], r["date"], r["snippet"]))
-            b.setFlat(True)
-            b.setStyleSheet("text-align:left;padding:3px 6px;%s" % ("font-weight:bold;" if r["current"] or r["unread"] else ""))
-            b.setEnabled(not r["current"])
-            b.clicked.connect(lambda _c=False, mid=r["id"]: self.open_message.emit(mid))
+            b = ThreadRow("%s%s · %s — %s" % ("● " if r["unread"] else "", r["who"], r["date"], (r["snippet"] or "")[:110]),
+                          bold=bool(r["current"] or r["unread"]), enabled=not r["current"])
+            b.clicked.connect(lambda mid=r["id"]: self.open_message.emit(mid))
             self.thread_box.addWidget(b)
 
     def _invite(self, inv):

@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.46.1
+- Colonne « Informations » : tout le texte passe à la ligne (lignes de la conversation, boutons des alertes, invitations, suggestions) et ne dépasse plus du cadre.
+
 ## 1.46.0
 - Lecteur : colonne « Informations » à droite du message (bouton ⓘ pour l'afficher ou la masquer). Elle réunit la boîte, le dossier, la date, la catégorie, les pièces jointes, la conversation, les alertes (message suspect, accusé de lecture, traduction), les images distantes, le résumé / la traduction IA. Elle défile : une longue traduction ou un petit écran ne cachent plus le message. Sur écran étroit, elle passe au-dessus du message avec une hauteur limitée.
 

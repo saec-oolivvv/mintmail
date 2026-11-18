@@ -460,12 +460,8 @@ class MainWindow(ExtrasMixin, OrganizerMixin, AIMixin, QMainWindow):
             lay.setContentsMargins(12, 8, 12, 8)
             lay.setSpacing(6)
             lay.addWidget(label)
-            row = QHBoxLayout()
-            row.setSpacing(6)
-            for b in buttons:
-                row.addWidget(b)
-            row.addStretch(1)
-            lay.addLayout(row)
+            for b in buttons:                                # boutons l'un sous l'autre : jamais plus larges que la colonne
+                lay.addWidget(b)
         self.suspect_bar = QFrame()                          # « Ce message semble suspect : le mettre en spam ? »
         self.suspect_bar.setObjectName("suspectbar")
         self.suspect_bar.setStyleSheet("#suspectbar { background: rgba(220,38,38,0.10); border: 1px solid rgba(220,38,38,0.45); border-radius: 10px; }"

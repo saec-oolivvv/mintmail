@@ -16,6 +16,7 @@ class InfoColumn(QScrollArea):
         self.setFrameShape(QFrame.NoFrame)
         self.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
         self.setMinimumWidth(250)
+        self.setStyleSheet("#infocol QPushButton { text-align: left; } #infocol QLabel { min-width: 0px; }")
         body = QWidget()
         body.setObjectName("infobody")
         self.lay = QVBoxLayout(body)
