@@ -36,6 +36,7 @@ class Eng:
     def accounts(self): return [{"id": k, "email": k + "@x.be"} for k in self.b]
     def backend(self, aid): return self.b[aid]
     def _apply_flags(self, kn, flags): pass
+    def pending_ids(self): return set()
 
 
 def test_a_slow_mailbox_does_not_delay_the_others_and_errors_name_the_mailbox():

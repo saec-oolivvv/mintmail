@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.45.3
+- Glissés instantanés : la ligne disparaît à l'instant (le serveur suit en fond) ; sur pavé tactile, l'action est décidée dès que les doigts sont levés (plus d'attente).
+- Temps réel entre machines : les actions rapprochées (ex. 21 suppressions) partent ensemble au serveur en une seule commande, un message déplacé ici mais pas encore côté serveur n'est plus ramené par un relevé, et une veille légère (toutes les 6 s, boîte de réception et envoyés de chaque boîte, en plus d'IDLE) détecte tout changement fait ailleurs (suppression, déplacement, lecture, arrivée). IDLE ne perd plus les rafales de changements.
+
 ## 1.45.2
 - Alertes : elles sont désormais émises par MintMail lui-même (icône dans la barre de menus / zone de notification) ; un clic sur l'alerte ramène MintMail au premier plan au lieu d'ouvrir l'éditeur de scripts. Menu de l'icône : Ouvrir MintMail / Quitter.
 - Sons : un son à la réception d'un message (même fenêtre au premier plan) et un autre à l'envoi, réglables dans Paramètres → Apparence → Comportement.

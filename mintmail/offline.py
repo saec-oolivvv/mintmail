@@ -1,4 +1,5 @@
 """Mode hors ligne : les actions serveur (déplacer, drapeaux, suppression) sont enregistrées puis rejouées dans l'ordre."""
+import json
 from types import SimpleNamespace
 
 from .backend import is_retryable      # noqa: F401  (réexporté pour la fenêtre)
@@ -45,20 +46,44 @@ class OfflineMixin:
         elif op["kind"] == "delete":
             be.delete_many(items)
 
-    def op_run(self, ops):
-        """Exécute des actions dans l'ordre (en arrière-plan). Retourne (réussies, erreurs, hors_ligne)."""
-        done, errors, offline = [], [], False
+    @staticmethod
+    def _coalesce(ops):
+        """Regroupe les actions CONSÉCUTIVES de même nature (même boîte, même type, mêmes paramètres) : 21 suppressions rapprochées = UNE commande au serveur.
+        Retourne [(action fusionnée, [actions d'origine])] dans l'ordre."""
+        groups = []
         for op in ops:
+            p = {k: v for k, v in op["payload"].items() if k != "items"}
+            key = (op["account"], op["kind"], json.dumps(p, sort_keys=True))
+            if groups and groups[-1][0] == key:
+                groups[-1][2].append(op)
+            else:
+                groups.append((key, p, [op]))
+        out = []
+        for _key, p, members in groups:
+            merged = dict(members[0], payload=dict(p, items=[i for m in members for i in m["payload"]["items"]]))
+            out.append((merged, members))
+        return out
+
+    def op_run(self, ops):
+        """Exécute des actions dans l'ordre (en arrière-plan), regroupées quand elles se suivent. Retourne (réussies, erreurs, hors_ligne)."""
+        done, errors, offline, blocked = [], [], False, set()
+        for merged, members in self._coalesce(ops):
+            if merged["account"] in blocked:
+                continue                       # l'ordre est gardé PAR BOÎTE : une boîte hors ligne ne retient pas les autres
             try:
-                self._op_exec(op)
-                self.cache.ops_done(op["id"])
-                done.append(op)
+                self._op_exec(merged)
+                for op in members:
+                    self.cache.ops_done(op["id"])
+                done += members
             except Exception as e:
-                if is_retryable(e) and op["tries"] < MAX_TRIES:
-                    self.cache.ops_fail(op["id"])
+                if is_retryable(e) and members[0]["tries"] < MAX_TRIES:
+                    for op in members:
+                        self.cache.ops_fail(op["id"])
                     offline = True
-                    break              # on garde l'ordre : le reste attend le retour du réseau
-                self.cache.ops_done(op["id"])      # refus définitif (ou trop d'échecs) : abandonné
+                    blocked.add(merged["account"])
+                    continue
+                for op in members:
+                    self.cache.ops_done(op["id"])      # refus définitif (ou trop d'échecs) : abandonné
                 errors.append(str(e))
         return done, errors, offline
 

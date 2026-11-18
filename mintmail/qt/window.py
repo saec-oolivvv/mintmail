@@ -101,6 +101,15 @@ class MessageModel(QAbstractListModel):
     def row_of(self, mid):
         return next((r for r, m in enumerate(self.msgs) if m.id == mid), -1)
 
+    def remove_ids(self, ids):
+        """Retire tout de suite ces messages de la liste affichée (action instantanée : le serveur suit en fond)."""
+        ids = set(ids)
+        for r in range(len(self.msgs) - 1, -1, -1):
+            if self.msgs[r].id in ids:
+                self.beginRemoveRows(QModelIndex(), r, r)
+                del self.msgs[r], self.infos[r]
+                self.endRemoveRows()
+
 
 def _make_reader(on_link):
     """Lecteur HTML : QtWebEngine (JavaScript coupé, navigation interdite, liens filtrés) ; QTextBrowser si QtWebEngine manque."""
@@ -625,6 +634,9 @@ class MainWindow(ExtrasMixin, OrganizerMixin, AIMixin, QMainWindow):
         self._partial_timer.timeout.connect(self._show_partial)
         self.bridge.partial.connect(lambda: self._partial_timer.start(250))
         self._setup_tray()
+        self.live_timer = QTimer(self)
+        self.live_timer.timeout.connect(self._live_poll)
+        self.live_timer.start(6000)                                         # veille légère (STATUS) en complément d'IDLE : un changement fait ailleurs est vu en quelques secondes
         self.engine.on_progress = self.bridge.partial.emit                     # appelé depuis les fils de relevé
         if self.config.get("push") is not False:
             self.engine.start_push(self.bridge.newmail.emit)             # réception instantanée : plus d'attente du relevé périodique
@@ -1060,14 +1072,17 @@ class MainWindow(ExtrasMixin, OrganizerMixin, AIMixin, QMainWindow):
             rows = [r for r in [self.model.row_of(self.current)] if r >= 0]
         return vm.expand_threads(self.cache, [self.model.msgs[r] for r in rows], bool(self.config.get("threads", True)))
 
-    def _after_action(self, msgs, op_ids, tag, extra=None):
+    def _after_action(self, msgs, op_ids, tag, extra=None, fast=False):
         for m in msgs:
             self._kept.discard(m.id)
         self.current = None
         self.list.clearSelection()
         self.list.setCurrentIndex(QModelIndex())
         self._show(None)
-        self.reload()
+        if fast:
+            QTimer.singleShot(60, self.reload)                              # la liste est déjà à jour : la remise en ordre complète vient juste après
+        else:
+            self.reload()
         self._background(lambda: (extra() if extra else self.engine.run_ops(op_ids)), tag)
 
     def move_selected(self, dest):
@@ -1656,8 +1671,10 @@ class MainWindow(ExtrasMixin, OrganizerMixin, AIMixin, QMainWindow):
             dest = fx["move"]
             if dest == "trash" and msg.folder == "trash":
                 dest = "archive"
+            if self.view_key != dest:
+                self.model.remove_ids([m.id for m in grp])              # la ligne disparaît à l'instant, avant tout travail de base de données ou de réseau
             op_ids = self.engine.move(grp, dest)
-            self._after_action(grp, op_ids, "move", lambda: self.engine.finish_move(grp, dest, op_ids))
+            self._after_action(grp, op_ids, "move", lambda: self.engine.finish_move(grp, dest, op_ids), fast=True)
         elif "flag" in fx:
             field, value = fx["flag"]
             op_ids = self.engine.set_flag(grp, field, value)
@@ -1732,7 +1749,7 @@ class MainWindow(ExtrasMixin, OrganizerMixin, AIMixin, QMainWindow):
             self._push_pending = True
             return
         self._busy = True
-        self._background(lambda: (None, AU.sync_and_route(self.engine, ("inbox",), only=aids), None), "sync")
+        self._background(lambda: (None, AU.sync_and_route(self.engine, ("inbox", "sent"), only=aids), None), "sync")
 
     def _setup_tray(self):
         """Icône de notification de MintMail : les alertes viennent de l'APPLICATION (et non d'un script système) et un clic dessus ramène MintMail au premier plan."""
@@ -1766,6 +1783,17 @@ class MainWindow(ExtrasMixin, OrganizerMixin, AIMixin, QMainWindow):
         self.showNormal()
         self.raise_()
         self.activateWindow()
+
+    def _live_poll(self):
+        if getattr(self, "_live_busy", False):
+            return
+        self._live_busy = True
+
+        def done(changed, err):
+            self._live_busy = False
+            for aid in (changed or []) if not err else []:
+                self._on_push(aid)
+        self.run_bg(self.engine.live_check, done)
 
     def _show_partial(self):
         """Une boîte a fini de se relever : la liste et les compteurs sont rafraîchis sans attendre les autres boîtes."""

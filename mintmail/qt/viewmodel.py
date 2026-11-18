@@ -1,6 +1,7 @@
 """Logique de l'interface Qt SANS Qt : vues, lignes de liste, HTML du lecteur, synchronisation, lecture d'un message.
 S'appuie uniquement sur le moteur (store, backend, offline, htmlsafe, util) : testable partout."""
 import sys
+import threading
 import time
 from typing import Dict, List, Tuple
 
@@ -227,6 +228,7 @@ class Engine(OfflineMixin):
         a reçu du nouveau, pour que l'interface l'affiche sans attendre la fin. Chaque erreur est précédée de l'adresse de la boîte concernée."""
         from concurrent.futures import ThreadPoolExecutor
         accounts = [a for a in self.accounts() if only is None or a["id"] in only]
+        pending = self.pending_ids()                  # déjà déplacés / supprimés ICI mais pas encore sur le serveur : ne pas les ramener
 
         def one(a):
             fresh, errors = 0, []
@@ -243,6 +245,7 @@ class Engine(OfflineMixin):
                 except Exception as e:
                     errors.append("%s : %s" % (who, e))
                     continue
+                msgs = [m for m in msgs if m.id not in pending]
                 self.cache.upsert_many(msgs)
                 self._apply_flags(kn, flags)
                 changed = changed or bool(msgs)
@@ -311,6 +314,32 @@ class Engine(OfflineMixin):
             for name, (_n, unseen) in status.items():
                 if self.folder_unread.get((a["id"], name)) != unseen:
                     self.folder_unread[(a["id"], name)], changed = unseen, True
+        return changed
+
+    def live_check(self):
+        """Veille légère (STATUS : boîte de réception et envoyés de chaque boîte, toutes en parallèle) : retourne les boîtes dont l'état a changé depuis le dernier
+        passage (message arrivé, supprimé, déplacé, lu ailleurs). Complète IDLE (perdu, bloqué par un pare-feu, serveur sans IDLE) : le changement est vu en quelques secondes."""
+        from concurrent.futures import ThreadPoolExecutor
+        sigs = self.__dict__.setdefault("_live_sigs", {})
+        accounts = [a for a in self.accounts() if not a.get("demo")]
+
+        def one(a):
+            names = {"INBOX"} | {e["name"] for e in self.folder_entries(a["id"]) if e.get("special") == "sent" and e.get("selectable", True)}
+            try:
+                return a["id"], self.backend(a["id"]).folder_signature(sorted(names))
+            except Exception:
+                return a["id"], None
+        if not accounts:
+            return []
+        with ThreadPoolExecutor(max_workers=min(8, len(accounts))) as pool:
+            results = list(pool.map(one, accounts))
+        changed = []
+        for aid, sig in results:
+            if sig is None:
+                continue
+            if aid in sigs and sigs[aid] != sig:
+                changed.append(aid)
+            sigs[aid] = sig
         return changed
 
     def run_absence(self, limit=40):
@@ -407,11 +436,19 @@ class Engine(OfflineMixin):
         extra = {"notjunk": True} if dest == "inbox" and all(m.folder == "spam" for m in msgs) else {}
         return self.op_enqueue("move", msgs, dest=dest, **extra)
 
+    def pending_ids(self):
+        """Identifiants des messages visés par une action locale pas encore exécutée sur le serveur (déplacement, suppression)."""
+        try:
+            return {it["id"] for op in self.cache.ops_pending(limit=2000) if op["kind"] in ("move", "delete") for it in op["payload"].get("items", [])}
+        except Exception:
+            return set()
+
     def finish_move(self, msgs, dest, op_ids):
-        """Exécute le déplacement sur le serveur ; si tout va bien, remplace les copies locales par celles du serveur (bon UID, bon dossier).
-        Retourne (erreurs, hors_ligne)."""
-        _ok, errors, offline = self.op_run([o for o in self.cache.ops_pending() if o["id"] in op_ids])
-        if not errors and not offline:
+        """Exécute le déplacement sur le serveur (les actions rapprochées partent ensemble) ; si tout va bien, remplace les copies locales par celles du serveur
+        (bon UID, bon dossier). Retourne (erreurs, hors_ligne)."""
+        _ok, errors, offline = self.run_ops(op_ids)
+        left = {o["id"] for o in self.cache.ops_pending(limit=2000)}
+        if not errors and not offline and not (left & set(op_ids)):
             real = []
             for m in msgs:
                 try:
@@ -421,7 +458,17 @@ class Engine(OfflineMixin):
                     pass
             if real:
                 self.cache.delete_many(real)
-                self.sync(folders=("inbox", dest))
+                dests = self.__dict__.setdefault("_resync_dests", set())
+                dests.add(dest)
+                lock = self.__dict__.setdefault("_resync_lock", threading.Lock())
+                if lock.acquire(blocking=False):                  # une seule relecture à la fois : les suivantes y sont intégrées
+                    try:
+                        while dests:
+                            todo, dests_copy = ("inbox",) + tuple(sorted(dests)), set(dests)
+                            dests.difference_update(dests_copy)
+                            self.sync(folders=todo)
+                    finally:
+                        lock.release()
         return errors, offline
 
     def delete_forever(self, msgs):
@@ -429,7 +476,10 @@ class Engine(OfflineMixin):
         return self.op_enqueue("delete", msgs)
 
     def run_ops(self, op_ids):
-        return self.op_run([o for o in self.cache.ops_pending() if o["id"] in op_ids])
+        """Envoie au serveur TOUTES les actions en attente, regroupées, une exécution à la fois (les gestes rapprochés ne s'attendent plus les uns les autres)."""
+        lock = self.__dict__.setdefault("_ops_lock", threading.Lock())
+        with lock:
+            return self.op_run(self.cache.ops_pending(limit=2000))
 
     def set_flag(self, msgs, field, value):
         """field : starred (favori), unread (non lu) ou pinned (épingle, aussi enregistrée sur la boîte). Retourne les actions à exécuter."""

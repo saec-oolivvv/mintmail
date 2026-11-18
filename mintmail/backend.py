@@ -884,7 +884,7 @@ class IMAPBackend:
         t0 = time.time()
         while tag not in buf and time.time() - t0 < 15:
             buf += read(3)
-        return changed
+        return changed or bool(re.search(rb"\* \d+ (EXISTS|EXPUNGE|RECENT|FETCH)", buf))      # un changement arrivé pendant la fin d'IDLE (rafale de suppressions) compte aussi
 
     def _smtp(self):
         a = self.acc

@@ -141,7 +141,10 @@ def test_move_offline_keeps_the_action_and_delete_forever_removes_locally():
     ids = eng.delete_forever(m2)
     assert cache.get("m2") is None
     eng.run_ops(ids)
-    assert ("delete", [2]) in be.calls
+    assert ("delete", [2]) not in be.calls                                            # l'ordre est gardé : la suppression attend le déplacement resté en panne
+    del be.move_many
+    eng.run_ops(ids)
+    assert ("delete", [2]) in be.calls and cache.ops_count() == 0                     # réseau revenu : tout part, dans l'ordre
 
 
 def test_flags_star_unread_pin_are_local_first_and_sent_to_the_server():

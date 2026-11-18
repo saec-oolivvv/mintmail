@@ -133,8 +133,8 @@ class MessageList(QListView):
         self._press = None
         super().mouseReleaseEvent(e)
 
-    IDLE_MS = 650                                    # pavé sans indication de phase (Linux) : le geste ne se termine qu'après ce silence
-    IDLE_PHASE_MS = 1200                             # avec les phases (macOS) : simple filet de sécurité, la fin vient de ScrollEnd
+    IDLE_MS = 320                                    # pavé sans indication de phase (Linux) : le geste ne se termine qu'après ce silence
+    IDLE_PHASE_MS = 500                             # avec les phases (macOS) : simple filet de sécurité, la fin vient de ScrollEnd
 
     def cancel_swipe(self):
         """Annule le geste en cours sans rien exécuter."""
@@ -154,7 +154,9 @@ class MessageList(QListView):
         phase = e.phase()
         horizontal = abs(ax) > abs(ay) and abs(ax) > 0
         if phase == Qt.ScrollMomentum and (horizontal or self._wheel):
-            e.accept()                                           # inertie après avoir levé les doigts : jamais un nouveau geste, et rien n'est ajouté
+            if self._wheel:
+                self._finish()                                   # l'inertie commence = doigts levés : on décide tout de suite (sous le seuil = annulé)
+            e.accept()                                           # l'inertie elle-même n'ajoute rien et ne lance jamais un nouveau geste
             return
         if phase == Qt.ScrollEnd and self._wheel:
             self._finish()                                       # doigts levés : on décide maintenant (sous le seuil = annulé)
