@@ -13,12 +13,35 @@ def _qt():
     return QApplication.instance() or QApplication([])
 
 
+_LIVE = []
+
+
+def _keep(w):
+    """Les widgets de test sont fermés et détruits à la fin du fichier (pas laissés au démontage de Qt, qui peut planter)."""
+    _LIVE.append(w)
+    return w
+
+
+def test_zz_cleanup():
+    app = _qt()
+    if app is None:
+        return
+    while _LIVE:
+        w = _LIVE.pop()
+        try:
+            w.hide()
+            w.deleteLater()
+        except RuntimeError:
+            pass
+    app.processEvents()
+
+
 def _list(n=5, cfg=None):
     from PySide6.QtGui import QStandardItem, QStandardItemModel
     from mintmail.qt.ui_widgets import MessageList
     cfg = cfg or {"right": "archive", "right_long": "trash", "left": "read", "left_long": "star"}
     d = types.SimpleNamespace(swipe=None, wide=False)
-    lst = MessageList(d, lambda: (cfg, False))
+    lst = _keep(MessageList(d, lambda: (cfg, False)))
     model = QStandardItemModel()
     for i in range(n):
         model.appendRow(QStandardItem("ligne %d" % i))
@@ -100,7 +123,7 @@ def test_info_column_scrolls_and_hides_title_without_facts():
         return
     from PySide6.QtWidgets import QLabel
     from mintmail.qt.ui_infocol import InfoColumn
-    col = InfoColumn()
+    col = _keep(InfoColumn())
     col.resize(300, 200)
     col.show()
     col.set_facts([("De", "a@x.be"), ("<b>", "x & y")])
@@ -122,7 +145,7 @@ def test_body_split_switches_orientation_with_width():
     from PySide6.QtCore import Qt
     from PySide6.QtWidgets import QWidget
     from mintmail.qt.ui_infocol import WIDE_MIN, BodySplit, InfoColumn
-    sp = BodySplit(QWidget(), InfoColumn())
+    sp = _keep(BodySplit(QWidget(), InfoColumn()))
     sp.resize(WIDE_MIN + 200, 500)
     sp.show()
     app.processEvents()
@@ -162,7 +185,7 @@ def test_quick_reply_bubble_grows_sends_with_ctrl_enter_and_offers_reply_all():
     from PySide6.QtCore import Qt
     from PySide6.QtTest import QTest
     from mintmail.qt.ui_readercard import QuickReply
-    q = QuickReply()
+    q = _keep(QuickReply())
     q.resize(500, 300)
     q.show()
     sent, full = [], []

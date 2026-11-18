@@ -31,4 +31,6 @@ for path in sorted(glob.glob(os.path.join(HERE, "test_*.py"))):
             traceback.print_exc()
             print("ÉCHEC :", mod.__name__, name)
 print("\nTests : %d réussis, %d échecs" % (ok, bad))
-sys.exit(1 if bad else 0)
+sys.stdout.flush()
+sys.stderr.flush()
+os._exit(1 if bad else 0)        # sortie directe : le démontage de Qt à la fermeture de l'interpréteur peut planter (segfault) alors que tous les tests ont réussi

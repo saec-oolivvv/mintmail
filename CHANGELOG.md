@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.48.2
+- Tests : plus de plantage (segfault) à la fermeture de Qt une fois tous les tests réussis ; les widgets de test sont détruits proprement.
+
 ## 1.48.1
 - Bulle de réponse : la zone de saisie grandit enfin avec le texte (hauteur calculée en lignes).
 
