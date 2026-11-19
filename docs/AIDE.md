@@ -1,4 +1,4 @@
-# Aide de MintMail 1.49.0
+# Aide de MintMail 1.50.0
 _Généré par `make docs` depuis l'aide intégrée (touche F1 dans l'application)._
 
 ## Premiers pas
@@ -57,9 +57,16 @@ Comme dans Spark, la boîte de réception range automatiquement vos messages en 
 • Paramètres → Groupes : pour chaque groupe, « Grouper » (pastille à part) ou « Afficher tout dans la boîte principale », et un interrupteur général.  
 • Chaque boîte mail peut avoir ses propres réglages (carte « Boîte mail » de la même page) : regrouper ou non, et mode de chaque groupe.
 
+### Priorités des messages
+
+Trois niveaux : haute ❗, normale, basse ⬇. Dans la rédaction, le bouton « Priorité » (drapeau, en bas) marque votre message : le destinataire voit l'urgence si son logiciel la gère (en-têtes X-Priority et Importance).  
+• Sur un message reçu : clic droit → Priorité, ou Ctrl+K → « Priorité : haute ». Votre choix prime sur celui de l'expéditeur, il est partagé avec vos autres machines mais jamais envoyé au serveur.  
+• La marque ❗ / ⬇ apparaît dans la liste ; la colonne Informations indique le niveau.  
+• Tri « Par priorité » de la boîte de réception : votre niveau d'abord, puis la priorité estimée par l'IA, puis la date.
+
 ### Accusés de lecture
 
-Dans la rédaction, le bouton œil demande un accusé de lecture (Paramètres → Apparence → Accusés de lecture pour le demander d'office). Quand le destinataire lit votre message et que son logiciel envoie l'accusé, un œil 👁 apparaît sur le message dans « Envoyés » (infobulle : qui, quand) et, si vous le souhaitez, une notification vous prévient.  
+Dans la rédaction, le bouton « Accusé » (œil) demande un accusé de lecture (Paramètres → Apparence → Accusés de lecture pour le demander d'office). Quand le destinataire lit votre message et que son logiciel envoie l'accusé, un œil 👁 apparaît sur le message dans « Envoyés » (infobulle : qui, quand) et, si vous le souhaitez, une notification vous prévient.  
 • Quand on vous demande un accusé, MintMail vous propose de l'envoyer, ne l'envoie jamais, ou l'envoie toujours (réglage).  
 • Limite : seul le logiciel du destinataire décide d'envoyer l'accusé (Gmail n'en envoie pas). MintMail n'utilise aucune image espion.
 
@@ -70,7 +77,8 @@ Comme dans Spark, envoyez un message vers vos autres outils : clic droit sur un 
 • Notes Markdown (dossier) et Obsidian : le message est enregistré en note ; Obsidian l'ouvre dans votre coffre.  
 • Bear (Mac) : « Ouvrir dans Bear ».  
 • Todoist : une tâche est créée (jeton d'API, projet facultatif). Notion : une page est ajoutée à votre base (jeton et identifiant de la base).  
-• Bouton « Envoyer un test » pour vérifier. Rien n'est envoyé sans votre geste ; les clés et adresses sont gardées dans le trousseau du système, et seules des adresses HTTPS publiques sont acceptées.
+• Bouton « Envoyer un test » pour vérifier. Rien n'est envoyé sans votre geste ; les clés et adresses sont gardées dans le trousseau du système, et seules des adresses HTTPS publiques sont acceptées.  
+Astuce : commencez la recherche par ? pour poser une question à l'IA (par exemple « ? factures de mars »).
 
 ### Dossiers de vos boîtes
 
@@ -78,14 +86,13 @@ Tous les dossiers IMAP de chaque compte sont visibles dans la barre latérale (a
 • Déplacer : touche V, menu clic droit ou ☰, palette (« Déplacer vers… »), ou l'IA.  
 • Créer, renommer, supprimer un dossier ou un sous-dossier : clic droit sur un dossier ou un compte.  
 • Les dossiers spéciaux (Envoyés, Brouillons, Archives, Spam, Corbeille) sont reconnus quelle que soit la langue du serveur.  
-Astuce : commencez la recherche par ? pour poser une question à l'IA (par exemple « ? factures de mars »).
+Astuce : X active le mode sélection, Ctrl+A sélectionne tout.
 
 ### Favoris, épingles, reports, relances
 
 • Favori (S) : étoile synchronisée avec le serveur. Épingle (P) : garde le message en haut de la liste ; elle est AUSSI enregistrée sur la boîte (mot-clé IMAP), donc visible sur vos autres postes à leur prochaine synchronisation. Sur Gmail, c'est une ÉTIQUETTE « MintMail-Epingles », visible dans Gmail (web et mobile) ; sur un serveur IMAP standard, un mot-clé IMAP, invisible dans la plupart des messageries web mais vu par vos autres postes MintMail. Si le serveur ne peut pas la garder, MintMail vous prévient au premier essai et l'épingle reste sur ce poste seulement ; « mintmail --check-pins » donne le verdict exact. Palette → « Envoyer mes épingles vers la boîte » envoie celles faites avant la 1.13.2.  
 • Reporter (H = demain 8 h, ou clic droit → Reporter) : le message disparaît puis revient en haut de la boîte à l'heure choisie (plus tard aujourd'hui, demain, ce week-end, lundi, la semaine prochaine…).  
-• « Me rappeler si pas de réponse » (menu ⋯ du lecteur ou clic droit) : MintMail vous prévient si le destinataire n'a pas répondu après 3 jours.  
-Astuce : X active le mode sélection, Ctrl+A sélectionne tout.
+• « Me rappeler si pas de réponse » (menu ⋯ du lecteur ou clic droit) : MintMail vous prévient si le destinataire n'a pas répondu après 3 jours.
 
 ### Rechercher
 
@@ -591,7 +598,7 @@ Mise à jour : sudo apt install ./mintmail_X.Y.Z_all.deb (vos réglages et votre
 
 ## À propos et crédits
 
-### MintMail 1.49.0
+### MintMail 1.50.0
 
 Le client mail pour Linux Mint dont l'IA est l'ADN : il lit, trie, résume, classe, rédige et agit avec vous — toujours avec votre accord.  
 Application Qt (PySide6) / Python, sans service cloud imposé : vos mails, vos clés et vos réglages restent chez vous.

@@ -368,6 +368,8 @@ class Cache:
                 email TEXT PRIMARY KEY, name TEXT, phone TEXT, org TEXT, notes TEXT, source TEXT, n INTEGER DEFAULT 0, ts REAL)""")
             self.db.execute("CREATE INDEX IF NOT EXISTS i_msg ON messages(account, folder, date)")
             self.db.execute("CREATE INDEX IF NOT EXISTS i_sender ON messages(sender)")
+            self.db.execute("""CREATE TABLE IF NOT EXISTS prio (
+                account TEXT, mid TEXT, level INTEGER, ts REAL, PRIMARY KEY (account, mid))""")      # priorité choisie par l'utilisateur (clé : Message-ID, stable quand un message change de dossier)
             self.db.execute("""CREATE TABLE IF NOT EXISTS outbox (
                 id TEXT PRIMARY KEY, send_at REAL, data TEXT)""")
             for col in ("claim REAL", "tries INTEGER DEFAULT 0"):
@@ -872,6 +874,41 @@ class Cache:
             r = self.db.execute(self._SEL % ("COALESCE(meta,data)", "1") + "WHERE folder='sent' AND instr(COALESCE(meta,data), ?) > 0 LIMIT 1",
                                 (needle,)).fetchone()
         return self._build(*r[:7], light=True) if r else None
+
+    # ---------------------------------------------------------------- priorité choisie par l'utilisateur
+    @staticmethod
+    def _prio_key(m):
+        return m.account, (getattr(m, "message_id", "") or m.id)
+
+    def set_priority(self, msgs, level):
+        """Enregistre la priorité (1 haute, 0 normale, -1 basse) choisie pour ces messages."""
+        now = time.time()
+        with self.lock:
+            for m in msgs:
+                a, mid = self._prio_key(m)
+                self.db.execute("INSERT OR REPLACE INTO prio (account, mid, level, ts) VALUES (?,?,?,?)", (a, mid, int(level), now))
+            self.db.commit()
+
+    def set_priority_by_message_id(self, account, message_id, level):
+        with self.lock:
+            self.db.execute("INSERT OR REPLACE INTO prio (account, mid, level, ts) VALUES (?,?,?,?)", (account, message_id, int(level), time.time()))
+            self.db.commit()
+
+    def priority_map(self, msgs):
+        """{id du message → priorité choisie} pour ceux qui en ont une (les autres : absents)."""
+        by_acct, out = {}, {}
+        for m in msgs:
+            a, mid = self._prio_key(m)
+            by_acct.setdefault(a, {}).setdefault(mid, []).append(m.id)
+        with self.lock:
+            for a, mids in by_acct.items():
+                keys = list(mids)
+                for i in range(0, len(keys), 400):
+                    chunk = keys[i:i + 400]
+                    for mid, level in self.db.execute("SELECT mid, level FROM prio WHERE account=? AND mid IN (%s)" % ",".join("?" * len(chunk)), [a] + chunk):
+                        for i_ in mids.get(mid, ()):
+                            out[i_] = level
+        return out
 
     def find_ids_by_message_id(self, account, message_id):
         """Identifiants (tous dossiers) des messages de ce compte dont l'en-tête Message-ID est `message_id`."""

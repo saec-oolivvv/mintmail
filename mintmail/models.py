@@ -33,6 +33,7 @@ class Message:
     receipt_request: str = ""     # adresse à qui l'expéditeur demande un accusé de lecture (Disposition-Notification-To, RFC 8098)
     receipt_for: str = ""         # message-id du message d'origine quand CE message est un accusé de lecture reçu
     auto: bool = False            # message automatique (Auto-Submitted, Precedence: bulk, liste) : jamais de réponse d'absence
+    importance: int = 0           # importance posée par l'expéditeur (X-Priority / Importance) : 1 haute, 0 normale, -1 basse
     security: str = ""            # état PGP/MIME affiché dans le lecteur (« ✔ Signature valide », « 🔒 Chiffré »…) ; vide : message ordinaire
 
     light = False   # True : version allégée (sans corps) issue de la liste — jamais réécrite en base
@@ -70,6 +71,7 @@ class Outgoing:
     request_receipt: bool = False   # demander un accusé de lecture (Disposition-Notification-To)
     pgp_sign: bool = False        # signer en PGP/MIME (gpg)
     auto_reply: bool = False      # réponse automatique d'absence : en-têtes Auto-Submitted / Precedence (pas de boucle entre robots)
+    priority: int = 0             # priorité du message envoyé : 1 haute, 0 normale, -1 basse (en-têtes X-Priority / Importance)
     pgp_encrypt: bool = False     # chiffrer en PGP/MIME (gpg) : une clé publique par destinataire est nécessaire
 
     def to_dict(self):

@@ -53,6 +53,7 @@ from .organizer_window import OrganizerMixin
 from .extras_window import ExtrasMixin
 from .ui_organizer import MessageExtras
 from . import organizer_window as OW
+from .. import priority as PR
 from .. import qtdeps as QD
 from ..store import DATA_DIR
 from .ui_palette import Palette
@@ -69,7 +70,7 @@ class MessageModel(QAbstractListModel):
         super().__init__()
         self.msgs, self.infos, self.lead = [], [], ""
 
-    def set_messages(self, msgs, meta=None, reads=None, lead=False, sections=True):
+    def set_messages(self, msgs, meta=None, reads=None, lead=False, sections=True, levels=None):
         self.beginResetModel()
         self.msgs = list(msgs)
         self.infos = [vm.row_info(m) for m in self.msgs]
@@ -83,6 +84,7 @@ class MessageModel(QAbstractListModel):
         for info, m in zip(self.infos, self.msgs):
             r = (reads or {}).get(m.id)
             info["read_by"] = RC.eye_title(r) if r else ""                 # accusé de lecture reçu : œil dans la liste
+            info["imp"] = (levels or {}).get(m.id, 0)                      # priorité (la vôtre, sinon celle de l'expéditeur)
         self.endResetModel()
 
     def rowCount(self, parent=QModelIndex()):
@@ -714,14 +716,16 @@ class MainWindow(ExtrasMixin, OrganizerMixin, AIMixin, QMainWindow):
             msgs.sort(key=lambda m: m.date, reverse=True)
         by_priority = self._sort() == "priority" and self.view_key == "inbox"
         meta = self.cache.ai_meta([m.id for m in msgs]) if msgs else None
-        if by_priority and meta:
-            msgs.sort(key=lambda m: (-int((meta.get(m.id) or {}).get("priority") or 0), -(m.date or 0)))      # priorité décidée par l'IA, puis les plus récents
+        mine = self.cache.priority_map(msgs) if msgs else {}
+        levels = {m.id: PR.effective(mine.get(m.id), getattr(m, "importance", 0)) for m in msgs}
+        if by_priority:
+            msgs.sort(key=lambda m: (-PR.sort_score(levels[m.id], int(((meta or {}).get(m.id) or {}).get("priority") or 0)), -(m.date or 0)))   # votre priorité, l'IA départage, puis les plus récents
         self.sort_btn.setText("⇅  " + (tr("Par priorité") if by_priority else tr("Par date")))
         reads = RC.read_ids(self.cache, [m.id for m in msgs if m.folder == "sent"]) if msgs else {}
         lead = bool(self._group_info and self.category is None and getattr(self._group_info[1], "digest", None))
         self._reloading = True                                               # la remise à zéro du modèle vide la sélection : ce n'est pas un « message fermé »
         try:
-            self.model.set_messages(msgs, meta, reads, lead=lead and not by_priority, sections=not by_priority)
+            self.model.set_messages(msgs, meta, reads, lead=lead and not by_priority, sections=not by_priority, levels=levels)
         finally:
             self._reloading = False
         self.srv_btn.setVisible(bool(q.strip()) and not AW.is_ai_query(raw) and not any(a.get("demo") for a in self.engine.accounts()))
@@ -1632,6 +1636,9 @@ class MainWindow(ExtrasMixin, OrganizerMixin, AIMixin, QMainWindow):
         sn = menu.addMenu(tr("Reporter"))
         for key, label in MN.SNOOZES:
             sn.addAction(label, lambda k=key: self._run_cmd(k, m))
+        pm = menu.addMenu(tr("Priorité"))
+        for lv, nm in ((PR.HIGH, tr("❗ Haute")), (PR.NORMAL, tr("Priorité normale")), (PR.LOW, tr("⬇ Basse"))):
+            pm.addAction(nm, lambda v=lv: self._run_cmd("prio:%d" % v, m))
         mv = menu.addMenu(tr("Déplacer vers un dossier"))
         for dest, label in self.engine.move_targets(m.account):
             mv.addAction(label, lambda d=dest: self._run_cmd("move:" + d, m))
@@ -1658,6 +1665,11 @@ class MainWindow(ExtrasMixin, OrganizerMixin, AIMixin, QMainWindow):
                 return self.move_selected(key)
             if key in ("read", "star", "pin"):
                 return self.toggle_flag({"read": "unread", "star": "starred", "pin": "pinned"}[key])
+            if head == "prio":
+                msgs = self.selected_msgs() or [m]
+                self.engine.set_priority(msgs, int(arg))
+                self.reload()
+                return
             if head == "integ":
                 return self.send_to(arg, m)
             if key in ("print", "print_pdf"):
@@ -1949,7 +1961,8 @@ class MainWindow(ExtrasMixin, OrganizerMixin, AIMixin, QMainWindow):
         self.reader.show_html(vm.render_html(msg, load, self.is_dark()))
         self.apply_zoom()
         self.fill_extras(msg)
-        self.info.set_facts(vm.info_facts(msg, self.engine.accounts(), len(self.cache.thread_members(msg.account, msg.thread_id)) if msg.thread_id else 0), self.t["dim"])
+        self.info.set_facts(vm.info_facts(msg, self.engine.accounts(), len(self.cache.thread_members(msg.account, msg.thread_id)) if msg.thread_id else 0,
+                                         PR.effective(self.cache.priority_map([msg]).get(msg.id), getattr(msg, "importance", 0))), self.t["dim"])
         self._info_visible()
         self.quick.show()
         self.quick.set_ai(AS.ai_engine(self.engine).enabled())

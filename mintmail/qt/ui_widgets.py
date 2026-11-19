@@ -5,6 +5,7 @@ from PySide6.QtWidgets import QApplication, QListView, QListWidget, QStyle, QSty
 
 from ..util import color_index, initials
 from ..i18n import tr
+from .. import priority as PR
 from . import gestures as GS
 
 InfoRole = Qt.UserRole + 2
@@ -317,7 +318,7 @@ class MessageDelegate(QStyledItemDelegate):
         p.drawText(QRect(x, top, w - tw - 6, 18), Qt.AlignLeft | Qt.AlignVCenter,
                    p.fontMetrics().elidedText(info["sender"], Qt.ElideRight, w - tw - 6))
         # ligne 2 : objet + marques
-        badge = (tr("⚠ Suspect") + "  ") if info.get("spam") else (tr("⚡ Important") + "  ") if info.get("prio") == 3 else ""
+        badge = PR.mark(info.get("imp", 0)) + ((tr("⚠ Suspect") + "  ") if info.get("spam") else (tr("⚡ Important") + "  ") if info.get("prio") == 3 else "")
         marks = badge + ("%d✉  " % info["count"] if info.get("count") else "") + ("👁 " if info.get("read_by") else "") + ("📌 " if info["pinned"] else "") + ("★ " if info["starred"] else "") + ("📎" if info["attachments"] else "")
         p.setFont(small)
         mw = p.fontMetrics().horizontalAdvance(marks) + 4 if marks else 0
@@ -344,7 +345,7 @@ class MessageDelegate(QStyledItemDelegate):
 
 
     def _marks(self, info):
-        badge = (tr("⚠ Suspect") + "  ") if info.get("spam") else (tr("⚡ Important") + "  ") if info.get("prio") == 3 else ""
+        badge = PR.mark(info.get("imp", 0)) + ((tr("⚠ Suspect") + "  ") if info.get("spam") else (tr("⚡ Important") + "  ") if info.get("prio") == 3 else "")
         return badge + ("%d✉  " % info["count"] if info.get("count") else "") + ("👁 " if info.get("read_by") else "") + ("📌 " if info["pinned"] else "") \
             + ("★ " if info["starred"] else "") + ("📎" if info["attachments"] else "")
 

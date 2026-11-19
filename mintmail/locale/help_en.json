@@ -43,8 +43,12 @@
      "Like Spark, the inbox sorts your messages into groups automatically: Pinned, Assigned to me (you are the only recipient of a real person's message, or a task or follow-up is set on it), Received invitations, Invitation replies, Notifications and Newsletters. At the top of the unified inbox, one row per group (Pinned, Notifications, Newsletters, Invitations…) shows its unread count and only the senders' names; click it to open the group, “Main” goes back. Below the rows, the list is split by period: Today, Yesterday, Last week, then each month, then each year.\n• Settings → Groups: for each group choose “Group” (separate chip) or “Show all in the main inbox”, plus a general switch.\n• Each mailbox can have its own settings (the “Mailbox” card on the same page): group or not, and the mode of each group."
     ],
     [
+     "Message priorities",
+     "Three levels: high ❗, normal, low ⬇. In the composer, the “Priority” button (flag, at the bottom) marks your message: the recipient sees the urgency if their software supports it (X-Priority and Importance headers).\n• On a received message: right-click → Priority, or Ctrl+K → “Priority: high”. Your choice overrides the sender's, is shared with your other computers and is never sent to the server.\n• The ❗ / ⬇ mark appears in the list; the Information column shows the level.\n• “By priority” sort in the inbox: your level first, then the AI-estimated priority, then date."
+    ],
+    [
      "Read receipts",
-     "In the composer, the eye button requests a read receipt (Settings → Appearance → Read receipts to request one by default). When the recipient reads your message and their software sends the receipt, an eye 👁 appears on the message in “Sent” (tooltip: who and when) and, if you wish, a notification tells you.\n• When someone asks you for a receipt, MintMail offers to send it, never sends it, or always sends it (setting).\n• Limit: only the recipient's software decides whether to send the receipt (Gmail sends none). MintMail uses no tracking pixel."
+     "In the composer, the “Receipt” (eye) button requests a read receipt (Settings → Appearance → Read receipts to request one by default). When the recipient reads your message and their software sends the receipt, an eye 👁 appears on the message in “Sent” (tooltip: who and when) and, if you wish, a notification tells you.\n• When someone asks you for a receipt, MintMail offers to send it, never sends it, or always sends it (setting).\n• Limit: only the recipient's software decides whether to send the receipt (Gmail sends none). MintMail uses no tracking pixel."
     ],
     [
      "Integrations (Teams, Slack, notes…)",

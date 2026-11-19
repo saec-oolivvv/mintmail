@@ -20,6 +20,7 @@ from email.utils import formataddr, make_msgid, parsedate_to_datetime, parseaddr
 from .models import Message
 from .store import DATA_DIR, private_dir, write_private
 from . import ical, oauth, pgp, receipts
+from . import priority as PR
 from .util import html_to_text, split_addresses, text_to_html, thread_key
 from .i18n import tr
 
@@ -247,7 +248,7 @@ def parse_message(raw, account, logical, real_folder, uid, flags):
         receipt_for=receipt_for, receipt_request=receipts.requested_address(em),
         message_id=message_id, references=references, unsubscribe=str(em.get("List-Unsubscribe", "") or ""),
         unsub_post="one-click" in str(em.get("List-Unsubscribe-Post", "") or "").lower(),
-        thread_id=thread_key(message_id, references, subject), invite=invite, security=security, auto=_is_auto(em))
+        thread_id=thread_key(message_id, references, subject), invite=invite, security=security, auto=_is_auto(em), importance=PR.from_headers(em))
 
 
 def _is_auto(em) -> bool:
@@ -939,6 +940,8 @@ class IMAPBackend:
         em["Message-ID"] = make_msgid(domain=from_email.split("@")[-1])
         if getattr(out, "auto_reply", False):
             em["Auto-Submitted"], em["Precedence"], em["X-Auto-Response-Suppress"] = "auto-replied", "bulk", "All"
+        for k, v in PR.headers(getattr(out, "priority", 0)).items():
+            em[k] = v                                                        # priorité choisie dans le rédacteur
         if getattr(out, "request_receipt", False):
             em["Disposition-Notification-To"] = from_email                  # demande d'accusé de lecture (RFC 8098)
         if out.in_reply_to:

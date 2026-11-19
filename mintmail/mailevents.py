@@ -7,7 +7,8 @@ from typing import Dict, Iterable, List, Optional, Tuple
 
 FLAGS = {"read": ("unread", False), "unread": ("unread", True), "star": ("starred", True), "unstar": ("starred", False),
          "pin": ("pinned", True), "unpin": ("pinned", False)}
-KINDS = set(FLAGS) | {"move", "delete"}
+PRIO = {"prio_high": 1, "prio_normal": 0, "prio_low": -1}          # priorité choisie par vous
+KINDS = set(FLAGS) | set(PRIO) | {"move", "delete"}
 MAX_EVENTS = 500            # par envoi
 MAX_AGE = 3600              # un événement vieux d'une heure n'est plus appliqué (le serveur a déjà tranché)
 
@@ -52,7 +53,7 @@ def newest_per_message(events: Iterable[Dict]) -> List[Dict]:
     """Le dernier événement de chaque famille (indicateur / déplacement) pour chaque message : c'est celui qui compte."""
     last: Dict[Tuple, Dict] = {}
     for ev in sorted(events, key=lambda e: e["ts"]):
-        family = FLAGS[ev["k"]][0] if ev["k"] in FLAGS else "move"          # « delete » et « move » : même famille (le dernier gagne)
+        family = FLAGS[ev["k"]][0] if ev["k"] in FLAGS else "prio" if ev["k"] in PRIO else "move"          # « delete » et « move » : même famille (le dernier gagne)
         last[(ev["acct"], ev["mid"], family)] = ev
     return list(last.values())
 
@@ -63,6 +64,8 @@ def as_change(ev) -> Tuple[str, object]:
         return "move", ev["to"]
     if ev["k"] == "delete":
         return "delete", None
+    if ev["k"] in PRIO:
+        return "prio", PRIO[ev["k"]]
     return "flag", FLAGS[ev["k"]]
 
 

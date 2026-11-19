@@ -14,6 +14,7 @@ from PySide6.QtWidgets import (QComboBox, QCompleter, QDialog, QDialogButtonBox,
 from ..i18n import tr
 from ..util import human_size
 from .. import pgp
+from .. import priority as PR
 from . import composing as C
 from . import sigimages as SI
 from . import ui_fetch as F
@@ -63,14 +64,17 @@ class ComposeWindow(QMainWindow):
             #attchip:hover { background: %(line)s; }
         """ % dict(th, rc=min(th["r"], 18) + (4 if th["r"] > 8 else 0)))
 
-        def tool(layout, icon, text, shortcut, fn, checkable=False, owner=None):
-            """Bouton à icône vectorielle + info-bulle (avec raccourci) lié à une action ; retourne l'action."""
+        def tool(layout, icon, text, shortcut, fn, checkable=False, owner=None, label=None, glyph=None, style=""):
+            """Bouton lié à une action ; retourne l'action. `glyph` : lettre ou symbole parlant (B, I, U, S…) ; `label` : icône + mot à côté ;
+            sans l'un ni l'autre : icône seule. L'info-bulle (avec raccourci) donne toujours la phrase complète."""
             a = QAction(self)
-            a.setText(text)
-            a.setIcon(UI.icon(icon, dim, accent, 18))
+            a.setText(glyph or label or text)
+            if not glyph:
+                a.setIcon(UI.icon(icon, dim, accent, 18))
             a.setCheckable(checkable)
             shortcut = SC.resolve(self.engine.config, shortcut, SC.COMPOSE) if shortcut else shortcut
             a.setToolTip(text + ("  (%s)" % shortcut if shortcut else ""))
+            a.setStatusTip(text)
             if shortcut:
                 a.setShortcut(QKeySequence(shortcut))
                 a.setShortcutContext(Qt.WindowShortcut)
@@ -79,7 +83,16 @@ class ComposeWindow(QMainWindow):
             btn = QToolButton()
             btn.setDefaultAction(a)
             btn.setIconSize(UI.icon_size(18))
-            btn.setToolButtonStyle(Qt.ToolButtonIconOnly if not a.icon().isNull() else Qt.ToolButtonTextOnly)
+            btn.setToolButtonStyle(Qt.ToolButtonTextOnly if glyph or a.icon().isNull() else Qt.ToolButtonTextBesideIcon if label else Qt.ToolButtonIconOnly)
+            if glyph:
+                f = btn.font()
+                f.setBold("b" in style)
+                f.setItalic("i" in style)
+                f.setUnderline("u" in style)
+                f.setStrikeOut("s" in style)
+                f.setPointSize(max(f.pointSize(), 11))
+                btn.setFont(f)
+                btn.setMinimumWidth(28)
             btn.setCursor(Qt.PointingHandCursor)
             layout.addWidget(btn)
             return a
@@ -159,17 +172,17 @@ class ComposeWindow(QMainWindow):
         fl = QHBoxLayout(fmt)
         fl.setContentsMargins(6, 0, 6, 0)
         fl.setSpacing(2)
-        tool(fl, "bold", tr("Gras"), "Ctrl+B", self._bold)
-        tool(fl, "italic", tr("Italique"), "Ctrl+I", self._italic)
-        tool(fl, "underline", tr("Souligné"), "Ctrl+U", self._underline)
-        tool(fl, "strike", tr("Barré"), None, self._strike)
+        tool(fl, "bold", tr("Gras"), "Ctrl+B", self._bold, glyph="B", style="b")
+        tool(fl, "italic", tr("Italique"), "Ctrl+I", self._italic, glyph="I", style="i")
+        tool(fl, "underline", tr("Souligné"), "Ctrl+U", self._underline, glyph="U", style="u")
+        tool(fl, "strike", tr("Barré"), None, self._strike, glyph="S", style="s")
         vsep(fl)
-        tool(fl, "bullets", tr("Liste à puces"), None, self._bullets)
-        tool(fl, "numbered", tr("Liste numérotée"), None, self._numbered)
-        tool(fl, "quote", tr("Citation"), None, self._quote)
+        tool(fl, "bullets", tr("Liste à puces"), None, self._bullets, glyph="•  ≡")
+        tool(fl, "numbered", tr("Liste numérotée"), None, self._numbered, glyph="1. ≡")
+        tool(fl, "quote", tr("Citation"), None, self._quote, glyph="❝")
         vsep(fl)
-        tool(fl, "link", tr("Insérer un lien"), "Ctrl+K", self._link)
-        tool(fl, "clear", tr("Effacer la mise en forme"), None, self._clear_format)
+        tool(fl, "link", tr("Insérer un lien"), "Ctrl+K", self._link, label=tr("Lien"))
+        tool(fl, "clear", tr("Effacer la mise en forme"), None, self._clear_format, glyph="Tₓ")
         fl.addStretch(1)
         tpl = QPushButton(tr("Modèles"))
         tpl.setObjectName("flat")
@@ -242,15 +255,28 @@ class ComposeWindow(QMainWindow):
         later.setMenu(menu)
         bl.addWidget(later)
         vsep(bl)
-        tool(bl, "attach", tr("Joindre un fichier"), "Ctrl+Shift+A", self._attach)
+        tool(bl, "attach", tr("Joindre un fichier"), "Ctrl+Shift+A", self._attach, label=tr("Joindre"))
         self.pgp_sign = self.pgp_encrypt = None
         if pgp.available():                                        # gpg installé : signer / chiffrer en PGP/MIME (facultatif)
-            self.pgp_sign = tool(bl, "sign", tr("Signer ce message avec votre clé OpenPGP (gpg)"), None, lambda: None, checkable=True)
-            self.pgp_encrypt = tool(bl, "lock", tr("Chiffrer ce message : il faut la clé publique de chaque destinataire"), None, lambda: None, checkable=True)
-        self.receipt_btn = tool(bl, "eye", tr("Demander un accusé de lecture (le logiciel du destinataire doit l'accepter)"), None, lambda: None, checkable=True)
+            self.pgp_sign = tool(bl, "sign", tr("Signer ce message avec votre clé OpenPGP (gpg)"), None, lambda: None, checkable=True, label=tr("Signer"))
+            self.pgp_encrypt = tool(bl, "lock", tr("Chiffrer ce message : il faut la clé publique de chaque destinataire"), None, lambda: None, checkable=True, label=tr("Chiffrer"))
+        self.receipt_btn = tool(bl, "eye", tr("Demander un accusé de lecture (le logiciel du destinataire doit l'accepter)"), None, lambda: None, checkable=True, label=tr("Accusé"))
         self.receipt_btn.setChecked(bool(self.engine.config.get("receipt_request", False)))
         bl.addStretch(1)
-        tool(bl, "trash", tr("Supprimer le brouillon"), None, self._discard)
+        self.priority = 0
+        self.prio_btn = QToolButton()
+        self.prio_btn.setIcon(UI.icon("flag", dim, accent, 18))
+        self.prio_btn.setIconSize(UI.icon_size(18))
+        self.prio_btn.setToolButtonStyle(Qt.ToolButtonTextBesideIcon)
+        self.prio_btn.setPopupMode(QToolButton.InstantPopup)
+        self.prio_btn.setCursor(Qt.PointingHandCursor)
+        pmenu = QMenu(self.prio_btn)
+        for lv, nm in ((1, tr("❗ Haute : à traiter en premier")), (0, tr("Priorité normale")), (-1, tr("⬇ Basse : sans urgence"))):
+            pmenu.addAction(nm, lambda v=lv: self._set_priority(v))
+        self.prio_btn.setMenu(pmenu)
+        bl.addWidget(self.prio_btn)
+        self._set_priority(0)
+        tool(bl, "trash", tr("Supprimer le brouillon"), None, self._discard, label=tr("Supprimer"))
         send_seq = SC.resolve(self.engine.config, "Ctrl+Return", SC.COMPOSE)
         if send_seq:
             QShortcut(QKeySequence(send_seq), self, activated=lambda: self.do_send(0))
@@ -522,6 +548,7 @@ class ComposeWindow(QMainWindow):
         out = C.build_outgoing(acc, ident, self.to.text(), self.cc.text(), self.bcc.text(), self.subject.text(), self._body(), self.attachments,
                                self.in_reply_to, self.references)
         out.request_receipt = bool(self.receipt_btn and self.receipt_btn.isChecked())
+        out.priority = int(getattr(self, "priority", 0))
         out.pgp_sign = bool(self.pgp_sign and self.pgp_sign.isChecked())
         out.pgp_encrypt = bool(self.pgp_encrypt and self.pgp_encrypt.isChecked())
         self.sent = True
@@ -533,6 +560,12 @@ class ComposeWindow(QMainWindow):
     # -- fermeture / brouillon
     def _dirty(self):
         return bool(self.to.text().strip() or self.subject.text().strip() or self.attachments or self._body().strip() != (self.initial or "").strip())
+
+    def _set_priority(self, level):
+        """Priorité du message envoyé (en-têtes X-Priority / Importance) ; le bouton dit où on en est."""
+        self.priority = level
+        self.prio_btn.setText(tr("Priorité : %s") % PR.label(level))
+        self.prio_btn.setToolTip(tr("Priorité du message : le destinataire verra une marque d'urgence si son logiciel le permet"))
 
     def _discard(self):
         self.sent = True

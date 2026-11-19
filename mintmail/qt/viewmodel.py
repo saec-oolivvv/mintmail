@@ -109,9 +109,10 @@ def header_lines(msg) -> Dict[str, str]:
             "to": msg.to, "subject": msg.subject, "date": time.strftime("%d/%m/%Y %H:%M", time.localtime(msg.date)) if msg.date else ""}
 
 
-def info_facts(msg, accounts, thread_count=0):
+def info_facts(msg, accounts, thread_count=0, level=0):
     """Lignes de la colonne « Informations » du lecteur : [(libellé, valeur)] — boîte, dossier, date complète, catégorie, pièces jointes, conversation."""
     from .. import groups as G
+    from .. import priority as PR
     from ..util import format_full, human_size
     acc = next((a for a in accounts if a["id"] == msg.account), None)
     rows = []
@@ -130,6 +131,8 @@ def info_facts(msg, accounts, thread_count=0):
         rows.append((tr("Pièces jointes"), "%d · %s" % (len(atts), human_size(sum(int(a.get("size") or 0) for a in atts)))))
     if thread_count > 1:
         rows.append((tr("Conversation"), tr("%d messages") % thread_count))
+    if level:
+        rows.append((tr("Priorité"), PR.label(level)))
     return rows
 
 
@@ -534,7 +537,9 @@ class Engine(OfflineMixin):
             if not ids:
                 continue
             kind, what = ME.as_change(ev)
-            if kind == "flag":
+            if kind == "prio":
+                self.cache.set_priority_by_message_id(aid, ev["mid"], what)
+            elif kind == "flag":
                 self.cache.update_many(ids, **{what[0]: what[1]})
             elif kind == "move":
                 self.cache.update_many(ids, folder=what, snoozed_until=0.0)
@@ -542,6 +547,13 @@ class Engine(OfflineMixin):
                 self.cache.delete_many(ids)
             done += len(ids)
         return done
+
+    def set_priority(self, msgs, level):
+        """Votre priorité (1 haute, 0 normale, -1 basse) pour ces messages : enregistrée ici et prévenue aux autres machines. Rien n'est envoyé au serveur."""
+        from .. import priority as PR
+        level = PR.clamp(level)
+        self.cache.set_priority(msgs, level)
+        self.emit_events({1: "prio_high", 0: "prio_normal", -1: "prio_low"}[level], msgs)
 
     def set_flag(self, msgs, field, value):
         """field : starred (favori), unread (non lu) ou pinned (épingle, aussi enregistrée sur la boîte). Retourne les actions à exécuter."""

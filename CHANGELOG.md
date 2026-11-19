@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.50.0
+- Priorités des messages : haute ❗ / normale / basse ⬇. Bouton « Priorité » (drapeau) dans le rédacteur → en-têtes X-Priority / Importance / Priority à l'envoi ; l'importance posée par l'expéditeur est lue à la réception.
+- Clic droit → Priorité (et palette Ctrl+K) pour fixer la vôtre : elle prime sur celle de l'expéditeur, se retrouve même si le message change de dossier, est partagée en direct avec vos autres machines (jamais envoyée au serveur) ; marque dans la liste, ligne « Priorité » dans les informations, tri « Par priorité » (votre niveau, puis l'IA, puis la date).
+- Rédacteur plus lisible : B / I / U / S, « • ≡ », « 1. ≡ », ❝ à la place d'icônes abstraites ; boutons du bas avec leur nom (Joindre, Signer, Chiffrer, Accusé, Priorité, Supprimer).
+
 ## 1.49.0
 - Échéances des tâches (et de « Attribuer à… ») lues aussi en anglais, néerlandais, allemand et espagnol : demain / tomorrow / morgen / mañana, dans 3 jours / in 3 days / over 3 dagen / in 3 Tagen / en 3 días, vendredi / friday / vrijdag / Freitag / viernes, « 15 november », « November 15th », « 15 de noviembre », fin de mois / semaine, semaine prochaine…
 

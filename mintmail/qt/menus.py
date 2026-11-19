@@ -68,6 +68,7 @@ def palette_commands(msg, engine=None, integ=()) -> List[Tuple[str, str]]:
                  (tr("Reporter à demain 8 h"), "snooze_tomorrow"), (tr("Imprimer ce message (Ctrl+P)"), "print"), (tr("Enregistrer ce message en PDF"), "print_pdf"), *integration_items(integ)]
     if msg is not None:
         cmds += [(tr("Créer une tâche depuis ce message"), "task_from"), (tr("Attribuer ce message à…"), "assign"), (tr("Partager ce message…"), "share"), (tr("Proposer des créneaux (agenda)"), "slots"),
+                 (tr("Priorité : haute"), "prio:1"), (tr("Priorité : normale"), "prio:0"), (tr("Priorité : basse"), "prio:-1"),
                  (tr("Me le rappeler si pas de réponse sous 3 jours"), "followup3"), (tr("Se désabonner de cet expéditeur"), "unsubscribe")]
     cmds += [(tr("Aujourd'hui : agenda, priorités, tâches, relances"), "today"), (tr("Agenda des prochains jours"), "agenda"),
              (tr("Nouvel événement dans l'agenda"), "new_event"), (tr("Nouvelle tâche"), "new_task"),
