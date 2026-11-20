@@ -15,12 +15,31 @@ from ..i18n import tr
 from ..util import human_size
 from .. import pgp
 from .. import priority as PR
+from . import ui_addr_complete as AD
 from . import composing as C
 from . import sigimages as SI
 from . import ui_fetch as F
 from . import ui_icons as UI
 from . import personal as P
 from ..util import text_to_html
+
+
+_WARMED = []
+
+
+def _warm_contacts(cache):
+    """Une fois par session, en arrière-plan : le carnet reprend les expéditeurs / destinataires des messages déjà reçus ou envoyés (il n'était alimenté nulle part)."""
+    if _WARMED:
+        return
+    _WARMED.append(1)
+    import threading
+
+    def work():
+        try:
+            cache.contacts_rebuild()
+        except Exception:
+            pass
+    threading.Thread(target=work, daemon=True).start()
 
 
 class ComposeWindow(QMainWindow):
@@ -114,9 +133,9 @@ class ComposeWindow(QMainWindow):
         self.subject.setObjectName("subjectedit")
         self.to.setPlaceholderText(tr("Destinataires"))
         self.subject.setPlaceholderText(tr("Objet"))
-        contacts = [("%s <%s>" % (n, e)) if n else e for n, e in self.engine.cache.contacts()]
         for edit in (self.to, self.cc, self.bcc):
-            self._complete(edit, contacts)
+            AD.AddressCompleter(edit, self.engine.cache)
+        _warm_contacts(self.engine.cache)
         self.editor = QTextEdit()
         self.editor.setObjectName("composeeditor")
         self.editor.setAcceptRichText(True)
@@ -309,12 +328,6 @@ class ComposeWindow(QMainWindow):
         self.show()
 
     # -- éléments
-    def _complete(self, edit, contacts):
-        comp = QCompleter(QStringListModel(contacts), edit)
-        comp.setCaseSensitivity(Qt.CaseInsensitive)
-        comp.setFilterMode(Qt.MatchContains)
-        edit.setCompleter(comp)
-
     def _show_cc(self, which="cc"):
         rows = {"cc": (self.cc_sep, self.cc_row, self.cc_btn), "bcc": (self.bcc_sep, self.bcc_row, self.bcc_btn)}[which]
         rows[0].show()
@@ -552,6 +565,10 @@ class ComposeWindow(QMainWindow):
         out.pgp_sign = bool(self.pgp_sign and self.pgp_sign.isChecked())
         out.pgp_encrypt = bool(self.pgp_encrypt and self.pgp_encrypt.isChecked())
         self.sent = True
+        try:
+            self.engine.cache.contacts_remember([self.to.text(), self.cc.text(), self.bcc.text()])        # le destinataire sera proposé la prochaine fois
+        except Exception:
+            pass
         if self.draft_id:
             self.engine.cache.delete(self.draft_id)
         self.main.queue_send(out, delay, scheduled)

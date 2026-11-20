@@ -142,7 +142,7 @@
    "items": [
     [
      "New message, reply, forward",
-     "C or Ctrl+N: new message. R / A / F: reply, reply all, forward (the quoted message is included). Addresses autocomplete from your address book and recent correspondents; Cc and Bcc show on demand. Closing the compose window with content offers to save a draft (found in Drafts)."
+     "C or Ctrl+N: new message. R / A / F: reply, reply all, forward (the quoted message is included). Addresses autocomplete from the first letter, by name, address or company (accents ignored), using your address book AND all received or sent messages; separate several recipients with a comma, each is completed in turn, and anyone you write to is added to the address book. Cc and Bcc show on demand. Closing the compose window with content offers to save a draft (found in Drafts)."
     ],
     [
      "Quick reply",

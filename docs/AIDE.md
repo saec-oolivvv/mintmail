@@ -1,4 +1,4 @@
-# Aide de MintMail 1.51.0
+# Aide de MintMail 1.52.0
 _Généré par `make docs` depuis l'aide intégrée (touche F1 dans l'application)._
 
 ## Premiers pas
@@ -220,7 +220,7 @@ Ctrl+B             Barre latérale réduite / étendue
 
 ### Nouveau message, réponse, transfert
 
-C ou Ctrl+N : nouveau message. R / A / F : répondre, répondre à tous, transférer (le message cité est repris). Les adresses se complètent d'après votre carnet d'adresses et vos correspondants récents ; Cc et Cci s'affichent à la demande. Fermer la rédaction avec du contenu propose d'enregistrer un brouillon (retrouvé dans Brouillons).
+C ou Ctrl+N : nouveau message. R / A / F : répondre, répondre à tous, transférer (le message cité est repris). Les adresses se complètent dès la première lettre, par nom, adresse ou société (sans tenir compte des accents), d'après votre carnet ET tous vos messages reçus ou envoyés ; plusieurs destinataires se séparent par une virgule, chacun est complété à son tour, et tout destinataire à qui vous écrivez entre dans le carnet. Cc et Cci s'affichent à la demande. Fermer la rédaction avec du contenu propose d'enregistrer un brouillon (retrouvé dans Brouillons).
 
 ### Réponse rapide
 
@@ -608,7 +608,7 @@ Mise à jour : sudo apt install ./mintmail_X.Y.Z_all.deb (vos réglages et votre
 
 ## À propos et crédits
 
-### MintMail 1.51.0
+### MintMail 1.52.0
 
 Le client mail pour Linux Mint dont l'IA est l'ADN : il lit, trie, résume, classe, rédige et agit avec vous — toujours avec votre accord.  
 Application Qt (PySide6) / Python, sans service cloud imposé : vos mails, vos clés et vos réglages restent chez vous.

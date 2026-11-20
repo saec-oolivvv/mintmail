@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.52.0
+- Rédaction : l'auto-complétion des destinataires marche enfin comme attendu. Elle cherche dès la première lettre, par nom, adresse ou société (sans accents), dans le carnet ET dans tous les expéditeurs / destinataires déjà vus (avant : seulement les 300 premiers contacts, et rien du tout si le carnet était vide, car il n'était alimenté nulle part) ; elle complète chaque adresse d'une liste séparée par des virgules (avant : seulement la première) ; chaque destinataire d'un envoi entre dans le carnet ; le carnet reprend en arrière-plan les messages existants.
+
 ## 1.51.0
 - Journal d'activité en direct : une bande sous les dossiers montre ce que MintMail fait avec chaque boîte (relève animée, « 3 nouveaux, 1 retiré du serveur », suppression / déplacement envoyés, refus du serveur, réception instantanée) ; clic ou Ctrl+K → « Activité » = historique complet avec l'heure, copiable.
 - Mails effacés qui reviennent : (1) une relève dont la réponse datait d'avant votre geste ne les ramène plus (protection 3 min + actions en attente, y compris pour les autres dossiers et les gestes venus d'un autre poste) ; (2) un refus du serveur n'est plus silencieux : ligne rouge dans le journal ; (3) hors ligne / frein de connexion ne consomment plus les essais d'une action (elle ne peut plus être abandonnée à tort).

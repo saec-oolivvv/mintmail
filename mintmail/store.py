@@ -798,6 +798,51 @@ class Cache:
             self.update_many(ids, snoozed_until=0.0, unread=True)
         return [m for m in (self.get_light(i) for i in ids) if m]
 
+    def contact_search(self, query, limit=12):
+        """Suggestions pour la saisie d'un destinataire : [(nom, adresse, société)] — carnet d'abord, puis tous les expéditeurs / destinataires des messages (même anciens, sans limite de 300).
+        Sans accents ni casse ; plusieurs mots = tous doivent correspondre (nom, adresse, société, notes)."""
+        from .contacts import fold, matches, parse_addresses
+        q = (query or "").strip().strip('"<>')
+        if len(q) < 1:
+            return []
+        out, seen = [], set()
+        with self.lock:
+            rows = self.db.execute("SELECT email, name, org, notes, source, n FROM contacts ORDER BY (source='manual') DESC, n DESC").fetchall()
+        for email, name, org, notes, _src, _n in rows:
+            if matches(q, email, name, org, notes):
+                out.append((name or "", email, org or ""))
+                seen.add(email)
+            if len(out) >= limit:
+                return out
+        word = max(fold(q).split() or [""], key=len)
+        with self.lock:
+            blobs = self.db.execute("SELECT COALESCE(meta,data) FROM messages WHERE folder IN ('inbox','sent','archive','drafts') ORDER BY date DESC LIMIT 2500").fetchall()
+        for (blob,) in blobs:
+            if word and word not in fold(blob):
+                continue
+            try:
+                d = json.loads(blob)
+            except ValueError:
+                continue
+            for hdr in ((d.get("sender_name", "") + " <" + d.get("sender_email", "") + ">"), d.get("to", ""), d.get("cc", "")):
+                for name, addr in parse_addresses(hdr):
+                    if addr not in seen and matches(q, addr, name):
+                        seen.add(addr)
+                        out.append((name, addr, ""))
+                        if len(out) >= limit:
+                            return out
+        return out
+
+    def contacts_remember(self, headers):
+        """Après un envoi : chaque destinataire entre dans le carnet (ou voit son compteur monter), pour être proposé la prochaine fois."""
+        from .contacts import parse_addresses
+        n = 0
+        for hdr in headers:
+            for name, addr in parse_addresses(hdr):
+                self.contact_upsert(addr, name, source="auto", bump=1)
+                n += 1
+        return n
+
     def contacts(self, limit=300):
         """(nom, adresse) pour l'auto-complétion : carnet d'adresses d'abord, puis expéditeurs récents."""
         found = [(c["name"], c["email"]) for c in self.contacts_list(limit=limit)]
