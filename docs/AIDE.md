@@ -1,4 +1,4 @@
-# Aide de MintMail 1.52.0
+# Aide de MintMail 1.53.0
 _Généré par `make docs` depuis l'aide intégrée (touche F1 dans l'application)._
 
 ## Premiers pas
@@ -428,6 +428,10 @@ Quand la synchronisation entre postes est active, lire un message, le mettre en 
 
 ## Hors ligne et fiabilité
 
+### Pastille de non lus sur l'icône
+
+Le nombre de messages non lus de la boîte de réception s'affiche en temps réel, comme sur un téléphone : pastille rouge sur l'icône de la fenêtre (barre des tâches, Alt-Tab) et de la zone de notification, compteur natif du lanceur sur les bureaux compatibles (Plank, Dash to Dock, Ubuntu Dock, KDE), pastille du Dock sous macOS. Au-delà de 99 : « 99+ ». Le titre de la fenêtre reste aussi « MintMail (N) ».
+
 ### Activité des boîtes en direct
 
 Sous la liste des dossiers, une bande montre en temps réel ce que MintMail fait avec vos boîtes : relève (⟳ animé), suppressions et déplacements envoyés au serveur, refus du serveur, réception instantanée. Cliquez dessus (ou Ctrl+K → « Activité ») pour l'historique complet, avec heure ; « Copier » pour me l'envoyer en cas de souci.  
@@ -608,7 +612,7 @@ Mise à jour : sudo apt install ./mintmail_X.Y.Z_all.deb (vos réglages et votre
 
 ## À propos et crédits
 
-### MintMail 1.52.0
+### MintMail 1.53.0
 
 Le client mail pour Linux Mint dont l'IA est l'ADN : il lit, trie, résume, classe, rédige et agit avec vous — toujours avec votre accord.  
 Application Qt (PySide6) / Python, sans service cloud imposé : vos mails, vos clés et vos réglages restent chez vous.

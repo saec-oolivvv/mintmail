@@ -55,6 +55,7 @@ from .ui_organizer import MessageExtras
 from . import organizer_window as OW
 from .. import priority as PR
 from . import ui_activity as UA
+from . import ui_badge as UB
 from .. import qtdeps as QD
 from ..store import DATA_DIR
 from .ui_palette import Palette
@@ -903,6 +904,7 @@ class MainWindow(ExtrasMixin, OrganizerMixin, AIMixin, QMainWindow):
             self.setWindowTitle(NR.title_with_count("%s %s (Qt)" % (APP_NAME, __version__), int(unread or 0)))
             if getattr(self, "tray", None) is not None:
                 self.tray.setToolTip(NR.title_with_count("MintMail", int(unread or 0)))
+            UB.apply(self, int(unread or 0))
         except (RuntimeError, TypeError, ValueError):
             pass
 
@@ -1863,6 +1865,7 @@ class MainWindow(ExtrasMixin, OrganizerMixin, AIMixin, QMainWindow):
             self.tray.activated.connect(lambda reason: reason in (QSystemTrayIcon.Trigger, QSystemTrayIcon.DoubleClick) and self.bring_to_front())
             self.tray.messageClicked.connect(self.bring_to_front)
             self.tray.show()
+            self.tray.setIcon(UB.badge_icon(getattr(self, "_badge_label", "") or ""))
             sysdeps.NOTIFIER = self._tray_notify
         except Exception:
             self.tray = None

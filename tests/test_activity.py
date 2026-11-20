@@ -166,3 +166,8 @@ def test_sync_does_not_resurrect_message_deleted_during_fetch():
     eng.sync(folders=("inbox",))
     assert cache.get("m1").folder == "trash"
     assert any("ramené" in e["text"] or "ramenés" in e["text"] for e in AC.LOG.entries(10))
+
+
+def test_badge_label():
+    from mintmail import notifyrules as NR
+    assert [NR.badge_label(n) for n in (0, -3, None, 1, 9, 99, 100, 5000)] == ["", "", "", "1", "9", "99", "99+", "99+"]

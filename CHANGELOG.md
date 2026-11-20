@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.53.0
+- Pastille de messages non lus sur l'icône, en temps réel : pastille rouge avec le nombre sur l'icône de la fenêtre (barre des tâches, Alt-Tab) et de la zone de notification ; compteur natif du lanceur (protocole Unity : Plank, Dash to Dock, Ubuntu Dock, KDE) ; pastille du Dock sous macOS. « 99+ » au-delà de 99.
+
 ## 1.52.0
 - Rédaction : l'auto-complétion des destinataires marche enfin comme attendu. Elle cherche dès la première lettre, par nom, adresse ou société (sans accents), dans le carnet ET dans tous les expéditeurs / destinataires déjà vus (avant : seulement les 300 premiers contacts, et rien du tout si le carnet était vide, car il n'était alimenté nulle part) ; elle complète chaque adresse d'une liste séparée par des virgules (avant : seulement la première) ; chaque destinataire d'un envoi entre dans le carnet ; le carnet reprend en arrière-plan les messages existants.
 

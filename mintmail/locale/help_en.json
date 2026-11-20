@@ -319,6 +319,10 @@
    "title": "Offline and reliability",
    "items": [
     [
+     "Unread badge on the icon",
+     "The number of unread inbox messages shows in real time, like on a phone: a red badge on the window icon (taskbar, Alt-Tab) and on the notification-area icon, a native launcher counter on compatible desktops (Plank, Dash to Dock, Ubuntu Dock, KDE), and the Dock badge on macOS. Above 99: “99+”. The window title also stays “MintMail (N)”."
+    ],
+    [
      "Live mailbox activity",
      "Under the folder list, a strip shows in real time what MintMail is doing with your mailboxes: checks (animated ⟳), deletions and moves sent to the server, server refusals, instant delivery. Click it (or Ctrl+K → “Activity”) for the full history with times; “Copy” to send it to me if something goes wrong.\n• Green ✔: done on the server; ⚠: offline or pending; red ✖: refused — the message concerned then reappears at the next check (this is the cause of a “deleted message that comes back”).\n• A message deleted or moved here is no longer brought back by a check that was already under way; the strip tells you."
     ],

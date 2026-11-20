@@ -64,6 +64,12 @@ def title_with_count(base, unread) -> str:
     return "%s (%d)" % (base, unread) if unread > 0 else base
 
 
+def badge_label(unread) -> str:
+    """Texte de la pastille sur l'icône (comme sur un téléphone) : vide à 0, « 99+ » au-delà de 99."""
+    n = int(unread or 0)
+    return "" if n <= 0 else str(n) if n <= 99 else "99+"
+
+
 def update(cfg, **changes) -> dict:
     """Enregistre les réglages de notification (clés inconnues ignorées)."""
     for k, v in changes.items():
