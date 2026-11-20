@@ -382,6 +382,10 @@ SECTIONS: List[Dict] = [
          "Quand la synchronisation entre postes est active, lire un message, le mettre en favori ou en épingle, le déplacer ou le supprimer est annoncé aussitôt à vos autres machines du réseau local (canal chiffré), sans attendre le serveur de courrier : la liste s'y met à jour en une ou deux secondes. Le serveur reste la référence : la machine qui agit lui envoie l'action, les autres ne modifient que leur copie locale (jamais d'écho ni de boucle). Les machines sur un autre réseau suivent via le serveur, comme avant."),
     ]},
     {"id": "offline", "title": "Hors ligne et fiabilité", "items": [
+        ("Activité des boîtes en direct",
+         "Sous la liste des dossiers, une bande montre en temps réel ce que MintMail fait avec vos boîtes : relève (⟳ animé), suppressions et déplacements envoyés au serveur, refus du serveur, réception instantanée. Cliquez dessus (ou Ctrl+K → « Activité ») pour l'historique complet, avec heure ; « Copier » pour me l'envoyer en cas de souci.\n• ✔ vert : fait sur le serveur ; ⚠ : hors ligne ou en attente ; ✖ rouge : refusé — le message concerné réapparaît alors à la prochaine relève (c'est la cause d'un message « effacé qui revient »).\n• Un message supprimé ou déplacé ici n'est plus ramené par une relève qui était déjà en route ; la bande l'indique."),
+        ("Blocage « trop de tentatives »",
+         "Quand un serveur refuse la connexion (mauvais mot de passe, trop d'essais, trop de connexions), MintMail s'interdit de réessayer pendant 2, 5, 15, 30 puis 60 minutes au lieu d'insister (c'est ce qui fait bloquer une adresse). Le journal d'activité l'indique ; vos actions restent en attente sans être perdues. Corrigez le mot de passe dans Paramètres → Comptes : le frein se lève tout de suite."),
         ("Mode hors ligne",
          "Si le réseau tombe, vos actions (déplacer, archiver, supprimer, marquer lu, favori) restent instantanées dans l'interface et sont enregistrées : "
          "elles sont rejouées dans l'ordre dès le retour du réseau. Le message d'état indique « Hors ligne — N action(s) en attente ». "

@@ -84,7 +84,7 @@ def palette_commands(msg, engine=None, integ=()) -> List[Tuple[str, str]]:
              (tr("Paramètres (Ctrl+,)"), "settings"), (tr("Réglages de l'IA"), "settings:ai"), (tr("Rechercher les mises à jour"), "updates"),
              (tr("Mises à jour"), "settings:updates"), (tr("Gestes de swipe (réglages)"), "settings:gestures"), (tr("Rechercher"), "search"),
              (tr("Enregistrer la recherche actuelle"), "save_search"), (tr("Tout marquer comme lu"), "mark_all_read"), (tr("Tout sélectionner"), "select_all"), (tr("Mode sélection multiple"), "select_mode"),
-             (tr("Chercher aussi sur le serveur"), "search_server"), (tr("Envoyer mes épingles vers la boîte"), "push_pins"), (tr("Journal d'erreurs"), "log"),
+             (tr("Chercher aussi sur le serveur"), "search_server"), (tr("Envoyer mes épingles vers la boîte"), "push_pins"), (tr("Journal d'erreurs"), "log"), (tr("Activité des boîtes en direct (relève, suppressions…)"), "activity"),
              (tr("Plein écran (F11)"), "fullscreen"), (tr("Actualiser la liste des dossiers"), "refresh_folders")]
     if engine is not None:
         many = len(engine.accounts()) > 1

@@ -6,6 +6,7 @@ import time
 from typing import Dict, List, Tuple
 
 from ..backend import is_retryable, make_backend
+from .. import activity as AC
 from .. import mailevents as ME
 from ..htmlsafe import reader_csp, sanitize
 from ..i18n import tr
@@ -161,6 +162,12 @@ def dest_of(entry) -> str:
     return entry["special"] if entry.get("special") in LOGICAL else "f:" + entry["name"]
 
 
+def _held(eng):
+    """Messages à ne pas recréer depuis une réponse du serveur (moteurs de test sans suivi : seulement les actions en attente)."""
+    f = getattr(eng, "held_ids", None)
+    return f() if f else (eng.pending_ids() if hasattr(eng, "pending_ids") else set())
+
+
 class Engine(OfflineMixin):
     """Moteur sans interface : comptes, serveurs, actions en file, synchronisation. Une instance par fenêtre."""
 
@@ -197,8 +204,13 @@ class Engine(OfflineMixin):
         self.push_state = {}
 
         def run(aid):
+            be = None
             stop = self._push_stop
-            state = lambda s: self.push_state.__setitem__(aid, s)
+            def state(st):
+                if self.push_state.get(aid) != st:
+                    who = self._who(aid)
+                    AC.LOG.add(AC.OK if st == "ok" else AC.WARN, (tr("Réception instantanée active : %s") % who) if st == "ok" else tr("Réception instantanée de %s : %s") % (who, st), aid)
+                self.push_state[aid] = st
             while not stop.is_set():
                 try:
                     be = self.backend(aid)
@@ -210,7 +222,7 @@ class Engine(OfflineMixin):
                         be.watch(lambda: on_change(aid), stop)
                 except Exception as e:
                     state("erreur : %s" % str(e)[:80])
-                stop.wait(30)                                        # mot de passe absent, réseau coupé… : on réessaie plus tard
+                stop.wait(max(30, int(getattr(be, "cooldown_left", lambda: 0)())))      # mot de passe absent, réseau coupé, frein anti-blocage… : on réessaie plus tard
         for acc in self.accounts():
             if not acc.get("demo"):
                 t = threading.Thread(target=run, args=(acc["id"],), daemon=True)
@@ -257,34 +269,54 @@ class Engine(OfflineMixin):
         a reçu du nouveau, pour que l'interface l'affiche sans attendre la fin. Chaque erreur est précédée de l'adresse de la boîte concernée."""
         from concurrent.futures import ThreadPoolExecutor
         accounts = [a for a in self.accounts() if only is None or a["id"] in only]
-        pending = self.pending_ids()                  # déjà déplacés / supprimés ICI mais pas encore sur le serveur : ne pas les ramener
 
         def one(a):
             fresh, errors = 0, []
             who = a.get("email") or a.get("name") or a["id"]
+            key = ("sync", a["id"])
+            AC.LOG.start(key, tr("Relève de %s…") % who, a["id"])
             try:
                 be = self.backend(a["id"])
             except Exception as e:
+                AC.LOG.finish(key, AC.ERR, "%s : %s" % (who, e), a["id"])
                 return 0, ["%s : %s" % (who, e)]
             changed = False
+            n_new = n_gone = n_held = 0
             for f in folders:
                 try:
                     kn = self.cache.uids(a["id"], f)
                     msgs, flags, present, minuid = be.sync(f, kn, limit=limit)
                 except Exception as e:
                     errors.append("%s : %s" % (who, e))
+                    if not getattr(e, "cooldown", False):          # frein anti-blocage : déjà signalé une fois, inutile de le répéter par dossier
+                        AC.LOG.add(AC.ERR, "%s (%s) : %s" % (who, f, str(e)[:100]), a["id"])
+                    if getattr(e, "cooldown", False):
+                        break
                     continue
-                msgs = [m for m in msgs if m.id not in pending]
+                held = _held(self)                 # déplacés / supprimés ICI (en attente, ou à l'instant) : calculé APRÈS la réponse du serveur, qui peut dater d'avant le geste
+                kept = [m for m in msgs if m.id not in held]
+                n_held += len(msgs) - len(kept)
+                msgs = kept
                 self.cache.upsert_many(msgs)
                 self._apply_flags(kn, flags)
+                known = set(kn.values())
+                n_new += sum(1 for m in msgs if m.id not in known)
                 changed = changed or bool(msgs)
                 if present is not None:
                     gone = [mid for uid, mid in kn.items() if uid >= minuid and uid not in present]
                     if gone:
                         self.cache.delete_many(gone)
+                        n_gone += len(gone)
                         changed = True
                 if kn:
                     fresh += sum(1 for m in msgs if m.unread and m.folder == "inbox")
+            if n_held:
+                AC.LOG.add(AC.INFO, AC.count_text(n_held, tr("%d message supprimé ou déplacé ici : le serveur le liste encore, il n'est pas ramené"),
+                                                  tr("%d messages supprimés ou déplacés ici : le serveur les liste encore, ils ne sont pas ramenés")), a["id"])
+            if not errors:
+                AC.LOG.finish(key, AC.OK, AC.sync_summary(who, n_new, n_gone, 0), a["id"])
+            else:
+                AC.LOG.finish(key)
             if changed and getattr(self, "on_progress", None):
                 try:
                     self.on_progress()
@@ -433,12 +465,16 @@ class Engine(OfflineMixin):
                 except Exception:
                     continue                                                 # on réessaiera au prochain passage
                 sigs[key] = sig
+                held = _held(self)
+                msgs = [m for m in msgs if m.id not in held]
                 self.cache.upsert_many(msgs)
                 self._apply_flags(kn, flags)
                 gone = [mid for uid, mid in kn.items() if present is not None and uid not in present]
                 if gone:
                     self.cache.delete_many(gone)
                 changed = changed or bool(msgs or gone or flags)
+                if msgs or gone:
+                    AC.LOG.add(AC.INFO, tr("%s — dossier %s : %d nouveau(x), %d retiré(s) du serveur") % (a.get("email") or a["id"], lg.split(":", 1)[-1], len(msgs), len(gone)), a["id"])
         return changed
 
     def refresh_folders(self):
@@ -462,9 +498,35 @@ class Engine(OfflineMixin):
     def move(self, msgs, dest):
         """Déplace dans le cache tout de suite ; retourne les identifiants d'actions à exécuter (finish_move, en fond)."""
         self.cache.update_many([m.id for m in msgs], folder=dest, snoozed_until=0.0)
+        self.mark_gone([m.id for m in msgs])
         self.emit_events("move", msgs, dest)
+        AC.LOG.add(AC.INFO, tr("Déplacé ici : %s → %s (envoi au serveur…)") % (AC.count_text(len(msgs), tr("%d message"), tr("%d messages")), self.folder_label(dest)))
         extra = {"notjunk": True} if dest == "inbox" and all(m.folder == "spam" for m in msgs) else {}
         return self.op_enqueue("move", msgs, dest=dest, **extra)
+
+    @staticmethod
+    def folder_label(dest):
+        for key, label in VIEWS:
+            if key == dest:
+                return label
+        return str(dest).split(":", 1)[-1]
+
+    GONE_TTL = 180.0                  # secondes : un message déplacé / supprimé ici n'est pas ramené par une relève dont la réponse date d'avant le geste
+
+    def mark_gone(self, ids):
+        """Note ces messages comme « partis d'ici à l'instant » (protège contre une relève en cours qui les listait encore)."""
+        now = time.time()
+        recent = self.__dict__.setdefault("_recent_gone", {})
+        for i in ids:
+            recent[i] = now
+        for k in [k for k, t in recent.items() if now - t > self.GONE_TTL * 4]:
+            recent.pop(k, None)
+
+    def held_ids(self, now=None):
+        """Messages à ne pas (re)créer depuis une réponse du serveur : visés par une action en attente, ou déplacés / supprimés depuis moins de GONE_TTL secondes."""
+        now = time.time() if now is None else now
+        recent = self.__dict__.get("_recent_gone", {})
+        return self.pending_ids() | {i for i, t in list(recent.items()) if now - t <= self.GONE_TTL}
 
     def pending_ids(self):
         """Identifiants des messages visés par une action locale pas encore exécutée sur le serveur (déplacement, suppression)."""
@@ -503,7 +565,9 @@ class Engine(OfflineMixin):
 
     def delete_forever(self, msgs):
         self.cache.delete_many([m.id for m in msgs])
+        self.mark_gone([m.id for m in msgs])
         self.emit_events("delete", msgs)
+        AC.LOG.add(AC.INFO, AC.count_text(len(msgs), tr("%d message à supprimer définitivement : envoi au serveur…"), tr("%d messages à supprimer définitivement : envoi au serveur…")))
         return self.op_enqueue("delete", msgs)
 
     def run_ops(self, op_ids):
@@ -543,8 +607,10 @@ class Engine(OfflineMixin):
                 self.cache.update_many(ids, **{what[0]: what[1]})
             elif kind == "move":
                 self.cache.update_many(ids, folder=what, snoozed_until=0.0)
+                self.mark_gone(ids)
             else:
                 self.cache.delete_many(ids)
+                self.mark_gone(ids)
             done += len(ids)
         return done
 

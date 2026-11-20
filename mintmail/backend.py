@@ -19,7 +19,8 @@ from email.utils import formataddr, make_msgid, parsedate_to_datetime, parseaddr
 
 from .models import Message
 from .store import DATA_DIR, private_dir, write_private
-from . import ical, oauth, pgp, receipts
+from . import activity as AC
+from . import ical, oauth, pgp, receipts, throttle as TH
 from . import priority as PR
 from .util import html_to_text, split_addresses, text_to_html, thread_key
 from .i18n import tr
@@ -54,10 +55,13 @@ def is_retryable(exc) -> bool:
 
 
 class BackendError(Exception):
-    """Erreur serveur. retryable=True : problème de réseau passager (l'action est conservée et rejouée plus tard)."""
-    def __init__(self, msg="", retryable=False):
+    """Erreur serveur. retryable=True : problème de réseau passager (l'action est conservée et rejouée plus tard).
+    cooldown=True : MintMail s'est interdit de réessayer pour l'instant (frein anti-blocage) ; `wait` = secondes restantes. Ne compte pas comme un échec de l'action."""
+    def __init__(self, msg="", retryable=False, cooldown=False, wait=0):
         super().__init__(msg)
         self.retryable = retryable
+        self.cooldown = cooldown
+        self.wait = wait
 
 
 def utf7_decode(s):
@@ -388,7 +392,54 @@ class IMAPBackend:
         raise BackendError(tr("Mot de passe introuvable pour %s : saisissez-le à nouveau dans Paramètres → Comptes.") % (self.acc.get("email") or self.acc.get("id")), retryable=True)
 
     # -- connexion
+    BREAKER = TH.Breaker()                 # partagé par toutes les connexions de toutes les boîtes (clé : identifiant du compte)
+
+    def cooldown_left(self):
+        try:
+            return self.BREAKER.left(self.acc["id"], TH.fingerprint(self._pw_quiet()))
+        except Exception:
+            return 0
+
+    def _pw_quiet(self):
+        if self.token_provider:
+            return "oauth"
+        try:
+            return self._pw()
+        except Exception:
+            return ""
+
     def _connect(self):
+        a = self.acc
+        key = a.get("id") or a.get("email")
+        pw, pw_err = "oauth" if self.token_provider else "", None
+        if not self.token_provider:
+            try:
+                pw = self._pw()                                # une seule lecture du mot de passe par connexion (trousseau)
+            except BackendError as e:
+                pw_err = e
+        fp = TH.fingerprint(pw)
+        left = self.BREAKER.left(key, fp)
+        if left:
+            raise BackendError(tr("Connexion à %s suspendue %s pour éviter un blocage du serveur (trop de tentatives). Vérifiez le mot de passe dans Paramètres → Comptes.")
+                               % (a.get("email") or key, TH.human_wait(left)), retryable=True, cooldown=True, wait=left)
+        if pw_err is not None:
+            raise pw_err
+        try:
+            imap = self._connect_raw(pw)
+            self.BREAKER.ok(key)
+            return imap
+        except BackendError:
+            raise
+        except Exception as e:
+            kind = TH.classify(e)
+            if kind:
+                wait = self.BREAKER.failed(key, kind, fp)
+                msg = tr("%s a refusé la connexion (%s). Nouvel essai automatique dans %s, pour ne pas être bloqué.") % (a.get("email") or key, str(e)[:80], TH.human_wait(wait))
+                AC.LOG.add(AC.ERR, msg, a.get("id", ""))
+                raise BackendError(msg, retryable=True, cooldown=True, wait=wait)
+            raise
+
+    def _connect_raw(self, pw=None):
         a = self.acc
         try:
             if a.get("imap_ssl", True):
@@ -402,13 +453,15 @@ class IMAPBackend:
                 token = self.token_provider()
                 imap.authenticate("XOAUTH2", lambda _c: oauth.xoauth2(user, token).encode())
             else:
-                imap.login(user, self._pw())
+                imap.login(user, pw if pw is not None else self._pw())
             return imap
         except BackendError:
             raise
         except oauth.OAuthError as e:
             raise BackendError(tr("Connexion OAuth : %s") % e)
         except Exception as e:
+            if TH.classify(e):
+                raise                                              # refus de connexion : _connect décide du délai avant de réessayer
             raise BackendError(tr("Connexion IMAP impossible : %s") % e, retryable=isinstance(e, (OSError, imaplib.IMAP4.abort)))
 
     def _list_raw(self, imap):
@@ -854,7 +907,7 @@ class IMAPBackend:
                         on_change()
             except Exception as e:
                 state("%s" % str(e)[:80])
-                if stop.wait(backoff):
+                if stop.wait(max(backoff, getattr(e, "wait", 0))):
                     break
                 backoff = min(backoff * 2, 300)
             finally:

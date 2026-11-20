@@ -1,4 +1,4 @@
-# Aide de MintMail 1.50.0
+# Aide de MintMail 1.51.0
 _Généré par `make docs` depuis l'aide intégrée (touche F1 dans l'application)._
 
 ## Premiers pas
@@ -428,6 +428,16 @@ Quand la synchronisation entre postes est active, lire un message, le mettre en 
 
 ## Hors ligne et fiabilité
 
+### Activité des boîtes en direct
+
+Sous la liste des dossiers, une bande montre en temps réel ce que MintMail fait avec vos boîtes : relève (⟳ animé), suppressions et déplacements envoyés au serveur, refus du serveur, réception instantanée. Cliquez dessus (ou Ctrl+K → « Activité ») pour l'historique complet, avec heure ; « Copier » pour me l'envoyer en cas de souci.  
+• ✔ vert : fait sur le serveur ; ⚠ : hors ligne ou en attente ; ✖ rouge : refusé — le message concerné réapparaît alors à la prochaine relève (c'est la cause d'un message « effacé qui revient »).  
+• Un message supprimé ou déplacé ici n'est plus ramené par une relève qui était déjà en route ; la bande l'indique.
+
+### Blocage « trop de tentatives »
+
+Quand un serveur refuse la connexion (mauvais mot de passe, trop d'essais, trop de connexions), MintMail s'interdit de réessayer pendant 2, 5, 15, 30 puis 60 minutes au lieu d'insister (c'est ce qui fait bloquer une adresse). Le journal d'activité l'indique ; vos actions restent en attente sans être perdues. Corrigez le mot de passe dans Paramètres → Comptes : le frein se lève tout de suite.
+
 ### Mode hors ligne
 
 Si le réseau tombe, vos actions (déplacer, archiver, supprimer, marquer lu, favori) restent instantanées dans l'interface et sont enregistrées : elles sont rejouées dans l'ordre dès le retour du réseau. Le message d'état indique « Hors ligne — N action(s) en attente ». Un refus définitif du serveur abandonne l'action avec un message clair (jamais de boucle infinie).
@@ -598,7 +608,7 @@ Mise à jour : sudo apt install ./mintmail_X.Y.Z_all.deb (vos réglages et votre
 
 ## À propos et crédits
 
-### MintMail 1.50.0
+### MintMail 1.51.0
 
 Le client mail pour Linux Mint dont l'IA est l'ADN : il lit, trie, résume, classe, rédige et agit avec vous — toujours avec votre accord.  
 Application Qt (PySide6) / Python, sans service cloud imposé : vos mails, vos clés et vos réglages restent chez vous.

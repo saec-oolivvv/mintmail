@@ -354,6 +354,8 @@ class OrganizerMixin:
         self.nav_delegate.rail = self.rail
         for w in (self.brand_text, self.status, self.p2p_lbl):
             w.setVisible(not self.rail and (w is not self.p2p_lbl or bool(self.p2p_lbl.text())))
+        self.activity.rail = self.rail
+        self.activity.refresh()
         self.new_btn.setText("✎" if self.rail else "✎   " + tr("Nouveau message"))
         self.today_btn.setText("📅" if self.rail else "📅   " + tr("Aujourd'hui"))
         for i in range(self.folders.count()):

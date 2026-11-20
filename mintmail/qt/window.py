@@ -54,6 +54,7 @@ from .extras_window import ExtrasMixin
 from .ui_organizer import MessageExtras
 from . import organizer_window as OW
 from .. import priority as PR
+from . import ui_activity as UA
 from .. import qtdeps as QD
 from ..store import DATA_DIR
 from .ui_palette import Palette
@@ -229,6 +230,9 @@ class MainWindow(ExtrasMixin, OrganizerMixin, AIMixin, QMainWindow):
         self.p2p_lbl.setContentsMargins(20, 0, 14, 0)
         self.p2p_lbl.hide()
         sl.addWidget(self.p2p_lbl)
+        self.activity = UA.ActivityStrip()
+        self.activity.clicked.connect(self.show_activity)
+        sl.addWidget(self.activity)
         foot = QHBoxLayout()
         foot.setContentsMargins(20, 0, 14, 0)
         self.status = QLabel()
@@ -1555,6 +1559,14 @@ class MainWindow(ExtrasMixin, OrganizerMixin, AIMixin, QMainWindow):
         if app is not None:
             app.quit()
 
+    def show_activity(self):
+        """Historique en direct des actions sur les boîtes (relève, suppression, déplacement, refus du serveur…)."""
+        if getattr(self, "_activity_dlg", None) is None:
+            self._activity_dlg = UA.ActivityDialog(self)
+        self._activity_dlg.show()
+        self._activity_dlg.raise_()
+        self._activity_dlg.activateWindow()
+
     def show_help(self):
         """Aide intégrée (F1) : une seule fenêtre, non bloquante."""
         if getattr(self, "_help", None) is None:
@@ -1739,7 +1751,7 @@ class MainWindow(ExtrasMixin, OrganizerMixin, AIMixin, QMainWindow):
                   "zoom_reset": lambda: self.zoom_reader(0), "p2p_now": self.p2p_now, "digest": lambda: self.refresh_digest(force=True),
                   "assistant": lambda: self.toggle_assistant(True), "compose": self.compose, "sync": lambda: self.sync(False), "help": self.show_help,
                   "apply_rules": self.apply_rules_now, "save_search": self.save_current_search, "mark_all_read": self.mark_all_read, "select_all": self.select_all, "select_mode": lambda: self.sel_btn.toggle(), "updates": lambda: self.check_updates(manual=True), "search": self.search.setFocus,
-                  "push_pins": self.push_local_pins, "log": self.show_log, "fullscreen": self.toggle_fullscreen, "search_server": self.search_server_now,
+                  "push_pins": self.push_local_pins, "log": self.show_log, "activity": self.show_activity, "fullscreen": self.toggle_fullscreen, "search_server": self.search_server_now,
                   "refresh_folders": self.refresh_folder_list}
         if key in simple:
             simple[key]()

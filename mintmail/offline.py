@@ -2,6 +2,7 @@
 import json
 from types import SimpleNamespace
 
+from . import activity as AC
 from .backend import is_retryable      # noqa: F401  (réexporté pour la fenêtre)
 from .i18n import tr
 
@@ -20,6 +21,10 @@ class OfflineMixin:
             if getattr(m, "uid", 0) > 0 and getattr(m, "real_folder", ""):
                 by.setdefault(m.account, []).append(m)
         ids = []
+        skipped = len(msgs) - sum(len(v) for v in by.values())
+        if skipped:
+            AC.LOG.add(AC.WARN, AC.count_text(skipped, tr("%d message sans identifiant serveur : action faite ici seulement, rien envoyé à la boîte"),
+                                              tr("%d messages sans identifiant serveur : action faite ici seulement, rien envoyé à la boîte")))
         for aid, lst in by.items():
             items = [{"id": m.id, "uid": m.uid, "real": m.real_folder} for m in lst]
             ids.append(self.cache.ops_add(aid, kind, dict(extra, items=items)))
@@ -64,27 +69,61 @@ class OfflineMixin:
             out.append((merged, members))
         return out
 
+    def _who(self, aid):
+        try:
+            for a in self.accounts():
+                if a["id"] == aid:
+                    return a.get("email") or a.get("name") or aid
+        except Exception:
+            pass
+        return aid
+
+    def _op_text(self, merged):
+        """Phrase décrivant une action serveur : « Suppression de 3 messages sur x@y »."""
+        n = len(merged["payload"].get("items", []))
+        msgs = AC.count_text(n, tr("%d message"), tr("%d messages"))
+        k, p = merged["kind"], merged["payload"]
+        who = self._who(merged["account"])
+        if k == "delete":
+            return tr("Suppression définitive de %s sur %s") % (msgs, who)
+        if k == "move":
+            dest = p.get("dest", "")
+            return tr("%s → %s sur %s") % (msgs, ("%s" % dest).split(":", 1)[-1], who)
+        if "pinned" in p:
+            what = tr("épingle")
+        elif p.get("flagged") is not None:
+            what = tr("favori (étoile)")
+        else:
+            what = tr("lu / non lu")
+        return tr("Drapeau « %s » de %s sur %s") % (what, msgs, who)
+
     def op_run(self, ops):
         """Exécute des actions dans l'ordre (en arrière-plan), regroupées quand elles se suivent. Retourne (réussies, erreurs, hors_ligne)."""
         done, errors, offline, blocked = [], [], False, set()
         for merged, members in self._coalesce(ops):
             if merged["account"] in blocked:
                 continue                       # l'ordre est gardé PAR BOÎTE : une boîte hors ligne ne retient pas les autres
+            what = self._op_text(merged)
+            AC.LOG.start(("op", merged["account"]), what + "…", merged["account"])
             try:
                 self._op_exec(merged)
                 for op in members:
                     self.cache.ops_done(op["id"])
                 done += members
+                AC.LOG.finish(("op", merged["account"]), AC.OK, what + " ✔", merged["account"])
             except Exception as e:
-                if is_retryable(e) and members[0]["tries"] < MAX_TRIES:
+                if is_retryable(e) and (getattr(e, "cooldown", False) or members[0]["tries"] < MAX_TRIES):
                     for op in members:
-                        self.cache.ops_fail(op["id"])
+                        if not getattr(e, "cooldown", False):          # frein anti-blocage : aucune tentative n'a eu lieu, l'action n'est pas « ratée »
+                            self.cache.ops_fail(op["id"])
                     offline = True
                     blocked.add(merged["account"])
+                    AC.LOG.finish(("op", merged["account"]), AC.WARN, tr("Pas de connexion, nouvel essai automatique. Action concernée : %s (%s)") % (what, str(e)[:60]), merged["account"])
                     continue
                 for op in members:
                     self.cache.ops_done(op["id"])      # refus définitif (ou trop d'échecs) : abandonné
                 errors.append(str(e))
+                AC.LOG.finish(("op", merged["account"]), AC.ERR, tr("%s REFUSÉ par le serveur : %s — le message sera restauré à la prochaine relève") % (what, str(e)[:100]), merged["account"])
         return done, errors, offline
 
     # --------------------------------------------------------------------- relecture

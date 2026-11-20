@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.51.0
+- Journal d'activité en direct : une bande sous les dossiers montre ce que MintMail fait avec chaque boîte (relève animée, « 3 nouveaux, 1 retiré du serveur », suppression / déplacement envoyés, refus du serveur, réception instantanée) ; clic ou Ctrl+K → « Activité » = historique complet avec l'heure, copiable.
+- Mails effacés qui reviennent : (1) une relève dont la réponse datait d'avant votre geste ne les ramène plus (protection 3 min + actions en attente, y compris pour les autres dossiers et les gestes venus d'un autre poste) ; (2) un refus du serveur n'est plus silencieux : ligne rouge dans le journal ; (3) hors ligne / frein de connexion ne consomment plus les essais d'une action (elle ne peut plus être abandonnée à tort).
+- Blocage IMAP « trop de tentatives » : après un refus de connexion (identifiants, trop d'essais, trop de connexions) MintMail attend 2, 5, 15, 30 puis 60 min (30 s à 10 min si « trop de connexions »), pour toutes les connexions d'une boîte (relève, actions, IDLE) ; un mot de passe corrigé lève le frein aussitôt.
+
 ## 1.50.0
 - Priorités des messages : haute ❗ / normale / basse ⬇. Bouton « Priorité » (drapeau) dans le rédacteur → en-têtes X-Priority / Importance / Priority à l'envoi ; l'importance posée par l'expéditeur est lue à la réception.
 - Clic droit → Priorité (et palette Ctrl+K) pour fixer la vôtre : elle prime sur celle de l'expéditeur, se retrouve même si le message change de dossier, est partagée en direct avec vos autres machines (jamais envoyée au serveur) ; marque dans la liste, ligne « Priorité » dans les informations, tri « Par priorité » (votre niveau, puis l'IA, puis la date).
