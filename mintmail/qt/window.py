@@ -1639,25 +1639,31 @@ class MainWindow(ExtrasMixin, OrganizerMixin, AIMixin, QMainWindow):
             return
         m = msgs[0]
         menu = QMenu(self)
-        for it in MN.context_items(m, m.sender_email.lower() in {x.lower() for x in self.config["blocked"]}, self._integrations()):
-            if it is None:
-                menu.addSeparator()
-            else:
-                menu.addAction(it[1], lambda k=it[0]: self._run_cmd(k, m))
-        self.add_extra_menu(menu, m)
-        self.add_ai_menu(menu, m)
-        menu.addSeparator()
-        sn = menu.addMenu(tr("Reporter"))
-        for key, label in MN.SNOOZES:
-            sn.addAction(label, lambda k=key: self._run_cmd(k, m))
-        pm = menu.addMenu(tr("Priorité"))
-        for lv, nm in ((PR.HIGH, tr("❗ Haute")), (PR.NORMAL, tr("Priorité normale")), (PR.LOW, tr("⬇ Basse"))):
-            pm.addAction(nm, lambda v=lv: self._run_cmd("prio:%d" % v, m))
-        mv = menu.addMenu(tr("Déplacer vers un dossier"))
-        for dest, label in self.engine.move_targets(m.account):
-            mv.addAction(label, lambda d=dest: self._run_cmd("move:" + d, m))
+        full = self.cache.get(m.id) or m
+        entries = MN.quick_menu(m, m.sender_email.lower() in {x.lower() for x in self.config["blocked"]}, self._integrations(), bool(getattr(full, "unsubscribe", "")))
+        self._fill_menu(menu, entries, m)
         menu.exec(self.list.viewport().mapToGlobal(pos))
         self.list.mouse_down = False                                    # le menu a pu avaler le relâchement du bouton
+
+    def _fill_menu(self, menu, entries, m):
+        """Remplit un menu depuis menus.quick_menu : icônes en couleur, sous-menus, et les deux sous-menus dynamiques (dossiers, IA)."""
+        def ic(name, color):
+            return UI.icon(name, color, color, 16)
+        for e in entries:
+            if e is None:
+                menu.addSeparator()
+            elif e[0] == "sub":
+                sub = menu.addMenu(ic(e[2], e[3]), e[1])
+                self._fill_menu(sub, e[4], m)
+            elif e[0] == "dyn":
+                sub = menu.addMenu(ic(e[3], e[4]), e[2])
+                if e[1] == "move":
+                    for dest, label in self.engine.move_targets(m.account):
+                        sub.addAction(label, lambda d=dest: self._run_cmd("move:" + d, m))
+                else:
+                    self.add_ai_menu(sub, m)
+            else:
+                menu.addAction(ic(e[2], e[3]), e[1], lambda k=e[0]: self._run_cmd(k, m))
 
     def show_palette(self):
         sel = self.selected_msgs()

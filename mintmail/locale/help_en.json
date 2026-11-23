@@ -319,6 +319,10 @@
    "title": "Offline and reliability",
    "items": [
     [
+     "Right-click: the short menu",
+     "Right-clicking a message shows the essentials with colour icons: Reply / Reply all / Forward, Archive, Delete, Spam, read / unread, favourite, pin. The rest is grouped in submenus: Snooze, Move to, Priority, ✨ AI, Organise (task, time slots, reminder, assign, share, unsubscribe), Sender (all its messages, block, contact, copy address) and More (print, PDF, Markdown, resend, send to other apps). Ctrl+K remains the full list of every command."
+    ],
+    [
      "Unread badge on the icon",
      "The number of unread inbox messages shows in real time, like on a phone: a red badge on the window icon (taskbar, Alt-Tab) and on the notification-area icon, a native launcher counter on compatible desktops (Plank, Dash to Dock, Ubuntu Dock, KDE), and the Dock badge on macOS. Above 99: “99+”. The window title also stays “MintMail (N)”."
     ],

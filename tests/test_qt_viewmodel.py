@@ -1173,3 +1173,31 @@ def test_info_column_facts():
     assert tr("Conversation") in rows and tr("Catégorie") in rows and tr("Reçu le") in rows
     sent = dict(V.info_facts(Message(id="s", account="zz", folder="sent", date=1.0), [], 1))
     assert tr("Envoyé le") in sent and tr("Boîte") not in sent and tr("Conversation") not in sent and tr("Pièces jointes") not in sent
+
+
+def test_quick_context_menu_is_short_coloured_and_every_key_is_known():
+    import re
+    items = MN.quick_menu(_m(1, unread=True, starred=False, pinned=False, folder="inbox"))
+    top = [i for i in items if i]
+    assert len(top) <= 17 and top[0][0] == "reply" and items.count(None) <= 5          # court : l'essentiel au premier niveau
+    known = {k for _l, k in MN.palette_commands(_m(1))} | {k for k, _l in (i for i in MN.context_items(_m(1)) if i)} | {"prio:1", "prio:0", "prio:-1", "resend", "copy_md", "snooze_monday"}
+    for k in MN.flat_keys(items):
+        assert k in known, k
+    def walk(entries):
+        for e in entries:
+            if e is None:
+                continue
+            if e[0] == "sub":
+                assert re.match(r"#[0-9a-f]{6}$", e[3]) and e[2], e
+                walk(e[4])
+            elif e[0] == "dyn":
+                assert re.match(r"#[0-9a-f]{6}$", e[4]) and e[3] and e[1] in ("move", "ai")
+            else:
+                assert re.match(r"#[0-9a-f]{6}$", e[3]) and e[2] and e[1], e
+    walk(items)
+    assert "notspam" not in MN.flat_keys(items) and "spam" in MN.flat_keys(items)
+    spam = MN.flat_keys(MN.quick_menu(_m(2, folder="spam")))
+    assert "notspam" in spam and "spam" not in spam
+    assert "unsubscribe" not in MN.flat_keys(items) and "unsubscribe" in MN.flat_keys(MN.quick_menu(_m(3), can_unsub=True))
+    blocked = dict((e[0], e[1]) for e in next(i for i in MN.quick_menu(_m(4, sender_email="x@y.be"), blocked=True) if i and i[0] == "sub" and i[1] == "Expéditeur")[4] if e)
+    assert "Débloquer" in blocked["block"]

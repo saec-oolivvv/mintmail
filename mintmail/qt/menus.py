@@ -50,6 +50,54 @@ def more_items(msg, blocked: bool = False, integ=()) -> List[Item]:
 
 SNOOZES = [("snooze_tomorrow", tr("Demain 8 h")), ("snooze_monday", tr("Lundi prochain 8 h"))]
 
+# Couleurs des icônes du clic droit (mi-teintes : lisibles en thème clair comme sombre)
+BLUE, GREEN, RED, AMBER, ORANGE, PURPLE, TEAL, VIOLET, SLATE = "#3b82f6", "#22c55e", "#ef4444", "#f59e0b", "#f97316", "#a855f7", "#14b8a6", "#8b5cf6", "#64748b"
+
+
+def quick_menu(msg, blocked: bool = False, integ=(), can_unsub: bool = False) -> List:
+    """Clic droit d'un message, version courte : l'essentiel au premier niveau (répondre, ranger, marquer), le reste regroupé en quelques sous-menus.
+    Entrées : (clé, libellé, icône, couleur) | ("sub", libellé, icône, couleur, [entrées]) | ("dyn", « move » | « ai ») pour un sous-menu rempli par la fenêtre | None (séparateur)."""
+    spam = msg.folder == "spam"
+    top: List = [
+        ("reply", tr("Répondre"), "reply", BLUE), ("reply_all", tr("Répondre à tous"), "replyall", BLUE), ("forward", tr("Transférer"), "forward", BLUE), None,
+        ("archive", tr("Archiver"), "archive", GREEN), ("trash", tr("Supprimer"), "trash", RED),
+        ("notspam", tr("✔ Ce n'est pas du spam"), "check", GREEN) if spam else ("spam", tr("Spam"), "spam", ORANGE), None,
+        ("read", tr("Marquer comme %s") % ("lu" if msg.unread else tr("non lu")), "mail", BLUE),
+        ("star", tr("Retirer des favoris") if msg.starred else tr("Ajouter aux favoris"), "star", AMBER),
+        ("pin", tr("Désépingler") if msg.pinned else tr("Épingler"), "pin", ORANGE), None,
+        ("sub", tr("Reporter"), "clock", PURPLE, [(k, l, "clock", PURPLE) for k, l in SNOOZES]),
+        ("dyn", "move", tr("Déplacer vers"), "folder", TEAL),
+        ("sub", tr("Priorité"), "flag", RED, [("prio:1", tr("❗ Haute"), "flag", RED), ("prio:0", tr("Priorité normale"), "flag", SLATE), ("prio:-1", tr("⬇ Basse"), "flag", BLUE)]), None,
+        ("dyn", "ai", tr("✨ IA"), "sparkles", VIOLET),
+        ("sub", tr("Organiser"), "checklist", TEAL, [
+            ("task_from", tr("Créer une tâche"), "checklist", TEAL), ("slots", tr("Proposer des créneaux"), "calendar", BLUE),
+            ("followup3", tr("Me le rappeler sans réponse (3 jours)"), "bell", AMBER), ("assign", tr("Attribuer à…"), "userplus", PURPLE), ("share", tr("Partager…"), "share", BLUE),
+            *([("unsubscribe", tr("Se désabonner"), "ban", ORANGE)] if can_unsub else [])]),
+        ("sub", tr("Expéditeur"), "user", SLATE, [
+            ("from", tr("Voir tous ses messages"), "search", BLUE), ("copy_addr", tr("Copier l'adresse"), "copy", SLATE), ("addcontact", tr("Ajouter aux contacts"), "userplus", GREEN), None,
+            ("spam_sender", tr("Mettre l'expéditeur en spam"), "spam", ORANGE),
+            ("block", tr("Débloquer ") + msg.sender_email if blocked else tr("Bloquer l'expéditeur"), "ban", RED)]),
+        ("sub", tr("Plus"), "more", SLATE, [
+            ("print", tr("Imprimer…"), "print", SLATE), ("print_pdf", tr("Enregistrer en PDF…"), "template", RED), ("copy_md", tr("Copier en Markdown"), "copy", SLATE),
+            ("resend", tr("Envoyer à nouveau"), "send", BLUE),
+            *([None] + [(k, l, "share", TEAL) for k, l in integration_items(integ)] if integ else [])]),
+    ]
+    return top
+
+
+def flat_keys(entries) -> List[str]:
+    """Toutes les clés d'action d'un menu (sous-menus compris) — pour les tests et pour vérifier que chaque clé est connue de _run_cmd."""
+    out: List[str] = []
+    for e in entries:
+        if e is None:
+            continue
+        if e[0] == "sub":
+            out += flat_keys(e[4])
+        elif e[0] != "dyn":
+            out.append(e[0])
+    return out
+
+
 
 def palette_commands(msg, engine=None, integ=()) -> List[Tuple[str, str]]:
     """Commandes de la palette : [(libellé, clé)] — actions sur le message courant, application, réglages, dispositions, dossiers, vues."""

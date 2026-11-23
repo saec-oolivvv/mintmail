@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.54.0
+- Clic droit refait, plus court et plus pratique : une trentaine d'entrées ramenées à 16 au premier niveau, avec des icônes en couleur (Répondre, Archiver, Supprimer, Spam, lu / non lu, favori, épingle…) ; le reste est regroupé en sous-menus Reporter, Déplacer vers, Priorité, ✨ IA, Organiser, Expéditeur, Plus. La palette Ctrl+K garde la liste complète.
+
 ## 1.53.0
 - Pastille de messages non lus sur l'icône, en temps réel : pastille rouge avec le nombre sur l'icône de la fenêtre (barre des tâches, Alt-Tab) et de la zone de notification ; compteur natif du lanceur (protocole Unity : Plank, Dash to Dock, Ubuntu Dock, KDE) ; pastille du Dock sous macOS. « 99+ » au-delà de 99.
 

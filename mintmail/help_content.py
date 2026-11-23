@@ -383,6 +383,8 @@ SECTIONS: List[Dict] = [
          "Quand la synchronisation entre postes est active, lire un message, le mettre en favori ou en épingle, le déplacer ou le supprimer est annoncé aussitôt à vos autres machines du réseau local (canal chiffré), sans attendre le serveur de courrier : la liste s'y met à jour en une ou deux secondes. Le serveur reste la référence : la machine qui agit lui envoie l'action, les autres ne modifient que leur copie locale (jamais d'écho ni de boucle). Les machines sur un autre réseau suivent via le serveur, comme avant."),
     ]},
     {"id": "offline", "title": "Hors ligne et fiabilité", "items": [
+        ("Clic droit : le menu court",
+         "Un clic droit sur un message affiche l'essentiel avec des icônes en couleur : Répondre / Répondre à tous / Transférer, Archiver, Supprimer, Spam, lu / non lu, favori, épingle. Le reste est rangé en sous-menus : Reporter, Déplacer vers, Priorité, ✨ IA, Organiser (tâche, créneaux, rappel, attribuer, partager, désabonnement), Expéditeur (tous ses messages, bloquer, contact, copier l'adresse) et Plus (imprimer, PDF, Markdown, envoyer à nouveau, vers d'autres applications). Ctrl+K reste la liste complète de toutes les commandes."),
         ("Pastille de non lus sur l'icône",
          "Le nombre de messages non lus de la boîte de réception s'affiche en temps réel, comme sur un téléphone : pastille rouge sur l'icône de la fenêtre (barre des tâches, Alt-Tab) et de la zone de notification, compteur natif du lanceur sur les bureaux compatibles (Plank, Dash to Dock, Ubuntu Dock, KDE), pastille du Dock sous macOS. Au-delà de 99 : « 99+ ». Le titre de la fenêtre reste aussi « MintMail (N) »."),
         ("Activité des boîtes en direct",

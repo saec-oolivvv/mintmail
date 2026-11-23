@@ -133,7 +133,8 @@ class AIMixin:
 
     # ------------------------------------------------------------ clic droit
     def add_ai_menu(self, menu, msg):
-        menu.addSeparator()
+        if not menu.isEmpty():
+            menu.addSeparator()
         for it in AW.context_items(self.engine, msg, self.account):
             if it is None:
                 menu.addSeparator()

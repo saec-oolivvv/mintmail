@@ -1,4 +1,4 @@
-# Aide de MintMail 1.53.0
+# Aide de MintMail 1.54.0
 _Généré par `make docs` depuis l'aide intégrée (touche F1 dans l'application)._
 
 ## Premiers pas
@@ -428,6 +428,10 @@ Quand la synchronisation entre postes est active, lire un message, le mettre en 
 
 ## Hors ligne et fiabilité
 
+### Clic droit : le menu court
+
+Un clic droit sur un message affiche l'essentiel avec des icônes en couleur : Répondre / Répondre à tous / Transférer, Archiver, Supprimer, Spam, lu / non lu, favori, épingle. Le reste est rangé en sous-menus : Reporter, Déplacer vers, Priorité, ✨ IA, Organiser (tâche, créneaux, rappel, attribuer, partager, désabonnement), Expéditeur (tous ses messages, bloquer, contact, copier l'adresse) et Plus (imprimer, PDF, Markdown, envoyer à nouveau, vers d'autres applications). Ctrl+K reste la liste complète de toutes les commandes.
+
 ### Pastille de non lus sur l'icône
 
 Le nombre de messages non lus de la boîte de réception s'affiche en temps réel, comme sur un téléphone : pastille rouge sur l'icône de la fenêtre (barre des tâches, Alt-Tab) et de la zone de notification, compteur natif du lanceur sur les bureaux compatibles (Plank, Dash to Dock, Ubuntu Dock, KDE), pastille du Dock sous macOS. Au-delà de 99 : « 99+ ». Le titre de la fenêtre reste aussi « MintMail (N) ».
@@ -612,7 +616,7 @@ Mise à jour : sudo apt install ./mintmail_X.Y.Z_all.deb (vos réglages et votre
 
 ## À propos et crédits
 
-### MintMail 1.53.0
+### MintMail 1.54.0
 
 Le client mail pour Linux Mint dont l'IA est l'ADN : il lit, trie, résume, classe, rédige et agit avec vous — toujours avec votre accord.  
 Application Qt (PySide6) / Python, sans service cloud imposé : vos mails, vos clés et vos réglages restent chez vous.
