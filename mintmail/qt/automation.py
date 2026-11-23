@@ -162,6 +162,36 @@ def apply_rules_now(engine):
     return len(keep), apply_moves(engine, plan)
 
 
+def decision_text(m, dest, grouper=None) -> str:
+    """Où arrive un nouveau message, en une phrase (pour le journal d'activité) : « « Offre… » de x@y → regroupé dans Newsletters (non lu) »."""
+    who = (getattr(m, "sender_name", "") or m.sender_email or "?")[:30]
+    subj = (m.subject or tr("(sans objet)"))[:40]
+    state = tr("non lu") if m.unread else tr("déjà lu")
+    if dest:
+        where = tr("déplacé vers %s par vos règles ou listes") % dest
+    else:
+        from .. import groups as G
+        g = grouper.group(m) if grouper is not None else None
+        if g and grouper is not None and not grouper.in_main(m):
+            where = tr("regroupé dans « %s » (rangée en haut de la boîte, pas dans la liste principale)") % G.label(g)
+        else:
+            where = tr("boîte de réception")
+    return "« %s » — %s → %s (%s)" % (subj, who, where, state)
+
+
+def _log_decisions(engine, new, keep, plan):
+    """Une ligne par nouveau message dans le journal d'activité : on voit pourquoi un message n'apparaît pas où on l'attend."""
+    try:
+        from .. import activity as AC
+        from .. import groups as G
+        dest_of_id = {m.id: d for d, lst in plan.items() for m in lst}
+        gr = G.Grouper(engine.config, engine.cache, engine.accounts())
+        for m in new[:30]:
+            AC.LOG.add(AC.INFO, decision_text(m, dest_of_id.get(m.id), gr), m.account)
+    except Exception:
+        pass
+
+
 def sync_and_route(engine, folders=("inbox", "sent"), only=None):
     """Synchronise puis applique blocages, listes et règles aux seuls NOUVEAUX messages de la boîte (comme la version GTK).
     Retourne (nouveaux non lus restants, erreurs, groupes déplacés terminés)."""
@@ -177,6 +207,7 @@ def sync_and_route(engine, folders=("inbox", "sent"), only=None):
             m.unread = False
             engine.__dict__.setdefault("receipt_events", []).append((hit[0].subject, hit[1]))
     keep, plan = route(engine, new)
+    _log_decisions(engine, new, keep, plan)
     done = []
     for msgs, dest, op_ids in apply_moves(engine, plan):
         errs, _off = engine.finish_move(msgs, dest, op_ids)

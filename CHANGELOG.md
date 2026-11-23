@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.54.2
+- Journal d'activité : chaque nouveau message y est expliqué (« « -50 % aujourd'hui » — Boutique → regroupé dans « Newsletters » (non lu) »), pour voir tout de suite pourquoi un message n'apparaît pas là où on l'attend : boîte principale, rangée de groupe en haut (Newsletters, Notifications…), déplacé par une règle ou une liste de spam, déjà lu.
+
 ## 1.54.1
 - Icônes « classiques » : sous Linux, le clic droit et le rédacteur utilisent d'abord les icônes du thème du système (Mint-Y, Adwaita… : répondre, transférer, corbeille, étoile, dossier, imprimante…), et nos dessins vectoriels seulement quand le thème n'en a pas (macOS, Windows). Les symboles cryptiques du rédacteur (« • ≡ », « 1. ≡ », ❝, « Tₓ ») redeviennent de vraies icônes de liste, de citation et de gomme ; épingle et « Plus » redessinés.
 

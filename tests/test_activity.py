@@ -171,3 +171,17 @@ def test_sync_does_not_resurrect_message_deleted_during_fetch():
 def test_badge_label():
     from mintmail import notifyrules as NR
     assert [NR.badge_label(n) for n in (0, -3, None, 1, 9, 99, 100, 5000)] == ["", "", "", "1", "9", "99", "99+", "99+"]
+
+
+def test_new_message_decision_is_logged_in_plain_words():
+    from mintmail.qt import automation as AU
+    from mintmail import groups as G
+    cfg = Config(os.path.join(tempfile.mkdtemp(), "c.json"))
+    cfg.data["accounts"] = [ACC]
+    gr = G.Grouper(cfg, None, [ACC])
+    pub = Message(id="p1", account="a1", folder="inbox", uid=1, sender_name="Boutique", sender_email="promo@shop.be", subject="-50% aujourd'hui", date=time.time(), category="news", unread=True)
+    perso = Message(id="p2", account="a1", folder="inbox", uid=2, sender_name="Paul", sender_email="paul@x.be", subject="Salut", date=time.time(), category="people", unread=True, to="a@b.be, c@d.be")
+    t = AU.decision_text(pub, None, gr)
+    assert "Newsletters" in t and "regroupé" in t and "non lu" in t and "-50%" in t
+    assert "boîte de réception" in AU.decision_text(perso, None, gr)
+    assert "spam" in AU.decision_text(pub, "spam", gr)
