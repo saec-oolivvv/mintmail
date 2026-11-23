@@ -1648,7 +1648,7 @@ class MainWindow(ExtrasMixin, OrganizerMixin, AIMixin, QMainWindow):
     def _fill_menu(self, menu, entries, m):
         """Remplit un menu depuis menus.quick_menu : icônes en couleur, sous-menus, et les deux sous-menus dynamiques (dossiers, IA)."""
         def ic(name, color):
-            return UI.icon(name, color, color, 16)
+            return UI.themed(name, color, color, 16)
         for e in entries:
             if e is None:
                 menu.addSeparator()

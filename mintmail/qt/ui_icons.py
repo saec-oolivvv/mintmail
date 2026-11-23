@@ -1,5 +1,7 @@
 """Icônes vectorielles (traits fins, style « outline ») dessinées depuis du SVG intégré : aucune image à installer, couleur suivant le thème.
 Sans QtSvg, `icon()` renvoie une icône vide et les boutons gardent leur texte."""
+import sys
+
 from PySide6.QtCore import QByteArray, QSize, Qt
 from PySide6.QtGui import QIcon, QPainter, QPixmap
 
@@ -40,12 +42,12 @@ PATHS = {
     "spam": '<polygon points="7.86 2 16.14 2 22 7.86 22 16.14 16.14 22 7.86 22 2 16.14 2 7.86 7.86 2"/>' + _L(12, 8, 12, 12) + _L(12, 16, 12.01, 16),
     "mail": '<path d="M4 4h16a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z"/><polyline points="22,6 12,13 2,6"/>',
     "star": '<polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>',
-    "pin": _L(12, 17, 12, 22) + '<path d="M9 3h6l-1 7 3 3v2H7v-2l3-3z"/>',
+    "pin": _L(12, 16, 12, 22) + '<path d="M8 2h8l-1.5 7L18 12.5V16H6v-3.5L9.5 9z"/>',
     "folder": '<path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>',
     "checklist": '<polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/>',
     "user": '<path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>',
     "userplus": '<path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="8.5" cy="7" r="4"/>' + _L(20, 8, 20, 14) + _L(23, 11, 17, 11),
-    "more": _L(5, 12, 5.01, 12) + _L(12, 12, 12.01, 12) + _L(19, 12, 19.01, 12),
+    "more": '<circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/>',
     "share": '<circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/>' + _L(8.59, 13.51, 15.42, 17.49) + _L(15.41, 6.51, 8.59, 10.49),
     "ban": '<circle cx="12" cy="12" r="10"/>' + _L(4.93, 4.93, 19.07, 19.07),
     "copy": '<rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>',
@@ -85,6 +87,28 @@ def icon(name, color="#6b7280", active=None, size=18, dpr=2.0):
         ic.addPixmap(_pixmap(name, active or color, size, dpr), QIcon.Active, QIcon.On)
         _cache[key] = ic
     return _cache[key]
+
+
+# Icônes « classiques » du bureau (thème d'icônes du système : Mint-Y, Adwaita…), dans l'ordre de préférence ; à défaut, notre dessin vectoriel.
+THEME = {
+    "reply": ("mail-reply-sender",), "replyall": ("mail-reply-all",), "forward": ("mail-forward",), "archive": ("mail-archive", "archive-insert", "folder-download"),
+    "trash": ("edit-delete", "user-trash"), "spam": ("mail-mark-junk",), "mail": ("mail-unread", "mail-mark-unread"), "star": ("starred", "emblem-favorite"),
+    "folder": ("folder",), "clock": ("appointment-soon", "alarm"), "flag": ("mail-mark-important", "flag"), "checklist": ("task-due",), "user": ("avatar-default", "user-info"),
+    "userplus": ("contact-new",), "copy": ("edit-copy",), "search": ("edit-find", "system-search"), "check": ("emblem-ok", "dialog-ok"), "bell": ("alarm", "appointment-soon"),
+    "calendar": ("x-office-calendar", "office-calendar"), "print": ("document-print",), "send": ("mail-send",), "template": ("application-pdf", "x-office-document"),
+    "bullets": ("format-list-unordered",), "numbered": ("format-list-ordered",), "quote": ("format-indent-more",), "clear": ("edit-clear-all", "format-text-clear", "edit-clear"),
+    "link": ("insert-link",), "attach": ("mail-attachment",), "ban": ("process-stop",), "bold": ("format-text-bold",), "italic": ("format-text-italic",),
+    "underline": ("format-text-underline",), "strike": ("format-text-strikethrough",),
+}
+
+
+def themed(name, color="#6b7280", active=None, size=18):
+    """Icône classique du thème du système quand elle existe (Linux), sinon notre dessin vectoriel `name` aux couleurs données."""
+    if sys.platform.startswith("linux"):
+        for cand in THEME.get(name, ()):
+            if QIcon.hasThemeIcon(cand):
+                return QIcon.fromTheme(cand)
+    return icon(name, color, active, size)
 
 
 def icon_size(px=18):

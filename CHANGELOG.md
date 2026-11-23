@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.54.1
+- Icônes « classiques » : sous Linux, le clic droit et le rédacteur utilisent d'abord les icônes du thème du système (Mint-Y, Adwaita… : répondre, transférer, corbeille, étoile, dossier, imprimante…), et nos dessins vectoriels seulement quand le thème n'en a pas (macOS, Windows). Les symboles cryptiques du rédacteur (« • ≡ », « 1. ≡ », ❝, « Tₓ ») redeviennent de vraies icônes de liste, de citation et de gomme ; épingle et « Plus » redessinés.
+
 ## 1.54.0
 - Clic droit refait, plus court et plus pratique : une trentaine d'entrées ramenées à 16 au premier niveau, avec des icônes en couleur (Répondre, Archiver, Supprimer, Spam, lu / non lu, favori, épingle…) ; le reste est regroupé en sous-menus Reporter, Déplacer vers, Priorité, ✨ IA, Organiser, Expéditeur, Plus. La palette Ctrl+K garde la liste complète.
 
