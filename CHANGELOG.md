@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.55.1
+- Cadre de lecture vide (Mac) : le lecteur complet (QtWebEngine) est surveillé — échec de chargement, processus d'affichage arrêté ou page vide malgré du texte (deux messages de suite) — et MintMail bascule seul, sans redémarrer, vers le lecteur simple (texte, images, liens), le dit dans le journal d'activité et s'en souvient (fichier « no-webengine »). Commandes Ctrl+K « passer au lecteur simple » / « retenter le lecteur complet » ; MINTMAIL_QT_NO_WEBENGINE=1 reste possible.
+- Fermeture forcée (Mac) : à la fermeture, MintMail arrête la réception instantanée puis termine le processus de force (au plus 2,5 s après Cmd+Q / Quitter du Dock), pour qu'aucun fil de fond ni QtWebEngine ne le retienne.
+
 ## 1.55.0
 - Erreurs 429 / quotas Gmail : la veille est beaucoup plus douce — veille légère 20 s (au lieu de 6 s) quand la réception instantanée marche, 40 s pour Gmail & co ; passage sur tous les dossiers 90 s (au lieu de 20 s), 4 min pour Gmail, 30 dossiers au plus et sans les vues Gmail « Tous les messages / Important / Suivis » qui doublent d'autres dossiers. Une réponse 429 / « quota » / « trop de connexions » (y compris du serveur de jetons Google) déclenche une attente de 30 s à 10 min au lieu d'une répétition immédiate, signalée dans le journal d'activité.
 

@@ -55,6 +55,7 @@ from .ui_organizer import MessageExtras
 from . import organizer_window as OW
 from .. import priority as PR
 from .. import pollplan as PP
+from ..store import CONFIG_DIR
 from . import ui_activity as UA
 from . import ui_badge as UB
 from .. import qtdeps as QD
@@ -118,9 +119,18 @@ class MessageModel(QAbstractListModel):
                 self.endRemoveRows()
 
 
-def _make_reader(on_link):
-    """Lecteur HTML : QtWebEngine (JavaScript coupé, navigation interdite, liens filtrés) ; QTextBrowser si QtWebEngine manque."""
-    if os.environ.get("MINTMAIL_QT_NO_WEBENGINE") != "1":
+NO_WEBENGINE_MARK = os.path.join(CONFIG_DIR, "no-webengine")          # posé quand le lecteur complet a échoué : lecteur simple tant que ce fichier existe
+
+
+def _visible_text_len(html):
+    import re
+    return len(re.sub(r"\s+", " ", re.sub(r"<(style|script|head)[^>]*>.*?</\1>|<[^>]+>", " ", html or "", flags=re.S | re.I)).strip())
+
+
+def _make_reader(on_link, on_fail=None, force_text=False):
+    """Lecteur HTML : QtWebEngine (JavaScript coupé, navigation interdite, liens filtrés) ; QTextBrowser si QtWebEngine manque, a échoué (fichier
+    `no-webengine`) ou si MINTMAIL_QT_NO_WEBENGINE=1. `on_fail(raison)` est appelé si le lecteur complet plante ou affiche une page vide."""
+    if not force_text and os.environ.get("MINTMAIL_QT_NO_WEBENGINE") != "1" and not os.path.exists(NO_WEBENGINE_MARK):
         try:
             from PySide6.QtWebEngineCore import QWebEnginePage, QWebEngineSettings
             from PySide6.QtWebEngineWidgets import QWebEngineView
@@ -140,7 +150,24 @@ def _make_reader(on_link):
             s.setAttribute(QWebEngineSettings.LocalContentCanAccessFileUrls, False)
             s.setAttribute(QWebEngineSettings.PluginsEnabled, False)
             s.setAttribute(QWebEngineSettings.AllowRunningInsecureContent, False)
-            view.show_html = lambda html: view.setHtml(html, QUrl("about:blank"))
+            blanks = [0]
+
+            def check_blank(html):
+                def got(text):
+                    if (text or "").strip():
+                        blanks[0] = 0
+                    elif _visible_text_len(html) > 40:
+                        blanks[0] += 1
+                        if blanks[0] >= 2 and on_fail:             # deux messages de suite avec du texte, mais rien d'affiché : le lecteur complet ne marche pas ici
+                            on_fail(tr("page vide"))
+                view.page().toPlainText(got)
+
+            def show(html):
+                view.setHtml(html, QUrl("about:blank"))
+                QTimer.singleShot(2500, lambda: check_blank(html))
+            view.show_html = show
+            view.loadFinished.connect(lambda ok: None if ok or not on_fail else on_fail(tr("chargement échoué")))
+            view.page().renderProcessTerminated.connect(lambda *_a: on_fail(tr("processus d'affichage arrêté")) if on_fail else None)
             view.kind = "webengine"
             return view
         except Exception:
@@ -455,7 +482,7 @@ class MainWindow(ExtrasMixin, OrganizerMixin, AIMixin, QMainWindow):
         self.images_menu = QMenu(self.images_btn)
         self.images_btn.setMenu(self.images_menu)             # un clic ouvre le choix : cette fois / toujours pour l'expéditeur / pour le domaine
         self.images_btn.hide()
-        self.reader = _make_reader(self._open_link)
+        self.reader = _make_reader(self._open_link, lambda why: QTimer.singleShot(0, lambda: self._degrade_reader(why)))
         right = QFrame()
         right.setObjectName("readerwrap")
         rl = QVBoxLayout(right)
@@ -535,6 +562,7 @@ class MainWindow(ExtrasMixin, OrganizerMixin, AIMixin, QMainWindow):
         rcl = QVBoxLayout(reader_col)
         rcl.setContentsMargins(0, 0, 0, 0)
         rcl.setSpacing(0)
+        self._rcl = rcl
         rcl.addWidget(self.reader, 1)
         rcl.addWidget(self.quick)
         self.info.hide()
@@ -1563,6 +1591,33 @@ class MainWindow(ExtrasMixin, OrganizerMixin, AIMixin, QMainWindow):
         if app is not None:
             app.quit()
 
+    def _reader_full(self):
+        try:
+            os.remove(NO_WEBENGINE_MARK)
+        except OSError:
+            pass
+        self.status.setText(tr("Le lecteur complet sera retenté au prochain démarrage de MintMail."))
+
+    def _degrade_reader(self, why):
+        """Le lecteur complet (QtWebEngine) ne marche pas sur cette machine : bascule tout de suite vers le lecteur simple (texte, images, liens) et s'en souvient."""
+        if getattr(self.reader, "kind", "") != "webengine":
+            return
+        try:
+            os.makedirs(os.path.dirname(NO_WEBENGINE_MARK), exist_ok=True)
+            open(NO_WEBENGINE_MARK, "w").write(why)
+        except OSError:
+            pass
+        old = self.reader
+        self.reader = _make_reader(self._open_link, force_text=True)
+        self._rcl.replaceWidget(old, self.reader)
+        old.hide()
+        old.deleteLater()
+        self.apply_zoom()
+        from .. import activity as AC
+        AC.LOG.add(AC.ERR, tr("Le lecteur complet n'a pas pu afficher les messages (%s) : lecteur simple activé. Pour retenter le lecteur complet, supprimez le fichier « no-webengine » du dossier de configuration de MintMail.") % why)
+        if self.shown is not None:
+            self._show(self.shown)
+
     def show_activity(self):
         """Historique en direct des actions sur les boîtes (relève, suppression, déplacement, refus du serveur…)."""
         if getattr(self, "_activity_dlg", None) is None:
@@ -1761,7 +1816,7 @@ class MainWindow(ExtrasMixin, OrganizerMixin, AIMixin, QMainWindow):
                   "zoom_reset": lambda: self.zoom_reader(0), "p2p_now": self.p2p_now, "digest": lambda: self.refresh_digest(force=True),
                   "assistant": lambda: self.toggle_assistant(True), "compose": self.compose, "sync": lambda: self.sync(False), "help": self.show_help,
                   "apply_rules": self.apply_rules_now, "save_search": self.save_current_search, "mark_all_read": self.mark_all_read, "select_all": self.select_all, "select_mode": lambda: self.sel_btn.toggle(), "updates": lambda: self.check_updates(manual=True), "search": self.search.setFocus,
-                  "push_pins": self.push_local_pins, "log": self.show_log, "activity": self.show_activity, "fullscreen": self.toggle_fullscreen, "search_server": self.search_server_now,
+                  "push_pins": self.push_local_pins, "log": self.show_log, "activity": self.show_activity, "reader_simple": lambda: self._degrade_reader(tr("choix manuel")), "reader_full": self._reader_full, "fullscreen": self.toggle_fullscreen, "search_server": self.search_server_now,
                   "refresh_folders": self.refresh_folder_list}
         if key in simple:
             simple[key]()
@@ -2256,6 +2311,30 @@ def _keyring_hint():
                          "sont introuvables. Installez-le : pip install keyring (ou recréez le venv avec --system-site-packages).\n")
 
 
+def _hard_exit(code=0):
+    """Termine le processus tout de suite (après avoir vidé les sorties) : sous macOS, un fil de fond ou QtWebEngine peut empêcher la fermeture."""
+    try:
+        sys.stdout.flush()
+        sys.stderr.flush()
+    except Exception:
+        pass
+    if os.environ.get("MINTMAIL_NO_HARD_EXIT") == "1":     # tests
+        return
+    os._exit(int(code or 0))
+
+
+def _force_exit_soon(win, delay=2.5):
+    """Dernier filet : si la fermeture propre traîne (Cmd+Q, Quitter du Dock…), le processus est terminé de force après `delay` secondes."""
+    import threading
+    try:
+        win.engine.stop_push()
+    except Exception:
+        pass
+    t = threading.Timer(delay, _hard_exit)
+    t.daemon = True
+    t.start()
+
+
 def run(argv=None):
     _keyring_hint()
     app = QApplication.instance() or QApplication(list(argv if argv is not None else sys.argv))
@@ -2283,4 +2362,7 @@ def run(argv=None):
         QTimer.singleShot(600, lambda: QMessageBox.information(win, tr("Mode sans échec"), BK.safe_message(safe, fixed)))
     QTimer.singleShot(0, lambda: QD.end_start(QD.start_marker(str(DATA_DIR))))       # la fenêtre est arrivée jusqu'à l'écran : le démarrage a réussi
     QTimer.singleShot(8000, lambda: BK.note_ok(DATA_DIR))  # …et tient plus de 8 s : le compteur de démarrages ratés repart à zéro
-    return app.exec()
+    app.aboutToQuit.connect(lambda: _force_exit_soon(win))
+    code = app.exec()
+    _hard_exit(code)                                       # sortie nette et immédiate : fils de fond, QtWebEngine ou IDLE ne doivent jamais retenir le programme (surtout sous macOS)
+    return code

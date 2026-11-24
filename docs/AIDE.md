@@ -1,4 +1,4 @@
-# Aide de MintMail 1.55.0
+# Aide de MintMail 1.55.1
 _Généré par `make docs` depuis l'aide intégrée (touche F1 dans l'application)._
 
 ## Premiers pas
@@ -442,6 +442,10 @@ Sous la liste des dossiers, une bande montre en temps réel ce que MintMail fait
 • ✔ vert : fait sur le serveur ; ⚠ : hors ligne ou en attente ; ✖ rouge : refusé — le message concerné réapparaît alors à la prochaine relève (c'est la cause d'un message « effacé qui revient »).  
 • Un message supprimé ou déplacé ici n'est plus ramené par une relève qui était déjà en route ; la bande l'indique.
 
+### Cadre de lecture vide
+
+Si le message ne s'affiche pas (cadre blanc), MintMail le détecte seul après deux messages et passe au lecteur simple (texte, images, liens), en le disant dans le journal d'activité. Vous pouvez aussi le demander : Ctrl+K → « Lecteur de messages : passer au lecteur simple ». Depuis un terminal : MINTMAIL_QT_NO_WEBENGINE=1 mintmail. Pour retenter le lecteur complet : Ctrl+K → « retenter le lecteur complet », puis relancez.
+
 ### Erreurs 429 / quotas (Gmail…)
 
 Gmail limite le nombre de connexions simultanées (15 par compte, toutes machines et applications confondues), le débit et le nombre de requêtes. MintMail ralentit donc tout seul : veille légère toutes les 20 s si la réception instantanée est active (8 s sinon), doublée pour Gmail ; passage sur tous les dossiers toutes les 90 s (4 min pour Gmail), sans les vues « Tous les messages / Important / Suivis » qui doublent d'autres dossiers. Sur une réponse 429 ou « trop de connexions », MintMail attend 30 s, 1, 2, 5 puis 10 min avant de réessayer, et le dit dans le journal d'activité. Si vous lisez la même boîte sur plusieurs machines, la limite se partage : ce sont autant de connexions pour Google.
@@ -620,7 +624,7 @@ Mise à jour : sudo apt install ./mintmail_X.Y.Z_all.deb (vos réglages et votre
 
 ## À propos et crédits
 
-### MintMail 1.55.0
+### MintMail 1.55.1
 
 Le client mail pour Linux Mint dont l'IA est l'ADN : il lit, trie, résume, classe, rédige et agit avec vous — toujours avec votre accord.  
 Application Qt (PySide6) / Python, sans service cloud imposé : vos mails, vos clés et vos réglages restent chez vous.
