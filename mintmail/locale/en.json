@@ -66,6 +66,7 @@
 "%s a refusé la connexion (%s). Nouvel essai automatique dans %s, pour ne pas être bloqué.": "%s refused the connection (%s). Automatic retry in %s, to avoid being blocked.",
 "%s ajouté aux contacts": "%s added to contacts",
 "%s demande un accusé de lecture. L'envoyer ?": "%s asks for a read receipt. Send it?",
+"%s limite les requêtes (%s). Nouvel essai automatique dans %s.": "%s is limiting requests (%s). Automatic retry in %s.",
 "%s n'a pas pu être ouvert": "%s could not be opened",
 "%s — aucun message concerné": "%s — no messages concerned",
 "%s — dossier %s : %d nouveau(x), %d retiré(s) du serveur": "%s — folder %s: %d new, %d removed from the server",

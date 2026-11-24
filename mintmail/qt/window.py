@@ -54,6 +54,7 @@ from .extras_window import ExtrasMixin
 from .ui_organizer import MessageExtras
 from . import organizer_window as OW
 from .. import priority as PR
+from .. import pollplan as PP
 from . import ui_activity as UA
 from . import ui_badge as UB
 from .. import qtdeps as QD
@@ -649,6 +650,7 @@ class MainWindow(ExtrasMixin, OrganizerMixin, AIMixin, QMainWindow):
         self.live_timer = QTimer(self)
         self.live_timer.timeout.connect(self._live_poll)
         self.live_timer.start(6000)                                         # veille légère (STATUS) en complément d'IDLE : un changement fait ailleurs est vu en quelques secondes
+        self._tune_polls()
         self.engine.on_progress = self.bridge.partial.emit                     # appelé depuis les fils de relevé
         if self.config.get("push") is not False:
             self.engine.start_push(self.bridge.newmail.emit)             # réception instantanée : plus d'attente du relevé périodique
@@ -1917,8 +1919,16 @@ class MainWindow(ExtrasMixin, OrganizerMixin, AIMixin, QMainWindow):
                 self._update_counts()
         self._background(self.engine.sync_changed_folders, done)
 
+    def _tune_polls(self):
+        """Cadence de la veille selon les boîtes (Gmail & co limitent vite) et l'état d'IDLE : moins de requêtes, donc moins d'erreurs 429."""
+        p = PP.plan(self.engine.accounts(), getattr(self.engine, "push_state", {}))
+        for timer, ms in ((self.live_timer, p["live"]), (self.folder_timer, p["folders"])):
+            if timer.interval() != ms:
+                timer.setInterval(ms)
+
     def _on_timer(self):
         self._tick += 1
+        self._tune_polls()
         self.refresh_btn.setToolTip(tr("Relever le courrier maintenant") + "  (Ctrl+R)\n" + self.engine.push_summary())
         self.sync(quiet=True)
         if self._tick % 5 == 0:

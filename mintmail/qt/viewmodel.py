@@ -7,6 +7,7 @@ from typing import Dict, List, Tuple
 
 from ..backend import is_retryable, make_backend
 from .. import activity as AC
+from .. import pollplan as PP
 from .. import mailevents as ME
 from ..htmlsafe import reader_csp, sanitize
 from ..i18n import tr
@@ -441,7 +442,9 @@ class Engine(OfflineMixin):
         for a in self.accounts():
             if a.get("demo"):
                 continue
-            ents = [e for e in self.folder_entries(a["id"]) if e.get("selectable", True)][:80]
+            prone = PP.is_prone(a)
+            ents = [e for e in self.folder_entries(a["id"]) if e.get("selectable", True) and not (prone and PP.is_virtual(e.get("path") or e["name"]))]
+            ents = ents[:PP.plan([a], getattr(self, "push_state", {}))["max_folders"]]
             logical = {e["name"]: dest_of(e) for e in ents}
             try:
                 be = self.backend(a["id"])

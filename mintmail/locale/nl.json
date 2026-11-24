@@ -66,6 +66,7 @@
 "%s a refusé la connexion (%s). Nouvel essai automatique dans %s, pour ne pas être bloqué.": "%s weigerde de verbinding (%s). Automatisch opnieuw proberen over %s, om blokkering te vermijden.",
 "%s ajouté aux contacts": "%s toegevoegd aan contacten",
 "%s demande un accusé de lecture. L'envoyer ?": "%s vraagt een leesbevestiging. Versturen?",
+"%s limite les requêtes (%s). Nouvel essai automatique dans %s.": "%s beperkt de verzoeken (%s). Automatisch opnieuw proberen over %s.",
 "%s n'a pas pu être ouvert": "%s kon niet worden geopend",
 "%s — aucun message concerné": "%s — geen berichten betrokken",
 "%s — dossier %s : %d nouveau(x), %d retiré(s) du serveur": "%s — map %s: %d nieuw, %d van de server verwijderd",

@@ -185,3 +185,40 @@ def test_new_message_decision_is_logged_in_plain_words():
     assert "Newsletters" in t and "regroupé" in t and "non lu" in t and "-50%" in t
     assert "boîte de réception" in AU.decision_text(perso, None, gr)
     assert "spam" in AU.decision_text(pub, "spam", gr)
+
+
+def test_poll_plan_is_gentler_for_gmail_and_with_idle():
+    from mintmail import pollplan as PP
+    gm = {"id": "g", "imap_host": "imap.gmail.com"}
+    ov = {"id": "o", "imap_host": "mail.ovh.net"}
+    assert PP.is_prone(gm) and not PP.is_prone(ov)
+    base = PP.plan([ov], {})
+    idle = PP.plan([ov], {"o": "ok"})
+    assert idle["live"] > base["live"] and base["live"] >= 8000 and base["folders"] >= 90000          # bien moins que 6 s / 20 s d'avant
+    g = PP.plan([gm], {"g": "ok"})
+    assert g["live"] > idle["live"] and g["folders"] >= 240000 and g["max_folders"] <= 30 and base["max_folders"] == 80
+    assert PP.plan([], {})["live"] > 0 and PP.plan([{"id": "d", "demo": True}], {})["max_folders"] == 80
+    assert PP.is_virtual("[Gmail]/All Mail") and PP.is_virtual("[Gmail]/Important") and PP.is_virtual("[Gmail]/Tous les messages") and not PP.is_virtual("Clients/Important-ish") and not PP.is_virtual("INBOX")
+
+
+def test_429_is_a_slowdown_not_a_failure():
+    assert TH.classify("HTTP Error 429: Too Many Requests") == TH.BUSY
+    assert TH.classify("Quota exceeded for quota metric 'Queries'") == TH.BUSY
+    assert TH.classify("b'[AUTHENTICATIONFAILED] Invalid credentials (Failure)'") == TH.AUTH
+    from mintmail import backend as B
+    be = B.IMAPBackend({"id": "g429", "email": "x@gmail.com", "username": "x", "imap_host": "imap.gmail.com", "imap_port": 993}, "pw")
+    B.IMAPBackend.BREAKER.reset()
+    calls = []
+
+    def raw(pw=None):
+        calls.append(1)
+        raise BackendError("OAuth : HTTP Error 429: Too Many Requests")
+    be._connect_raw = raw
+    for _ in range(3):
+        try:
+            be._connect()
+            assert False
+        except BackendError as e:
+            assert e.cooldown and e.wait > 0 and e.retryable
+    assert len(calls) == 1
+    B.IMAPBackend.BREAKER.reset()

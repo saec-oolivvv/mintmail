@@ -331,6 +331,10 @@
      "Under the folder list, a strip shows in real time what MintMail is doing with your mailboxes: checks (animated ⟳), deletions and moves sent to the server, server refusals, instant delivery. Click it (or Ctrl+K → “Activity”) for the full history with times; “Copy” to send it to me if something goes wrong.\n• Green ✔: done on the server; ⚠: offline or pending; red ✖: refused — the message concerned then reappears at the next check (this is the cause of a “deleted message that comes back”).\n• A message deleted or moved here is no longer brought back by a check that was already under way; the strip tells you."
     ],
     [
+     "429 errors / quotas (Gmail…)",
+     "Gmail limits simultaneous connections (15 per account, across all machines and apps), bandwidth and request counts. MintMail therefore slows itself down: light watch every 20 s when instant delivery is active (8 s otherwise), doubled for Gmail; pass over all folders every 90 s (4 min for Gmail), skipping the “All Mail / Important / Starred” views that duplicate other folders. On a 429 or “too many connections” reply, MintMail waits 30 s, 1, 2, 5 then 10 min before retrying, and says so in the activity log. If you read the same mailbox on several machines, the limit is shared: each one counts as connections for Google."
+    ],
+    [
      "“Too many attempts” lockout",
      "When a server refuses the connection (wrong password, too many tries, too many connections), MintMail stops retrying for 2, 5, 15, 30, then 60 minutes instead of insisting (which is what gets an address blocked). The activity log says so; your actions stay queued, not lost. Fix the password in Settings → Accounts: the pause is lifted immediately."
     ],

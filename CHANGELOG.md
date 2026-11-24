@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.55.0
+- Erreurs 429 / quotas Gmail : la veille est beaucoup plus douce — veille légère 20 s (au lieu de 6 s) quand la réception instantanée marche, 40 s pour Gmail & co ; passage sur tous les dossiers 90 s (au lieu de 20 s), 4 min pour Gmail, 30 dossiers au plus et sans les vues Gmail « Tous les messages / Important / Suivis » qui doublent d'autres dossiers. Une réponse 429 / « quota » / « trop de connexions » (y compris du serveur de jetons Google) déclenche une attente de 30 s à 10 min au lieu d'une répétition immédiate, signalée dans le journal d'activité.
+
 ## 1.54.2
 - Journal d'activité : chaque nouveau message y est expliqué (« « -50 % aujourd'hui » — Boutique → regroupé dans « Newsletters » (non lu) »), pour voir tout de suite pourquoi un message n'apparaît pas là où on l'attend : boîte principale, rangée de groupe en haut (Newsletters, Notifications…), déplacé par une règle ou une liste de spam, déjà lu.
 

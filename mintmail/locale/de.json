@@ -66,6 +66,7 @@
 "%s a refusé la connexion (%s). Nouvel essai automatique dans %s, pour ne pas être bloqué.": "%s hat die Verbindung abgelehnt (%s). Automatischer neuer Versuch in %s, um eine Sperre zu vermeiden.",
 "%s ajouté aux contacts": "%s zu den Kontakten hinzugefügt",
 "%s demande un accusé de lecture. L'envoyer ?": "%s bittet um eine Lesebestätigung. Senden?",
+"%s limite les requêtes (%s). Nouvel essai automatique dans %s.": "%s begrenzt die Anfragen (%s). Automatischer neuer Versuch in %s.",
 "%s n'a pas pu être ouvert": "%s konnte nicht geöffnet werden",
 "%s — aucun message concerné": "%s — keine Nachrichten betroffen",
 "%s — dossier %s : %d nouveau(x), %d retiré(s) du serveur": "%s — Ordner %s: %d neu, %d vom Server entfernt",

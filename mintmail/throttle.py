@@ -11,7 +11,8 @@ _AUTH_WORDS = ("authenticationfailed", "authentication failed", "login failed", 
                "wrong password", "too many login", "too many failed", "too many invalid", "blocked", "temporarily disabled", "account is locked", "web login required",
                "application-specific password", "app password", "authorization failed", "nologin", "[authenticationfailed]")
 _BUSY_WORDS = ("too many connections", "too many simultaneous", "maximum number of connections", "max connections", "exceeded the maximum", "connection limit",
-               "throttle", "rate limit", "try again later", "temporary failure", "[unavailable]", "[inuse]")
+               "throttle", "rate limit", "try again later", "temporary failure", "[unavailable]", "[inuse]",
+               "429", "too many requests", "quota", "ratelimit", "rate_limit", "userratelimitexceeded", "resource_exhausted", "bandwidth limit")
 
 
 def classify(message):

@@ -428,7 +428,12 @@ class IMAPBackend:
             imap = self._connect_raw(pw)
             self.BREAKER.ok(key)
             return imap
-        except BackendError:
+        except BackendError as e:
+            if not e.cooldown and TH.classify(str(e)) == TH.BUSY:            # ex. 429 du serveur de jetons Google : on lève le pied au lieu de réessayer aussitôt
+                wait = self.BREAKER.failed(key, TH.BUSY, fp)
+                msg = tr("%s limite les requêtes (%s). Nouvel essai automatique dans %s.") % (a.get("email") or key, str(e)[:80], TH.human_wait(wait))
+                AC.LOG.add(AC.WARN, msg, a.get("id", ""))
+                raise BackendError(msg, retryable=True, cooldown=True, wait=wait)
             raise
         except Exception as e:
             kind = TH.classify(e)
