@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.55.2
+- Images absentes des messages : la détection « page vide » de la 1.55.1 se trompait (le texte lu est toujours vide quand JavaScript est coupé) et faisait passer à tort au lecteur simple, qui ne charge pas les images distantes. Détection retirée ; un ancien fichier « no-webengine » est effacé tout seul. Le basculement ne se fait plus que si le lecteur complet plante ou échoue vraiment.
+
 ## 1.55.1
 - Cadre de lecture vide (Mac) : le lecteur complet (QtWebEngine) est surveillé — échec de chargement, processus d'affichage arrêté ou page vide malgré du texte (deux messages de suite) — et MintMail bascule seul, sans redémarrer, vers le lecteur simple (texte, images, liens), le dit dans le journal d'activité et s'en souvient (fichier « no-webengine »). Commandes Ctrl+K « passer au lecteur simple » / « retenter le lecteur complet » ; MINTMAIL_QT_NO_WEBENGINE=1 reste possible.
 - Fermeture forcée (Mac) : à la fermeture, MintMail arrête la réception instantanée puis termine le processus de force (au plus 2,5 s après Cmd+Q / Quitter du Dock), pour qu'aucun fil de fond ni QtWebEngine ne le retienne.

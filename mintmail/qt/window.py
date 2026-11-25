@@ -127,10 +127,23 @@ def _visible_text_len(html):
     return len(re.sub(r"\s+", " ", re.sub(r"<(style|script|head)[^>]*>.*?</\1>|<[^>]+>", " ", html or "", flags=re.S | re.I)).strip())
 
 
+def _marker_active():
+    """Le fichier « no-webengine » ne compte que s'il a été posé après un vrai échec (préfixe « v2: ») : ceux de la 1.55.1 venaient d'un faux « page vide » (JavaScript coupé) et sont effacés."""
+    try:
+        if not os.path.exists(NO_WEBENGINE_MARK):
+            return False
+        if open(NO_WEBENGINE_MARK).read().startswith("v2:"):
+            return True
+        os.remove(NO_WEBENGINE_MARK)
+    except OSError:
+        pass
+    return False
+
+
 def _make_reader(on_link, on_fail=None, force_text=False):
     """Lecteur HTML : QtWebEngine (JavaScript coupé, navigation interdite, liens filtrés) ; QTextBrowser si QtWebEngine manque, a échoué (fichier
     `no-webengine`) ou si MINTMAIL_QT_NO_WEBENGINE=1. `on_fail(raison)` est appelé si le lecteur complet plante ou affiche une page vide."""
-    if not force_text and os.environ.get("MINTMAIL_QT_NO_WEBENGINE") != "1" and not os.path.exists(NO_WEBENGINE_MARK):
+    if not force_text and os.environ.get("MINTMAIL_QT_NO_WEBENGINE") != "1" and not _marker_active():
         try:
             from PySide6.QtWebEngineCore import QWebEnginePage, QWebEngineSettings
             from PySide6.QtWebEngineWidgets import QWebEngineView
@@ -164,7 +177,7 @@ def _make_reader(on_link, on_fail=None, force_text=False):
 
             def show(html):
                 view.setHtml(html, QUrl("about:blank"))
-                QTimer.singleShot(2500, lambda: check_blank(html))
+                # (pas de détection de « page vide » : toPlainText() est vide quand JavaScript est coupé, ce qui faisait basculer à tort vers le lecteur simple)
             view.show_html = show
             view.loadFinished.connect(lambda ok: None if ok or not on_fail else on_fail(tr("chargement échoué")))
             view.page().renderProcessTerminated.connect(lambda *_a: on_fail(tr("processus d'affichage arrêté")) if on_fail else None)
@@ -1604,7 +1617,7 @@ class MainWindow(ExtrasMixin, OrganizerMixin, AIMixin, QMainWindow):
             return
         try:
             os.makedirs(os.path.dirname(NO_WEBENGINE_MARK), exist_ok=True)
-            open(NO_WEBENGINE_MARK, "w").write(why)
+            open(NO_WEBENGINE_MARK, "w").write("v2:" + why)
         except OSError:
             pass
         old = self.reader
