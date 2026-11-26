@@ -59,7 +59,8 @@ def quick_menu(msg, blocked: bool = False, integ=(), can_unsub: bool = False) ->
     Entrées : (clé, libellé, icône, couleur) | ("sub", libellé, icône, couleur, [entrées]) | ("dyn", « move » | « ai ») pour un sous-menu rempli par la fenêtre | None (séparateur)."""
     spam = msg.folder == "spam"
     top: List = [
-        ("reply", tr("Répondre"), "reply", BLUE), ("reply_all", tr("Répondre à tous"), "replyall", BLUE), ("forward", tr("Transférer"), "forward", BLUE), None,
+        ("reply", tr("Répondre"), "reply", BLUE), ("reply_all", tr("Répondre à tous"), "replyall", BLUE), ("forward", tr("Transférer"), "forward", BLUE),
+        *([("nudge", tr("Relancer (sans réponse)"), "bell", AMBER)] if msg.folder == "sent" else []), None,
         ("archive", tr("Archiver"), "archive", GREEN), ("trash", tr("Supprimer"), "trash", RED),
         ("notspam", tr("✔ Ce n'est pas du spam"), "check", GREEN) if spam else ("spam", tr("Spam"), "spam", ORANGE), None,
         ("read", tr("Marquer comme %s") % ("lu" if msg.unread else tr("non lu")), "mail", BLUE),
@@ -106,6 +107,7 @@ def palette_commands(msg, engine=None, integ=()) -> List[Tuple[str, str]]:
         who = msg.sender_email
         dom = "@" + who.split("@")[-1]
         cmds += [(tr("Répondre"), "reply"), (tr("Répondre à tous"), "reply_all"), (tr("Transférer"), "forward"),
+                 *([(tr("Relancer : écrire un rappel (message envoyé sans réponse)"), "nudge")] if msg.folder == "sent" else []),
                  (tr("✨ Résumer / analyser ce message"), "summarize"), (tr("✨ Répondre avec l'IA"), "ai_reply"), (tr("✨ Traduire ce message"), "translate"),
                  (tr("Archiver"), "archive"), (tr("Supprimer"), "trash"),
                  *([(tr("✔ Ce n'est pas du spam — ") + who, "notspam")] if msg.folder == "spam" else []),

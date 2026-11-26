@@ -1,4 +1,4 @@
-# Aide de MintMail 1.55.3
+# Aide de MintMail 1.56.0
 _Généré par `make docs` depuis l'aide intégrée (touche F1 dans l'application)._
 
 ## Premiers pas
@@ -217,6 +217,10 @@ Ctrl+B             Barre latérale réduite / étendue
 ```
 
 ## Rédiger et envoyer
+
+### Relancer un message resté sans réponse
+
+Dans « Envoyés », ouvrez le message : la colonne Informations indique « aucune réponse depuis N jour(s) ». Clic droit → « Relancer (sans réponse) » (ou Ctrl+K → « Relancer ») ouvre un nouveau message dans le même fil : mêmes destinataires, objet « Re : … », un court rappel courtois à adapter, et votre message d'origine cité en dessous. Une réponse reçue (même sous un autre fil, avec le même objet) supprime l'indication.
 
 ### Nouveau message, réponse, transfert
 
@@ -624,7 +628,7 @@ Mise à jour : sudo apt install ./mintmail_X.Y.Z_all.deb (vos réglages et votre
 
 ## À propos et crédits
 
-### MintMail 1.55.3
+### MintMail 1.56.0
 
 Le client mail pour Linux Mint dont l'IA est l'ADN : il lit, trie, résume, classe, rédige et agit avec vous — toujours avec votre accord.  
 Application Qt (PySide6) / Python, sans service cloud imposé : vos mails, vos clés et vos réglages restent chez vous.

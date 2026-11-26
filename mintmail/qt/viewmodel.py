@@ -111,7 +111,7 @@ def header_lines(msg) -> Dict[str, str]:
             "to": msg.to, "subject": msg.subject, "date": time.strftime("%d/%m/%Y %H:%M", time.localtime(msg.date)) if msg.date else ""}
 
 
-def info_facts(msg, accounts, thread_count=0, level=0):
+def info_facts(msg, accounts, thread_count=0, level=0, waiting=None):
     """Lignes de la colonne « Informations » du lecteur : [(libellé, valeur)] — boîte, dossier, date complète, catégorie, pièces jointes, conversation."""
     from .. import groups as G
     from .. import priority as PR
@@ -135,6 +135,9 @@ def info_facts(msg, accounts, thread_count=0, level=0):
         rows.append((tr("Conversation"), tr("%d messages") % thread_count))
     if level:
         rows.append((tr("Priorité"), PR.label(level)))
+    if waiting is not None:
+        from .. import nudge as NU
+        rows.append((tr("Réponse"), NU.waiting_text(waiting)))
     return rows
 
 

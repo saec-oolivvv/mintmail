@@ -198,6 +198,8 @@ SECTIONS: List[Dict] = [
          "@SHORTCUTS@"),
     ]},
     {"id": "write", "title": "Rédiger et envoyer", "items": [
+        ("Relancer un message resté sans réponse",
+         "Dans « Envoyés », ouvrez le message : la colonne Informations indique « aucune réponse depuis N jour(s) ». Clic droit → « Relancer (sans réponse) » (ou Ctrl+K → « Relancer ») ouvre un nouveau message dans le même fil : mêmes destinataires, objet « Re : … », un court rappel courtois à adapter, et votre message d'origine cité en dessous. Une réponse reçue (même sous un autre fil, avec le même objet) supprime l'indication."),
         ("Nouveau message, réponse, transfert",
          "C ou Ctrl+N : nouveau message. R / A / F : répondre, répondre à tous, transférer (le message cité est repris). Les adresses se "
          "complètent dès la première lettre, par nom, adresse ou société (sans tenir compte des accents), d'après votre carnet ET tous vos messages reçus ou envoyés ; "

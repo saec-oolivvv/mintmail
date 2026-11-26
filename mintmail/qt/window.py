@@ -1733,6 +1733,32 @@ class MainWindow(ExtrasMixin, OrganizerMixin, AIMixin, QMainWindow):
         if m:
             self.compose(**C.reply_args(self.config, self.engine.accounts(), m, all_, self.engine.default_account(m, self.account)))
 
+    def nudge(self, m=None):
+        """Relancer : nouveau message dans le même fil, mêmes destinataires, avec un court rappel courtois et le message d'origine cité."""
+        from .. import nudge as NU
+        m = m or self._open_msg()
+        if not m:
+            return
+        full = self.cache.get(m.id) or m
+        if full.folder != "sent":
+            self.status.setText(tr("La relance se fait depuis un message envoyé."))
+            return
+        days = NU.waiting_days(full, self.cache.thread_members(full.account, full.thread_id) if full.thread_id else [], self._my_addresses())
+        self.compose(**NU.args(full, C.quote_html(full), days or 0, self.engine.default_account(full, self.account)))
+
+    def _waiting(self, msg):
+        """Jours sans réponse d'un message envoyé (None si ce n'est pas un envoyé ou s'il a une réponse)."""
+        if msg.folder != "sent":
+            return None
+        from .. import nudge as NU
+        try:
+            return NU.waiting_days(msg, self.cache.thread_members(msg.account, msg.thread_id) if msg.thread_id else [], self._my_addresses())
+        except Exception:
+            return None
+
+    def _my_addresses(self):
+        return [a.get("email", "") for a in self.engine.accounts()] + [i.get("email", "") for i in C.identities(self.config)]
+
     def forward(self):
         m = self._open_msg()
         if m:
@@ -1851,6 +1877,8 @@ class MainWindow(ExtrasMixin, OrganizerMixin, AIMixin, QMainWindow):
                 return self.propose_slots(self.cache.get(m.id) or m)
             if key in ("assign", "share"):
                 return self.assign_dialog(m, key == "assign")
+            if key == "nudge":
+                return self.nudge(self.cache.get(m.id) or m)
             if key == "followup3":
                 return self.add_followup(self.cache.get(m.id) or m, 3)
             if key == "unsubscribe":
@@ -2109,7 +2137,7 @@ class MainWindow(ExtrasMixin, OrganizerMixin, AIMixin, QMainWindow):
         self.apply_zoom()
         self.fill_extras(msg)
         self.info.set_facts(vm.info_facts(msg, self.engine.accounts(), len(self.cache.thread_members(msg.account, msg.thread_id)) if msg.thread_id else 0,
-                                         PR.effective(self.cache.priority_map([msg]).get(msg.id), getattr(msg, "importance", 0))), self.t["dim"])
+                                         PR.effective(self.cache.priority_map([msg]).get(msg.id), getattr(msg, "importance", 0)), self._waiting(msg)), self.t["dim"])
         self._info_visible()
         self.quick.show()
         self.quick.set_ai(AS.ai_engine(self.engine).enabled())

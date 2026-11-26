@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.56.0
+- Relancer un message resté sans réponse : sur un message envoyé, clic droit → « Relancer (sans réponse) » (ou Ctrl+K) ouvre un message de relance dans le même fil — mêmes destinataires, objet « Re : … », court rappel courtois à adapter, message d'origine cité. La colonne Informations indique « aucune réponse depuis N jour(s) » tant qu'aucune réponse n'est arrivée.
+
 ## 1.55.3
 - Sélection multiple : un clic coche / décoche le message sans jamais l'ouvrir (l'ouverture rechargeait la liste « Non lus » et faisait perdre la sélection, d'où des suppressions en lot qui ne marchaient qu'à moitié).
 - Lecteur simple : télécharge maintenant les images distantes autorisées du message (logos, bannières) au lieu d'afficher des pages grises. Les messages HTML y ont désormais un fond blanc (le texte sombre était presque illisible sur le thème sombre).

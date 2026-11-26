@@ -141,6 +141,10 @@
    "title": "Compose and send",
    "items": [
     [
+     "Follow up on a message with no reply",
+     "In “Sent”, open the message: the Information column shows “no reply for N day(s)”. Right-click → “Follow up (no reply)” (or Ctrl+K → “Follow up”) opens a new message in the same thread: same recipients, subject “Re: …”, a short polite reminder to adapt, and your original message quoted below. A reply received (even in another thread with the same subject) removes the indication."
+    ],
+    [
      "New message, reply, forward",
      "C or Ctrl+N: new message. R / A / F: reply, reply all, forward (the quoted message is included). Addresses autocomplete from the first letter, by name, address or company (accents ignored), using your address book AND all received or sent messages; separate several recipients with a comma, each is completed in turn, and anyone you write to is added to the address book. Cc and Bcc show on demand. Closing the compose window with content offers to save a draft (found in Drafts)."
     ],
