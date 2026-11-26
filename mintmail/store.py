@@ -321,6 +321,27 @@ def parse_search(q):
 # Vue « Non lus » : tout sauf ces dossiers (un message rangé par une règle ou à la main ne doit pas passer inaperçu)
 UNREAD_EXCLUDED = "('trash','spam','sent','drafts')"
 
+_FOLDER_RANK = {"inbox": 0, "archive": 1, "sent": 2}
+
+
+def dedupe_copies(msgs):
+    """Recherche : un même message (même Message-ID, même compte) présent dans plusieurs dossiers (Boîte de réception + « Tous les messages » de Gmail,
+    copie envoyée à soi-même…) n'est montré qu'une fois — la copie de la boîte de réception, sinon des archives, sinon la plus récente."""
+    best, order = {}, []
+    for m in msgs:
+        key = (m.account, getattr(m, "message_id", "") or "")
+        if not key[1]:
+            order.append(m)
+            continue
+        cur = best.get(key)
+        if cur is None:
+            best[key] = m
+            order.append(key)
+        elif _FOLDER_RANK.get(m.folder, 9) < _FOLDER_RANK.get(cur.folder, 9):
+            best[key] = m
+    return [best[x] if isinstance(x, tuple) else x for x in order]
+
+
 class Cache:
     """Cache SQLite. La liste lit des « méta » légères (sans corps) ; les corps sont chargés à l'ouverture.
     Les indicateurs (dossier, lu, favori…) vivent dans des colonnes : une mise à jour = un UPDATE."""
@@ -628,7 +649,8 @@ class Cache:
             where.append("has_att=1")
         if threads:
             return self.query_threads(" AND ".join(where), args, limit)
-        return self._light_rows("WHERE " + " AND ".join(where) + " ORDER BY date DESC LIMIT ?", args + [limit])
+        rows = self._light_rows("WHERE " + " AND ".join(where) + " ORDER BY date DESC LIMIT ?", args + [limit])
+        return dedupe_copies(rows) if (terms or flt) else rows
 
     def thread_members(self, account, thread, exclude=("trash", "spam")):
         """Messages (allégés) d'une conversation, du plus ancien au plus récent."""

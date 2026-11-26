@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.56.1
+- Recherche : un message présent dans plusieurs dossiers (Boîte de réception et « Tous les messages » de Gmail, copie envoyée à soi-même…) n'apparaît plus qu'une fois dans les résultats.
+
 ## 1.56.0
 - Relancer un message resté sans réponse : sur un message envoyé, clic droit → « Relancer (sans réponse) » (ou Ctrl+K) ouvre un message de relance dans le même fil — mêmes destinataires, objet « Re : … », court rappel courtois à adapter, message d'origine cité. La colonne Informations indique « aucune réponse depuis N jour(s) » tant qu'aucune réponse n'est arrivée.
 

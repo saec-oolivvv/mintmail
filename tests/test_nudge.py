@@ -29,3 +29,13 @@ def test_nudge_args():
     assert a["to"] == "x@y.fr" and a["subject"] == "Re: Devis cuisine" and a["in_reply_to"] == "<1@m>" and "<blockquote>q" in a["quote_html"]
     assert "<p>" in a["body_html"]
     assert NU.waiting_text(0) and NU.waiting_text(3)
+
+
+def test_search_shows_a_message_once():
+    from mintmail.store import dedupe_copies
+    a = mk("1", "gmail_all", "x@y.fr", 100, thread="a")
+    b = mk("2", "inbox", "x@y.fr", 100, thread="a")
+    a.message_id = b.message_id = "<same@m>"
+    c = mk("3", "inbox", "z@y.fr", 50, thread="c")
+    out = dedupe_copies([a, c, b])
+    assert [m.id for m in out] == ["2", "3"]
