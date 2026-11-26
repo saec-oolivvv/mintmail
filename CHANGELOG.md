@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.55.3
+- Sélection multiple : un clic coche / décoche le message sans jamais l'ouvrir (l'ouverture rechargeait la liste « Non lus » et faisait perdre la sélection, d'où des suppressions en lot qui ne marchaient qu'à moitié).
+- Lecteur simple : télécharge maintenant les images distantes autorisées du message (logos, bannières) au lieu d'afficher des pages grises. Les messages HTML y ont désormais un fond blanc (le texte sombre était presque illisible sur le thème sombre).
+
 ## 1.55.2
 - Images absentes des messages : la détection « page vide » de la 1.55.1 se trompait (le texte lu est toujours vide quand JavaScript est coupé) et faisait passer à tort au lecteur simple, qui ne charge pas les images distantes. Détection retirée ; un ancien fichier « no-webengine » est effacé tout seul. Le basculement ne se fait plus que si le lecteur complet plante ou échoue vraiment.
 

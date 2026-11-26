@@ -86,3 +86,10 @@ def test_infos_and_models():
     assert not [r for r in V.info_facts(m, [ACC]) if r[1] == PR.label(PR.HIGH)]
     assert (PR.label(PR.HIGH)) in [r[1] for r in V.info_facts(m, [ACC], 0, PR.HIGH)]
     assert Message.from_dict({"id": "x", "account": "a", "importance": 1}).importance == 1 and Outgoing("a", "t", "s", "h").priority == 0
+
+
+def test_remote_image_urls():
+    from mintmail.util import remote_image_urls
+    h = '<p><img src="https://a.fr/x.png?a=1&amp;b=2"><img src=\'//b.fr/y.gif\'><img src="cid:z"><img src="data:image/png;base64,AA"><img src="https://a.fr/x.png?a=1&amp;b=2"></p>'
+    assert remote_image_urls(h) == ["https://a.fr/x.png?a=1&b=2", "https://b.fr/y.gif"]
+    assert remote_image_urls("") == []

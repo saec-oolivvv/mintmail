@@ -1,0 +1,17 @@
+Langue inconnue ou non relisible ici : 'fr' (nl, de, es…).
+Langue inconnue ou non relisible ici : 'en' (nl, de, es…).
+Langue inconnue ou non relisible ici : '../etc' (nl, de, es…).
+Langue inconnue ou non relisible ici : 'nl/../de' (nl, de, es…).
+Langue inconnue ou non relisible ici : 'xx' (nl, de, es…).
+Langue inconnue ou non relisible ici : '' (nl, de, es…).
+5 textes exportés dans /tmp/tmpuw5w3gzk/r.csv — remplissez la colonne « correction » (laissez vide ce qui est bon), puis : import.
+1 correction(s) appliquée(s), 0 identique(s) à l'existant.
+RIEN n'a été modifié. À corriger :
+  - ligne 6 : marqueurs de format différents — 'kapot'
+Envois différés : 1 envoyé(s), 0 abandonné(s).
+Envois différés : 0 envoyé(s), 0 abandonné(s).
+Envois différés : 0 envoyé(s), 0 abandonné(s).
+Envois différés : 0 envoyé(s), 1 abandonné(s).
+Envois différés : 0 envoyé(s), 0 abandonné(s).
+
+Tests : 439 réussis, 0 échecs

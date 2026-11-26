@@ -8,7 +8,7 @@ import threading
 import time
 
 from PySide6.QtCore import QAbstractListModel, QModelIndex, QObject, Qt, QTimer, QUrl, Signal
-from PySide6.QtGui import QAction, QDesktopServices, QKeySequence
+from PySide6.QtGui import QAction, QDesktopServices, QKeySequence, QTextDocument
 from PySide6.QtWidgets import (QSystemTrayIcon, QApplication, QFileDialog, QFrame, QHBoxLayout, QLabel, QLineEdit, QListView, QListWidget, QListWidgetItem, QMainWindow, QMenu,
                                QInputDialog, QMessageBox, QPushButton, QSplitter, QTextBrowser, QVBoxLayout, QWidget)
 
@@ -140,6 +140,51 @@ def _marker_active():
     return False
 
 
+class _TextReader(QTextBrowser):
+    """Lecteur simple : comme QTextBrowser, mais les images distantes que le message a le droit de charger (le HTML assaini n'en contient pas sinon)
+    sont téléchargées en fond (taille limitée) puis affichées, car QTextBrowser ne sait pas aller les chercher lui-même."""
+    _got = Signal(str, bytes)
+
+    def __init__(self):
+        super().__init__()
+        self._html, self._img, self._asked = "", {}, set()
+        self._got.connect(self._arrived)
+
+    def show_html(self, html):
+        self._html = html
+        # QTextBrowser ignore le fond de la page : un message HTML (texte sombre prévu pour fond blanc) s'affichait en gris sur le thème sombre, illisible
+        self.setStyleSheet("QTextBrowser{background:#ffffff;color:#111111;border:none}" if "html{background:#fff;color:#111}" in html else "")
+        self.setHtml(html)
+        from ..util import remote_image_urls
+        for u in remote_image_urls(html)[:40]:
+            if u in self._img:
+                self.document().addResource(QTextDocument.ImageResource, QUrl(u), self._img[u])
+            elif u not in self._asked:
+                self._asked.add(u)
+                threading.Thread(target=self._fetch, args=(u,), daemon=True).start()
+
+    def _fetch(self, url):
+        import urllib.request
+        try:
+            req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0 MintMail"})
+            with urllib.request.urlopen(req, timeout=12) as r:
+                data = r.read(6_000_000)
+            self._got.emit(url, data)
+        except Exception:
+            pass
+
+    def _arrived(self, url, data):
+        from PySide6.QtGui import QImage
+        img = QImage.fromData(data)
+        if img.isNull():
+            return
+        self._img[url] = img
+        bar = self.verticalScrollBar().value()
+        self.document().addResource(QTextDocument.ImageResource, QUrl(url), img)
+        self.setHtml(self._html)
+        self.verticalScrollBar().setValue(bar)
+
+
 def _make_reader(on_link, on_fail=None, force_text=False):
     """Lecteur HTML : QtWebEngine (JavaScript coupé, navigation interdite, liens filtrés) ; QTextBrowser si QtWebEngine manque, a échoué (fichier
     `no-webengine`) ou si MINTMAIL_QT_NO_WEBENGINE=1. `on_fail(raison)` est appelé si le lecteur complet plante ou affiche une page vide."""
@@ -185,10 +230,9 @@ def _make_reader(on_link, on_fail=None, force_text=False):
             return view
         except Exception:
             pass
-    view = QTextBrowser()
+    view = _TextReader()
     view.setOpenLinks(False)
     view.anchorClicked.connect(lambda u: on_link(u.toString()))
-    view.show_html = view.setHtml
     view.kind = "text"
     return view
 
@@ -976,6 +1020,8 @@ class MainWindow(ExtrasMixin, OrganizerMixin, AIMixin, QMainWindow):
         """Clic simple terminé : on ouvre le message (un clic droit ou un glissé ne l'ouvrent jamais)."""
         if not self.list.selectionModel().isRowSelected(idx.row(), QModelIndex()):
             return                                                      # clic avec Ctrl qui désélectionne
+        if self.select_mode:
+            return                                                      # mode sélection multiple : le clic coche / décoche, il n'ouvre jamais le message
         if self.list.currentIndex() != idx:
             self.list.setCurrentIndex(idx)                              # déclenche _row_changed
         else:
@@ -984,6 +1030,8 @@ class MainWindow(ExtrasMixin, OrganizerMixin, AIMixin, QMainWindow):
     def _row_changed(self, cur, _prev):
         if not cur.isValid() and getattr(self, "_reloading", False):
             return
+        if cur.isValid() and self.select_mode:
+            return                                                      # sélection multiple : rien ne s'ouvre, rien ne se recharge (la sélection en cours resterait sinon perdue)
         if cur.isValid() and self.list.keynav:
             return                                                      # flèches en mode « surbrillance » : on ne fait que déplacer la sélection ; Entrée ouvre
         if cur.isValid() and (self.list.mouse_down or getattr(self, "_ctx", False)):

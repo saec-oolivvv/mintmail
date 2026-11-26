@@ -114,6 +114,20 @@ def has_remote_content(h):
         re.search(r"url\(\s*['\"]?(https?:)?//", h or "", re.I))
 
 
+def remote_image_urls(h):
+    """Adresses http(s) des <img> d'un HTML (sans doublons, dans l'ordre) ; « //hôte/… » devient https."""
+    import html as _h
+    out = []
+    for tag in _IMG_TAG.findall(h or ""):
+        m = re.search(r"""\bsrc\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+))""", tag, re.I)
+        u = _h.unescape(next((g for g in (m.groups() if m else ()) if g), "")).strip()
+        if u.startswith("//"):
+            u = "https:" + u
+        if re.match(r"https?://", u, re.I) and u not in out:
+            out.append(u)
+    return out
+
+
 def block_remote_content(h):
     def fix(m):
         return _REMOTE_SRC.sub(
